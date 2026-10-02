@@ -208,8 +208,8 @@ attributed one.
 | `Syntax.lean` | The universal deep embedding: `Val`, `Obj`/`Heap`, `Lit`, `Expr`, `Stmt`, `Func`, `Program`, `Dialect`, `EResult`, plus the hole/size folds the ledger is built on. |
 | `Semantics.lean` | The fuel-indexed total interpreter: `Env`, `Ctx`, `evalExpr`/`execStmt`/`applyFunc`/`applyClosure`, operator application, name resolution, `runFunc`/`runMain`. No `partial`, no `sorry`. |
 | `Numeric.lean` | Machine integers as a dialect parameter: `Width`, `IntType`, `NumConfig` (Python / C32 / C64 / unsigned / Java / Go presets), and `NumResult` with `ok`/`divZero`/`trap`/`ub`. Undefined behaviour becomes a hole, never a number. |
-| `Stdlib.lean` | A modelled Python standard library and builtins, consulted *after* user functions. Every entry returns `none` — falling through to a visible hole — on any argument shape it cannot model faithfully. Under `.cLike` it returns `none` for everything. |
-| `Float.lean` | IEEE-754 binary32/binary64 as an explicit bit pattern (`Fl`) with exact-rational rounding, plus Python's float semantics (`pyMod`, int/float comparison without coercion, `OverflowError`). Chosen over Lean's `Float` because `Float` is an opaque `@[extern]` type the kernel cannot reduce. As of this writing it is a standalone development: `Val` has no `float` constructor and `Semantics.lean` does not import it, so floats still reach the interpreter as holes. Check with `grep -n float Autoform/Lang/Core/Syntax.lean`. |
+| `Stdlib.lean` | A modelled Python standard library and builtins, consulted *after* user functions. Every entry returns `none` — falling through to a visible hole — on any argument shape it cannot model faithfully. Under `.cLike` and `.javascript` it returns `none` for everything. |
+| `Float.lean` | IEEE-754 binary32/binary64 as an explicit bit pattern (`Fl`) with exact-rational rounding, plus Python's float semantics (`pyMod`, int/float comparison without coercion, `OverflowError`). Chosen over Lean's `Float` because `Float` is an opaque `@[extern]` type the kernel cannot reduce. Wired in: `Syntax.lean` imports it for `Val.float`/`Lit.float`, and `Semantics.lean`'s "Floating point" section evaluates float literals, arithmetic, comparison and unary minus. What still holes is listed in `docs/core-language.md` §1. |
 
 ### `Autoform/Lang/Imp/` — the worked example
 
@@ -226,7 +226,10 @@ subject.
 | `Refine.lean` | Deep ≈ shallow. `Refines p name N dom spec` says the interpreter applied to the translated AST equals a clean Lean function, for every fuel budget above a stated bound, on a stated domain. `Outcome` deliberately has no `hole` and no `outOfFuel` constructor. |
 | `Ledger.lean` | Coverage arithmetic and the trust ledger: hole-free, call-closed, dynamic-hole risk, holes-by-cause; `Program.ledger` (human) and `Program.ledgerJson` (evidence for the assurance case, tagged with module and dialect). |
 | `Overflow.lean` | Derives representability obligations (`Fits32`-style side conditions) mechanically from the AST, with a soundness theorem: if the generated obligations hold, evaluation agrees with the exact mathematical value and in particular is never `hole "ub:…"`. |
-| `Contracts.lean` | Boundary contracts for code outside the verified core. Being written concurrently — see `docs/contracts.md`. |
+| `Contracts.lean` | Contracts at holes: `RefinesUnder Γ`, refinement relative to stated assumptions about named holes, with the unsatisfiable-assumption failure mode stated as a theorem. See `docs/contracts.md`. |
+| `FuelMono.lean` | General fuel monotonicity for all seven mutually recursive interpreter functions, excluding `Stmt.tryFinally` (stated why in the file). |
+| `CallingConvention.lean` | Anti-vacuity evidence for `starred`/`kwargE`/`dstarred` and `vararg`/`kwarg`: `#eval`s paired with the values CPython printed. |
+| `BuiltinBase.lean` | Classes with a builtin base type (`class X(tuple)`): the `Val.bobj` model and its checks against CPython. |
 | `Harness/Audit.lean` | `#audit_axioms`, `#audit_depends`, `#audit_ledger`, implemented as Lean metaprogramming over `Lean.Environment`. |
 | `Harness/Conformance.lean` | Specimen-derived generators and checkers over the `BigStep` relation; `plausible` used as a **refutation** gate before a prover is allowed to spend time. |
 | `Tactics/Portfolio.lean` | The tiered proof portfolio, with the guard that a rung counts as success only if the resulting term passes `hasSorry`/`hasExprMVar` screening. Exhaustion records an `Obligation` as data; it never admits a theorem. |

@@ -1,7 +1,8 @@
 # Scale: behaviour on a large codebase
 
-Every number in `README.md` and `STRATEGY.md` comes from one corpus: `cachetools`, 1,637
-lines, 238 functions at the time of writing (now 209). "Point it at an arbitrary codebase"
+When this was written, every number in `README.md` and `STRATEGY.md` came from one corpus:
+`cachetools`, 1,637 lines, 238 functions at the time (now 209). (The README has since
+added a SQLite hole census, and `docs/evidence-*.md` cover V8, Linux and Ansible.) "Point it at an arbitrary codebase"
 was never tested. This document records that test, on seven open-source Python
 repositories from 8.8k to 165k lines. Figures move with every change to the pipeline;
 where a document and an artifact disagree, the artifact wins.
@@ -65,9 +66,13 @@ below).
 
 ### Coverage, from the ledger
 
+The `cachetools` row was regenerated on 2026-10-02 at `46c65fc` (`scripts/ledger.lean.tmpl`
+over the tracked `ast-Cachetools.json`); `scripts/check_docs.py` checks it. The other rows
+predate the exporter changes described below and were not re-run.
+
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 209 | 180 (86%) | 101 (48%) | 118 | 5,416 | 1,014 |
+| `cachetools` (published) | 209 | 184 (88%) | 105 (50%) | 26 | 5,574 | 890 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |
@@ -83,18 +88,20 @@ was read as evidence that call closure is largely an artifact of corpus *size*: 
 library calls mostly outward into an unmodelled stdlib, while a large framework calls
 mostly inward and its callees resolve inside the translated program.
 
-**That reading no longer follows from these two numbers.** `cachetools` is now 101/209 =
-48%, against Django's 52%. The change came from exporter work — emitting Joern's resolved
+**That reading no longer follows from these two numbers.** `cachetools` is now 105/209 =
+50%, against Django's 52%. The change came from exporter work — emitting Joern's resolved
 `fullName` so `Ctx.resolve`'s exact match fires, closing `op:starredUnpack`, and dropping
 `<metaClassCallHandler>` synthetics — not from the corpus getting larger. So most of the
 original gap was a resolution defect in the exporter, not a property of corpus size.
 
-The size effect may still exist; it is simply not measurable from a 48%-versus-52%
+The size effect may still exist; it is simply not measurable from a 50%-versus-52%
 comparison. Establishing it would require re-running Django with the current exporter,
 which has not been done — every Django figure in this table predates that work.
 
-Hole *density* is stable — 2.4%-3.0% of AST nodes across every corpus including Django's
-397,571 nodes — so translation quality is size-independent. The hole causes shift:
+Hole *density* was stable — 2.4%-3.0% of AST nodes across every corpus including Django's
+397,571 nodes — so translation quality was size-independent at the time these rows were
+measured. `cachetools` has since dropped to 0.5% (26 / 5,574) through exporter work, which
+the other rows have not been re-run against. The hole causes shift:
 Django's top cause is `import:unresolved` (5,122), which barely registers on `cachetools`.
 
 ## Where it breaks, in the order it breaks
@@ -200,7 +207,9 @@ kept as `Program.callClosedRef`, and `Program.callClosureAgrees` re-derives the 
 both ways: `scripts/ledger.lean.tmpl` aborts if they differ, so the faster number can
 never be reported unchecked.
 
-Measured in one process per corpus, `callClosedRef` vs `callClosed`, identical results:
+Measured in one process per corpus, `callClosedRef` vs `callClosed`, identical results
+(a timing snapshot, not re-run; the Cachetools verifiable core is 105 today, see the
+coverage table above):
 
 | corpus | functions | verifiable core | before | after |
 |---|---|---|---|---|

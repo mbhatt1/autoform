@@ -20,10 +20,12 @@ heap-inert.
 Step 2 splits into two halves that are NOT equally separable. `Val.identical` (the `is` half,
 section 5) is landed: it is total, heap-free, and touches one call site, and it made `is`
 strictly more honest at no cost to the oracle (35 compared / 169-174 agree, unchanged). The
-`Val.eqPy` half is not landed, and is the piece this document calls the largest mechanical
-cost of the design -- `Val.beq` is structurally recursive and reducible by `rfl`/`decide`,
-which `Refine.lean` depends on, so re-typing it to take a heap and fuel cannot be sliced into
-a piece that leaves the corpora verifying.
+`Val.eqPy` half was at first judged unsliceable -- `Val.beq` is structurally recursive and
+reducible by `rfl`/`decide`, which `Refine.lean` depends on, so re-typing it to take a heap
+and fuel could not be done without breaking the corpora. It landed anyway (step 2b,
+`de8db00`, 2026-08-22) by *not* re-typing `Val.beq`: `Val.eqPy` is a separate heap-aware
+relation, reached only through the `binopNeedsHeap` guard described at the top of this
+section.
 
 Step 1 (`Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`) is in the tree and is
 INERT: nothing constructs a payload other than `.none`. It cost zero proof changes and zero
@@ -37,9 +39,9 @@ The consequences are all currently visible in the ledger and the oracle:
 
 | symptom | where | size |
 |---|---|---|
-| `Stmt.setIndex` is an unconditional hole | `Semantics.lean:608` | `setIndex:immutable-containers` |
+| `Stmt.setIndex` is an unconditional hole | `execStmt`'s `.setIndex` case, `Semantics.lean` | `setIndex:immutable-containers` |
 | `del d[k]` / `del xs[a:b]` are holes | transpiler | `op:delete-index`, `op:delete-slice` |
-| `list.append` / `dict.pop` implemented but unwireable | `Stdlib.lean:376` | `MethodResult.mutating` |
+| `list.append` / `dict.pop` implemented but unwireable | `MethodResult`, `Stdlib.lean` | `MethodResult.mutating` |
 | `dict`/`tuple`-subclass receivers refused by the oracle | `differential.py` | `skip_self_not_object` 1,361 |
 | `==` cannot distinguish "equal" from "the same object" | `Val.beq` | see §5 |
 
@@ -382,7 +384,7 @@ Counts taken from this repository, not estimated:
 | `evalSimp` mechanical lemmas (`evalExpr_*`, `execStmt_*`, `evalList_*`, `applyFunc_*`) | ~40 | **unaffected** |
 
 The "~74 theorems" figure overstates the cost, because of a design decision already taken:
-`PureE` (`Refine.lean:487`) is `lit | name | fnref | unop | binop | cond` — it
+`PureE` (`Refine.lean`) is `lit | name | fnref | unop | binop | cond` — it
 never admitted `listE`, `dictE` or `index`. So `evalExpr_pure_fuel_indep`,
 `evalExpr_pure_fuel_mono` and `evalExpr_pure_heap_inert` — the three load-bearing
 structural theorems, and the expensive ones — are about a fragment that does not allocate,

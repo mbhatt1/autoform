@@ -22,11 +22,13 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `int : Int → Val` | An integer. Width and overflow are **not** properties of the value — they belong to `NumConfig`, selected by the dialect. A `Val.int` is always the mathematical integer that the configured arithmetic produced. |
 | `str : String → Val` | A string *or* a C `char*`. One constructor: see §7, where the operators are dialect-split instead. |
 | `bool : Bool → Val` | A boolean. |
+| `float : Fl → Val` | An IEEE-754 float as a bit pattern plus its format (`Autoform/Lang/Core/Float.lean`). The format comes from the dialect (`Dialect.toFConfig`: `.python` → `FConfig.python`, `.cLike`/`.javascript` → `FConfig.cDouble`). `Val.beq` routes floats through `Fl.eqv`, never bit equality: NaN ≠ NaN and `-0.0 == 0.0`. |
 | `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
-| `list : List Val → Val` | A list. **Immutable** — Core has no boxed containers, which is why `Stmt.setIndex` is a hole. |
+| `list : List Val → Val` | A list. **Immutable** — containers are still values (`Obj.payload` exists but nothing constructs one yet; `docs/boxed-containers.md`), which is why `Stmt.setIndex` is a hole. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
 | `dict : List (Val × Val) → Val` | An association list, *not* a hash map. Key order is observable in real languages and differs between them, so imposing one language's iteration order would be an invented answer. |
 | `ref : Ref → Val` | A reference to a heap object. Reference identity is what `is` compares. |
+| `iref : Ref → Sel → Val` | An *interior* pointer: a heap-boxed array or struct plus a position in it (`Sel.idx i` or `Sel.fld f`). Produced by `irefIndex`/`irefField`; read and written with `derefIref`/`setDerefIref`. Pointer arithmetic is defined only on `Sel.idx`; on a field it is the hole `iref:arith-on-field`. |
 | `fn : String → Val` | A function, method or class used as a value (CPG `METHOD_REF` / `TYPE_REF`). |
 | `clos : String → List (String × Val) → Val` | A closure: a function name plus the bindings it captured. Capture is **by value**. |
 | `clsClos : String → List (String × Val) → Val` | A *class* value that captured an enclosing scope. Distinct from `clos` because a class is not a function: its methods, not it, read the captured bindings. |
@@ -52,18 +54,28 @@ to build a `bobj` for a class that defines its own `__eq__` (or its own `__init_
 emitting `alloc:builtin-base:<cls>:own-__eq__` instead — `Val.beq` has no dunder dispatch,
 so honouring such a class would mean silently ignoring the override.
 
-There is **no float constructor**. `Autoform/Lang/Core/Float.lean` develops a full
-IEEE-754 model as an explicit bit pattern, but at the time of writing it is not wired into
-`Val`; floats therefore still surface as holes and as skipped differential cases.
+**Floats are partially wired.** `Val.float` and `Lit.float` exist; the exporter emits
+float literals and `render_lean.py` encodes them as exact binary64 bit patterns. Evaluated:
+`+ - * / %` (an `int` operand is promoted; a failed promotion is Python's `OverflowError`),
+the six comparisons (exact `int`/`float` comparison under `.python`, promote-then-compare
+under `.cLike`/`.javascript`; NaN is unordered), unary `-`, truthiness and equality. Still
+holes: float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), C casts to a
+floating type (`op:cast:float`), and `float()`/`str()`/`repr()` (the stdlib model has no
+float builtins). Known wrong answers rather than holes: Python `/` on two ints floors,
+because the exporter maps `//` onto `/` (see "Floating point" in `Semantics.lean`); and float
+`%` is Python's floored remainder in every dialect, which is wrong for JavaScript
+(`-5.5 % 2.0` is `-1.5` in JS, `0.5` here). The differential harness refuses float
+arguments, so none of this is oracle-checked yet.
 
 ## 2. The memory model: `Heap`, `Obj`, `Env`, `Ctx`
 
 ```lean
 abbrev Ref  := Nat
 structure Obj where cls : String; fields : List (String × Val); captured : List (String × Val)
+                    payload : Payload; version : Nat   -- both inert: boxed-containers.md, step 1
 abbrev Heap := List Obj                 -- index into the list is the Ref; alloc appends
 abbrev Env  := List (String × Val)      -- local variables; `set` conses, shadowing
-structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
+structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; globals : Ref
 ```
 
 * **Objects are the only mutable things.** Everything else is a value. Field writes go
@@ -90,7 +102,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 
 | Constructor | Meaning |
 |---|---|
-| `lit : Lit → Expr` | An `int` / `str` / `bool` / `unit` literal. |
+| `lit : Lit → Expr` | An `int` / `str` / `bool` / `float` / `unit` literal. |
 | `name : String → Expr` | Variable read. Resolution order: local `Env`, then the globals frame, then the function table (yielding `Val.fn`), then `unit`. The function-table fallback is what makes higher-order code translatable instead of holed. |
 | `binop : String → Expr → Expr → Expr` | Binary operator by name. `&&`/`\|\|` short-circuit (§5); everything else evaluates left then right. |
 | `unop : String → Expr → Expr` | Unary operator by name (`-`, `!`). |
@@ -106,7 +118,15 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `cond : Expr → Expr → Expr → Expr` | Conditional expression; only the taken branch is evaluated. |
 | `isOp : Bool → Expr → Expr → Expr` | Identity. Reference identity for `.ref`, structural for immediates. The `Bool` means negated (`is not`). |
 | `inOp : Bool → Expr → Expr → Expr` | Membership over lists, tuples, dict keys, and substrings. The `Bool` means negated (`not in`). |
+| `starred` / `kwargE` / `dstarred` | `*e`, `k = e` and `**e` in an argument list (the calling convention, STRATEGY.md §35). Only meaningful directly inside a call's arguments; anywhere else they are the hole `op:starred-outside-call`. |
 | `hole : String → Expr` | An unmapped expression, tagged with the CPG node label that produced it. |
+| `boxNew : Expr → Expr` | Allocate a fresh single-field box (`"v"`) holding the value: an address-taken C local. |
+| `boxFields : List (Expr × Expr) → Expr` | Allocate a fresh multi-field box: a boxed C array (fields `"0"`, `"1"`, …) or struct (member names). |
+| `boxArray : Expr → Expr` | Allocate a box whose length is a *runtime* value, every field `.unit`: `malloc(n)`-shaped buffers. |
+| `irefIndex` / `irefField` | `&a[i]` / `&s.f` on a boxed array or struct: yields a `Val.iref`. |
+| `derefIref : Expr → Expr` | `*p` where `p` is a `Val.iref`. |
+| `strByte : Expr → Expr → Expr` | C `*p` / `p[i]` on a `char*` byte cursor: the byte as an `int`; reading at the string's length gives `0` (the implicit terminator), further out is a hole. C-family exporter only. |
+| `strFrom : Expr → Expr → Expr` | The suffix of a string from a position: a byte cursor passed on whole, or `p + n` on an untracked `char*`. |
 
 ## 4. Statements (`Stmt`)
 
@@ -117,8 +137,10 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `assign : String → Expr → Stmt` | Local binding — unless a `declGlobal` marker for that name is in scope, in which case it writes the globals frame. |
 | `setField : Expr → String → Expr → Stmt` | `e.f = v`. Non-object receiver: `setField:<f>:non-object`. |
 | `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`. **Always** the hole `setIndex:immutable-containers` — see §8. |
+| `setDerefIref : Expr → Expr → Stmt` | `*p = v` where `p` is a `Val.iref`. |
 | `seq : Stmt → Stmt → Stmt` | Sequencing. Only a `normal` outcome continues. |
 | `ifte` / `loop` | Conditional and `while`. |
+| `breakBlock : Stmt → Stmt` | Absorbs a `break` but not a `continue`: a C `switch` lowers to an `ifte` chain inside one, so `break` ends the switch while `continue` reaches the enclosing loop. |
 | `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. The CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
 | `ret` / `brk` / `cont` | Return, break, continue — each its own `Ctl` outcome. |
 | `tryCatch : Stmt → String → Stmt → Stmt` | `try/except as x`. Catches **exceptions only**: `ret`/`brk`/`cont` pass straight through, or every `try` containing a `return` would break. |
@@ -129,7 +151,8 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `declGlobal : String → Stmt` | `global x` — records a marker in `Env` that subsequent `assign`s to `x` consult. |
 | `hole : String → Stmt` | An unmapped statement, tagged with the originating CPG node label. |
 
-`Func` is a name, parameter list and body; `Program` is a list of `Func` plus the
+`Func` is a name, parameter list and body, plus optional `vararg`/`kwarg` naming the
+`*args`/`**kwargs` parameters; `Program` is a list of `Func` plus the
 `Dialect` the transpiler recorded. `Func.holes`, `Func.size`, `Func.total`,
 `Program.verifiableCore` are the folds the ledger is computed from. `Func.total` inspects
 only the AST, which is why static hole-freedom is an upper bound rather than a guarantee
@@ -172,7 +195,7 @@ theorems therefore quantify `∀ fuel ≥ N` rather than picking one.
 ## 6. Dialects
 
 ```lean
-inductive Dialect | python | cLike
+inductive Dialect | python | cLike | javascript
 ```
 
 Every program carries the dialect the transpiler inferred (`render_lean.py` infers it from
@@ -200,14 +223,25 @@ The dialect currently controls:
 
 * `Dialect.idiv`/`imod` — floored vs truncated division and remainder.
 * `Dialect.toNumConfig` — the `NumConfig` from `Numeric.lean`: Python gets unbounded
-  integers, `.cLike` gets 32-bit two's complement. (Which C policy is selected —
+  integers, `.cLike` gets 32-bit two's complement, and `.javascript` gets Python's
+  unbounded config (exact up to `Number.MAX_SAFE_INTEGER`; integer `/` and `%` therefore
+  *floor*, which is wrong for JavaScript — see `docs/languages.md`). (Which C policy is selected —
   `c32` surfacing undefined behaviour, or `c32Wrapv` matching what `cc` actually does — is
   a recorded choice, not a default: see §8 and `Numeric.lean`.)
-* String operators: under `.python`, `+` concatenates and `<`/`>`/`==` compare contents;
-  under `.cLike`, a `char*` is an address, so all three are holes rather than the Python
-  answer applied to a C program.
-* `Stdlib` — Python only. Under `.cLike` every builtin and method returns `none`, because
-  answering a C program with Python's builtins is the original modulo bug again.
+* `Dialect.toFConfig` — the float format and rules (`FConfig.python` or
+  `FConfig.cDouble`; §1).
+* `Dialect.comparesIntFloatExactly` — whether `int`/`float` comparison is exact (Python)
+  or promotes the integer first (C, JavaScript).
+* `Dialect.boolOpsAreValues` — whether `and`/`or` yield an operand (Python, JavaScript)
+  or a boolean (C).
+* String operators (`Dialect.stringsAreValues`): under `.python` and `.javascript`, `+`
+  concatenates and `<`/`>`/`==` compare contents; under `.cLike`, a `char*` is an address,
+  so all three are holes rather than the Python answer applied to a C program.
+* `Dialect.fieldsOnDicts` — whether `e.f` on a `dict` value reads key `"f"` (C aggregate
+  initializers, JS object literals) or stays a hole (Python).
+* `Stdlib` — Python only. Under `.cLike` and `.javascript` every builtin and method
+  returns `none`, because answering another language with Python's builtins is the
+  original modulo bug again.
 
 ## 7. Numeric outcomes
 
@@ -262,7 +296,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 |---|---|---|
 | ~~`op:starredUnpack`~~ | `*args` / `**kwargs` splicing. **Closed** (STRATEGY.md §35): `Expr.starred` / `Expr.kwargE` / `Expr.dstarred` and `Func.vararg` / `Func.kwarg` express it. The label no longer occurs. | Implemented. What remains is narrower and separately named: `op:starred-outside-call`, `call:<f>:keyword-to-builtin`. |
 | `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here and is now mapped to `/`, because the dialect already makes `/` floor under `.python` — check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
-| `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (Core has no float value, as for `lit:float`). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` is blocked on `Float.lean`; `char-signedness` needs a target-ABI parameter; `int-to-pointer` needs an address model. |
+| `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (`Val.float` exists, but the int↔float conversion is not wired into the exporter). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` needs the conversion wired (`FConfig.ofInt` exists); `char-signedness` needs a target-ABI parameter; `int-to-pointer` needs an address model. |
 | `op:sizeOf:<kind>` | A `sizeof` that could not be folded to a constant. Folding uses the exporter's `dataModel` for pointer and `long`-family widths and standard C layout for aggregates (members in source order, each at the next multiple of its own alignment; an array has its element's alignment; an aggregate the maximum of its members'; 8-byte scalars are refused under ILP32, where their in-struct alignment is ABI-dependent). An aggregate is refused (`object`) when a member is a bit-field, when the struct is packed, when its tag has more than one distinct definition, when a `#if` in its body cannot be decided for the parsed configuration (only `#ifdef`/`#ifndef`/`defined()` of macros the corpus never defines and the frontend was not given are decided; see `cppDefines`), or when Joern's member list is not exactly the declarators of the source (it omits function-pointer members and lists every `#if` branch). `array-bound`: an array whose bound is neither a literal, an integer constant expression over literals, a resolvable `NAME±N` macro, nor (for `T x[] = {...}`) a countable initializer. `model-dependent`, `opaque-type`, `unknown-type`, `pointer` as for casts. | Not yet implemented beyond the shapes named. |
 | `op:shiftRight:unknown-signedness`, `op:shiftRight:64-bit-operand` | C `>>` is arithmetic or logical depending on the promoted left operand's signedness, which is taken from resolved types only (typedef chains, casts, literals, the usual arithmetic conversions; enums and bit-fields are refused). `unknown-signedness`: that type did not resolve. `64-bit-operand`: it did, and it is wider than the 32-bit arithmetic Core's `.cLike` dialect performs. | `64-bit-operand` needs width-typed arithmetic in Core. |
 | `stmt:va_arg` | A statement reading a variadic argument with `va_arg(ap, T)`. The frontend cannot parse it (the second argument is a type), and Core has no C variadic calling convention to read from. | Needs a variadic-argument model in Core. |
@@ -278,7 +312,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `op:indirection:<kind>`, `assign:lhs:indirection`, `op:<incr>:unsupported-target` | `*p` read, `*p = v` / `*p op= v`, and `(*p)++` where `p` is not provably an interior pointer (`Val.iref`), an alias of one boxed local, or a closed out-parameter. `<kind>` is `addrKind` of `p`'s static type (`pointer`, `scalar`, `object`, `unknown-type`, `opaque-type`). What remains is mostly `p` a parameter of a function with an external or unclosable caller (the public C API), `p` a struct pointer dereferenced whole (`*pA = *pB` struct copy), and pointers loaded from fields/arrays. `&n` of a boxed scalar is `irefField n "v"`, so a scalar out-parameter and an `&s->f`/`&a[i]` out-parameter are the same runtime shape and a callee's `*p` is `derefIref`/`setDerefIref` for both. A cast that changes the pointee type of a scalar (`*(char*)&one`, `*(i64*)&u64Val`, `f((u32*)&intVal)`) is a reinterpretation of bits, so it is never seen through and the dereference stays one of these holes; pointer-to-pointer pointee changes (`(void**)&pData`) are allowed because Core pointer values carry no C type. | Needs a location model for pointers of unknown provenance, and a byte-level memory model for type punning; not yet implemented. |
 | `call:computed-callee`, `call:no-callee-name` | A call whose callee is an expression rather than a name the CPG resolved. | Not yet implemented. |
 | `import:module-value`, `import:unresolved`, `import:absent:external`, `import:absent:prefix-in-cpg`, `import:absent:relative` | A module used as a value, or an import the CPG could not resolve. The `absent:` labels split the second case by *why*: the module is external to the CPG, a proper prefix of its path is in the CPG (so more resolver work could reach it), or it is a relative import whose target is missing. | Permanent for genuinely external modules; that is the boundary the assurance case declares. `absent:prefix-in-cpg` is the part that is not permanent. |
-| `lit:float`, `lit:unquoted` | A float literal (Core has no float value) and a literal the exporter could not decode. | `lit:float` is blocked on wiring `Float.lean` into `Val`. |
+| ~~`lit:float`~~, `lit:unquoted` | `lit:float` was a float literal before Core had a float value; the exporter now emits `{"k": "float"}` and the label no longer occurs. `lit:unquoted` is a literal the exporter could not decode. | `lit:float`: implemented. |
 | `expr:BLOCK`, `expr:BLOCK-impure`, `expr:BLOCK-prelude`, `expr:empty-block`, `expr:genExp`, `expr:<label>` | Statement-expressions and generator expressions. `genExp` needs laziness Core does not have. In C/C++ a BLOCK in a *prelude-aware* position (`exprV`: conditions, returns, assignment RHS, call arguments, operands) that is a pure comma expression (`(e1, e2)`, or a multi-child macro expansion such as `UNUSED_PARAMETER2`) is translated as `e1` run as a statement then `e2` as the value; a block containing a declaration (`SWAP(T,a,b)` expanding to `{T t=a; ...}`: block scope Core's flat environment cannot express) or a statement stays a hole. | Mixed. |
 | `control:GOTO` | A `goto` none of the lowerings in `methodBody` proves safe. Translated today: a forward jump to the single top-level label (`while(true){...;break}`); jumps to several top-level labels whose tail ends in a `return` **or falls off the end of the function** (the tail is spliced at the jump with an explicit `return` appended, which `applyFunc` makes identical to falling off the end); a backward jump to a single top-level restart label, from outside any loop/switch (`while(true){ tail; break }` with `goto` as `continue`); and a jump to a label inside the body of the jump's innermost enclosing loop or switch (directly, or through plain `{}` blocks): the rest of that body from the label is spliced at the jump, followed by `continue` (loop) or `break` (switch). Everything else — jumps into nested blocks, backward jumps from inside loops, mixtures of a restart label with other labels, label cycles — stays a hole. | Partly implemented; the remainder needs a general reducible-CFG structuring pass or a Core `Stmt.label`/`goto`. |
 | `control:FOR:elided-clause` | A `for` with fewer than four children whose clauses could not be identified. Omitted clauses are resolved when the children's CPG `order` (init 1, cond 2, step 3, body 4) *and* the blank clauses of the header text agree; an omitted condition is `true` (C11 6.8.5.3p2). | Residual only on disagreement. |
@@ -311,7 +345,8 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `forIn:non-iterable` | Iterating a non-iterable. |
 | `setIndex:immutable-containers` | *Any* `e[i] = v`. Containers are values, so a write cannot be observed by anything else holding the container. |
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |
-| `ub:<reason>` | The configured integer arithmetic says the source language does not define this operation. |
+| `ub:<reason>` | The configured integer (or float) arithmetic says the source language does not define this operation. |
+| `binop://:float-floordiv`, `float:pow`, `float:format-mismatch`, `binop:<op>:non-numeric` | Float `//` and `**` (not modelled), a float of the wrong format for the dialect, and float arithmetic against a non-number. `Float.lean`'s `unmodelled` results also surface here under their own labels. |
 | `str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`, `str:pointer-equality-not-modelled` | A C string operation under `.cLike`. |
 | `call:stray-control-flow` | A `brk`/`cont` escaped a function body — a transpiler bug if it appears. |
 | `initializers:outOfFuel` | Module initializers did not finish within the fuel budget. |
@@ -341,8 +376,9 @@ The distinction tells you whether a hole is work or a boundary.
 
 * `setIndex:immutable-containers`, `mcall:*:unboxed-container`, `op:delete-index/slice` —
   all one feature: boxed mutable containers. See `docs/boxed-containers.md`.
-* `lit:float` and the float skips in the differential oracle — wiring `Float.lean` into
-  `Val`.
+* The rest of floats: `op:cast:float`, `binop://:float-floordiv`, `float:pow`, float
+  builtins, and the float skips in the differential oracle (`Unencodable("float")`).
+  Literals and arithmetic are wired (§1).
 * `control:TRY-*` beyond the translated shapes — a richer control-flow encoding.
 * `call:<name>` for stdlib callees — more of `Stdlib.lean`. This is the largest single
   lever on the verifiable core, because a function is only as analysable as its callees.
