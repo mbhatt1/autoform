@@ -469,7 +469,8 @@ theorem TTLLink_init_mrefines :
   simp [Plain] at hpl
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P, hpl,
-        payload_setField]
+        payload_setField, Func.defaultEnv, Func.guardedBody, Func.defaultHole, Func.supplied,
+        Func.kwParams]
 
 /-! ### `TTLCache.__setstate__.<lambda>0` — a projection out of an *argument*, not `self` -/
 
@@ -516,11 +517,17 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
   obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError"
   refine ⟨v, ?_⟩
   have hne : ((none : Option String) != some "time") = true := rfl
-  simp +decide only [hne, applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+  -- `time=None` is a default now (the exporter records defaults); the call supplies `time`,
+  -- so the default contributes no binding and the body runs unguarded.
+  have hE : f_cachetools___init___py__module___TimedCache_expire.defaultEnv [t] [] = [] := rfl
+  have hG : f_cachetools___init___py__module___TimedCache_expire.guardedBody [t] [] =
+      f_cachetools___init___py__module___TimedCache_expire.body := rfl
+  simp only [applyFunc, bindParams, hE, hG]
+  simp +decide only [hne, Func.posParams, kwargsRejected, posRejected,
         Val.unbuiltin, execStmt, f_cachetools___init___py__module___TimedCache_expire,
         Env.set, List.filter, List.any, Option.isNone, bne_iff_ne, ne_eq,
         reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self,
-        Func.defaultEnv_mk, Func.guardedBody_mk, List.contains_nil, Bool.not_false,
+        List.contains_nil, Bool.not_false,
         List.nil_append]
   rw [hv]
   simp +decide
@@ -541,28 +548,35 @@ theorem cachedmethod_none_refines :
 
 `Refine.lean` proves `sample_id_not_refinable` on a copied term. The same argument is
 worth having on the *real* module, because holes in `cachetools` are the reason the SACM
-top claim is UNDEVELOPED. `_uncached_info.cache_clear` is one of the 102: it writes a
-closed-over variable, and `nonlocal` *writes* are an honest hole
-(`Stmt.hole "scope:nonlocal-write"`, README "Not yet built").
+top claim is UNDEVELOPED.
+
+**Restated, because the translation became more honest.** This section used to be about
+`_uncached_info.cache_clear`, whose `nonlocal misses; misses = 0` was the static hole
+`scope:nonlocal-write`. Cell conversion (STRATEGY.md §58) now translates it
+(`misses.v = 0`), so "it reaches a hole on every input" became false and was not kept.
+The subject is now `TTLCache.__iter__`, a generator: calling it runs none of its body,
+Core has no suspension, and the exporter therefore emits the hole `gen:generator` ahead
+of the body (docs/conformance.md, finding 1 -- it used to translate `yield` as `return`,
+which made this function hole-free and *wrong*).
 
 The theorem says: no shallow specification, at any fuel bound, on any inhabited domain,
-refines it. Holes are not an inconvenience to be routed around — they are provably
-unspecifiable, and this is now stated about generated code rather than a copy. -/
+refines it. Holes are not an inconvenience to be routed around -- they are provably
+unspecifiable, and this is stated about generated code rather than a copy. -/
 
-theorem cache_clear_reaches_hole (k : Nat) (h : Heap) (self : Val) :
-    (runMethod (k + 4) h "cachetools/_cached.py:<module>._uncached_info.cache_clear"
-      self []).2 = .hole "scope:nonlocal-write" := by
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools__cached_py__module___uncached_info_cache_clear rfl]
+theorem TTL_iter_reaches_hole (k : Nat) (h : Heap) (self : Val) :
+    (runMethod (k + 4) h "cachetools/__init__.py:<module>.TTLCache.__iter__"
+      self []).2 = .hole "gen:generator" := by
+  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache___iter__ rfl]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, Env.set,
-        f_cachetools__cached_py__module___uncached_info_cache_clear]
+        f_cachetools___init___py__module__TTLCache___iter__]
 
-theorem cache_clear_not_refinable (N : Nat)
+theorem TTL_iter_not_refinable (N : Nat)
     (dom : Heap → Val → List Val → Prop) (spec : Heap → Val → List Val → Heap × Outcome)
     (h : Heap) (self : Val) (hd : dom h self []) :
-    ¬ MRefines "cachetools/_cached.py:<module>._uncached_info.cache_clear" N dom spec := by
+    ¬ MRefines "cachetools/__init__.py:<module>.TTLCache.__iter__" N dom spec := by
   intro hm
   have h1 := congrArg Prod.snd (hm h self [] hd (N + 4) (Nat.le_add_right _ _))
-  rw [cache_clear_reaches_hole N h self] at h1
+  rw [TTL_iter_reaches_hole N h self] at h1
   exact Outcome.toEResult_ne_hole _ _ h1.symm
 
 /-! ## 4. What the mutation gate actually said
@@ -590,7 +604,8 @@ theorem failing to notice a behavioural change:
   change the answer. The parent `TLRUItem_lt_mrefines` kills both (6/6).
 * **2 × `ast-int` in `_uncached_info.cache_clear`.** The only mutable point in that
   function sits *after* `Stmt.hole "scope:nonlocal-write"`, so it is unreachable: the
-  interpreter stops at the hole. Dead-code mutant.
+  interpreter stops at the hole. Dead-code mutant. (That run predates cell conversion;
+  §3 is now about `TTLCache.__iter__`, and this survivor analysis has not been re-run.)
 * **1 theorem with no mutants at all**: `_DefaultSize.__setitem__` has body `.skip`.
   There is nothing to perturb, so `DefaultSize_setitem_mrefines` is reported `UNTESTED`
   rather than given a score. That is the honest verdict, not a pass.

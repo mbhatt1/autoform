@@ -120,10 +120,16 @@ both are hole-free, and the `yield curr.key` in each body is a `{"k": "ret"}`. J
 key", which is wrong. The old recorder made the same mistake in the same direction: it
 recorded the first yielded element as the call's result. So `TLRUCache.__iter__` was
 **compared and agreeing** at `46c65fc`, two wrong models agreeing with each other. The
-recorder now refuses generator calls, so the false agreement is gone. The exporter still
-needs to hole `Return` nodes whose code begins with `yield`. That needs a Joern re-export
-of `ast-Cachetools.json`, plus re-rendering and re-generating the specs bound to its hash
-(`check_specs_fresh`), so it was not done in this round.
+recorder now refuses generator calls, so the false agreement is gone.
+
+**Fixed in the exporter (item L).** A `Return` whose code is a `yield`/`yield from` is the
+hole `gen:yield` (statement or value position), and a function whose own body contains
+one starts with `gen:generator`: calling a generator runs none of its body, and Core has
+no suspension. Both `__iter__`s are no longer hole-free (`ast-Cachetools.json` re-exported
+at `01af8e5`; `tests/test_cachetools_ast_scoping.py` pins it). Eager materialisation into a
+list was considered and rejected: it is wrong for an infinite generator, a consumer that
+stops early, and these two bodies, which read the timer and the linked list between
+yields.
 
 ### 2. The exporter binds a call through a closure variable to an unrelated method (11 divergences)
 
@@ -146,6 +152,24 @@ Both are name-based call resolution in the front end. The fix belongs in the exp
 prefer a local or captured binding over a global method of the same short name, and honour
 the import.
 
+**Fixed in the exporter (item L), and the 11 divergences remain, now with a Core cause.**
+A Python call whose bare callee is bound in a function scope (the caller's or an enclosing
+`def`'s parameter, assignment or import) is now emitted *by the variable's name*
+(`Expr.call "cache"`, `Expr.call "_wrapper"`); Joern's target is kept only when it is the
+one function that scope binds the name to (a nested `def`, or `x = lambda`). The scan
+above now finds 0 sites in the re-exported AST (`tests/test_cachetools_ast_scoping.py`).
+The pyscoping fixture re-exports byte-identically under the same rule.
+
+The differential verdicts did not move, because Core's `Expr.call` consults the function
+table **before** a non-closure local: `Ctx.resolve "cache"` is a unique suffix match for
+`_WrapperBase.cache`, and the lambda the harness supplies for `cache` is a `.fn`, not a
+`.clos` (checked with `#eval` on the rendered program: `resolve "cache"` = `some
+…_WrapperBase.cache`; `resolve "_wrapper"` = `none`, ambiguous, so `cached.decorator`'s call
+now reaches the imported `_cached.py` `_wrapper` through the environment). So the remaining
+11 are finding 3's suffix fallback applied to a bare call name. Python scoping for bare
+names in Core (in progress elsewhere) resolves them; the exporter now hands Core the name
+Python would look up rather than a wrong qualified one.
+
 ### 3. Core's method dispatch has no class hierarchy (3 divergences)
 
 The cachetools suite subclasses its caches (`class DefaultCache(self.Cache)`) and
@@ -159,12 +183,54 @@ That fallback is how finding 2's misbinding would also have surfaced, had the ha
 supplied captures. Inside a corpus these fallbacks are right only when names are unique.
 For a receiver class Core does not know, the honest answer is a hole.
 
+## Re-export (item L)
+
+`ast-Cachetools.json` was re-exported from cachetools `01af8e5` with the merged exporter
+(items H, G and L) and now has a provenance record
+(`provenance/ast-Cachetools.json.prov.json`). Static figures, each from `stats`-style
+counting over the AST and checked against `ledger-Cachetools.json`:
+
+| AST | holes | hole-free |
+|---|--:|--:|
+| committed at `46c65fc` | 26 | 184 |
+| fresh export, exporter at `86a161b` (H: cells, defaults) | 48 | 167 |
+| + G (boxed containers) | 42 | 170 |
+| + L (this change: `gen:*`, local-name calls) — committed | 46 | 168 |
+
+L's own static delta is exactly 10 functions: the two `__iter__`s gain `gen:generator` +
+`gen:yield`, and 8 call sites change callee name (`_locked/_unlocked/_condition` ×
+`wrapper/cache_clear`, `cached/cachedmethod.decorator`).
+
+Differential, `python3.11 scripts/differential.py ast-Cachetools.json <cachetools@01af8e5>
+Cachetools 5`, each run against its own rendered module:
+
+| | committed AST, `86a161b` | H+G export, merged | H+G+L (committed) |
+|---|--:|--:|--:|
+| hole-free | 184 | 170 | 168 |
+| compared | 60 | 48 | 48 |
+| cases agreeing | 233 / 247 | 225 / 237 | 225 / 237 |
+| divergences | 14 | 12 | 12 |
+| by status: compared / blocked (sem.) / AST holes / value model / unexercised | 60 / 67 / 25 / 33 / 24 | 48 / 65 / 39 / 33 / 24 | 48 / 65 / 41 / 31 / 24 |
+
+* L moves no verdict: the two generators move from "value model" (the recorder refuses
+  generator calls) to "AST holes", and the 11 closure divergences now have a Core cause
+  (above).
+* The 12 compared functions lost between the first two columns all carry exactly one hole,
+  `param:default-nonliteral` (H: `cache_getitem=Cache.__getitem__`, `key=keys.hashkey`, …).
+  That hole fires only on a call that *omits* the argument, but the harness treats any
+  static hole as "untestable until translated". `TLRUCache.__getitem__` is among them, so
+  its 2 finding-3 divergences are no longer *observed*; they are not fixed.
+* Remaining 12 divergences: 11 × finding 2 via Core's bare-name suffix rule, 1 ×
+  `Cache.__getitem__` (finding 3).
+
 ## What remains
 
-* Fix findings 1 and 2 in `cartographer/export_ast.sc` and re-export `ast-Cachetools.json`
-  at `01af8e5`. Fix finding 3 in Core: method resolution along `classBases`, or a hole for
-  an unknown receiver class. Each fix changes what the translated functions compute, so
-  the specs and mutation results bound to the AST hash move with it.
+* Finding 3 in Core: method resolution along `classBases`, or a hole for an unknown
+  receiver class; and Python scoping for a bare call name, which retires the last 11 of
+  finding 2. Each changes what translated functions compute, so specs bound to the AST
+  hash move with it.
+* The harness could compare a function whose only static hole is a parameter default on
+  every recorded call that supplies that argument; today it skips the function.
 * Lambdas (9 functions) need the exporter's per-file lambda numbering reproduced from the
   source. The numbering is plausible but unverified, so the recorder does not guess it.
 * `functools.partial` (the `key=` of every `cachedmethod` wrapper) and `set` (all of
