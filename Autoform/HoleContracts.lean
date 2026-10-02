@@ -521,6 +521,11 @@ theorem delitem_under : UnderS Γdel P DelitemPost := by
       = some f_cachetools___init___py__module___DefaultSize_pop := by
     rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_pop]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
+  -- `obj.pop(…)` resolves through `resolveMethodOn`, which is `resolveMethod` on the
+  -- object's class for a program without a class table (STRATEGY.md §60).
+  have hpopOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "pop"
+      = some f_cachetools___init___py__module___DefaultSize_pop := by
+    rw [Ctx.resolveMethodOn_of_none rfl, hdcls, hpop]
   have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
   unfold runMethodIn
   rw [resolve_onProgram, resolve_delitem]
@@ -529,7 +534,7 @@ theorem delitem_under : UnderS Γdel P DelitemPost := by
   simp only [delContract, completesOrRaisesFramed, delitemName] at hlk hpost
   simp only [hlk]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
-    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop,
+    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop, hpopOn,
     hdpay, Heap.payload, Heap.view,
     f_cachetools___init___py__module___DefaultSize_pop]
   -- The only thing known about the filled site is its contract.
@@ -568,6 +573,11 @@ theorem delitem_reaches_hole_of (τ : SImpl)
       = some f_cachetools___init___py__module___DefaultSize_pop := by
     rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_pop]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
+  -- `obj.pop(…)` resolves through `resolveMethodOn`, which is `resolveMethod` on the
+  -- object's class for a program without a class table (STRATEGY.md §60).
+  have hpopOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "pop"
+      = some f_cachetools___init___py__module___DefaultSize_pop := by
+    rw [Ctx.resolveMethodOn_of_none rfl, hdcls, hpop]
   unfold runMethodIn
   rw [resolve_onProgram, resolve_delitem]
   simp only [Option.map_some, SImpl.onFunc, f_cachetools___init___py__module__Cache___delitem__,
@@ -575,7 +585,7 @@ theorem delitem_reaches_hole_of (τ : SImpl)
   simp only [delitemName, fillS] at hfill
   simp only [hfill]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
-    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop,
+    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop, hpopOn,
     hdpay,
     f_cachetools___init___py__module___DefaultSize_pop]
 

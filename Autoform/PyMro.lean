@@ -140,6 +140,10 @@ open Autoform.Generated.PyMro in
 def pyRun (c : String) : String :=
   PyScoping.showR (runMain program 600 moduleInits ("pymro_cases.py:<module>." ++ c) [])
 
+-- CPython: ('shape', 9)
+/-- info: "('shape', 9)" -/
+#guard_msgs in #eval pyRun "case_abc_base_is_transparent"
+
 -- CPython: 'AttributeError'
 /-- info: "hole mcall:Store.nonexistent" -/
 #guard_msgs in #eval pyRun "case_absent_method"
@@ -175,6 +179,14 @@ def pyRun (c : String) : String :=
 -- CPython: 2
 /-- info: "2" -/
 #guard_msgs in #eval pyRun "case_inherited_method"
+
+-- CPython: 12
+/-- info: "12" -/
+#guard_msgs in #eval pyRun "case_inherited_setitem"
+
+-- CPython: 'instance'
+/-- info: "hole mcall:Callbacks.handler:instance-attribute" -/
+#guard_msgs in #eval pyRun "case_instance_attribute_shadows_method"
 
 -- CPython: 5
 /-- info: "5" -/

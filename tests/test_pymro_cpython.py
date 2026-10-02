@@ -59,6 +59,9 @@ EXPECTED_HOLES = {
     # globals frame did not receive, so the honest answer is a hole -- where suffix
     # resolution used to call `Holder.orphan_fn`.
     "case_unbound_name_is_not_a_method": "call:orphan_fn",
+    # `c.handler = lambda: ...` shadows the method in the instance dict. Core does not call
+    # an instance attribute; it must not call the class's method in its place either.
+    "case_instance_attribute_shadows_method": "mcall:Callbacks.handler:instance-attribute",
 }
 
 
@@ -133,6 +136,7 @@ def test_ast_records_the_class_table():
     assert table["Bag"]["bases"] == ["<ext>collections.abc.Mapping"]
     assert table["Shelf"]["attrs"] == ["fetch"]                     # `make` is a staticmethod
     assert "Dynamic" not in table                                   # unresolvable base
+    assert table["Shape"]["bases"] == []                            # `abc.ABC` adds nothing
 
 
 def test_program_is_the_render_of_the_ast(tmp_path):

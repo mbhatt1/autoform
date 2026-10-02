@@ -16,6 +16,7 @@ suffix (docs/conformance.md finding 3):
 """
 
 import collections.abc
+from abc import ABC
 
 
 # ---- overriding and inheritance -----------------------------------------------
@@ -256,3 +257,60 @@ def case_module_global_read():
 
 def case_builtin_call():
     return len("abcd")
+
+
+# ---- additions after the merge with boxed containers ------------------------------
+
+
+class Shape(ABC):
+    def area(self):
+        return 0
+
+    def describe(self):
+        return ("shape", self.area())
+
+
+class Square(Shape):
+    def __init__(self, s):
+        self.s = s
+
+    def area(self):
+        return self.s * self.s
+
+
+def case_abc_base_is_transparent():
+    # `abc.ABC` defines nothing an instance lookup can find, so it does not block the walk.
+    return Square(3).describe()
+
+
+class Callbacks:
+    def handler(self):
+        return "method"
+
+
+def case_instance_attribute_shadows_method():
+    # The instance's own attribute wins over the class's method in CPython. Core does not
+    # call it (a hole), but it must not call the method instead.
+    c = Callbacks()
+    c.handler = lambda: "instance"
+    return c.handler()
+
+
+class Grid:
+    def __init__(self):
+        self.total = 0
+
+    def __setitem__(self, k, v):
+        self.total = self.total + v
+
+
+class SubGrid(Grid):
+    pass
+
+
+def case_inherited_setitem():
+    # `g[k] = v` dispatches `__setitem__` along the MRO: SubGrid inherits Grid's.
+    g = SubGrid()
+    g[1] = 5
+    g[2] = 7
+    return g.total

@@ -12,7 +12,7 @@ import Autoform.Lang.Core.Semantics
 -- which elaborates as nested cons cells -- one frame or more per function, and
 -- Ansible has 5,546. So the limit has to scale with the module's function count,
 -- not with how deep its code happens to be.
-set_option maxRecDepth 8384
+set_option maxRecDepth 8472
 
 -- Lean's default `maxHeartbeats` (200000) budgets ONE declaration's own
 -- elaboration cost, separately from `maxRecDepth` above (which bounds nesting
@@ -134,7 +134,7 @@ def f_pymro_cases_py__module__case_base_method_through_class_value : Func :=
 def f_pymro_cases_py__module__Root_who : Func :=
   { name := "pymro_cases.py:<module>.Root.who"
   , params := []
-  , body := (.ret (.listE [(.lit (.str "Root"))])) }
+  , body := (.ret (.boxContainer (.listE [(.lit (.str "Root"))]))) }
 
 /-- `pymro_cases.py:<module>.Root.tag`  (from `pymro_cases.py`) -/
 def f_pymro_cases_py__module__Root_tag : Func :=
@@ -153,7 +153,7 @@ def f_pymro_cases_py__module__Left_who : Func :=
             (.seq
               .skip
               (.seq
-                (.ret (.binop "+" (.listE [(.lit (.str "Left"))]) (.name "rest")))
+                (.ret (.binop "+" (.boxContainer (.listE [(.lit (.str "Left"))])) (.name "rest")))
                 (.seq .skip .skip)))) }
 
 /-- `pymro_cases.py:<module>.Right.who`  (from `pymro_cases.py`) -/
@@ -167,7 +167,7 @@ def f_pymro_cases_py__module__Right_who : Func :=
             (.seq
               .skip
               (.seq
-                (.ret (.binop "+" (.listE [(.lit (.str "Right"))]) (.name "rest")))
+                (.ret (.binop "+" (.boxContainer (.listE [(.lit (.str "Right"))])) (.name "rest")))
                 (.seq .skip .skip)))) }
 
 /-- `pymro_cases.py:<module>.Right.tag`  (from `pymro_cases.py`) -/
@@ -187,7 +187,7 @@ def f_pymro_cases_py__module__Bottom_who : Func :=
             (.seq
               .skip
               (.seq
-                (.ret (.binop "+" (.listE [(.lit (.str "Bottom"))]) (.name "rest")))
+                (.ret (.binop "+" (.boxContainer (.listE [(.lit (.str "Bottom"))])) (.name "rest")))
                 (.seq .skip .skip)))) }
 
 /-- `pymro_cases.py:<module>.case_diamond_mro_lookup`  (from `pymro_cases.py`) -/
@@ -312,7 +312,7 @@ def f_pymro_cases_py__module__Bag___len__ : Func :=
 def f_pymro_cases_py__module__Bag___iter__ : Func :=
   { name := "pymro_cases.py:<module>.Bag.__iter__"
   , params := []
-  , body := (.seq (.ret (.call "iter" [(.listE [(.lit (.str "a"))])])) .skip) }
+  , body := (.seq (.ret (.call "iter" [(.boxContainer (.listE [(.lit (.str "a"))]))])) .skip) }
 
 /-- `pymro_cases.py:<module>.case_external_base_method`  (from `pymro_cases.py`) -/
 def f_pymro_cases_py__module__case_external_base_method : Func :=
@@ -411,7 +411,8 @@ def f_pymro_cases_py__module__case_parameter_function_value : Func :=
             (.ret
               (.call
                 "pymro_cases.py:<module>.apply_it"
-                [(.name "len"), (.listE [(.lit (.int 1)), (.lit (.int 2)), (.lit (.int 3))])]))
+                [ (.name "len")
+                , (.boxContainer (.listE [(.lit (.int 1)), (.lit (.int 2)), (.lit (.int 3))])) ]))
             (.seq .skip .skip)) }
 
 /-- `pymro_cases.py:<module>.apply_it`  (from `pymro_cases.py`) -/
@@ -432,6 +433,96 @@ def f_pymro_cases_py__module__case_builtin_call : Func :=
   , params := []
   , body := (.seq (.ret (.call "len" [(.lit (.str "abcd"))])) .skip) }
 
+/-- `pymro_cases.py:<module>.Shape.area`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__Shape_area : Func :=
+  { name := "pymro_cases.py:<module>.Shape.area"
+  , params := []
+  , body := (.ret (.lit (.int 0))) }
+
+/-- `pymro_cases.py:<module>.Shape.describe`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__Shape_describe : Func :=
+  { name := "pymro_cases.py:<module>.Shape.describe"
+  , params := []
+  , body := (.ret (.tupleE [(.lit (.str "shape")), (.mcall (.name "self") "area" [])])) }
+
+/-- `pymro_cases.py:<module>.Square.__init__`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__Square___init__ : Func :=
+  { name := "pymro_cases.py:<module>.Square.__init__"
+  , params := ["s"]
+  , body := (.setField (.name "self") "s" (.name "s")) }
+
+/-- `pymro_cases.py:<module>.Square.area`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__Square_area : Func :=
+  { name := "pymro_cases.py:<module>.Square.area"
+  , params := []
+  , body := (.ret (.binop "*" (.field (.name "self") "s") (.field (.name "self") "s"))) }
+
+/-- `pymro_cases.py:<module>.case_abc_base_is_transparent`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_abc_base_is_transparent : Func :=
+  { name := "pymro_cases.py:<module>.case_abc_base_is_transparent"
+  , params := []
+  , body := (.seq
+            (.seq
+              (.assign "tmp0" (.alloc "Square" [(.lit (.int 3))]))
+              (.ret (.mcall (.name "tmp0") "describe" [])))
+            (.seq .skip .skip)) }
+
+/-- `pymro_cases.py:<module>.Callbacks.handler`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__Callbacks_handler : Func :=
+  { name := "pymro_cases.py:<module>.Callbacks.handler"
+  , params := []
+  , body := (.ret (.lit (.str "method"))) }
+
+/-- `pymro_cases.py:<module>.case_instance_attribute_shadows_method`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_instance_attribute_shadows_method : Func :=
+  { name := "pymro_cases.py:<module>.case_instance_attribute_shadows_method"
+  , params := []
+  , body := (.seq
+            (.assign "c" (.alloc "Callbacks" []))
+            (.seq
+              (.setField
+                (.name "c")
+                "handler"
+                (.fnref "pymro_cases.py:<module>.case_instance_attribute_shadows_method.<lambda>1"))
+              (.seq (.ret (.mcall (.name "c") "handler" [])) (.seq .skip .skip)))) }
+
+/-- `pymro_cases.py:<module>.case_instance_attribute_shadows_method.<lambda>1`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_instance_attribute_shadows_method__lambda_1 : Func :=
+  { name := "pymro_cases.py:<module>.case_instance_attribute_shadows_method.<lambda>1"
+  , params := []
+  , body := (.ret (.lit (.str "instance"))) }
+
+/-- `pymro_cases.py:<module>.Grid.__init__`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__Grid___init__ : Func :=
+  { name := "pymro_cases.py:<module>.Grid.__init__"
+  , params := []
+  , body := (.setField (.name "self") "total" (.lit (.int 0))) }
+
+/-- `pymro_cases.py:<module>.Grid.__setitem__`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__Grid___setitem__ : Func :=
+  { name := "pymro_cases.py:<module>.Grid.__setitem__"
+  , params := ["k", "v"]
+  , body := (.setField
+            (.name "self")
+            "total"
+            (.binop "+" (.field (.name "self") "total") (.name "v"))) }
+
+/-- `pymro_cases.py:<module>.case_inherited_setitem`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_inherited_setitem : Func :=
+  { name := "pymro_cases.py:<module>.case_inherited_setitem"
+  , params := []
+  , body := (.seq
+            (.assign "g" (.alloc "SubGrid" []))
+            (.seq
+              .skip
+              (.seq
+                (.setIndex (.name "g") (.lit (.int 1)) (.lit (.int 5)))
+                (.seq
+                  .skip
+                  (.seq
+                    (.setIndex (.name "g") (.lit (.int 2)) (.lit (.int 7)))
+                    (.ret (.field (.name "g") "total"))))))) }
+
 /-- `<module-objects>:<module>`  (from ``) -/
 def f__module_objects___module_ : Func :=
   { name := "<module-objects>:<module>"
@@ -446,66 +537,82 @@ def f__module_objects___module_ : Func :=
               (.seq
                 (.setField
                   (.name "<module>pymro_cases.py")
-                  "case_absent_method"
-                  (.fnref "pymro_cases.py:<module>.case_absent_method"))
+                  "case_abc_base_is_transparent"
+                  (.fnref "pymro_cases.py:<module>.case_abc_base_is_transparent"))
                 (.seq
                   (.setField
                     (.name "<module>pymro_cases.py")
-                    "case_base_method_through_class_value"
-                    (.fnref "pymro_cases.py:<module>.case_base_method_through_class_value"))
+                    "case_absent_method"
+                    (.fnref "pymro_cases.py:<module>.case_absent_method"))
                   (.seq
                     (.setField
                       (.name "<module>pymro_cases.py")
-                      "case_base_method_unchanged"
-                      (.fnref "pymro_cases.py:<module>.case_base_method_unchanged"))
+                      "case_base_method_through_class_value"
+                      (.fnref "pymro_cases.py:<module>.case_base_method_through_class_value"))
                     (.seq
                       (.setField
                         (.name "<module>pymro_cases.py")
-                        "case_builtin_call"
-                        (.fnref "pymro_cases.py:<module>.case_builtin_call"))
+                        "case_base_method_unchanged"
+                        (.fnref "pymro_cases.py:<module>.case_base_method_unchanged"))
                       (.seq
                         (.setField
                           (.name "<module>pymro_cases.py")
-                          "case_class_attribute_alias"
-                          (.fnref "pymro_cases.py:<module>.case_class_attribute_alias"))
+                          "case_builtin_call"
+                          (.fnref "pymro_cases.py:<module>.case_builtin_call"))
                         (.seq
                           (.setField
                             (.name "<module>pymro_cases.py")
-                            "case_diamond_mro_lookup"
-                            (.fnref "pymro_cases.py:<module>.case_diamond_mro_lookup"))
+                            "case_class_attribute_alias"
+                            (.fnref "pymro_cases.py:<module>.case_class_attribute_alias"))
                           (.seq
                             (.setField
                               (.name "<module>pymro_cases.py")
-                              "case_external_base_method"
-                              (.fnref "pymro_cases.py:<module>.case_external_base_method"))
+                              "case_diamond_mro_lookup"
+                              (.fnref "pymro_cases.py:<module>.case_diamond_mro_lookup"))
                             (.seq
                               (.setField
                                 (.name "<module>pymro_cases.py")
-                                "case_inherited_init"
-                                (.fnref "pymro_cases.py:<module>.case_inherited_init"))
+                                "case_external_base_method"
+                                (.fnref "pymro_cases.py:<module>.case_external_base_method"))
                               (.seq
                                 (.setField
                                   (.name "<module>pymro_cases.py")
-                                  "case_inherited_method"
-                                  (.fnref "pymro_cases.py:<module>.case_inherited_method"))
+                                  "case_inherited_init"
+                                  (.fnref "pymro_cases.py:<module>.case_inherited_init"))
                                 (.seq
                                   (.setField
                                     (.name "<module>pymro_cases.py")
-                                    "case_local_function_value_shadows_method"
-                                    (.fnref
-                                      "pymro_cases.py:<module>.case_local_function_value_shadows_method"))
+                                    "case_inherited_method"
+                                    (.fnref "pymro_cases.py:<module>.case_inherited_method"))
                                   (.seq
                                     (.setField
                                       (.name "<module>pymro_cases.py")
-                                      "case_module_global_read"
-                                      (.fnref "pymro_cases.py:<module>.case_module_global_read"))
+                                      "case_inherited_setitem"
+                                      (.fnref "pymro_cases.py:<module>.case_inherited_setitem"))
                                     (.seq
                                       (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "case_instance_attribute_shadows_method"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_instance_attribute_shadows_method"))
+                                      (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "case_local_function_value_shadows_method"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_local_function_value_shadows_method"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "case_module_global_read"
+                                        (.fnref "pymro_cases.py:<module>.case_module_global_read"))
+                                        (.seq
+                                        (.setField
                                         (.name "<module>pymro_cases.py")
                                         "case_override_reached_from_base"
                                         (.fnref
                                         "pymro_cases.py:<module>.case_override_reached_from_base"))
-                                      (.seq
+                                        (.seq
                                         (.setField
                                         (.name "<module>pymro_cases.py")
                                         "case_own_method_before_external_base"
@@ -568,6 +675,11 @@ def f__module_objects___module_ : Func :=
                                         (.seq
                                         (.setField
                                         (.name "<module>pymro_cases.py")
+                                        "Callbacks"
+                                        (.fnref "pymro_cases.py:<module>.Callbacks<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
                                         "Counter"
                                         (.fnref "pymro_cases.py:<module>.Counter<meta>"))
                                         (.seq
@@ -580,6 +692,11 @@ def f__module_objects___module_ : Func :=
                                         (.name "<module>pymro_cases.py")
                                         "Dynamic"
                                         (.fnref "pymro_cases.py:<module>.Dynamic<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "Grid"
+                                        (.fnref "pymro_cases.py:<module>.Grid<meta>"))
                                         (.seq
                                         (.setField
                                         (.name "<module>pymro_cases.py")
@@ -603,8 +720,18 @@ def f__module_objects___module_ : Func :=
                                         (.seq
                                         (.setField
                                         (.name "<module>pymro_cases.py")
+                                        "Shape"
+                                        (.fnref "pymro_cases.py:<module>.Shape<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
                                         "Shelf"
                                         (.fnref "pymro_cases.py:<module>.Shelf<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "Square"
+                                        (.fnref "pymro_cases.py:<module>.Square<meta>"))
                                         (.seq
                                         (.setField
                                         (.name "<module>pymro_cases.py")
@@ -615,7 +742,12 @@ def f__module_objects___module_ : Func :=
                                         (.name "<module>pymro_cases.py")
                                         "Store"
                                         (.fnref "pymro_cases.py:<module>.Store<meta>"))
-                                        .skip))))))))))))))))))))))))))))))))))) }
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "SubGrid"
+                                        (.fnref "pymro_cases.py:<module>.SubGrid<meta>"))
+                                        .skip))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- `pymro_cases.py:<module>`  (from `pymro_cases.py`) -/
 def f_pymro_cases_py__module_ : Func :=
@@ -636,43 +768,45 @@ def f_pymro_cases_py__module_ : Func :=
                     (.seq
                       (.setGlobal "collections" (.fnref "<absent:external>collections"))
                       (.seq
-                        (.seq
-                          (.setGlobal "Store" (.fnref "pymro_cases.py:<module>.Store<meta>"))
-                          (.expr (.fnref "pymro_cases.py:<module>.Store<meta>")))
+                        (.setGlobal "ABC" (.fnref "<absent:external>abc"))
                         (.seq
                           (.seq
-                            (.setGlobal
-                              "DefaultStore"
-                              (.fnref "pymro_cases.py:<module>.DefaultStore<meta>"))
-                            (.expr (.fnref "pymro_cases.py:<module>.DefaultStore<meta>")))
+                            (.setGlobal "Store" (.fnref "pymro_cases.py:<module>.Store<meta>"))
+                            (.expr (.fnref "pymro_cases.py:<module>.Store<meta>")))
                           (.seq
-                            (.setGlobal
-                              "case_override_reached_from_base"
-                              (.fnref "pymro_cases.py:<module>.case_override_reached_from_base"))
                             (.seq
                               (.setGlobal
-                                "case_base_method_unchanged"
-                                (.fnref "pymro_cases.py:<module>.case_base_method_unchanged"))
+                                "DefaultStore"
+                                (.fnref "pymro_cases.py:<module>.DefaultStore<meta>"))
+                              (.expr (.fnref "pymro_cases.py:<module>.DefaultStore<meta>")))
+                            (.seq
+                              (.setGlobal
+                                "case_override_reached_from_base"
+                                (.fnref "pymro_cases.py:<module>.case_override_reached_from_base"))
                               (.seq
                                 (.setGlobal
-                                  "case_inherited_method"
-                                  (.fnref "pymro_cases.py:<module>.case_inherited_method"))
+                                  "case_base_method_unchanged"
+                                  (.fnref "pymro_cases.py:<module>.case_base_method_unchanged"))
                                 (.seq
                                   (.setGlobal
-                                    "case_inherited_init"
-                                    (.fnref "pymro_cases.py:<module>.case_inherited_init"))
+                                    "case_inherited_method"
+                                    (.fnref "pymro_cases.py:<module>.case_inherited_method"))
                                   (.seq
                                     (.setGlobal
-                                      "case_base_method_through_class_value"
-                                      (.fnref
-                                        "pymro_cases.py:<module>.case_base_method_through_class_value"))
+                                      "case_inherited_init"
+                                      (.fnref "pymro_cases.py:<module>.case_inherited_init"))
                                     (.seq
+                                      (.setGlobal
+                                        "case_base_method_through_class_value"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_base_method_through_class_value"))
                                       (.seq
+                                        (.seq
                                         (.setGlobal
                                         "Root"
                                         (.fnref "pymro_cases.py:<module>.Root<meta>"))
                                         (.expr (.fnref "pymro_cases.py:<module>.Root<meta>")))
-                                      (.seq
+                                        (.seq
                                         (.seq
                                         (.setGlobal
                                         "Left"
@@ -804,7 +938,49 @@ def f_pymro_cases_py__module_ : Func :=
                                         "case_builtin_call"
                                         (.fnref "pymro_cases.py:<module>.case_builtin_call"))
                                         (.seq
-                                        .skip
+                                        (.seq
+                                        (.setGlobal
+                                        "Shape"
+                                        (.fnref "pymro_cases.py:<module>.Shape<meta>"))
+                                        (.expr (.fnref "pymro_cases.py:<module>.Shape<meta>")))
+                                        (.seq
+                                        (.seq
+                                        (.setGlobal
+                                        "Square"
+                                        (.fnref "pymro_cases.py:<module>.Square<meta>"))
+                                        (.expr (.fnref "pymro_cases.py:<module>.Square<meta>")))
+                                        (.seq
+                                        (.setGlobal
+                                        "case_abc_base_is_transparent"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_abc_base_is_transparent"))
+                                        (.seq
+                                        (.seq
+                                        (.setGlobal
+                                        "Callbacks"
+                                        (.fnref "pymro_cases.py:<module>.Callbacks<meta>"))
+                                        (.expr (.fnref "pymro_cases.py:<module>.Callbacks<meta>")))
+                                        (.seq
+                                        (.setGlobal
+                                        "case_instance_attribute_shadows_method"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_instance_attribute_shadows_method"))
+                                        (.seq
+                                        (.seq
+                                        (.setGlobal
+                                        "Grid"
+                                        (.fnref "pymro_cases.py:<module>.Grid<meta>"))
+                                        (.expr (.fnref "pymro_cases.py:<module>.Grid<meta>")))
+                                        (.seq
+                                        (.seq
+                                        (.setGlobal
+                                        "SubGrid"
+                                        (.fnref "pymro_cases.py:<module>.SubGrid<meta>"))
+                                        (.expr (.fnref "pymro_cases.py:<module>.SubGrid<meta>")))
+                                        (.seq
+                                        (.setGlobal
+                                        "case_inherited_setitem"
+                                        (.fnref "pymro_cases.py:<module>.case_inherited_setitem"))
                                         (.seq
                                         .skip
                                         (.seq
@@ -881,7 +1057,27 @@ def f_pymro_cases_py__module_ : Func :=
                                         .skip
                                         (.seq
                                         .skip
-                                        (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- Module-level initializers: run these to populate the globals frame
 before calling any entry point. -/
@@ -891,7 +1087,7 @@ def moduleInits : List Func := [f__module_objects___module_, f_pymro_cases_py__m
 
 `pyClasses` is the class table: methods resolve along the C3 MRO, and bare
 names by Python scoping (STRATEGY.md §59). -/
-def program : Program := { dialect := .python, pyClasses := some [{ name := "Bag", bases := ["<ext>collections.abc.Mapping"], attrs := [] }, { name := "Bottom", bases := ["Left", "Right"], attrs := [] }, { name := "Counter", bases := [], attrs := [] }, { name := "DefaultStore", bases := ["Store"], attrs := [] }, { name := "Holder", bases := [], attrs := [] }, { name := "Left", bases := ["Root"], attrs := [] }, { name := "Right", bases := ["Root"], attrs := [] }, { name := "Root", bases := [], attrs := [] }, { name := "Shelf", bases := [], attrs := ["fetch"] }, { name := "StepCounter", bases := ["Counter"], attrs := [] }, { name := "Store", bases := [], attrs := [] }], funcs := [
+def program : Program := { dialect := .python, pyClasses := some [{ name := "Bag", bases := ["<ext>collections.abc.Mapping"], attrs := [] }, { name := "Bottom", bases := ["Left", "Right"], attrs := [] }, { name := "Callbacks", bases := [], attrs := [] }, { name := "Counter", bases := [], attrs := [] }, { name := "DefaultStore", bases := ["Store"], attrs := [] }, { name := "Grid", bases := [], attrs := [] }, { name := "Holder", bases := [], attrs := [] }, { name := "Left", bases := ["Root"], attrs := [] }, { name := "Right", bases := ["Root"], attrs := [] }, { name := "Root", bases := [], attrs := [] }, { name := "Shape", bases := [], attrs := [] }, { name := "Shelf", bases := [], attrs := ["fetch"] }, { name := "Square", bases := ["Shape"], attrs := [] }, { name := "StepCounter", bases := ["Counter"], attrs := [] }, { name := "Store", bases := [], attrs := [] }, { name := "SubGrid", bases := ["Grid"], attrs := [] }], funcs := [
   f_pymro_cases_py__module__Store___init__,
   f_pymro_cases_py__module__Store_lookup,
   f_pymro_cases_py__module__Store_on_missing,
@@ -938,6 +1134,17 @@ def program : Program := { dialect := .python, pyClasses := some [{ name := "Bag
   f_pymro_cases_py__module__apply_it,
   f_pymro_cases_py__module__case_module_global_read,
   f_pymro_cases_py__module__case_builtin_call,
+  f_pymro_cases_py__module__Shape_area,
+  f_pymro_cases_py__module__Shape_describe,
+  f_pymro_cases_py__module__Square___init__,
+  f_pymro_cases_py__module__Square_area,
+  f_pymro_cases_py__module__case_abc_base_is_transparent,
+  f_pymro_cases_py__module__Callbacks_handler,
+  f_pymro_cases_py__module__case_instance_attribute_shadows_method,
+  f_pymro_cases_py__module__case_instance_attribute_shadows_method__lambda_1,
+  f_pymro_cases_py__module__Grid___init__,
+  f_pymro_cases_py__module__Grid___setitem__,
+  f_pymro_cases_py__module__case_inherited_setitem,
   f__module_objects___module_,
   f_pymro_cases_py__module_
 ] }

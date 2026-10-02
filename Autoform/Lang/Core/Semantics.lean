@@ -1803,7 +1803,17 @@ def Ctx.builtinOfValue (ctx : Ctx) (h : Heap) (g : String) (vs : List Val) :
   if ctx.pyStrict && g.startsWith "__builtin." then
     let b0 := (g.drop "__builtin.".length).toString
     let b  := if b0.endsWith "<meta>" then b0.dropRight "<meta>".length else b0
-    Stdlib.builtin ctx.dialect h b (builtinSeeThrough b vs)
+    -- Exactly what a call of `b` by name does (the `Expr.call` fallthrough): boxed
+    -- containers are seen through only where that is exact, and a fresh container a
+    -- builtin builds is boxed.
+    if builtinRefused h b vs then some (h, .hole s!"call:{b}:boxed-key") else
+    match Stdlib.builtin ctx.dialect h b (builtinSeeThrough b (builtinArgs h b vs)) with
+    | some (h₂, .val v) =>
+        if ctx.dialect.isPython && freshBuiltins.contains b then
+          let (h₃, v') := h₂.boxFresh v
+          some (h₃, .val v')
+        else some (h₂, .val v)
+    | r => r
   else none
 
 @[simp] theorem Ctx.builtinOfValue_of_none {ctx : Ctx} {h : Heap} {g : String} {vs : List Val}

@@ -412,13 +412,16 @@
   "body": {
    "k": "ret",
    "e": {
-    "k": "listE",
-    "items": [
-     {
-      "k": "str",
-      "v": "Root"
-     }
-    ]
+    "k": "boxContainer",
+    "e": {
+     "k": "listE",
+     "items": [
+      {
+       "k": "str",
+       "v": "Root"
+      }
+     ]
+    }
    }
   }
  },
@@ -487,13 +490,16 @@
        "k": "binop",
        "op": "+",
        "a": {
-        "k": "listE",
-        "items": [
-         {
-          "k": "str",
-          "v": "Left"
-         }
-        ]
+        "k": "boxContainer",
+        "e": {
+         "k": "listE",
+         "items": [
+          {
+           "k": "str",
+           "v": "Left"
+          }
+         ]
+        }
        },
        "b": {
         "k": "name",
@@ -567,13 +573,16 @@
        "k": "binop",
        "op": "+",
        "a": {
-        "k": "listE",
-        "items": [
-         {
-          "k": "str",
-          "v": "Right"
-         }
-        ]
+        "k": "boxContainer",
+        "e": {
+         "k": "listE",
+         "items": [
+          {
+           "k": "str",
+           "v": "Right"
+          }
+         ]
+        }
        },
        "b": {
         "k": "name",
@@ -659,13 +668,16 @@
        "k": "binop",
        "op": "+",
        "a": {
-        "k": "listE",
-        "items": [
-         {
-          "k": "str",
-          "v": "Bottom"
-         }
-        ]
+        "k": "boxContainer",
+        "e": {
+         "k": "listE",
+         "items": [
+          {
+           "k": "str",
+           "v": "Bottom"
+          }
+         ]
+        }
        },
        "b": {
         "k": "name",
@@ -1251,13 +1263,16 @@
      "f": "iter",
      "args": [
       {
-       "k": "listE",
-       "items": [
-        {
-         "k": "str",
-         "v": "a"
-        }
-       ]
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "str",
+          "v": "a"
+         }
+        ]
+       }
       }
      ]
     }
@@ -1620,21 +1635,24 @@
        "v": "len"
       },
       {
-       "k": "listE",
-       "items": [
-        {
-         "k": "int",
-         "v": "1"
-        },
-        {
-         "k": "int",
-         "v": "2"
-        },
-        {
-         "k": "int",
-         "v": "3"
-        }
-       ]
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "int",
+          "v": "1"
+         },
+         {
+          "k": "int",
+          "v": "2"
+         },
+         {
+          "k": "int",
+          "v": "3"
+         }
+        ]
+       }
       }
      ]
     }
@@ -1722,6 +1740,342 @@
   }
  },
  {
+  "name": "pymro_cases.py:<module>.Shape.area",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "int",
+    "v": "0"
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.Shape.describe",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "str",
+      "v": "shape"
+     },
+     {
+      "k": "mcall",
+      "recv": {
+       "k": "name",
+       "v": "self"
+      },
+      "m": "area",
+      "args": []
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.Square.__init__",
+  "file": "pymro_cases.py",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "setField",
+   "r": {
+    "k": "name",
+    "v": "self"
+   },
+   "f": "s",
+   "v": {
+    "k": "name",
+    "v": "s"
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.Square.area",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "*",
+    "a": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "s"
+    },
+    "b": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "s"
+    }
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_abc_base_is_transparent",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "alloc",
+      "cls": "Square",
+      "args": [
+       {
+        "k": "int",
+        "v": "3"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "mcall",
+      "recv": {
+       "k": "name",
+       "v": "tmp0"
+      },
+      "m": "describe",
+      "args": []
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "skip"
+    }
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.Callbacks.handler",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "str",
+    "v": "method"
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_instance_attribute_shadows_method",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "c",
+    "e": {
+     "k": "alloc",
+     "cls": "Callbacks",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "c"
+     },
+     "f": "handler",
+     "v": {
+      "k": "fnref",
+      "v": "pymro_cases.py:<module>.case_instance_attribute_shadows_method.<lambda>1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "c"
+       },
+       "m": "handler",
+       "args": []
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "skip"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_instance_attribute_shadows_method.<lambda>1",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "str",
+    "v": "instance"
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.Grid.__init__",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "setField",
+   "r": {
+    "k": "name",
+    "v": "self"
+   },
+   "f": "total",
+   "v": {
+    "k": "int",
+    "v": "0"
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.Grid.__setitem__",
+  "file": "pymro_cases.py",
+  "params": [
+   "k",
+   "v"
+  ],
+  "body": {
+   "k": "setField",
+   "r": {
+    "k": "name",
+    "v": "self"
+   },
+   "f": "total",
+   "v": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "total"
+    },
+    "b": {
+     "k": "name",
+     "v": "v"
+    }
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_inherited_setitem",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "g",
+    "e": {
+     "k": "alloc",
+     "cls": "SubGrid",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "g"
+      },
+      "i": {
+       "k": "int",
+       "v": "1"
+      },
+      "v": {
+       "k": "int",
+       "v": "5"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setIndex",
+        "r": {
+         "k": "name",
+         "v": "g"
+        },
+        "i": {
+         "k": "int",
+         "v": "2"
+        },
+        "v": {
+         "k": "int",
+         "v": "7"
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "field",
+         "a": {
+          "k": "name",
+          "v": "g"
+         },
+         "f": "total"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
   "name": "<module-objects>:<module>",
   "file": "",
   "params": [],
@@ -1758,10 +2112,10 @@
        "k": "name",
        "v": "<module>pymro_cases.py"
       },
-      "f": "case_absent_method",
+      "f": "case_abc_base_is_transparent",
       "v": {
        "k": "fnref",
-       "v": "pymro_cases.py:<module>.case_absent_method"
+       "v": "pymro_cases.py:<module>.case_abc_base_is_transparent"
       }
      },
      "b": {
@@ -1772,10 +2126,10 @@
         "k": "name",
         "v": "<module>pymro_cases.py"
        },
-       "f": "case_base_method_through_class_value",
+       "f": "case_absent_method",
        "v": {
         "k": "fnref",
-        "v": "pymro_cases.py:<module>.case_base_method_through_class_value"
+        "v": "pymro_cases.py:<module>.case_absent_method"
        }
       },
       "b": {
@@ -1786,10 +2140,10 @@
          "k": "name",
          "v": "<module>pymro_cases.py"
         },
-        "f": "case_base_method_unchanged",
+        "f": "case_base_method_through_class_value",
         "v": {
          "k": "fnref",
-         "v": "pymro_cases.py:<module>.case_base_method_unchanged"
+         "v": "pymro_cases.py:<module>.case_base_method_through_class_value"
         }
        },
        "b": {
@@ -1800,10 +2154,10 @@
           "k": "name",
           "v": "<module>pymro_cases.py"
          },
-         "f": "case_builtin_call",
+         "f": "case_base_method_unchanged",
          "v": {
           "k": "fnref",
-          "v": "pymro_cases.py:<module>.case_builtin_call"
+          "v": "pymro_cases.py:<module>.case_base_method_unchanged"
          }
         },
         "b": {
@@ -1814,10 +2168,10 @@
            "k": "name",
            "v": "<module>pymro_cases.py"
           },
-          "f": "case_class_attribute_alias",
+          "f": "case_builtin_call",
           "v": {
            "k": "fnref",
-           "v": "pymro_cases.py:<module>.case_class_attribute_alias"
+           "v": "pymro_cases.py:<module>.case_builtin_call"
           }
          },
          "b": {
@@ -1828,10 +2182,10 @@
             "k": "name",
             "v": "<module>pymro_cases.py"
            },
-           "f": "case_diamond_mro_lookup",
+           "f": "case_class_attribute_alias",
            "v": {
             "k": "fnref",
-            "v": "pymro_cases.py:<module>.case_diamond_mro_lookup"
+            "v": "pymro_cases.py:<module>.case_class_attribute_alias"
            }
           },
           "b": {
@@ -1842,10 +2196,10 @@
              "k": "name",
              "v": "<module>pymro_cases.py"
             },
-            "f": "case_external_base_method",
+            "f": "case_diamond_mro_lookup",
             "v": {
              "k": "fnref",
-             "v": "pymro_cases.py:<module>.case_external_base_method"
+             "v": "pymro_cases.py:<module>.case_diamond_mro_lookup"
             }
            },
            "b": {
@@ -1856,10 +2210,10 @@
               "k": "name",
               "v": "<module>pymro_cases.py"
              },
-             "f": "case_inherited_init",
+             "f": "case_external_base_method",
              "v": {
               "k": "fnref",
-              "v": "pymro_cases.py:<module>.case_inherited_init"
+              "v": "pymro_cases.py:<module>.case_external_base_method"
              }
             },
             "b": {
@@ -1870,10 +2224,10 @@
                "k": "name",
                "v": "<module>pymro_cases.py"
               },
-              "f": "case_inherited_method",
+              "f": "case_inherited_init",
               "v": {
                "k": "fnref",
-               "v": "pymro_cases.py:<module>.case_inherited_method"
+               "v": "pymro_cases.py:<module>.case_inherited_init"
               }
              },
              "b": {
@@ -1884,10 +2238,10 @@
                 "k": "name",
                 "v": "<module>pymro_cases.py"
                },
-               "f": "case_local_function_value_shadows_method",
+               "f": "case_inherited_method",
                "v": {
                 "k": "fnref",
-                "v": "pymro_cases.py:<module>.case_local_function_value_shadows_method"
+                "v": "pymro_cases.py:<module>.case_inherited_method"
                }
               },
               "b": {
@@ -1898,10 +2252,10 @@
                  "k": "name",
                  "v": "<module>pymro_cases.py"
                 },
-                "f": "case_module_global_read",
+                "f": "case_inherited_setitem",
                 "v": {
                  "k": "fnref",
-                 "v": "pymro_cases.py:<module>.case_module_global_read"
+                 "v": "pymro_cases.py:<module>.case_inherited_setitem"
                 }
                },
                "b": {
@@ -1912,10 +2266,10 @@
                   "k": "name",
                   "v": "<module>pymro_cases.py"
                  },
-                 "f": "case_override_reached_from_base",
+                 "f": "case_instance_attribute_shadows_method",
                  "v": {
                   "k": "fnref",
-                  "v": "pymro_cases.py:<module>.case_override_reached_from_base"
+                  "v": "pymro_cases.py:<module>.case_instance_attribute_shadows_method"
                  }
                 },
                 "b": {
@@ -1926,10 +2280,10 @@
                    "k": "name",
                    "v": "<module>pymro_cases.py"
                   },
-                  "f": "case_own_method_before_external_base",
+                  "f": "case_local_function_value_shadows_method",
                   "v": {
                    "k": "fnref",
-                   "v": "pymro_cases.py:<module>.case_own_method_before_external_base"
+                   "v": "pymro_cases.py:<module>.case_local_function_value_shadows_method"
                   }
                  },
                  "b": {
@@ -1940,10 +2294,10 @@
                     "k": "name",
                     "v": "<module>pymro_cases.py"
                    },
-                   "f": "case_parameter_function_value",
+                   "f": "case_module_global_read",
                    "v": {
                     "k": "fnref",
-                    "v": "pymro_cases.py:<module>.case_parameter_function_value"
+                    "v": "pymro_cases.py:<module>.case_module_global_read"
                    }
                   },
                   "b": {
@@ -1954,10 +2308,10 @@
                      "k": "name",
                      "v": "<module>pymro_cases.py"
                     },
-                    "f": "case_staticmethod_through_instance",
+                    "f": "case_override_reached_from_base",
                     "v": {
                      "k": "fnref",
-                     "v": "pymro_cases.py:<module>.case_staticmethod_through_instance"
+                     "v": "pymro_cases.py:<module>.case_override_reached_from_base"
                     }
                    },
                    "b": {
@@ -1968,10 +2322,10 @@
                       "k": "name",
                       "v": "<module>pymro_cases.py"
                      },
-                     "f": "case_super_follows_instance_mro",
+                     "f": "case_own_method_before_external_base",
                      "v": {
                       "k": "fnref",
-                      "v": "pymro_cases.py:<module>.case_super_follows_instance_mro"
+                      "v": "pymro_cases.py:<module>.case_own_method_before_external_base"
                      }
                     },
                     "b": {
@@ -1982,10 +2336,10 @@
                        "k": "name",
                        "v": "<module>pymro_cases.py"
                       },
-                      "f": "case_super_init_with_args",
+                      "f": "case_parameter_function_value",
                       "v": {
                        "k": "fnref",
-                       "v": "pymro_cases.py:<module>.case_super_init_with_args"
+                       "v": "pymro_cases.py:<module>.case_parameter_function_value"
                       }
                      },
                      "b": {
@@ -1996,10 +2350,10 @@
                         "k": "name",
                         "v": "<module>pymro_cases.py"
                        },
-                       "f": "case_super_single",
+                       "f": "case_staticmethod_through_instance",
                        "v": {
                         "k": "fnref",
-                        "v": "pymro_cases.py:<module>.case_super_single"
+                        "v": "pymro_cases.py:<module>.case_staticmethod_through_instance"
                        }
                       },
                       "b": {
@@ -2010,10 +2364,10 @@
                          "k": "name",
                          "v": "<module>pymro_cases.py"
                         },
-                        "f": "case_unbound_name_is_not_a_method",
+                        "f": "case_super_follows_instance_mro",
                         "v": {
                          "k": "fnref",
-                         "v": "pymro_cases.py:<module>.case_unbound_name_is_not_a_method"
+                         "v": "pymro_cases.py:<module>.case_super_follows_instance_mro"
                         }
                        },
                        "b": {
@@ -2024,10 +2378,10 @@
                           "k": "name",
                           "v": "<module>pymro_cases.py"
                          },
-                         "f": "case_unresolvable_base",
+                         "f": "case_super_init_with_args",
                          "v": {
                           "k": "fnref",
-                          "v": "pymro_cases.py:<module>.case_unresolvable_base"
+                          "v": "pymro_cases.py:<module>.case_super_init_with_args"
                          }
                         },
                         "b": {
@@ -2038,10 +2392,10 @@
                            "k": "name",
                            "v": "<module>pymro_cases.py"
                           },
-                          "f": "make_base",
+                          "f": "case_super_single",
                           "v": {
                            "k": "fnref",
-                           "v": "pymro_cases.py:<module>.make_base"
+                           "v": "pymro_cases.py:<module>.case_super_single"
                           }
                          },
                          "b": {
@@ -2052,10 +2406,10 @@
                             "k": "name",
                             "v": "<module>pymro_cases.py"
                            },
-                           "f": "Bag",
+                           "f": "case_unbound_name_is_not_a_method",
                            "v": {
                             "k": "fnref",
-                            "v": "pymro_cases.py:<module>.Bag<meta>"
+                            "v": "pymro_cases.py:<module>.case_unbound_name_is_not_a_method"
                            }
                           },
                           "b": {
@@ -2066,10 +2420,10 @@
                              "k": "name",
                              "v": "<module>pymro_cases.py"
                             },
-                            "f": "Bottom",
+                            "f": "case_unresolvable_base",
                             "v": {
                              "k": "fnref",
-                             "v": "pymro_cases.py:<module>.Bottom<meta>"
+                             "v": "pymro_cases.py:<module>.case_unresolvable_base"
                             }
                            },
                            "b": {
@@ -2080,10 +2434,10 @@
                               "k": "name",
                               "v": "<module>pymro_cases.py"
                              },
-                             "f": "Counter",
+                             "f": "make_base",
                              "v": {
                               "k": "fnref",
-                              "v": "pymro_cases.py:<module>.Counter<meta>"
+                              "v": "pymro_cases.py:<module>.make_base"
                              }
                             },
                             "b": {
@@ -2094,10 +2448,10 @@
                                "k": "name",
                                "v": "<module>pymro_cases.py"
                               },
-                              "f": "DefaultStore",
+                              "f": "Bag",
                               "v": {
                                "k": "fnref",
-                               "v": "pymro_cases.py:<module>.DefaultStore<meta>"
+                               "v": "pymro_cases.py:<module>.Bag<meta>"
                               }
                              },
                              "b": {
@@ -2108,10 +2462,10 @@
                                 "k": "name",
                                 "v": "<module>pymro_cases.py"
                                },
-                               "f": "Dynamic",
+                               "f": "Bottom",
                                "v": {
                                 "k": "fnref",
-                                "v": "pymro_cases.py:<module>.Dynamic<meta>"
+                                "v": "pymro_cases.py:<module>.Bottom<meta>"
                                }
                               },
                               "b": {
@@ -2122,10 +2476,10 @@
                                  "k": "name",
                                  "v": "<module>pymro_cases.py"
                                 },
-                                "f": "Holder",
+                                "f": "Callbacks",
                                 "v": {
                                  "k": "fnref",
-                                 "v": "pymro_cases.py:<module>.Holder<meta>"
+                                 "v": "pymro_cases.py:<module>.Callbacks<meta>"
                                 }
                                },
                                "b": {
@@ -2136,10 +2490,10 @@
                                   "k": "name",
                                   "v": "<module>pymro_cases.py"
                                  },
-                                 "f": "Left",
+                                 "f": "Counter",
                                  "v": {
                                   "k": "fnref",
-                                  "v": "pymro_cases.py:<module>.Left<meta>"
+                                  "v": "pymro_cases.py:<module>.Counter<meta>"
                                  }
                                 },
                                 "b": {
@@ -2150,10 +2504,10 @@
                                    "k": "name",
                                    "v": "<module>pymro_cases.py"
                                   },
-                                  "f": "Right",
+                                  "f": "DefaultStore",
                                   "v": {
                                    "k": "fnref",
-                                   "v": "pymro_cases.py:<module>.Right<meta>"
+                                   "v": "pymro_cases.py:<module>.DefaultStore<meta>"
                                   }
                                  },
                                  "b": {
@@ -2164,10 +2518,10 @@
                                     "k": "name",
                                     "v": "<module>pymro_cases.py"
                                    },
-                                   "f": "Root",
+                                   "f": "Dynamic",
                                    "v": {
                                     "k": "fnref",
-                                    "v": "pymro_cases.py:<module>.Root<meta>"
+                                    "v": "pymro_cases.py:<module>.Dynamic<meta>"
                                    }
                                   },
                                   "b": {
@@ -2178,10 +2532,10 @@
                                      "k": "name",
                                      "v": "<module>pymro_cases.py"
                                     },
-                                    "f": "Shelf",
+                                    "f": "Grid",
                                     "v": {
                                      "k": "fnref",
-                                     "v": "pymro_cases.py:<module>.Shelf<meta>"
+                                     "v": "pymro_cases.py:<module>.Grid<meta>"
                                     }
                                    },
                                    "b": {
@@ -2192,10 +2546,10 @@
                                       "k": "name",
                                       "v": "<module>pymro_cases.py"
                                      },
-                                     "f": "StepCounter",
+                                     "f": "Holder",
                                      "v": {
                                       "k": "fnref",
-                                      "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                                      "v": "pymro_cases.py:<module>.Holder<meta>"
                                      }
                                     },
                                     "b": {
@@ -2206,14 +2560,134 @@
                                        "k": "name",
                                        "v": "<module>pymro_cases.py"
                                       },
-                                      "f": "Store",
+                                      "f": "Left",
                                       "v": {
                                        "k": "fnref",
-                                       "v": "pymro_cases.py:<module>.Store<meta>"
+                                       "v": "pymro_cases.py:<module>.Left<meta>"
                                       }
                                      },
                                      "b": {
-                                      "k": "skip"
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setField",
+                                       "r": {
+                                        "k": "name",
+                                        "v": "<module>pymro_cases.py"
+                                       },
+                                       "f": "Right",
+                                       "v": {
+                                        "k": "fnref",
+                                        "v": "pymro_cases.py:<module>.Right<meta>"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "setField",
+                                        "r": {
+                                         "k": "name",
+                                         "v": "<module>pymro_cases.py"
+                                        },
+                                        "f": "Root",
+                                        "v": {
+                                         "k": "fnref",
+                                         "v": "pymro_cases.py:<module>.Root<meta>"
+                                        }
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "setField",
+                                         "r": {
+                                          "k": "name",
+                                          "v": "<module>pymro_cases.py"
+                                         },
+                                         "f": "Shape",
+                                         "v": {
+                                          "k": "fnref",
+                                          "v": "pymro_cases.py:<module>.Shape<meta>"
+                                         }
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "setField",
+                                          "r": {
+                                           "k": "name",
+                                           "v": "<module>pymro_cases.py"
+                                          },
+                                          "f": "Shelf",
+                                          "v": {
+                                           "k": "fnref",
+                                           "v": "pymro_cases.py:<module>.Shelf<meta>"
+                                          }
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "setField",
+                                           "r": {
+                                            "k": "name",
+                                            "v": "<module>pymro_cases.py"
+                                           },
+                                           "f": "Square",
+                                           "v": {
+                                            "k": "fnref",
+                                            "v": "pymro_cases.py:<module>.Square<meta>"
+                                           }
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "setField",
+                                            "r": {
+                                             "k": "name",
+                                             "v": "<module>pymro_cases.py"
+                                            },
+                                            "f": "StepCounter",
+                                            "v": {
+                                             "k": "fnref",
+                                             "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                                            }
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "setField",
+                                             "r": {
+                                              "k": "name",
+                                              "v": "<module>pymro_cases.py"
+                                             },
+                                             "f": "Store",
+                                             "v": {
+                                              "k": "fnref",
+                                              "v": "pymro_cases.py:<module>.Store<meta>"
+                                             }
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "setField",
+                                              "r": {
+                                               "k": "name",
+                                               "v": "<module>pymro_cases.py"
+                                              },
+                                              "f": "SubGrid",
+                                              "v": {
+                                               "k": "fnref",
+                                               "v": "pymro_cases.py:<module>.SubGrid<meta>"
+                                              }
+                                             },
+                                             "b": {
+                                              "k": "skip"
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
                                      }
                                     }
                                    }
@@ -2317,21 +2791,11 @@
         "b": {
          "k": "seq",
          "a": {
-          "k": "seq",
-          "a": {
-           "k": "setGlobal",
-           "x": "Store",
-           "e": {
-            "k": "fnref",
-            "v": "pymro_cases.py:<module>.Store<meta>"
-           }
-          },
-          "b": {
-           "k": "exprS",
-           "e": {
-            "k": "fnref",
-            "v": "pymro_cases.py:<module>.Store<meta>"
-           }
+          "k": "setGlobal",
+          "x": "ABC",
+          "e": {
+           "k": "fnref",
+           "v": "<absent:external>abc"
           }
          },
          "b": {
@@ -2340,88 +2804,88 @@
            "k": "seq",
            "a": {
             "k": "setGlobal",
-            "x": "DefaultStore",
+            "x": "Store",
             "e": {
              "k": "fnref",
-             "v": "pymro_cases.py:<module>.DefaultStore<meta>"
+             "v": "pymro_cases.py:<module>.Store<meta>"
             }
            },
            "b": {
             "k": "exprS",
             "e": {
              "k": "fnref",
-             "v": "pymro_cases.py:<module>.DefaultStore<meta>"
+             "v": "pymro_cases.py:<module>.Store<meta>"
             }
            }
           },
           "b": {
            "k": "seq",
            "a": {
-            "k": "setGlobal",
-            "x": "case_override_reached_from_base",
-            "e": {
-             "k": "fnref",
-             "v": "pymro_cases.py:<module>.case_override_reached_from_base"
+            "k": "seq",
+            "a": {
+             "k": "setGlobal",
+             "x": "DefaultStore",
+             "e": {
+              "k": "fnref",
+              "v": "pymro_cases.py:<module>.DefaultStore<meta>"
+             }
+            },
+            "b": {
+             "k": "exprS",
+             "e": {
+              "k": "fnref",
+              "v": "pymro_cases.py:<module>.DefaultStore<meta>"
+             }
             }
            },
            "b": {
             "k": "seq",
             "a": {
              "k": "setGlobal",
-             "x": "case_base_method_unchanged",
+             "x": "case_override_reached_from_base",
              "e": {
               "k": "fnref",
-              "v": "pymro_cases.py:<module>.case_base_method_unchanged"
+              "v": "pymro_cases.py:<module>.case_override_reached_from_base"
              }
             },
             "b": {
              "k": "seq",
              "a": {
               "k": "setGlobal",
-              "x": "case_inherited_method",
+              "x": "case_base_method_unchanged",
               "e": {
                "k": "fnref",
-               "v": "pymro_cases.py:<module>.case_inherited_method"
+               "v": "pymro_cases.py:<module>.case_base_method_unchanged"
               }
              },
              "b": {
               "k": "seq",
               "a": {
                "k": "setGlobal",
-               "x": "case_inherited_init",
+               "x": "case_inherited_method",
                "e": {
                 "k": "fnref",
-                "v": "pymro_cases.py:<module>.case_inherited_init"
+                "v": "pymro_cases.py:<module>.case_inherited_method"
                }
               },
               "b": {
                "k": "seq",
                "a": {
                 "k": "setGlobal",
-                "x": "case_base_method_through_class_value",
+                "x": "case_inherited_init",
                 "e": {
                  "k": "fnref",
-                 "v": "pymro_cases.py:<module>.case_base_method_through_class_value"
+                 "v": "pymro_cases.py:<module>.case_inherited_init"
                 }
                },
                "b": {
                 "k": "seq",
                 "a": {
-                 "k": "seq",
-                 "a": {
-                  "k": "setGlobal",
-                  "x": "Root",
-                  "e": {
-                   "k": "fnref",
-                   "v": "pymro_cases.py:<module>.Root<meta>"
-                  }
-                 },
-                 "b": {
-                  "k": "exprS",
-                  "e": {
-                   "k": "fnref",
-                   "v": "pymro_cases.py:<module>.Root<meta>"
-                  }
+                 "k": "setGlobal",
+                 "x": "case_base_method_through_class_value",
+                 "e": {
+                  "k": "fnref",
+                  "v": "pymro_cases.py:<module>.case_base_method_through_class_value"
                  }
                 },
                 "b": {
@@ -2430,17 +2894,17 @@
                   "k": "seq",
                   "a": {
                    "k": "setGlobal",
-                   "x": "Left",
+                   "x": "Root",
                    "e": {
                     "k": "fnref",
-                    "v": "pymro_cases.py:<module>.Left<meta>"
+                    "v": "pymro_cases.py:<module>.Root<meta>"
                    }
                   },
                   "b": {
                    "k": "exprS",
                    "e": {
                     "k": "fnref",
-                    "v": "pymro_cases.py:<module>.Left<meta>"
+                    "v": "pymro_cases.py:<module>.Root<meta>"
                    }
                   }
                  },
@@ -2450,17 +2914,17 @@
                    "k": "seq",
                    "a": {
                     "k": "setGlobal",
-                    "x": "Right",
+                    "x": "Left",
                     "e": {
                      "k": "fnref",
-                     "v": "pymro_cases.py:<module>.Right<meta>"
+                     "v": "pymro_cases.py:<module>.Left<meta>"
                     }
                    },
                    "b": {
                     "k": "exprS",
                     "e": {
                      "k": "fnref",
-                     "v": "pymro_cases.py:<module>.Right<meta>"
+                     "v": "pymro_cases.py:<module>.Left<meta>"
                     }
                    }
                   },
@@ -2470,68 +2934,68 @@
                     "k": "seq",
                     "a": {
                      "k": "setGlobal",
-                     "x": "Bottom",
+                     "x": "Right",
                      "e": {
                       "k": "fnref",
-                      "v": "pymro_cases.py:<module>.Bottom<meta>"
+                      "v": "pymro_cases.py:<module>.Right<meta>"
                      }
                     },
                     "b": {
                      "k": "exprS",
                      "e": {
                       "k": "fnref",
-                      "v": "pymro_cases.py:<module>.Bottom<meta>"
+                      "v": "pymro_cases.py:<module>.Right<meta>"
                      }
                     }
                    },
                    "b": {
                     "k": "seq",
                     "a": {
-                     "k": "setGlobal",
-                     "x": "case_diamond_mro_lookup",
-                     "e": {
-                      "k": "fnref",
-                      "v": "pymro_cases.py:<module>.case_diamond_mro_lookup"
+                     "k": "seq",
+                     "a": {
+                      "k": "setGlobal",
+                      "x": "Bottom",
+                      "e": {
+                       "k": "fnref",
+                       "v": "pymro_cases.py:<module>.Bottom<meta>"
+                      }
+                     },
+                     "b": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "fnref",
+                       "v": "pymro_cases.py:<module>.Bottom<meta>"
+                      }
                      }
                     },
                     "b": {
                      "k": "seq",
                      "a": {
                       "k": "setGlobal",
-                      "x": "case_super_follows_instance_mro",
+                      "x": "case_diamond_mro_lookup",
                       "e": {
                        "k": "fnref",
-                       "v": "pymro_cases.py:<module>.case_super_follows_instance_mro"
+                       "v": "pymro_cases.py:<module>.case_diamond_mro_lookup"
                       }
                      },
                      "b": {
                       "k": "seq",
                       "a": {
                        "k": "setGlobal",
-                       "x": "case_super_single",
+                       "x": "case_super_follows_instance_mro",
                        "e": {
                         "k": "fnref",
-                        "v": "pymro_cases.py:<module>.case_super_single"
+                        "v": "pymro_cases.py:<module>.case_super_follows_instance_mro"
                        }
                       },
                       "b": {
                        "k": "seq",
                        "a": {
-                        "k": "seq",
-                        "a": {
-                         "k": "setGlobal",
-                         "x": "Counter",
-                         "e": {
-                          "k": "fnref",
-                          "v": "pymro_cases.py:<module>.Counter<meta>"
-                         }
-                        },
-                        "b": {
-                         "k": "exprS",
-                         "e": {
-                          "k": "fnref",
-                          "v": "pymro_cases.py:<module>.Counter<meta>"
-                         }
+                        "k": "setGlobal",
+                        "x": "case_super_single",
+                        "e": {
+                         "k": "fnref",
+                         "v": "pymro_cases.py:<module>.case_super_single"
                         }
                        },
                        "b": {
@@ -2540,294 +3004,399 @@
                          "k": "seq",
                          "a": {
                           "k": "setGlobal",
-                          "x": "StepCounter",
+                          "x": "Counter",
                           "e": {
                            "k": "fnref",
-                           "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                           "v": "pymro_cases.py:<module>.Counter<meta>"
                           }
                          },
                          "b": {
                           "k": "exprS",
                           "e": {
                            "k": "fnref",
-                           "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                           "v": "pymro_cases.py:<module>.Counter<meta>"
                           }
                          }
                         },
                         "b": {
                          "k": "seq",
                          "a": {
-                          "k": "setGlobal",
-                          "x": "case_super_init_with_args",
-                          "e": {
-                           "k": "fnref",
-                           "v": "pymro_cases.py:<module>.case_super_init_with_args"
+                          "k": "seq",
+                          "a": {
+                           "k": "setGlobal",
+                           "x": "StepCounter",
+                           "e": {
+                            "k": "fnref",
+                            "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                           }
+                          },
+                          "b": {
+                           "k": "exprS",
+                           "e": {
+                            "k": "fnref",
+                            "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                           }
                           }
                          },
                          "b": {
                           "k": "seq",
                           "a": {
-                           "k": "seq",
-                           "a": {
-                            "k": "setGlobal",
-                            "x": "Shelf",
-                            "e": {
-                             "k": "fnref",
-                             "v": "pymro_cases.py:<module>.Shelf<meta>"
-                            }
-                           },
-                           "b": {
-                            "k": "exprS",
-                            "e": {
-                             "k": "fnref",
-                             "v": "pymro_cases.py:<module>.Shelf<meta>"
-                            }
+                           "k": "setGlobal",
+                           "x": "case_super_init_with_args",
+                           "e": {
+                            "k": "fnref",
+                            "v": "pymro_cases.py:<module>.case_super_init_with_args"
                            }
                           },
                           "b": {
                            "k": "seq",
                            "a": {
-                            "k": "setGlobal",
-                            "x": "case_staticmethod_through_instance",
-                            "e": {
-                             "k": "fnref",
-                             "v": "pymro_cases.py:<module>.case_staticmethod_through_instance"
+                            "k": "seq",
+                            "a": {
+                             "k": "setGlobal",
+                             "x": "Shelf",
+                             "e": {
+                              "k": "fnref",
+                              "v": "pymro_cases.py:<module>.Shelf<meta>"
+                             }
+                            },
+                            "b": {
+                             "k": "exprS",
+                             "e": {
+                              "k": "fnref",
+                              "v": "pymro_cases.py:<module>.Shelf<meta>"
+                             }
                             }
                            },
                            "b": {
                             "k": "seq",
                             "a": {
                              "k": "setGlobal",
-                             "x": "case_class_attribute_alias",
+                             "x": "case_staticmethod_through_instance",
                              "e": {
                               "k": "fnref",
-                              "v": "pymro_cases.py:<module>.case_class_attribute_alias"
+                              "v": "pymro_cases.py:<module>.case_staticmethod_through_instance"
                              }
                             },
                             "b": {
                              "k": "seq",
                              "a": {
-                              "k": "seq",
-                              "a": {
-                               "k": "setGlobal",
-                               "x": "Bag",
-                               "e": {
-                                "k": "fnref",
-                                "v": "pymro_cases.py:<module>.Bag<meta>"
-                               }
-                              },
-                              "b": {
-                               "k": "exprS",
-                               "e": {
-                                "k": "fnref",
-                                "v": "pymro_cases.py:<module>.Bag<meta>"
-                               }
+                              "k": "setGlobal",
+                              "x": "case_class_attribute_alias",
+                              "e": {
+                               "k": "fnref",
+                               "v": "pymro_cases.py:<module>.case_class_attribute_alias"
                               }
                              },
                              "b": {
                               "k": "seq",
                               "a": {
-                               "k": "setGlobal",
-                               "x": "case_external_base_method",
-                               "e": {
-                                "k": "fnref",
-                                "v": "pymro_cases.py:<module>.case_external_base_method"
+                               "k": "seq",
+                               "a": {
+                                "k": "setGlobal",
+                                "x": "Bag",
+                                "e": {
+                                 "k": "fnref",
+                                 "v": "pymro_cases.py:<module>.Bag<meta>"
+                                }
+                               },
+                               "b": {
+                                "k": "exprS",
+                                "e": {
+                                 "k": "fnref",
+                                 "v": "pymro_cases.py:<module>.Bag<meta>"
+                                }
                                }
                               },
                               "b": {
                                "k": "seq",
                                "a": {
                                 "k": "setGlobal",
-                                "x": "case_own_method_before_external_base",
+                                "x": "case_external_base_method",
                                 "e": {
                                  "k": "fnref",
-                                 "v": "pymro_cases.py:<module>.case_own_method_before_external_base"
+                                 "v": "pymro_cases.py:<module>.case_external_base_method"
                                 }
                                },
                                "b": {
                                 "k": "seq",
                                 "a": {
                                  "k": "setGlobal",
-                                 "x": "case_absent_method",
+                                 "x": "case_own_method_before_external_base",
                                  "e": {
                                   "k": "fnref",
-                                  "v": "pymro_cases.py:<module>.case_absent_method"
+                                  "v": "pymro_cases.py:<module>.case_own_method_before_external_base"
                                  }
                                 },
                                 "b": {
                                  "k": "seq",
                                  "a": {
                                   "k": "setGlobal",
-                                  "x": "make_base",
+                                  "x": "case_absent_method",
                                   "e": {
                                    "k": "fnref",
-                                   "v": "pymro_cases.py:<module>.make_base"
+                                   "v": "pymro_cases.py:<module>.case_absent_method"
                                   }
                                  },
                                  "b": {
                                   "k": "seq",
                                   "a": {
-                                   "k": "seq",
-                                   "a": {
-                                    "k": "setGlobal",
-                                    "x": "Dynamic",
-                                    "e": {
-                                     "k": "fnref",
-                                     "v": "pymro_cases.py:<module>.Dynamic<meta>"
-                                    }
-                                   },
-                                   "b": {
-                                    "k": "exprS",
-                                    "e": {
-                                     "k": "fnref",
-                                     "v": "pymro_cases.py:<module>.Dynamic<meta>"
-                                    }
+                                   "k": "setGlobal",
+                                   "x": "make_base",
+                                   "e": {
+                                    "k": "fnref",
+                                    "v": "pymro_cases.py:<module>.make_base"
                                    }
                                   },
                                   "b": {
                                    "k": "seq",
                                    "a": {
-                                    "k": "setGlobal",
-                                    "x": "case_unresolvable_base",
-                                    "e": {
-                                     "k": "fnref",
-                                     "v": "pymro_cases.py:<module>.case_unresolvable_base"
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setGlobal",
+                                     "x": "Dynamic",
+                                     "e": {
+                                      "k": "fnref",
+                                      "v": "pymro_cases.py:<module>.Dynamic<meta>"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "exprS",
+                                     "e": {
+                                      "k": "fnref",
+                                      "v": "pymro_cases.py:<module>.Dynamic<meta>"
+                                     }
                                     }
                                    },
                                    "b": {
                                     "k": "seq",
                                     "a": {
-                                     "k": "seq",
-                                     "a": {
-                                      "k": "setGlobal",
-                                      "x": "Holder",
-                                      "e": {
-                                       "k": "fnref",
-                                       "v": "pymro_cases.py:<module>.Holder<meta>"
-                                      }
-                                     },
-                                     "b": {
-                                      "k": "exprS",
-                                      "e": {
-                                       "k": "fnref",
-                                       "v": "pymro_cases.py:<module>.Holder<meta>"
-                                      }
+                                     "k": "setGlobal",
+                                     "x": "case_unresolvable_base",
+                                     "e": {
+                                      "k": "fnref",
+                                      "v": "pymro_cases.py:<module>.case_unresolvable_base"
                                      }
                                     },
                                     "b": {
                                      "k": "seq",
                                      "a": {
-                                      "k": "setGlobal",
-                                      "x": "case_unbound_name_is_not_a_method",
-                                      "e": {
-                                       "k": "fnref",
-                                       "v": "pymro_cases.py:<module>.case_unbound_name_is_not_a_method"
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setGlobal",
+                                       "x": "Holder",
+                                       "e": {
+                                        "k": "fnref",
+                                        "v": "pymro_cases.py:<module>.Holder<meta>"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "exprS",
+                                       "e": {
+                                        "k": "fnref",
+                                        "v": "pymro_cases.py:<module>.Holder<meta>"
+                                       }
                                       }
                                      },
                                      "b": {
                                       "k": "seq",
                                       "a": {
                                        "k": "setGlobal",
-                                       "x": "case_local_function_value_shadows_method",
+                                       "x": "case_unbound_name_is_not_a_method",
                                        "e": {
                                         "k": "fnref",
-                                        "v": "pymro_cases.py:<module>.case_local_function_value_shadows_method"
+                                        "v": "pymro_cases.py:<module>.case_unbound_name_is_not_a_method"
                                        }
                                       },
                                       "b": {
                                        "k": "seq",
                                        "a": {
                                         "k": "setGlobal",
-                                        "x": "case_parameter_function_value",
+                                        "x": "case_local_function_value_shadows_method",
                                         "e": {
                                          "k": "fnref",
-                                         "v": "pymro_cases.py:<module>.case_parameter_function_value"
+                                         "v": "pymro_cases.py:<module>.case_local_function_value_shadows_method"
                                         }
                                        },
                                        "b": {
                                         "k": "seq",
                                         "a": {
                                          "k": "setGlobal",
-                                         "x": "apply_it",
+                                         "x": "case_parameter_function_value",
                                          "e": {
                                           "k": "fnref",
-                                          "v": "pymro_cases.py:<module>.apply_it"
+                                          "v": "pymro_cases.py:<module>.case_parameter_function_value"
                                          }
                                         },
                                         "b": {
                                          "k": "seq",
                                          "a": {
                                           "k": "setGlobal",
-                                          "x": "MODULE_LIMIT",
+                                          "x": "apply_it",
                                           "e": {
-                                           "k": "int",
-                                           "v": "9"
+                                           "k": "fnref",
+                                           "v": "pymro_cases.py:<module>.apply_it"
                                           }
                                          },
                                          "b": {
                                           "k": "seq",
                                           "a": {
                                            "k": "setGlobal",
-                                           "x": "case_module_global_read",
+                                           "x": "MODULE_LIMIT",
                                            "e": {
-                                            "k": "fnref",
-                                            "v": "pymro_cases.py:<module>.case_module_global_read"
+                                            "k": "int",
+                                            "v": "9"
                                            }
                                           },
                                           "b": {
                                            "k": "seq",
                                            "a": {
                                             "k": "setGlobal",
-                                            "x": "case_builtin_call",
+                                            "x": "case_module_global_read",
                                             "e": {
                                              "k": "fnref",
-                                             "v": "pymro_cases.py:<module>.case_builtin_call"
+                                             "v": "pymro_cases.py:<module>.case_module_global_read"
                                             }
                                            },
                                            "b": {
                                             "k": "seq",
                                             "a": {
-                                             "k": "skip"
+                                             "k": "setGlobal",
+                                             "x": "case_builtin_call",
+                                             "e": {
+                                              "k": "fnref",
+                                              "v": "pymro_cases.py:<module>.case_builtin_call"
+                                             }
                                             },
                                             "b": {
                                              "k": "seq",
                                              "a": {
-                                              "k": "skip"
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "setGlobal",
+                                               "x": "Shape",
+                                               "e": {
+                                                "k": "fnref",
+                                                "v": "pymro_cases.py:<module>.Shape<meta>"
+                                               }
+                                              },
+                                              "b": {
+                                               "k": "exprS",
+                                               "e": {
+                                                "k": "fnref",
+                                                "v": "pymro_cases.py:<module>.Shape<meta>"
+                                               }
+                                              }
                                              },
                                              "b": {
                                               "k": "seq",
                                               "a": {
-                                               "k": "skip"
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "setGlobal",
+                                                "x": "Square",
+                                                "e": {
+                                                 "k": "fnref",
+                                                 "v": "pymro_cases.py:<module>.Square<meta>"
+                                                }
+                                               },
+                                               "b": {
+                                                "k": "exprS",
+                                                "e": {
+                                                 "k": "fnref",
+                                                 "v": "pymro_cases.py:<module>.Square<meta>"
+                                                }
+                                               }
                                               },
                                               "b": {
                                                "k": "seq",
                                                "a": {
-                                                "k": "skip"
+                                                "k": "setGlobal",
+                                                "x": "case_abc_base_is_transparent",
+                                                "e": {
+                                                 "k": "fnref",
+                                                 "v": "pymro_cases.py:<module>.case_abc_base_is_transparent"
+                                                }
                                                },
                                                "b": {
                                                 "k": "seq",
                                                 "a": {
-                                                 "k": "skip"
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "setGlobal",
+                                                  "x": "Callbacks",
+                                                  "e": {
+                                                   "k": "fnref",
+                                                   "v": "pymro_cases.py:<module>.Callbacks<meta>"
+                                                  }
+                                                 },
+                                                 "b": {
+                                                  "k": "exprS",
+                                                  "e": {
+                                                   "k": "fnref",
+                                                   "v": "pymro_cases.py:<module>.Callbacks<meta>"
+                                                  }
+                                                 }
                                                 },
                                                 "b": {
                                                  "k": "seq",
                                                  "a": {
-                                                  "k": "skip"
+                                                  "k": "setGlobal",
+                                                  "x": "case_instance_attribute_shadows_method",
+                                                  "e": {
+                                                   "k": "fnref",
+                                                   "v": "pymro_cases.py:<module>.case_instance_attribute_shadows_method"
+                                                  }
                                                  },
                                                  "b": {
                                                   "k": "seq",
                                                   "a": {
-                                                   "k": "skip"
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "setGlobal",
+                                                    "x": "Grid",
+                                                    "e": {
+                                                     "k": "fnref",
+                                                     "v": "pymro_cases.py:<module>.Grid<meta>"
+                                                    }
+                                                   },
+                                                   "b": {
+                                                    "k": "exprS",
+                                                    "e": {
+                                                     "k": "fnref",
+                                                     "v": "pymro_cases.py:<module>.Grid<meta>"
+                                                    }
+                                                   }
                                                   },
                                                   "b": {
                                                    "k": "seq",
                                                    "a": {
-                                                    "k": "skip"
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "setGlobal",
+                                                     "x": "SubGrid",
+                                                     "e": {
+                                                      "k": "fnref",
+                                                      "v": "pymro_cases.py:<module>.SubGrid<meta>"
+                                                     }
+                                                    },
+                                                    "b": {
+                                                     "k": "exprS",
+                                                     "e": {
+                                                      "k": "fnref",
+                                                      "v": "pymro_cases.py:<module>.SubGrid<meta>"
+                                                     }
+                                                    }
                                                    },
                                                    "b": {
                                                     "k": "seq",
                                                     "a": {
-                                                     "k": "skip"
+                                                     "k": "setGlobal",
+                                                     "x": "case_inherited_setitem",
+                                                     "e": {
+                                                      "k": "fnref",
+                                                      "v": "pymro_cases.py:<module>.case_inherited_setitem"
+                                                     }
                                                     },
                                                     "b": {
                                                      "k": "seq",
@@ -3000,7 +3569,115 @@
                                                                                        "k": "skip"
                                                                                       },
                                                                                       "b": {
-                                                                                       "k": "skip"
+                                                                                       "k": "seq",
+                                                                                       "a": {
+                                                                                        "k": "skip"
+                                                                                       },
+                                                                                       "b": {
+                                                                                        "k": "seq",
+                                                                                        "a": {
+                                                                                         "k": "skip"
+                                                                                        },
+                                                                                        "b": {
+                                                                                         "k": "seq",
+                                                                                         "a": {
+                                                                                          "k": "skip"
+                                                                                         },
+                                                                                         "b": {
+                                                                                          "k": "seq",
+                                                                                          "a": {
+                                                                                           "k": "skip"
+                                                                                          },
+                                                                                          "b": {
+                                                                                           "k": "seq",
+                                                                                           "a": {
+                                                                                            "k": "skip"
+                                                                                           },
+                                                                                           "b": {
+                                                                                            "k": "seq",
+                                                                                            "a": {
+                                                                                             "k": "skip"
+                                                                                            },
+                                                                                            "b": {
+                                                                                             "k": "seq",
+                                                                                             "a": {
+                                                                                              "k": "skip"
+                                                                                             },
+                                                                                             "b": {
+                                                                                              "k": "seq",
+                                                                                              "a": {
+                                                                                               "k": "skip"
+                                                                                              },
+                                                                                              "b": {
+                                                                                               "k": "seq",
+                                                                                               "a": {
+                                                                                                "k": "skip"
+                                                                                               },
+                                                                                               "b": {
+                                                                                                "k": "seq",
+                                                                                                "a": {
+                                                                                                 "k": "skip"
+                                                                                                },
+                                                                                                "b": {
+                                                                                                 "k": "seq",
+                                                                                                 "a": {
+                                                                                                  "k": "skip"
+                                                                                                 },
+                                                                                                 "b": {
+                                                                                                  "k": "seq",
+                                                                                                  "a": {
+                                                                                                   "k": "skip"
+                                                                                                  },
+                                                                                                  "b": {
+                                                                                                   "k": "seq",
+                                                                                                   "a": {
+                                                                                                    "k": "skip"
+                                                                                                   },
+                                                                                                   "b": {
+                                                                                                    "k": "seq",
+                                                                                                    "a": {
+                                                                                                     "k": "skip"
+                                                                                                    },
+                                                                                                    "b": {
+                                                                                                     "k": "seq",
+                                                                                                     "a": {
+                                                                                                      "k": "skip"
+                                                                                                     },
+                                                                                                     "b": {
+                                                                                                      "k": "seq",
+                                                                                                      "a": {
+                                                                                                       "k": "skip"
+                                                                                                      },
+                                                                                                      "b": {
+                                                                                                       "k": "seq",
+                                                                                                       "a": {
+                                                                                                        "k": "skip"
+                                                                                                       },
+                                                                                                       "b": {
+                                                                                                        "k": "seq",
+                                                                                                        "a": {
+                                                                                                         "k": "skip"
+                                                                                                        },
+                                                                                                        "b": {
+                                                                                                         "k": "skip"
+                                                                                                        }
+                                                                                                       }
+                                                                                                      }
+                                                                                                     }
+                                                                                                    }
+                                                                                                   }
+                                                                                                  }
+                                                                                                 }
+                                                                                                }
+                                                                                               }
+                                                                                              }
+                                                                                             }
+                                                                                            }
+                                                                                           }
+                                                                                          }
+                                                                                         }
+                                                                                        }
+                                                                                       }
                                                                                       }
                                                                                      }
                                                                                     }
@@ -3100,6 +3777,10 @@
     ],
     "attrs": []
    },
+   "Callbacks": {
+    "bases": [],
+    "attrs": []
+   },
    "Counter": {
     "bases": [],
     "attrs": []
@@ -3108,6 +3789,10 @@
     "bases": [
      "Store"
     ],
+    "attrs": []
+   },
+   "Grid": {
+    "bases": [],
     "attrs": []
    },
    "Holder": {
@@ -3130,11 +3815,21 @@
     "bases": [],
     "attrs": []
    },
+   "Shape": {
+    "bases": [],
+    "attrs": []
+   },
    "Shelf": {
     "bases": [],
     "attrs": [
      "fetch"
     ]
+   },
+   "Square": {
+    "bases": [
+     "Shape"
+    ],
+    "attrs": []
    },
    "StepCounter": {
     "bases": [
@@ -3144,6 +3839,12 @@
    },
    "Store": {
     "bases": [],
+    "attrs": []
+   },
+   "SubGrid": {
+    "bases": [
+     "Grid"
+    ],
     "attrs": []
    }
   }
