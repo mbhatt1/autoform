@@ -200,10 +200,14 @@ instead of 1, and it is in that run's `decls` list. The harness now detects the
 `.mutate-backup` sentinel, sets `build_stable: false`, and refuses to let a mutated module
 be read as a divergence. See STRATEGY.md §33.
 
-The `_HashedTuple` gap is real but separate: Core has no inheritance from builtin types,
-so instances are opaque `Val.ref`s while CPython's instance *is* a tuple. It surfaces as
-a counted `representation:value-vs-object` INCONCLUSIVE, not as a divergence, because the
-oracle cannot compare the two encodings.
+The `_HashedTuple` gap was real but separate, and is now closed in both the semantics
+and the oracle: an instance of a class whose single base is `tuple`/`list`/`dict`/`str`
+is `Val.bobj cls payload` (STRATEGY.md §35), and `scripts/differential.py` encodes
+CPython's instance the same way and compares **class and payload**, so a result that
+loses or invents the class is a divergence rather than agreement. On `cachetools` v7.1.7
+`representation:value-vs-object` is 0 INCONCLUSIVE, and the four `_HashedTuple` methods
+are now attempted instead of skipped as `self-not-object` (1,358 skipped calls → 0);
+`__add__`, `__radd__` and `__getstate__` are compared and agree. See STRATEGY.md §57.
 
 `leanchecker` ships with the Lean toolchain (v4.28.0+) — `lean4checker` is deprecated and
 there is no Homebrew formula. **Use `--fresh`**: without it the checker can silently pass

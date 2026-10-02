@@ -314,8 +314,8 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     -- **Excluded, deliberately.** `len(A((0,)))` is `1` in CPython for `class A(tuple)`,
     -- but adding a `.bobj` case here defeats the branch enumeration in
     -- `builtin_heap_unchanged` below (a `whnf` timeout that raising the heartbeat budget
-    -- does not fix). `len` of a builtin-based instance is therefore a `call:len` hole —
-    -- counted ignorance, not a wrong number. `list`, `tuple`, `sorted`, `sum`, `min` and
+    -- does not fix). `len` of a builtin-based instance is instead unwrapped one level up,
+    -- at the interpreter's call site (`Semantics.builtinSeeThrough`). `list`, `tuple`, `sorted`, `sum`, `min` and
     -- `max` all go through `elems` and *do* see through the base.
     -- abs: Python integers are unbounded, so this cannot overflow.
     | "abs", [.int i] => v (.int i.natAbs)

@@ -52,6 +52,30 @@ to build a `bobj` for a class that defines its own `__eq__` (or its own `__init_
 emitting `alloc:builtin-base:<cls>:own-__eq__` instead — `Val.beq` has no dunder dispatch,
 so honouring such a class would mean silently ignoring the override.
 
+The same holds for every other operation Core performs on a `bobj`'s payload directly —
+indexing, `len`, iteration, `in` and truthiness — so a class overriding any dunder in
+`builtinBaseRefusedDunders` (`__init__`, `__eq__`, `__new__`, `__ne__`, `__getitem__`,
+`__len__`, `__iter__`, `__contains__`, `__bool__`, `__getattribute__`) is refused with
+`alloc:builtin-base:<cls>:own-<dunder>`. `len(x)` of a `bobj` is the payload's length
+(`builtinSeeThrough`, at the interpreter's builtin call site). Arithmetic dunders need no
+refusal: `applyBinop` has no `bobj` case, so `+` on one is already `binop:+`.
+
+**Assumption, not checked:** `__hash__` overrides are accepted (`_HashedTuple` has one).
+Core's `dict` lookup is by `Val.beq` alone, which agrees with CPython for every class
+keeping Python's documented invariant `a == b → hash(a) == hash(b)`; a class that breaks
+it would get the builtin's lookup rather than its own.
+
+**Mutable bases.** A `list`/`dict` base is modelled with value semantics, exactly like
+Core's own containers: a mutating method on one is `mcall:<m>:unboxed-container` and
+`x[k] = v` is `setIndex:immutable-containers`. Faithful mutable subclasses
+(`class Cache(dict)` with in-place updates) wait on the boxed-container work in
+`docs/boxed-containers.md`. `int`/`float` bases are not modelled at all (`BuiltinBase` has
+no constructor for them; the exporter records nothing, so instances stay opaque `ref`s):
+an `int` payload would need `Val.beq`, `applyBinop` and the numeric tower to see through
+the wrapper. `cachetools` (v7.1.7) has no such class: `_HashedTuple(tuple)` is its only
+class with a builtin base, and `Cache` derives from `collections.abc.MutableMapping`, not
+`dict`.
+
 There is **no float constructor**. `Autoform/Lang/Core/Float.lean` develops a full
 IEEE-754 model as an explicit bit pattern, but at the time of writing it is not wired into
 `Val`; floats therefore still surface as holes and as skipped differential cases.
