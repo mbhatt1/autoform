@@ -3516,7 +3516,8 @@ hole-freedom.
 
 | corpus | holeFree before | after | holes before | after |
 |---|---|---|---|---|
-| SQLite amalgamation (2433 fns) | 1909 (78.5%) | 1987 (81.7%) | 2280 | 1818 |
+| SQLite amalgamation (2433 fns), on base `46c65fc` | 1909 (78.5%) | 1987 (81.7%) | 2280 | 1818 |
+| SQLite amalgamation, merged onto integration head `6d7000e` | 1907 (78.4%) | 1985 (81.6%) | 2296 | 1834 |
 
 Amalgamation labels, before → after: `op:addressOf:element:scalar` 386 → 30,
 `cstr:address-compare` 41 → 21, `cstr:address-equality` 52 → 39, `cstr:pointer-arith`
