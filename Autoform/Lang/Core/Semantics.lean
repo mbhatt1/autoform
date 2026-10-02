@@ -498,7 +498,9 @@ def binopFallback (d : Dialect) (op : String) (a b : Val) : EResult :=
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
 Integer arithmetic goes through `NumConfig`, so width and overflow policy follow the
-source dialect: Python gets bignums, C-like gets 32-bit two's-complement. -/
+source dialect: Python gets bignums, C-like gets 32-bit two's-complement for an UNTYPED
+operator. A width-typed operator (`"*:i64"`, `TypedInt.lean`) matches none of the literal arms
+below and is answered by `binopTail`. -/
 def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
@@ -550,7 +552,7 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- strings here rather than sharing the logical ones.
   --
   -- The arithmetic is `NumConfig`'s, so the width and overflow policy are the dialect's:
-  -- under `.cLike` every integer is 32-bit two's-complement, so `1 << 31` is `INT_MIN`
+  -- under `.cLike` an UNTYPED operator is 32-bit two's-complement, so `1 << 31` is `INT_MIN`
   -- (the wrapping config the oracle measures) and `-1 & 255` is `255`.
   --
   -- `>>` and `>>>` are **two different operators** and the difference is only visible on

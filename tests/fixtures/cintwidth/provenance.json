@@ -1,0 +1,20 @@
+{
+ "_": [
+  "How tests/fixtures/cintwidth/ast.json was produced. `tests/test_cintwidth_cc.py`",
+  "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
+  "exporter_sha256 is informational."
+ ],
+ "source": "tests/fixtures/cintwidth/cintwidth_cases.c",
+ "source_sha256": "72d473c3f093ec88dea55abb935b8a3bff9a4d5197b2a0de240c3e912ff319ad",
+ "ast_sha256": "80980cced35a734b7564e7c3e07b0e5e2b39a19a2639b288bf72290db34c9371",
+ "joern_version": "4.0.606",
+ "frontend": "c2cpg (Joern 4.0.606, /opt/joern/joern-cli/c2cpg.sh), no defines",
+ "data_model": "lp64 (the exporter default, printed on every run)",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "1f016f63873a3ec67f26d0775c7d03b6f52117764e3f62241e4e91f095ab7e37",
+ "command": [
+  "c2cpg.sh <a directory holding only cintwidth_cases.c> --output cpg.bin",
+  "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/cintwidth/ast.json",
+  "python3 cartographer/render_lean.py tests/fixtures/cintwidth/ast.json Autoform/CIntWidthProgram.lean CIntWidth"
+ ]
+}

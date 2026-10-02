@@ -1,0 +1,1489 @@
+[
+ {
+  "name": "case_long_mul",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "100000"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:i64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_int_mul_wraps",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "100000"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "p",
+         "e": {
+          "k": "binop",
+          "op": "*:i32",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         }
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "name",
+          "v": "p"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_mixed_mul",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "3000000000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:i64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shift_left_64",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "v",
+     "e": {
+      "k": "binop",
+      "op": "|:i64",
+      "a": {
+       "k": "binop",
+       "op": "<<:i64",
+       "a": {
+        "k": "unop",
+        "op": "cast:i64",
+        "a": {
+         "k": "int",
+         "v": "108096"
+        }
+       },
+       "b": {
+        "k": "int",
+        "v": "32"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "275971583"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "v"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_tree_depth",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "nPMA",
+     "e": {
+      "k": "int",
+      "v": "2147483647"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "nDepth",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "nDiv",
+         "e": {
+          "k": "int",
+          "v": "16"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "loop",
+          "c": {
+           "k": "binop",
+           "op": "<:i64",
+           "a": {
+            "k": "name",
+            "v": "nDiv"
+           },
+           "b": {
+            "k": "unop",
+            "op": "cast:i64",
+            "a": {
+             "k": "name",
+             "v": "nPMA"
+            }
+           }
+          },
+          "body": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "nDiv",
+            "e": {
+             "k": "binop",
+             "op": "*:i64",
+             "a": {
+              "k": "name",
+              "v": "nDiv"
+             },
+             "b": {
+              "k": "int",
+              "v": "16"
+             }
+            }
+           },
+           "b": {
+            "k": "assign",
+            "x": "nDepth",
+            "e": {
+             "k": "binop",
+             "op": "+:i32",
+             "a": {
+              "k": "name",
+              "v": "nDepth"
+             },
+             "b": {
+              "k": "int",
+              "v": 1
+             }
+            }
+           }
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "name",
+           "v": "nDepth"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_accumulate",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "i",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "loop",
+       "c": {
+        "k": "binop",
+        "op": "<:i32",
+        "a": {
+         "k": "name",
+         "v": "i"
+        },
+        "b": {
+         "k": "int",
+         "v": "3"
+        }
+       },
+       "body": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "s",
+         "e": {
+          "k": "binop",
+          "op": "+:i64",
+          "a": {
+           "k": "name",
+           "v": "s"
+          },
+          "b": {
+           "k": "int",
+           "v": "2000000000"
+          }
+         }
+        },
+        "b": {
+         "k": "assign",
+         "x": "i",
+         "e": {
+          "k": "binop",
+          "op": "+:i32",
+          "a": {
+           "k": "name",
+           "v": "i"
+          },
+          "b": {
+           "k": "int",
+           "v": 1
+          }
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "s"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_unsigned_underflow",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "u",
+     "e": {
+      "k": "unop",
+      "op": "cast:u32",
+      "a": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "u",
+      "e": {
+       "k": "binop",
+       "op": "-:u32",
+       "a": {
+        "k": "name",
+        "v": "u"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "u"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_unsigned_init_widen",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "u",
+     "e": {
+      "k": "unop",
+      "op": "cast:u32",
+      "a": {
+       "k": "unop",
+       "op": "-:i32",
+       "a": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "y",
+       "e": {
+        "k": "name",
+        "v": "u"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "y"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_u32_add_wraps",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "3000000000"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+:u32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_u64_mul_wraps",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "18446744073709551615"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:u64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shift_right_u32",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "2147483648"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:u32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "31"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shift_right_i32",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "y",
+     "e": {
+      "k": "unop",
+      "op": "-:i32",
+      "a": {
+       "k": "int",
+       "v": "8"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:i32",
+      "a": {
+       "k": "name",
+       "v": "y"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shift_right_u64",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "17293822569102704640"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i64",
+      "a": {
+       "k": "binop",
+       "op": ">>:u64",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "60"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shift_right_i64",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:i64",
+      "a": {
+       "k": "int",
+       "v": "4294967296"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:i64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "4"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_mixed_compare",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "unop",
+      "op": "-:i32",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "unop",
+        "op": "cast:u32",
+        "a": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "r",
+         "e": {
+          "k": "int",
+          "v": "0"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "ifte",
+          "c": {
+           "k": "binop",
+           "op": "<:u32",
+           "a": {
+            "k": "name",
+            "v": "a"
+           },
+           "b": {
+            "k": "name",
+            "v": "b"
+           }
+          },
+          "t": {
+           "k": "assign",
+           "x": "r",
+           "e": {
+            "k": "int",
+            "v": "1"
+           }
+          },
+          "e": {
+           "k": "skip"
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "name",
+           "v": "r"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_unsigned_div",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "unop",
+      "op": "cast:u32",
+      "a": {
+       "k": "unop",
+       "op": "-:i32",
+       "a": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "/:u32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_unsigned_neg",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "unop",
+      "op": "cast:u32",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "-:u32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_u64_not",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "unop",
+      "op": "cast:u64",
+      "a": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "~:u64",
+      "a": {
+       "k": "name",
+       "v": "z"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_u8_increment_wraps",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "c",
+     "e": {
+      "k": "unop",
+      "op": "cast:u8",
+      "a": {
+       "k": "int",
+       "v": "255"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "c",
+      "e": {
+       "k": "unop",
+       "op": "cast:u8",
+       "a": {
+        "k": "binop",
+        "op": "+:i32",
+        "a": {
+         "k": "name",
+         "v": "c"
+        },
+        "b": {
+         "k": "int",
+         "v": 1
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "c"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_u8_compound_wraps",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "c",
+     "e": {
+      "k": "unop",
+      "op": "cast:u8",
+      "a": {
+       "k": "int",
+       "v": "250"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "c",
+      "e": {
+       "k": "unop",
+       "op": "cast:u8",
+       "a": {
+        "k": "binop",
+        "op": "+:i32",
+        "a": {
+         "k": "name",
+         "v": "c"
+        },
+        "b": {
+         "k": "int",
+         "v": "10"
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "c"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_size_t_underflow",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "n",
+     "e": {
+      "k": "unop",
+      "op": "cast:u64",
+      "a": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "n",
+      "e": {
+       "k": "binop",
+       "op": "-:u64",
+       "a": {
+        "k": "name",
+        "v": "n"
+       },
+       "b": {
+        "k": "int",
+        "v": 1
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "r",
+        "e": {
+         "k": "int",
+         "v": "0"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": ">:u64",
+          "a": {
+           "k": "name",
+           "v": "n"
+          },
+          "b": {
+           "k": "int",
+           "v": "4294967296"
+          }
+         },
+         "t": {
+          "k": "assign",
+          "x": "r",
+          "e": {
+           "k": "int",
+           "v": "1"
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "name",
+          "v": "r"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_i64_div",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "unop",
+      "op": "-:i64",
+      "a": {
+       "k": "int",
+       "v": "7000000000"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "/:i64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_narrow_signed_char",
+  "file": "cintwidth_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "300"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "sc",
+       "e": {
+        "k": "unop",
+        "op": "cast:i8",
+        "a": {
+         "k": "name",
+         "v": "x"
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "sc"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cintwidth_cases.c:<global>",
+  "file": "cintwidth_cases.c",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "skip"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "skip"
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "skip"
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "skip"
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "skip"
+                        },
+                        "b": {
+                         "k": "skip"
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]
