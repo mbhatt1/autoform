@@ -123,6 +123,23 @@ verified and some **UNVERIFIABLE**. A missing AST, a missing manifest entry or a
 render is reported with a reason and a non-zero exit — this check must never pass by
 having stopped looking.
 
+**Not tracked by policy (2026-10-02, STRATEGY §59).** `Ansible`, `LinuxCrypto` and
+`LinuxLib` are pinned in the manifest but their ASTs exist in no clone, and cannot be
+regenerated to the pinned hash: neither the corpus commit nor the exporter version that
+produced them was recorded, no copy survives on the build machine, and Ansible's 136.6 MB
+exceeds GitHub's per-file limit. Reporting them UNVERIFIABLE made `check_render` exit 3 on
+every CI run, and a gate that is always red says nothing. They are now listed in
+`artifact-manifest.json`'s hand-edited `untracked_by_policy` (a `reason` and a `reviewed`
+field each) and reported with a fourth verdict, **NOT-TRACKED**: named on every run, counted
+separately in the summary, never counted as verified, and exit 0. The allowlist is
+checked, not trusted — an entry only applies if `git check-ignore` confirms the AST is
+ignored, `git ls-files` that it is untracked, the manifest says `ast_tracked: false`, and
+**no spec module is pinned to that corpus** (tracked theorems about an absent corpus stay
+UNVERIFIABLE whatever the allowlist says, per §55). An absent AST that is not on the list is
+UNVERIFIABLE exactly as before; an allowlisted AST that *is* on disk is fully checked;
+`--strict` ignores the list. `--record` never writes it. The cost is unchanged and stated in
+each entry: the evidence figures for those three corpora cannot be re-derived from a clone.
+
 **Open finding, recorded rather than laundered.** On the first run under the new policy,
 `Cachetools` came back MISMATCH: the tracked module was rendered by an older
 `render_lean.py` (no `set_option maxRecDepth`, pre-indent-cap layout) and is ~1148 lines

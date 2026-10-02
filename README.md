@@ -118,13 +118,22 @@ selects the functions the C leg of `scripts/differential.py` can run without inv
 anything: hole-free, call-closed through candidates only, every parameter and the return
 an integer type, no preprocessor line in the body, no free names, compiled by the default
 amalgamation of the same checkout. **9 of 5,724** qualify (most take a pointer or
-return `void`). Against `cc`, 20 random cases each: **140/170 agree, 30 diverge,
-10 inconclusive**. All 30 divergences are one root cause: Core comparisons return
-`Val.bool` where C returns `int` 0/1 (`isFatalError`, `validJulianDay`). This is a real
-wrong answer, not a printing difference: in a fixture, `int t = (a<b); if (t == 1) return
-7; return 3;` returns 3 in Lean and 7 under `cc`, because Core's `==` on `bool`/`int` is
-false. The 10 inconclusive are `validJulianDay`'s `(i64)0x1a640 << 32`, which Core's
-32-bit `cLike` int holes as `ub:shift count out of range`. See `docs/scale.md`.
+return `void`). Round 1 measured **140/170 agree, 30 diverge, 10 inconclusive** against
+`cc`, and all 30 divergences were one root cause: C's comparison and logical results are
+`int` 0/1, Core's were `Val.bool`, and Core's `==` on `bool`/`int` was false, so
+`int t = (a<b); if (t == 1) return 7; return 3;` returned 3 where `cc` returns 7. Core
+now promotes a `bool` to 0/1 wherever it meets a number under `.cLike`
+(`Dialect.promotesBool`; the C++ rule, unreachable from well-typed Java/Go/Kotlin, which
+share the dialect), and the harness reads a `bool` result as 0/1 (the C return
+conversion). Same sample, same 20 random cases each: **170/170 agree, 0 diverge, 10
+inconclusive**. The C leg is now typed (`csrc/ctypes.json`: real widths, signedness and
+`_Bool`, arguments over each type's full range): **168/168 agree, 12 inconclusive**. The
+inconclusive cases are holes or `outOfFuel` where `cc` has an answer, and both trace to one
+remaining gap: Core computes C `i64`/`u64` arithmetic at 32 bits
+(`validJulianDay`'s `<< 32` holes; `vdbeSorterTreeDepth`'s `i64` loop wraps and runs out
+of fuel). A 15-case fixture, `tests/test_cboolint_cc.py`, pins the fix against `cc`.
+`.cLike` float `%` is now Java's truncated remainder (`-5.5 % 2.0` is `-1.5`), not
+Python's floored one. See `docs/scale.md`.
 
 ## The oracle
 
@@ -236,11 +245,11 @@ population (see `docs/languages.md`) and have not been re-run against it.
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **60 of 209** `cachetools` functions compared, **14 divergences**, all root-caused: 11 are an exporter call misbinding, 3 are Core method dispatch with no class hierarchy ([docs/conformance.md](docs/conformance.md)) |
+| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **48 of 209** `cachetools` functions compared, **12 divergences**, all root-caused: 11 are calls through a captured name that Core's bare-name suffix rule resolves to an unrelated method (the exporter's misbinding is fixed; the Core half is not yet), 1 is Core method dispatch with no class hierarchy ([docs/conformance.md](docs/conformance.md)) |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
-| untranslated code is declared | hole counting + SACM assumptions | 26 holes, all named |
+| untranslated code is declared | hole counting + SACM assumptions | 46 holes, all named |
 
 The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
 not a property of the specifications: `scripts/mutate.py`'s `error_lines` regex matched
@@ -260,8 +269,9 @@ run's score as the other's.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
-It was wrong to say 100%, because the denominator is small. Only 60 of 209 `cachetools`
-functions are compared (`python3.11 scripts/differential.py ast-Cachetools.json
+It was wrong to say 100%, because the denominator is small. Only 48 of 209 `cachetools`
+functions are compared (60 before the item-L re-export of `ast-Cachetools.json`, whose
+honest parameter defaults hole 12 previously compared functions) (`python3.11 scripts/differential.py ast-Cachetools.json
 <cachetools@01af8e5> Cachetools 5`). The rest are INCONCLUSIVE, and each one carries a
 counted reason in `conformance.json`: a value the harness cannot encode, a receiver it
 cannot build, or a hole. **The limit is reach, not agreement.** A conformance rate quoted
@@ -273,7 +283,9 @@ down generator yields as return values, and that agreed with an exporter that tr
 closures without their captured variables, and it refused, as parameter mismatches, the
 calls that would have exposed an exporter call misbinding. With the recorder fixed, the
 same corpus at the same commit gives 14 divergences. They are three findings, not noise.
-See [docs/conformance.md](docs/conformance.md).
+The exporter halves of findings 1 and 2 are now fixed (generators are holes; a call through
+a local name is emitted by that name); after the re-export the count is 12. See
+[docs/conformance.md](docs/conformance.md).
 
 It was then briefly wrong in the other direction: an intermediate run reported 5
 divergences, and this file attributed them to `class _HashedTuple(tuple)`. That
@@ -300,12 +312,16 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 ## Not yet built
 
-- **Boxed mutable containers.** Steps 1 and 2 of `docs/boxed-containers.md` are in the
-  tree (`Obj.payload`/`version`, still inert; `Val.identical`, `Val.eqPy`), but nothing
-  allocates a container payload yet, so `Stmt.setIndex` is still the hole
-  `setIndex:immutable-containers` and mutating container methods still hole.
-- **Cross-scope writes** (`nonlocal` is the hole `scope:nonlocal-write`; reads and closures
-  work).
+- **Boxed mutable containers, remainder.** Python list/dict displays are heap objects;
+  `e[i] = v`, `del e[i]` and `append`/`pop`/... write through every alias. Still holes:
+  slices, live dict views, mutation during iteration, list/dict subclasses, and the
+  differential oracle's encoder still passes lists/dicts by value (`docs/boxed-containers.md`).
+- **Scoping and calling convention, remainder.** `nonlocal` writes (cell conversion),
+  literal default values, keyword-only/positional-only parameters and starred assignment
+  are translated (STRATEGY.md §58). Still holes: non-literal defaults
+  (`param:default-nonliteral`; Core would have to execute `def`), the `TypeError` for a
+  missing required argument, late-binding reads of captured non-`nonlocal` variables, and
+  `scope:del-cell`.
 - **Floats, partially.** `Val.float`/`Lit.float` exist and are wired: the exporter emits
   float literals, `render_lean.py` encodes them as exact binary64 bit patterns, and
   `Semantics.lean` evaluates `+ - * / %` (with int→float promotion), the six comparisons
@@ -317,12 +333,8 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   on two ints still floors, because the exporter maps `//` onto `/`
   (`Semantics.lean`, "Floating point"); and float `%` uses Python's floored remainder under
   `.cLike` as well as `.python`, so Java's `-5.5 % 2.0` (`-1.5`) is mis-modelled
-  (`.javascript` uses the truncated remainder and matches Node). The differential harness still refuses float arguments
-  (`Unencodable("float")`), so none of this is oracle-checked yet.
-- **Calling convention, remainder.** `op:starredUnpack` is **closed** (STRATEGY.md §35);
-  what is left is default parameter values, keyword-only parameters, and starred
-  *destructuring* (`op:starred-outside-call`).
-
+  (`.javascript` uses the truncated remainder and matches Node). The differential harness
+  now encodes float arguments recorded from the test suite (`docs/conformance.md`).
 - **Contract *inference* at holes.** The mechanism for reasoning about partially translated
   functions under named assumptions exists (`Autoform/Contracts.lean` for expression holes,
   `Autoform/HoleContracts.lean` for statement holes), as do the ledger's separate

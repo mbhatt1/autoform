@@ -1,0 +1,1210 @@
+[
+ {
+  "name": "lt_flag",
+  "file": "cboolint_cases.c",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "t",
+     "e": {
+      "k": "binop",
+      "op": "<",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "binop",
+       "op": "==",
+       "a": {
+        "k": "name",
+        "v": "t"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "t": {
+       "k": "ret",
+       "e": {
+        "k": "int",
+        "v": "7"
+       }
+      },
+      "e": {
+       "k": "skip"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "int",
+       "v": "3"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "is_fatal",
+  "file": "cboolint_cases.c",
+  "params": [
+   "rc"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "&&",
+    "a": {
+     "k": "binop",
+     "op": "&&",
+     "a": {
+      "k": "binop",
+      "op": "!=",
+      "a": {
+       "k": "name",
+       "v": "rc"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "binop",
+      "op": "!=",
+      "a": {
+       "k": "name",
+       "v": "rc"
+      },
+      "b": {
+       "k": "int",
+       "v": "5"
+      }
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "!=",
+     "a": {
+      "k": "name",
+      "v": "rc"
+     },
+     "b": {
+      "k": "int",
+      "v": "6"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "both_ways",
+  "file": "cboolint_cases.c",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "binop",
+     "op": "<",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "<",
+     "a": {
+      "k": "name",
+      "v": "b"
+     },
+     "b": {
+      "k": "name",
+      "v": "a"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_lt_flag_true",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "lt_flag",
+    "args": [
+     {
+      "k": "int",
+      "v": "3"
+     },
+     {
+      "k": "int",
+      "v": "12"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "case_lt_flag_false",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "lt_flag",
+    "args": [
+     {
+      "k": "int",
+      "v": "12"
+     },
+     {
+      "k": "int",
+      "v": "3"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "case_cmp_eq_one",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "3"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "12"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "name",
+          "v": "b"
+         }
+        },
+        "b": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_cmp_plus_cmp",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "call",
+     "f": "both_ways",
+     "args": [
+      {
+       "k": "int",
+       "v": "3"
+      },
+      {
+       "k": "int",
+       "v": "12"
+      }
+     ]
+    },
+    "b": {
+     "k": "call",
+     "f": "both_ways",
+     "args": [
+      {
+       "k": "int",
+       "v": "5"
+      },
+      {
+       "k": "int",
+       "v": "5"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "name": "case_logical_times",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "call",
+      "f": "is_fatal",
+      "args": [
+       {
+        "k": "int",
+        "v": "4"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+",
+      "a": {
+       "k": "binop",
+       "op": "*",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "10"
+       }
+      },
+      "b": {
+       "k": "call",
+       "f": "is_fatal",
+       "args": [
+        {
+         "k": "int",
+         "v": "5"
+        }
+       ]
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_not_plus",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+",
+      "a": {
+       "k": "unop",
+       "op": "!",
+       "a": {
+        "k": "name",
+        "v": "a"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_neg_cmp",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "unop",
+        "op": "-",
+        "a": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "name",
+          "v": "b"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_bnot_cmp",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "unop",
+        "op": "~",
+        "a": {
+         "k": "binop",
+         "op": ">",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "name",
+          "v": "b"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_bitand_cmps",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "+",
+        "a": {
+         "k": "binop",
+         "op": "&",
+         "a": {
+          "k": "binop",
+          "op": "<",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         },
+         "b": {
+          "k": "binop",
+          "op": ">",
+          "a": {
+           "k": "name",
+           "v": "b"
+          },
+          "b": {
+           "k": "int",
+           "v": "0"
+          }
+         }
+        },
+        "b": {
+         "k": "int",
+         "v": "2"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_xor_cmps",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "+",
+        "a": {
+         "k": "binop",
+         "op": "^",
+         "a": {
+          "k": "binop",
+          "op": "<",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         },
+         "b": {
+          "k": "binop",
+          "op": ">",
+          "a": {
+           "k": "name",
+           "v": "b"
+          },
+          "b": {
+           "k": "int",
+           "v": "0"
+          }
+         }
+        },
+        "b": {
+         "k": "int",
+         "v": "4"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shift_cmp",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<",
+        "a": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "name",
+          "v": "b"
+         }
+        },
+        "b": {
+         "k": "int",
+         "v": "3"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_cmp_vs_cmp",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">",
+        "a": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "name",
+          "v": "b"
+         }
+        },
+        "b": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "b"
+         },
+         "b": {
+          "k": "name",
+          "v": "a"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_sum_flags",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "n",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "i",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "loop",
+        "c": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "i"
+         },
+         "b": {
+          "k": "int",
+          "v": "10"
+         }
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "n",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "n"
+           },
+           "b": {
+            "k": "binop",
+            "op": "==",
+            "a": {
+             "k": "binop",
+             "op": "%",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "3"
+             }
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           }
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "i",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "i"
+           },
+           "b": {
+            "k": "int",
+            "v": "1"
+           }
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_cmp_plus_double",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ifte",
+        "c": {
+         "k": "binop",
+         "op": ">",
+         "a": {
+          "k": "binop",
+          "op": "+",
+          "a": {
+           "k": "binop",
+           "op": "<",
+           "a": {
+            "k": "name",
+            "v": "a"
+           },
+           "b": {
+            "k": "name",
+            "v": "b"
+           }
+          },
+          "b": {
+           "k": "float",
+           "v": "0.5"
+          }
+         },
+         "b": {
+          "k": "float",
+          "v": "1.0"
+         }
+        },
+        "t": {
+         "k": "ret",
+         "e": {
+          "k": "int",
+          "v": "1"
+         }
+        },
+        "e": {
+         "k": "skip"
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "int",
+         "v": "0"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_direct_return",
+  "file": "cboolint_cases.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cboolint_cases.c:<global>",
+  "file": "cboolint_cases.c",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "skip"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

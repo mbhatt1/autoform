@@ -1577,12 +1577,90 @@ def run_suite(test_dir):
 
 # ----------------------------------------------------------------------- C runtime
 
-def c_runtime(src_root):
+def c_signatures(src_root):
+    """Per-function C integer signatures, from `<src_root>/ctypes.json` if present.
+
+    The AST carries no C types, so without this file every parameter and result is
+    passed and read as `int` (the original C leg). A corpus that knows its signatures
+    -- `scripts/sqlite_sample.py` writes the file, with every width and signedness
+    resolved by the COMPILER from the real typedefs, not from their spelling -- gets
+    exact ctypes types instead: `u8`, `i16`, `u32`, `i64`, `u64`, `_Bool`, ... are
+    passed at their real width, results are read at their real width and signedness
+    (`unsigned` above INT_MAX, a 64-bit result, a `_Bool`), and arguments are drawn
+    over the whole range of the type (see `c_typed_arg`).
+
+    Format: {"functions": {name: {"params": [T, ...], "ret": T}}} with
+    T = {"c": spelling, "bits": 8|16|32|64, "signed": bool, "bool": bool}."""
+    path = os.path.join(src_root, "ctypes.json")
+    if not os.path.exists(path):
+        return {}
+    return json.load(open(path)).get("functions", {})
+
+
+def c_ctype(t):
+    import ctypes
+    if t.get("bool"):
+        return ctypes.c_bool
+    return {(8, True): ctypes.c_int8, (8, False): ctypes.c_uint8,
+            (16, True): ctypes.c_int16, (16, False): ctypes.c_uint16,
+            (32, True): ctypes.c_int32, (32, False): ctypes.c_uint32,
+            (64, True): ctypes.c_int64, (64, False): ctypes.c_uint64}[
+                (t["bits"], bool(t["signed"]))]
+
+
+def c_type_range(t):
+    if t.get("bool"):
+        return 0, 1
+    b = t["bits"]
+    return (-(1 << (b - 1)), (1 << (b - 1)) - 1) if t["signed"] else (0, (1 << b) - 1)
+
+
+def c_typed_arg(t):
+    """An argument for a parameter of C type `t`, always representable in `t`.
+
+    Mostly the small range the int-only leg uses (clamped into the type), and with
+    probability 0.35 a boundary of THIS type -- its min/max and their neighbours, and
+    the power-of-two edges below it. `randint(-20, 20)` alone can never exercise
+    wraparound: a `u8` needs 255, a `u32` needs values above INT_MAX, an `i64` needs
+    values a 32-bit model cannot hold."""
+    lo, hi = c_type_range(t)
+    if t.get("bool"):
+        return random.randint(0, 1)
+    if random.random() < 0.35:
+        pool = {lo, lo + 1, hi, hi - 1, 0, 1, hi // 2, hi // 2 + 1}
+        if t["signed"]:
+            pool.add(-1)
+        for k in (7, 8, 15, 16, 31, 32, 63):
+            for v in ((1 << k) - 1, 1 << k, -(1 << k)):
+                pool.add(v)
+        return random.choice(sorted(v for v in pool if lo <= v <= hi))
+    v = random.randint(-20, 20) if t["signed"] else random.randint(0, 40)
+    return max(lo, min(hi, v))
+
+
+def c_return_conversion(lr):
+    """Read a Core `bool` result the way C reads the value it stands for.
+
+    Under `.cLike` Core produces `Val.bool` for `<`, `==`, `!`, `&&`, ... and promotes it
+    to 0/1 in every integer context (`Dialect.promotesBool` in Semantics.lean), because
+    Java's `boolean` and C++'s `bool` share that dialect. The one integer context Core
+    does not see is the RETURN conversion to the function's declared integer type, which
+    the C side always applies (every C leg function returns an integer type: `int` on
+    the untyped leg, an integer type from `ctypes.json` on the typed one). So a
+    `bool true` result is compared as `1` -- the same conversion `cc` performs, and
+    nothing looser: `bool true` against a C result of 5 is still a divergence."""
+    if lr[0] == "val" and lr[1][0] == "bool":
+        return ("val", ("int", 1 if lr[1][1] else 0))
+    return lr
+
+
+def c_runtime(src_root, sigs=None):
     """Compile the C sources to a shared library and expose them via ctypes.
 
     Same oracle, different runtime: the point of the Core language is that one semantics
     is checked against whichever real implementation produced the code."""
     import ctypes
+    sigs = sigs or {}
     srcs = glob.glob(os.path.join(src_root, "**", "*.c"), recursive=True)
     if not srcs: return None
     lib = os.path.join(WORK, "libautoform_diff_c" +
@@ -1596,8 +1674,13 @@ def c_runtime(src_root):
     def get(name, nargs):
         try: fn = getattr(dll, name)
         except AttributeError: return None
-        fn.restype = ctypes.c_int
-        fn.argtypes = [ctypes.c_int] * nargs
+        sig = sigs.get(name)
+        if sig is not None and len(sig["params"]) == nargs:
+            fn.restype = c_ctype(sig["ret"])
+            fn.argtypes = [c_ctype(t) for t in sig["params"]]
+        else:
+            fn.restype = ctypes.c_int
+            fn.argtypes = [ctypes.c_int] * nargs
         return fn
     return get
 
@@ -2212,7 +2295,22 @@ def main():
     elif lang == "kotlin":
         backend_status = "UNSUPPORTED: no kotlinc"
     elif is_c:
-        cget = c_runtime(src_root)
+        csigs = c_signatures(src_root)
+        if csigs:
+            if wasm_mode:
+                raise SystemExit("--wasm is not supported with a typed C leg "
+                                 "(ctypes.json): the wasm caller passes i32 only")
+            BASIS = "c-typed-v1"
+            BASIS_NOTE = (
+                "Basis c-typed-v1: the C leg read per-function signatures from "
+                "ctypes.json. Arguments and results are passed at their real C width "
+                "and signedness (char/short/int/long/long long, unsigned, _Bool), and "
+                "arguments are drawn over the whole range of each parameter type "
+                "(boundary values with p=0.35), not only randint(-20, 20). A Core "
+                "`bool` result is compared as 0/1, the C return conversion "
+                "(`c_return_conversion`). Not comparable with the int-only basis.")
+            print("  typed C leg: %d signatures from ctypes.json" % len(csigs))
+        cget = c_runtime(src_root, csigs)
         cands = [f for f in holefree
                  if f["params"] and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', f["name"])]
         # Fix the argument vectors up front so the native and wasm runs see EXACTLY the
@@ -2236,10 +2334,16 @@ def main():
                 return random.choice(UB_POOL)
             return random.randint(-20, 20)
 
+        def c_args(f):
+            sig = csigs.get(f["name"])
+            if sig is not None and len(sig["params"]) == len(f["params"]):
+                return [c_typed_arg(t) for t in sig["params"]]
+            return [c_arg() for _ in f["params"]]
+
         plan = []
         for f in cands:
             for _ in range(ncases):
-                plan.append((f, [c_arg() for _ in f["params"]]))
+                plan.append((f, c_args(f)))
 
         # ---- native leg (the existing `cc` backend)
         native, native2 = {}, {}
@@ -2331,7 +2435,7 @@ def main():
             cases.append({"name": f["name"], "heap": [], "self": None,
                           "args": [("int", a) for a in args],
                           "outcome": ("val", ("int", nat)), "origin": "random",
-                          "objs": {}})
+                          "objs": {}, "c_int_return": True})
         if wasm_report is not None:
             wasm_report.update(calls_planned=len(plan), tally=wtally,
                                trap_detail=dict(sorted(trap_detail.items(),
@@ -2825,6 +2929,8 @@ def main():
             print("  unparsable %s: %s" % (c["name"], line[:80]))
             continue
         py = c["outcome"]
+        if c.get("c_int_return"):
+            lr = c_return_conversion(lr)
         argstr = "(%s)" % ", ".join(show(a) for a in c["args"])
         if lr[0] in ("hole", "outOfFuel"):
             # ignorance is never agreement

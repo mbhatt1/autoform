@@ -1,6 +1,7 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
 import Autoform.Lang.Core.Stdlib
+import Autoform.Lang.Core.Boxed
 
 /-!
 # Core — semantics
@@ -206,9 +207,14 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                    -- JS `%` on a `Number` is the remainder of TRUNCATED division
                    -- (sign of the dividend): Node's `-7.5 % 2` is `-1.5`, CPython's
                    -- is `0.5`. That is C's `fmod`, which IEEE makes exact.
+                   -- `.cLike` likewise: the only `.cLike` languages in which `%`
+                   -- accepts a floating operand at all are Java and Kotlin (C, C++ and
+                   -- Go reject it at compile time), and both define it as the
+                   -- truncated remainder (JLS 15.17.3: `-5.5 % 2.0` is `-1.5`). It was
+                   -- Python's floored `pyMod` here, which answered `0.5`.
                    | _   => match d with
-                            | .javascript => fc.fmod x y
-                            | _           => fc.pyMod x y)
+                            | .javascript | .cLike => fc.fmod x y
+                            | .python              => fc.pyMod x y)
         -- a failed promotion (Python's `OverflowError` on a huge int) is the answer
       | some r, some (.ok _) => fresToE r
       | some (.ok _), some r => fresToE r
@@ -245,6 +251,116 @@ def jsIntMod (x y : Int) : EResult :=
   if y != 0 && (Int.tmod x y != 0 || x >= 0) then .val (.int (Int.tmod x y))
   else flBinop .javascript "%" (.int x) (.int y)
 
+/-! ### JavaScript bitwise operators: ToInt32 / ToUint32
+
+Every JS bitwise operator converts its operands to 32-bit integers first (ECMA-262
+`ToInt32`/`ToUint32`, i.e. reduction modulo 2^32), and every one but `>>>` yields a
+signed 32-bit result; the shift count is `ToUint32(rhs) & 31`. `.javascript` borrows
+`NumConfig.python` (unbounded) for `+`/`-`/`*`, so routing `&`/`|`/`^`/`<<`/`>>`/`~`
+through it gave bignum answers: `1 << 32` was `4294967296` (Node: `1`), `1 << 31` was
+`2147483648` (Node: `-2147483648`), `~2147483648` was `-2147483649` (Node:
+`2147483647`), and `-1 >>> 0` was a `ub` hole (Node: `4294967295`).
+
+**Precision guard.** A Core `.int` under `.javascript` is exact past 2^53 where Node's
+double would already have rounded, so ToInt32 of such a value can disagree with Node.
+Operands with `|n| > 2^53` are a hole rather than an answer. Float operands (`1.5 | 0`)
+never reach here: `flBinop` holes every bitwise operator. -/
+
+/-- ECMA-262 `ToUint32` on an integer: reduction into `[0, 2^32)`. -/
+def jsToUint32 (n : Int) : Int := n % 4294967296
+
+/-- ECMA-262 `ToInt32` on an integer: reduction into `[-2^31, 2^31)`. -/
+def jsToInt32 (n : Int) : Int :=
+  let m := jsToUint32 n
+  if m ≥ 2147483648 then m - 4294967296 else m
+
+/-- `|n| ≤ 2^53`: every such integer is an exact binary64, so ToInt32 of the Core value
+is ToInt32 of the Node value. -/
+def jsExactInt (n : Int) : Bool := n.natAbs ≤ 9007199254740992
+
+/-- JS `x op y` for a bitwise operator on two `.int`s. -/
+def jsBitwise (op : String) (x y : Int) : EResult :=
+  if !(jsExactInt x && jsExactInt y) then .hole "js:bitwise:operand-beyond-2^53"
+  else
+    let ux := (jsToUint32 x).toNat
+    let uy := (jsToUint32 y).toNat
+    let s  := uy % 32
+    match op with
+    | "&"   => .val (.int (jsToInt32 (Nat.land ux uy)))
+    | "|"   => .val (.int (jsToInt32 (Nat.lor ux uy)))
+    | "^"   => .val (.int (jsToInt32 (Nat.xor ux uy)))
+    | "<<"  => .val (.int (jsToInt32 (jsToInt32 x * 2 ^ s)))
+    -- arithmetic (sign-propagating): floor division of the signed 32-bit value
+    | ">>"  => .val (.int (Int.fdiv (jsToInt32 x) (2 ^ s)))
+    -- zero-filling, and the result is UNSIGNED: `-1 >>> 0` is `4294967295`
+    | ">>>" => .val (.int ((ux / 2 ^ s : Nat) : Int))
+    | _     => .hole s!"binop:{op}"
+
+/-- JS `~x` on an `.int`: `-ToInt32(x) - 1`, always in int32 range. -/
+def jsBitNot (x : Int) : EResult :=
+  if jsExactInt x then .val (.int (-(jsToInt32 x) - 1))
+  else .hole "js:bitwise:operand-beyond-2^53"
+
+/-! ### JavaScript `===` and `==`
+
+`===` (IsStrictlyEqual) is `false` across JS types and value comparison within one,
+except that objects compare by identity. `==` (IsLooselyEqual) agrees with it on two
+operands of the same JS type; across types it coerces (`1 == "1"`, `0 == false`,
+`[1] == 1` are all `true`) through ToNumber/ToPrimitive, which this model does **not**
+implement -- those are holes. The one cross-type case that needs no coercion is decided:
+`null`/`undefined` are loosely equal to each other and to nothing else.
+
+Core's value representation limits what can be answered:
+
+* `.int` and `.float` are both a JS Number, compared numerically (`1 === 1.0`), with IEEE
+  rules via `flCmp` (`NaN !== NaN`, `0 === -0`).
+* `.unit` is **both** `null` and `undefined` -- Core does not distinguish them -- so
+  `.unit === .unit` is a hole (`null === undefined` is `false`), while `.unit == .unit` is
+  `true` in every combination and `.unit == <non-nullish>` is `false`.
+* Objects compare by identity. A `.ref` and a named `.fn` carry it; an unboxed
+  `.list`/`.tuple`/`.dict` or a closure value does not, so two of those are a hole. -/
+
+/-- The JS type of a Core value as far as equality needs it: 0 Number, 1 String,
+2 Boolean, 3 null/undefined, 4 Object. `none` for values that are not JS values. -/
+def jsEqTag : Val → Option Nat
+  | .int _ | .float _ => some 0
+  | .str _ => some 1
+  | .bool _ => some 2
+  | .unit => some 3
+  | .ref _ | .list _ | .tuple _ | .dict _ | .fn _ | .clos _ _ | .clsClos _ _
+  | .bobj _ _ => some 4
+  | .iref _ _ => none
+
+/-- Equality of two values of the same JS type (`jsEqTag x = jsEqTag y`), where Core can
+decide it. `.unit`/`.unit` is left to the caller (it differs between `==` and `===`). -/
+def jsSameTypeEq : Val → Val → Option Bool
+  | .int a,  .int b  => some (a == b)
+  | .str a,  .str b  => some (a == b)
+  | .bool a, .bool b => some (a == b)
+  | .ref a,  .ref b  => some (a == b)
+  | .fn a,   .fn b   => some (a == b)
+  | x, y =>
+      if x.kind == 3 || y.kind == 3 then some (flCmp .javascript x y == some .eq)
+      else none
+
+/-- JS `x === y` (`strict := true`) or `x == y` (`strict := false`), negated if `neg`. -/
+def jsEqE (strict neg : Bool) (x y : Val) : EResult :=
+  let r : Except String Bool :=
+    match jsEqTag x, jsEqTag y with
+    | some tx, some ty =>
+        if tx == ty then
+          if tx == 3 then
+            if strict then .error "js:===:null-vs-undefined" else .ok true
+          else match jsSameTypeEq x y with
+               | some b => .ok b
+               | none   => .error "js:eq:object-identity-unknown"
+        else if strict || tx == 3 || ty == 3 then .ok false
+        else .error "js:==:cross-type-coercion"
+    | _, _ => .error "js:eq:non-js-value"
+  match r with
+  | .ok b    => .val (.bool (if neg then !b else b))
+  | .error l => .hole l
+
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
 Only a REFERENCE forces it: two distinct objects with equal contents are `==` in Python, and
@@ -252,15 +368,125 @@ no structural compare of two refs can see that. Everything else stays on `applyB
 is heap-free and reducible -- the property `Refine.lean` is built on. Named rather than
 inlined so proofs can discharge it by `simp` on concrete operands. -/
 def binopNeedsHeap (op : String) (x y : Val) : Bool :=
-  (op == "==" || op == "!=") && (x.kind == 8 || y.kind == 8)
+  (op == "==" || op == "!=") &&
+    -- A reference, or a VALUE container (list 5, tuple 6, dict 7, builtin-based 12) that may
+    -- hold one: `(xs,) == ([1],)` compares a boxed list at depth 1, and `Val.beq` would
+    -- compare it by address.
+    (x.kind == 5 || x.kind == 6 || x.kind == 7 || x.kind == 8 || x.kind == 12 ||
+     y.kind == 5 || y.kind == 6 || y.kind == 7 || y.kind == 8 || y.kind == 12)
 
 @[simp] theorem binopNeedsHeap_int_left (op : String) (i : Int) (y : Val) :
-    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") && y.kind == 8) := by
+    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") &&
+      (y.kind == 5 || y.kind == 6 || y.kind == 7 || y.kind == 8 || y.kind == 12)) := by
   simp [binopNeedsHeap, Val.kind]
 
 @[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
     (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
   simp [binopNeedsHeap, beq_iff_eq, h, h2]
+
+/-! ### `bool` in integer contexts under `.cLike`
+
+C has no boolean results: `a < b`, `a == b`, `!a`, `a && b` are `int` 0 or 1 (C11
+6.5.8p6, 6.5.9p3, 6.5.3.3p5, 6.5.13p3, 6.5.14p3), and a `_Bool` promotes to `int`
+(6.3.1.1p2). C++ does have `bool`, and integral promotion turns it into `int` 0/1 in
+arithmetic, comparison and bitwise contexts ([conv.prom]/6). Java, Go and Kotlin share
+`.cLike` too, and there `a < b` is a `boolean` and mixing it with an integer is a
+**compile error** — so no well-typed program of theirs ever reaches the cases below.
+
+Core keeps producing `Val.bool` for comparisons under `.cLike` (Java's `boolean` and
+C++'s `bool` need it, and `Refine.applyBinop_int_lt` & co. state it for every dialect),
+and instead PROMOTES a `bool` operand to `0`/`1` wherever it meets an integer or a float:
+the C++ rule, which under C is the same arithmetic with the 0/1 already applied. Before
+this, `int t = (a < b); if (t == 1) ...` compared `Val.bool true` with `Val.int 1` via
+`Val.beq` and answered **false** (cc: true) — a silent wrong answer measured on SQLite
+(`docs/scale.md`), and `(a<b) + (b<a)` was a hole.
+
+Two `bool`s under `&`, `|`, `^` stay a `bool` (Java's logical `&`; in C the 0/1 that a
+later integer context promotes), and two `bool`s under `==`/`!=`/`&&`/`||` take the
+existing path, whose truth value is the same either way. Every other operator on two
+`bool`s promotes both (C/C++ only; a compile error elsewhere).
+
+What is NOT done here: the RETURN conversion. `int f(void) { return a < b; }` returns
+`Val.bool`, which every integer context above reads as `0`/`1`; the C oracle
+(`scripts/differential.py`) compares a `bool` result against an integer-typed C result as
+`0`/`1` for the same reason. -/
+
+/-- Does this dialect promote `bool` to `0`/`1` in integer contexts? See above. -/
+def Dialect.promotesBool : Dialect → Bool
+  | .python     => false
+  | .cLike      => true
+  | .javascript => false
+
+/-- `false`/`true` as the integers C gives them. -/
+def boolToInt (b : Bool) : Int := if b then 1 else 0
+
+/-- The operators a promoted `bool` takes part in as an integer. -/
+def cIntOps : List String :=
+  ["+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!="]
+
+/-- `applyBinop .cLike op (.int x) (.int y)` for `op ∈ cIntOps`, restated so the promoted
+`bool` arms of `applyBinop` can use it without recursion. `cIntBinop_eq` (below
+`applyBinop`) proves the two agree, so they cannot drift apart. -/
+def cIntBinop (op : String) (x y : Int) : EResult :=
+  let nc := Dialect.cLike.toNumConfig
+  match op with
+  | "+"   => numToE (nc.add x y)
+  | "-"   => numToE (nc.sub x y)
+  | "*"   => numToE (nc.mul x y)
+  | "/"   => numToE (nc.div x y)
+  | "%"   => numToE (nc.mod x y)
+  | "&"   => numToE (nc.band x y)
+  | "|"   => numToE (nc.bor x y)
+  | "^"   => numToE (nc.bxor x y)
+  | "<<"  => numToE (nc.shl x y)
+  | ">>"  => numToE (nc.shr x y)
+  | ">>>" => numToE ({ nc with negRightShift := .logical }.shr x y)
+  | "<"   => .val (.bool (x < y))
+  | "<="  => .val (.bool (x ≤ y))
+  | ">"   => .val (.bool (x > y))
+  | ">="  => .val (.bool (x ≥ y))
+  | "=="  => .val (.bool (x == y))
+  | "!="  => .val (.bool (!(x == y)))
+  | _     => .hole s!"binop:{op}"
+
+/-- What `applyBinop` answers for operands no typed arm claims: the generic tail of its
+match (structural `==`/`!=`, value-or-bool `&&`/`||`, otherwise a hole). -/
+def binopTail (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match op with
+  | "==" => .val (.bool (Val.beq a b))
+  | "!=" => .val (.bool (!Val.beq a b))
+  | "&&" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
+  | "||" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
+  | _    => .hole s!"binop:{op}"
+
+/-- The tail of `applyBinop`: operand pairs no typed arm there claims. A `bool` meeting a
+number is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`); everything else is
+`binopTail`. A separate function, not more arms of `applyBinop`'s match, because every
+extra arm there multiplies the string-literal tests `simp` has to discharge in the
+operator lemmas below. -/
+def binopFallback (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match a, b with
+  | .bool p, .int y =>
+      if d.promotesBool && cIntOps.contains op then cIntBinop op (boolToInt p) y
+      else binopTail d op a b
+  | .int x, .bool q =>
+      if d.promotesBool && cIntOps.contains op then cIntBinop op x (boolToInt q)
+      else binopTail d op a b
+  | .bool p, .float _ =>
+      if d.promotesBool then flBinop d op (.int (boolToInt p)) b else binopTail d op a b
+  | .float _, .bool q =>
+      if d.promotesBool then flBinop d op a (.int (boolToInt q)) else binopTail d op a b
+  | .bool p, .bool q =>
+      if d.promotesBool then
+        match op with
+        | "&" => .val (.bool (p && q))
+        | "|" => .val (.bool (p || q))
+        | "^" => .val (.bool (p != q))
+        | "==" | "!=" | "&&" | "||" => binopTail d op a b
+        | _ => if cIntOps.contains op then cIntBinop op (boolToInt p) (boolToInt q)
+               else binopTail d op a b
+      else binopTail d op a b
+  | _, _ => binopTail d op a b
 
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
@@ -269,6 +495,17 @@ source dialect: Python gets bignums, C-like gets 32-bit two's-complement. -/
 def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
+  -- JavaScript strict equality. Its own operator string, emitted by the exporter only for
+  -- a JS `===`/`!==` source token (jssrc2cpg spells both `<operator>.equals`), and first
+  -- in the match so the float arms below cannot claim it. See `jsEqE`.
+  | "===", x, y =>
+      match d with
+      | .javascript => jsEqE true false x y
+      | _           => .hole "binop:===:non-javascript"
+  | "!==", x, y =>
+      match d with
+      | .javascript => jsEqE true true x y
+      | _           => .hole "binop:!==:non-javascript"
   | "+",  .int x,   .int y   => numToE (nc.add x y)
   -- Item 6: a C `char*` is not a Python `str`. In C, `+` on pointers is POINTER
   -- ARITHMETIC and `<`/`>`/`==` compare ADDRESSES, not contents. Core has one `Val.str`
@@ -316,12 +553,24 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- from the CPG's static type, which of the two it emits, and holes when the type is
   -- unknown. Collapsing them here would reintroduce exactly the `<operator>.and` mistake
   -- in a place where it is much harder to see.
-  | "&",  .int x, .int y => numToE (nc.band x y)
-  | "|",  .int x, .int y => numToE (nc.bor x y)
-  | "^",  .int x, .int y => numToE (nc.bxor x y)
-  | "<<", .int x, .int y => numToE (nc.shl x y)
-  | ">>", .int x, .int y => numToE (nc.shr x y)
-  | ">>>", .int x, .int y => numToE ({ nc with negRightShift := .logical }.shr x y)
+  --
+  -- JavaScript is the exception to "the arithmetic is `NumConfig`'s": its integers are
+  -- unbounded for `+`, but its bitwise operators work on ToInt32/ToUint32 of their
+  -- operands. See `jsBitwise`.
+  | "&",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "&" x y  | _ => numToE (nc.band x y)
+  | "|",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "|" x y  | _ => numToE (nc.bor x y)
+  | "^",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "^" x y  | _ => numToE (nc.bxor x y)
+  | "<<", .int x, .int y =>
+      match d with | .javascript => jsBitwise "<<" x y | _ => numToE (nc.shl x y)
+  | ">>", .int x, .int y =>
+      match d with | .javascript => jsBitwise ">>" x y | _ => numToE (nc.shr x y)
+  | ">>>", .int x, .int y =>
+      match d with
+      | .javascript => jsBitwise ">>>" x y
+      | _           => numToE ({ nc with negRightShift := .logical }.shr x y)
   | "<",  .int x, .int y => .val (.bool (x < y))
   | "<=", .int x, .int y => .val (.bool (x ≤ y))
   | ">",  .int x, .int y => .val (.bool (x > y))
@@ -332,6 +581,11 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | ">",  .str x, .str y =>
       if d.stringsAreValues then .val (.bool (x > y))
       else .hole "str:pointer-compare-not-modelled"
+  -- `int == int` is the same in every dialect (JS: two Numbers). Its own arm so that it
+  -- does not depend on the dialect split in the generic `==` arm below, and
+  -- `Refine.applyBinop_int_eq` stays `rfl` for an arbitrary dialect.
+  | "==", .int x, .int y => .val (.bool (x == y))
+  | "!=", .int x, .int y => .val (.bool (!(x == y)))
   -- `==` on strings compares contents in Python and addresses in C. `Val.beq` is
   -- structural, so it is right for Python and wrong for C.
   | "==", .str _, .str _ =>
@@ -408,13 +662,21 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
            | _,      _      => .hole "iref:cmp-non-index"
   | "==", .iref r1 s1, .iref r2 s2 => .val (.bool (r1 == r2 && s1 == s2))
   | "!=", .iref r1 s1, .iref r2 s2 => .val (.bool !(r1 == r2 && s1 == s2))
-  | "==", x, y           => .val (.bool (Val.beq x y))
-  | "!=", x, y           => .val (.bool (!Val.beq x y))
-  -- Reached only when the left operand did not decide the result, so the value
-  -- of the expression is the RIGHT operand under value semantics.
-  | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | _, _, _              => .hole s!"binop:{op}"
+  -- JavaScript `==`/`!=` is LOOSE equality (`1 == "1"` is `true`), which `Val.beq`
+  -- answered `false`. Same-type operands are decided; cross-type coercion is a hole.
+  -- (`int`/`int`, `str`/`str` and the float arms above are already right for JS.)
+  | "==", x, y           =>
+      match d with
+      | .javascript => jsEqE false false x y
+      | _           => binopFallback d op x y
+  | "!=", x, y           =>
+      match d with
+      | .javascript => jsEqE false true x y
+      | _           => binopFallback d op x y
+  -- Everything else: structural `==`/`!=`, `&&`/`||` (reached only when the left
+  -- operand did not decide the result, so the value is the RIGHT operand under value
+  -- semantics), a `bool` promoted under `.cLike`, or a hole. See `binopFallback`.
+  | _, _, _              => binopFallback d op a b
 
 /-!
 ### Operator equations
@@ -480,6 +742,84 @@ example : applyBinop .javascript "/" (.int 6) (.int (-3)) = .val (.int (-2)) := 
 #eval applyBinop .javascript "||" (.float (Fl.ofBits (Float.toBits 0.0).toNat)) (.int 2)
   -- val (int 2), matches Node's `0.0 || 2` (was `bool true`)
 
+/-! Java `%` on doubles is the TRUNCATED remainder (JLS 15.17.3): `-5.5 % 2.0` is `-1.5`.
+`.cLike` used CPython's floored `pyMod` and answered `0.5`. Pinned by `#guard`, which
+compares the IEEE bits, so a regression fails the build. -/
+#guard (match applyBinop .cLike "%" (.float (Fl.ofBits (Float.toBits (-5.5)).toNat))
+                                     (.float (Fl.ofBits (Float.toBits 2.0).toNat)) with
+        | .val (.float f) => f.bits == (Float.toBits (-1.5)).toNat
+        | _ => false)
+#guard (match applyBinop .cLike "%" (.float (Fl.ofBits (Float.toBits 5.5).toNat))
+                                     (.int (-2)) with
+        | .val (.float f) => f.bits == (Float.toBits 1.5).toNat
+        | _ => false)
+-- CPython is unchanged: `-5.5 % 2.0 == 0.5`.
+#guard (match applyBinop .python "%" (.float (Fl.ofBits (Float.toBits (-5.5)).toNat))
+                                      (.float (Fl.ofBits (Float.toBits 2.0).toNat)) with
+        | .val (.float f) => f.bits == (Float.toBits 0.5).toNat
+        | _ => false)
+
+/-! `==` vs `===` (`docs/languages.md` §4). Every right-hand side below is Node's answer,
+from `node -e` (v22); a hole is written where Core declines to answer. -/
+example : applyBinop .javascript "===" (.int 1) (.str "1") = .val (.bool false) := rfl
+example : applyBinop .javascript "!==" (.int 1) (.str "1") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.int 1) (.int 1) = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.str "a") (.str "a") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.bool true) (.int 1) = .val (.bool false) := rfl
+example : applyBinop .javascript "===" .unit (.int 0) = .val (.bool false) := rfl
+-- `1 == "1"` and `0 == false` are `true` in Node; Core used to say `false`. Now a hole:
+example : applyBinop .javascript "==" (.int 1) (.str "1")
+    = .hole "js:==:cross-type-coercion" := rfl
+example : applyBinop .javascript "==" (.int 0) (.bool false)
+    = .hole "js:==:cross-type-coercion" := rfl
+-- `null == undefined` is `true`, `null == 0` is `false`, `null === undefined` is `false`
+-- (Core cannot tell null from undefined, so `===` on two of them is a hole).
+example : applyBinop .javascript "==" .unit .unit = .val (.bool true) := rfl
+example : applyBinop .javascript "==" .unit (.int 0) = .val (.bool false) := rfl
+example : applyBinop .javascript "!=" .unit (.str "") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" .unit .unit = .hole "js:===:null-vs-undefined" := rfl
+-- same-type `==` is exact
+example : applyBinop .javascript "==" (.bool true) (.bool true) = .val (.bool true) := rfl
+example : applyBinop .javascript "==" (.int 2) (.int 3) = .val (.bool false) := rfl
+-- objects: identity (`[1] == [1]` is `false`; `o == o` is `true`)
+example : applyBinop .javascript "==" (.ref 0) (.ref 1) = .val (.bool false) := rfl
+example : applyBinop .javascript "===" (.ref 4) (.ref 4) = .val (.bool true) := rfl
+example : applyBinop .javascript "==" (.list [.int 1]) (.list [.int 1])
+    = .hole "js:eq:object-identity-unknown" := rfl
+-- `===` is not a JS-only spelling anywhere else: other dialects hole rather than guess.
+example : applyBinop .python "===" (.int 1) (.int 1) = .hole "binop:===:non-javascript" := rfl
+#eval applyBinop .javascript "===" (.int 1) (.float (Fl.ofBits (Float.toBits 1.0).toNat))
+  -- val (bool true), matches Node's `1 === 1.0`
+#eval applyBinop .javascript "===" (.float (Fl.ofBits (Float.toBits (0.0/0.0)).toNat))
+                                   (.float (Fl.ofBits (Float.toBits (0.0/0.0)).toNat))
+  -- val (bool false), matches Node's `NaN === NaN`
+#eval applyBinop .javascript "===" (.float (Fl.ofBits (Float.toBits (-0.0)).toNat)) (.int 0)
+  -- val (bool true), matches Node's `-0 === 0`
+
+/-! Bitwise operators: ToInt32/ToUint32 (`jsBitwise`). Right-hand sides from `node -e`. -/
+example : applyBinop .javascript "<<" (.int 1) (.int 31) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int 32) = .val (.int 1) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int 33) = .val (.int 2) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int (-1)) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "|" (.int 2147483648) (.int 0) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "|" (.int 4294967296) (.int 0) = .val (.int 0) := rfl
+example : applyBinop .javascript "^" (.int (-2147483649)) (.int 0) = .val (.int 2147483647) := rfl
+example : applyBinop .javascript "&" (.int 5) (.int (-1)) = .val (.int 5) := rfl
+example : applyBinop .javascript "&" (.int 4294967295) (.int 1) = .val (.int 1) := rfl
+example : applyBinop .javascript ">>" (.int (-8)) (.int 1) = .val (.int (-4)) := rfl
+example : applyBinop .javascript ">>" (.int 4294967295) (.int 0) = .val (.int (-1)) := rfl
+example : applyBinop .javascript ">>>" (.int (-1)) (.int 0) = .val (.int 4294967295) := rfl
+example : applyBinop .javascript ">>>" (.int (-1)) (.int 28) = .val (.int 15) := rfl
+example : applyBinop .javascript ">>>" (.int (-16)) (.int 2) = .val (.int 1073741820) := rfl
+example : applyBinop .javascript ">>>" (.int 3) (.int (-1)) = .val (.int 0) := rfl
+example : applyBinop .javascript "|" (.int 9007199254740992) (.int 0) = .val (.int 0) := rfl
+example : applyBinop .javascript "|" (.int 9007199254740994) (.int 0)
+    = .hole "js:bitwise:operand-beyond-2^53" := rfl
+-- C is untouched: `1 << 31` is still `INT_MIN` under `.cLike`, `~0` still `-1`.
+example : applyBinop .cLike "<<" (.int 1) (.int 31) = .val (.int (-2147483648)) := rfl
+#eval applyBinop .javascript ">>>" (.int (-1)) (.int 0)   -- val (int 4294967295), Node
+#eval applyBinop .javascript "<<" (.int 1) (.int 32)       -- val (int 1), Node
+
 /-! ### Float equations, and the two that must not regress
 
 `Val.beq` on floats is the place where a plausible-looking implementation is wrong. Both
@@ -530,6 +870,38 @@ abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
 @[simp] theorem applyBinop_c_divZero (x : Int) :
     applyBinop .cLike "/" (.int x) (.int 0) = .exn (.str "ZeroDivisionError") := rfl
 
+/-! `binopFallback` on operands it does not promote is `binopTail`, and `binopTail` on a
+literal operator is one line. Stated as `simp` lemmas so that proofs which `simp` through
+`applyBinop` (`Specs/V8Spec.lean`) see the same terms as before the fallback was split
+out. -/
+@[simp] theorem binopFallback_int_int (d : Dialect) (op : String) (x y : Int) :
+    binopFallback d op (.int x) (.int y) = binopTail d op (.int x) (.int y) := rfl
+@[simp] theorem binopTail_eq (d : Dialect) (a b : Val) :
+    binopTail d "==" a b = .val (.bool (Val.beq a b)) := rfl
+@[simp] theorem binopTail_ne (d : Dialect) (a b : Val) :
+    binopTail d "!=" a b = .val (.bool (!Val.beq a b)) := rfl
+@[simp] theorem binopTail_and (d : Dialect) (a b : Val) :
+    binopTail d "&&" a b = .val (if d.boolOpsAreValues then b else .bool b.truthy) := rfl
+@[simp] theorem binopTail_or (d : Dialect) (a b : Val) :
+    binopTail d "||" a b = .val (if d.boolOpsAreValues then b else .bool b.truthy) := rfl
+
+/-- The promoted arms of `applyBinop` compute exactly what the integer arms do. -/
+theorem cIntBinop_eq (op : String) (x y : Int) (h : op ∈ cIntOps) :
+    cIntBinop op x y = applyBinop .cLike op (.int x) (.int y) := by
+  simp only [cIntOps, List.mem_cons, List.not_mem_nil, or_false] at h
+  rcases h with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl <;> rfl
+
+/-! The SQLite fixture of `docs/scale.md`, at the operator level: `(a < b) == 1` is true
+and `(a < b) + (b < a)` is `1` under `.cLike`, as `cc` computes. -/
+example : applyBinop .cLike "==" (.bool true) (.int 1) = .val (.bool true) := rfl
+example : applyBinop .cLike "+" (.bool true) (.bool false) = .val (.int 1) := rfl
+example : applyBinop .cLike "*" (.int 7) (.bool true) = .val (.int 7) := rfl
+-- Java's logical `&` on two `boolean`s stays a `boolean`.
+example : applyBinop .cLike "&" (.bool true) (.bool false) = .val (.bool false) := rfl
+-- Python is untouched by this change (its own `True == 1` is a separate matter).
+example : applyBinop .python "+" (.bool true) (.int 1) = .hole "binop:+" := rfl
+
 /-- Built-in unary operators. -/
 def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   match op, a with
@@ -546,7 +918,16 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- `<operator>.not` and `<operator>.logicalNot`; this exporter previously mapped *both*
   -- onto `"!"`, so `~0` translated to `false`. `bnot` is `-x-1` wrapped to the dialect's
   -- width, which is two's complement at every width and never overflows.
-  | "~", .int x => numToE ((d.toNumConfig).bnot x)
+  | "~", .int x =>
+      match d with
+      | .javascript => jsBitNot x            -- `~2147483648` is `2147483647` in Node
+      | _           => numToE ((d.toNumConfig).bnot x)
+  -- A `bool` operand is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`):
+  -- `-(a < b)` is `-1` in C. Elsewhere it stays the hole it was.
+  | "-", .bool b => if d.promotesBool then numToE ((d.toNumConfig).neg (boolToInt b))
+                    else .hole s!"unop:{op}"
+  | "~", .bool b => if d.promotesBool then numToE ((d.toNumConfig).bnot (boolToInt b))
+                    else .hole s!"unop:{op}"
   -- **Width conversions.** `static_cast<uint8_t>(e)` in C++ is a unary operator whose
   -- meaning is completely determined: since C++20, conversion to any integer type is
   -- two's-complement reduction modulo `2^width`, which is exactly `IntType.wrap`. So it
@@ -601,6 +982,11 @@ example : applyUnop .cLike "cast:i8" (.int 200) = .val (.int (-56)) := by rfl
 
 /-- A cast of something that is not a number is a hole, not a guess. -/
 example : applyUnop .cLike "cast:u8" (.str "x") = .hole "unop:cast:u8" := by rfl
+
+/-- JS `~` is `-ToInt32(x) - 1` (`jsBitNot`); Node: `~2147483648` is `2147483647`, `~0`
+is `-1`. The unbounded `NumConfig.python` answer was `-2147483649`. -/
+example : applyUnop .javascript "~" (.int 2147483648) = .val (.int 2147483647) := rfl
+example : applyUnop .javascript "~" (.int 0) = .val (.int (-1)) := rfl
 
 /-- Negation is definitional under the unbounded (Python) config. -/
 @[simp] theorem applyUnop_py_neg (x : Int) :
@@ -1093,6 +1479,21 @@ carries a class table, the legacy suffix rule otherwise. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
   if ctx.pyStrict then ctx.resolveMethodPy cls meth else ctx.resolveMethodLegacy cls meth
 
+/-- Method resolution for `obj.m(…)` on a heap object. Under Python's rules an attribute
+in the INSTANCE's own `__dict__` shadows a method of its class (CPython consults the
+instance dictionary before non-data class attributes), and such an attribute is called
+without a receiver. Core does not call it -- it is the hole
+`mcall:<C>.<m>:instance-attribute` -- but it no longer calls the class's method in its
+place. Reserved classes and legacy programs are unchanged. -/
+def Ctx.resolveMethodOn (ctx : Ctx) (o : Obj) (meth : String) : Option Func :=
+  if ctx.pyStrict && !o.cls.startsWith "<" && o.fields.any (·.1 == meth) then
+    some (holeFunc s!"mcall:{o.cls}.{meth}:instance-attribute")
+  else ctx.resolveMethod o.cls meth
+
+theorem Ctx.resolveMethodOn_of_none {ctx : Ctx} {o : Obj} {m : String}
+    (h : ctx.pyClasses = none) : ctx.resolveMethodOn o m = ctx.resolveMethod o.cls m := by
+  simp [Ctx.resolveMethodOn, Ctx.pyStrict, h]
+
 /-- Does looking `meth` up on class `cls` *reach* something — a method, or a hole? The
 guard for calling a method through a class value (`Base.m(self, …)`): under Python's
 rules an inherited method counts; under the legacy rule only the class's own does
@@ -1210,7 +1611,8 @@ def Ctx.calleeVal (ctx : Ctx) (h : Heap) (ρ : Env) (f : String) : Val :=
     | some (_, v) => v
     | none =>
       match ctx.globalVal? h f with
-      | some (.fn g) => if g == "__builtin." ++ f then .unit else .fn g
+      | some (.fn g) =>
+          if g == "__builtin." ++ f || g == "__builtin." ++ f ++ "<meta>" then .unit else .fn g
       | some v       => v
       | none         => .unit
   else ρ.get f
@@ -1399,7 +1801,8 @@ hold such a value through this path and keep their `call:` hole. -/
 def Ctx.builtinOfValue (ctx : Ctx) (h : Heap) (g : String) (vs : List Val) :
     Option (Heap × EResult) :=
   if ctx.pyStrict && g.startsWith "__builtin." then
-    let b := (g.drop "__builtin.".length).toString
+    let b0 := (g.drop "__builtin.".length).toString
+    let b  := if b0.endsWith "<meta>" then b0.dropRight "<meta>".length else b0
     Stdlib.builtin ctx.dialect h b (builtinSeeThrough b vs)
   else none
 
@@ -1448,7 +1851,8 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .dstarred _    => (h, .hole "op:starred-outside-call")
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op v)
+      -- Through the heap: `not xs` on a boxed empty list is `True`.
+      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op (h₁.view v))
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .binop op a b =>
       match evalExpr ctx n h ρ a with
@@ -1464,9 +1868,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- value position; it survived because cachetools only uses them in
         -- conditions, where truthiness makes the two indistinguishable.
         -- C is the opposite: `&&`/`||` genuinely yield 0/1.
-        if op == "&&" && !x.truthy then
+        if op == "&&" && !(h₁.view x).truthy then
           (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false))
-        else if op == "||" && x.truthy then
+        else if op == "||" && (h₁.view x).truthy then
           (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true))
         else
           match evalExpr ctx n h₁ ρ b with
@@ -1477,15 +1881,25 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- one `Refine.lean` needs reducible -- diverting here costs one call site
             -- instead of re-typing `applyBinop` and its 155 references.
             if binopNeedsHeap op x y then
+              match ctx.dialect with
+              -- JS `==` on objects is IDENTITY (`[1] == [1]` is `false`), never Python's
+              -- value equality; `applyBinop`'s `jsEqE` decides it or holes.
+              | .javascript => (h₂, applyBinop ctx.dialect op x y)
+              | _ =>
               match Val.eqPy h₂ (Val.eqFuel h₂) x y with
               | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
               | none   => (h₂, .outOfFuel)
-            else (h₂, applyBinop ctx.dialect op x y)
+            -- `and`/`or` yield an OPERAND, which must stay the object itself; every other
+            -- operator sees a boxed container's contents (`xs + ys` concatenates them into a
+            -- fresh value; the rest hole on containers exactly as before).
+            else if op == "&&" || op == "||" then (h₂, applyBinop ctx.dialect op x y)
+            else (h₂, applyBinop ctx.dialect op (h₂.view x) (h₂.view y))
           | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .cond c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v) => if v.truthy then evalExpr ctx n h₁ ρ t else evalExpr ctx n h₁ ρ e
+      | (h₁, .val v) => if (h₁.view v).truthy then evalExpr ctx n h₁ ρ t
+                        else evalExpr ctx n h₁ ρ e
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .isOp neg a b =>
       match evalExpr ctx n h ρ a with
@@ -1507,7 +1921,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val x) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val c) =>
-            match valIn x c with
+            match valInH ctx.dialect h₂ x c with
             | .val (.bool r) => (h₂, .val (.bool (if neg then !r else r)))
             | r              => (h₂, r)
         | (h₂, r) => (h₂, r)
@@ -1517,27 +1931,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
-          -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
-          -- A NEGATIVE index counts from the end in Python (`xs[-1]` is the last
-          -- element). `Int.toNat` clamps it to `0`, so this used to answer the FIRST
-          -- element for `xs[-1]` -- a silently wrong value for one of the commonest
-          -- idioms in the language, found when `p, *q, r = "abcd"` (which Joern lowers to
-          -- `r = tmp[-1]`) gave `r == 'a'`. Python wraps; no other dialect has a
-          -- meaning Core models for it, so there it is a hole rather than a guess.
-          match c.unbuiltin, k with
-          | .list vs, .int i =>
-              if i < 0 && ctx.dialect != .python then (h₂, .hole "index:negative") else
-              match Stdlib.seqIndex vs.length i with
-              | some j => if hh : j < vs.length then (h₂, .val (vs[j]))
-                          else (h₂, .exn (.str "IndexError"))
-              | none   => (h₂, .exn (.str "IndexError"))
-          | .tuple vs, .int i =>
-              if i < 0 && ctx.dialect != .python then (h₂, .hole "index:negative") else
-              match Stdlib.seqIndex vs.length i with
-              | some j => if hh : j < vs.length then (h₂, .val (vs[j]))
-                          else (h₂, .exn (.str "IndexError"))
-              | none   => (h₂, .exn (.str "IndexError"))
+          -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`; a boxed container is
+          -- read through the heap. A NEGATIVE index counts from the end under Python
+          -- (`seqRead`); `Int.toNat` used to clamp it, so `xs[-1]` answered the FIRST
+          -- element. Other dialects hole on it rather than guess.
+          match (h₂.view c).unbuiltin, k with
+          | .list vs, .int i  => (h₂, seqRead ctx.dialect vs i)
+          | .tuple vs, .int i => (h₂, seqRead ctx.dialect vs i)
           | .dict kvs, key =>
+              if ctx.dialect.isPython && h₂.unhashable key then (h₂, .exn (.str "TypeError"))
+              else
               match kvs.find? (fun kv => Val.beq kv.1 key) with
               | some (_, v) => (h₂, .val v)
               | none        => (h₂, .exn (.str "KeyError"))
@@ -1604,6 +2007,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            | none        =>
                              if o.cls.startsWith "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
+                             -- A boxed list or dict has no instance attributes (its fields
+                             -- are always empty: it is allocated with none and
+                             -- `Stmt.setField` refuses it), so an attribute read always lands
+                             -- here. CPython raises `AttributeError`; `unit` would be a silent
+                             -- wrong answer, so it is a hole.
+                             else if ctx.dialect.isPython && (o.payload).toVal.isSome then
+                               (h₁, .hole s!"field:{f}:builtin-container")
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -1622,6 +2032,26 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
   -- here (a dict display is `dictE`), so a keyword group in a list/tuple literal is a
   -- shape we do not model and it says so.
+  -- `docs/boxed-containers.md` step 3: a Python list/dict display is a fresh object.
+  -- A dict display's pairs are stored the way repeated `d[k] = v` would store them, so a
+  -- repeated key keeps its first position and its last value, and an unhashable key is
+  -- CPython's `TypeError`.
+  | n+1, h, ρ, .boxContainer e =>
+      -- Only Python has boxed containers; the exporter emits this node for `.py` only, and
+      -- refusing it elsewhere keeps "a payload object exists" a Python-only fact.
+      if !ctx.dialect.isPython then (h, .hole "boxContainer:non-python") else
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val (.list vs)) =>
+          let (h₂, r) := h₁.alloc { cls := "list", fields := [], payload := .list vs }
+          (h₂, .val (.ref r))
+      | (h₁, .val (.dict kvs)) =>
+          if kvs.any (fun kv => h₁.unhashable kv.1) then (h₁, .exn (.str "TypeError"))
+          else
+          let ps := kvs.foldl (fun acc kv => dictStore acc kv.1 kv.2) []
+          let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict ps }
+          (h₂, .val (.ref r))
+      | (h₁, .val _) => (h₁, .hole "boxContainer:non-container")
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .listE es =>
       match evalList ctx n h ρ es with
       | (h₁, .inr (vs, []))  => (h₁, .val (.list vs))
@@ -1715,7 +2145,17 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               match ctx.makeSuper f vs with
               | some v => (h₁, .val v)
               | none   =>
-              match Stdlib.builtin ctx.dialect h₁ f (builtinSeeThrough f vs) with
+              -- A boxed container is seen through the heap only by the builtins for which
+              -- that is exact (`Boxed.builtinArgs`); a fresh container a builtin builds is
+              -- itself boxed under Python, because in CPython it is a new object.
+              if builtinRefused h₁ f vs then (h₁, .hole s!"call:{f}:boxed-key")
+              else
+              match Stdlib.builtin ctx.dialect h₁ f (builtinSeeThrough f (builtinArgs h₁ f vs)) with
+              | some (h₂, .val v) =>
+                  if ctx.dialect.isPython && freshBuiltins.contains f then
+                    let (h₃, v') := h₂.boxFresh v
+                    (h₃, .val v')
+                  else (h₂, .val v)
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
@@ -1727,8 +2167,19 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .inr (vs, kws)) =>
           match h₂.get r with
           | none   => (h₂, .hole "mcall:dangling-ref")
+          -- A boxed list/dict: its builtin methods, on the payload, written back to the SAME
+          -- reference. Checked BEFORE `resolveMethod`, whose free-function fallback would
+          -- otherwise let a global `append` answer `xs.append(1)`.
           | some o =>
-            match ctx.resolveMethod o.cls m with
+            match o.payload with
+            | .list ps =>
+                if kws.isEmpty then boxedMethod ctx.dialect h₂ r (.list ps) m vs
+                else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+            | .dict ps =>
+                if kws.isEmpty then boxedMethod ctx.dialect h₂ r (.dict ps) m vs
+                else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+            | _ =>
+            match ctx.resolveMethodOn o m with
             | none    =>
               -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
               -- `resolveMethod` finds nothing; what it has is a *field* holding a
@@ -1820,6 +2271,10 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             | .error l => (h₂, .hole l)
           | none =>
           if !kws.isEmpty then (h₂, .hole s!"mcall:{m}:keyword-to-builtin") else
+          match methodRefusal h₂ recv m vs with
+          | some l => (h₂, .hole l)
+          | none =>
+          if methodKeyError ctx.dialect h₂ recv m vs then (h₂, .exn (.str "TypeError")) else
           match Stdlib.method ctx.dialect h₂ recv m vs with
           | some (h₃, .pure r)       => (h₃, r)
           -- A mutating container method cannot be honoured while containers are values:
@@ -1920,7 +2375,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match ctx.builtinBase cls with
         -- `class X(tuple)` and friends: the instance IS the builtin, not an opaque
         -- reference. See `Val.bobj`.
-        | some b => (h₁, allocBuiltin ctx cls b vs)
+        | some b => (h₁, allocBuiltin ctx cls b (vs.map h₁.view))
         | none =>
         -- A class defined inside a function is a *value*; instances carry the bindings it
         -- captured, so its methods can read the enclosing scope.
@@ -2002,7 +2457,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .starred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
+        match (h₁.view v).iterable with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some xs =>
           match evalList ctx n h₁ ρ as with
@@ -2019,7 +2474,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .dstarred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match strKeyed v with
+        match strKeyed (h₁.view v) with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some ks =>
           match evalList ctx n h₁ ρ as with
@@ -2096,6 +2551,10 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .setField r f v =>
       match evalExpr ctx n h ρ r with
       | (h₁, .val (.ref addr)) =>
+        -- CPython: `AttributeError: 'list' object has no attribute ...`. Not modelled as
+        -- that exception (a `list` SUBCLASS would accept it), so a hole.
+        if (h₁.payload addr).toVal.isSome then (h₁, .hole s!"setField:{f}:builtin-container")
+        else
         match evalExpr ctx n h₁ ρ v with
         | (h₂, .val vv)    => (h₂.setField addr f vv, .normal ρ)
         | (h₂, .exn e)     => (h₂, .exn e)
@@ -2121,9 +2580,104 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .exn e) => (h₁, .exn e)
       | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
-  | n+1, h, ρ, .setIndex _ _ _ =>
-      -- Container mutation needs boxed containers, which Core does not have yet.
-      (h, .hole "setIndex:immutable-containers")
+  -- `docs/boxed-containers.md` step 4. Only Python has boxed containers; every other
+  -- dialect keeps the original hole, unevaluated, exactly as before.
+  --
+  -- CPython's order for `e[i] = v` is `v`, then `e`, then `i`. A boxed container is
+  -- written with `Heap.setPayload` on the reference `e` evaluated to -- never through the
+  -- expression `e`, which is what makes a write through one alias visible through every
+  -- other. A plain object runs its class's own `__setitem__`; anything else is
+  -- `valueSubscriptWrite`'s `TypeError` (immutable values) or hole (unboxed containers).
+  | n+1, h, ρ, .setIndex e i v =>
+      if !ctx.dialect.isPython then (h, .hole "setIndex:immutable-containers") else
+      match evalExpr ctx n h ρ v with
+      | (h₁, .val x) =>
+        match evalExpr ctx n h₁ ρ e with
+        | (h₂, .val c) =>
+          match evalExpr ctx n h₂ ρ i with
+          | (h₃, .val k) =>
+            match c with
+            | .ref r =>
+              match h₃.get r with
+              | none => (h₃, .hole "setIndex:dangling-ref")
+              | some o =>
+                match o.payload with
+                | .none =>
+                  if ctx.classResponds o.cls "__setitem__" then
+                    match ctx.resolveMethod o.cls "__setitem__" with
+                    | some fn =>
+                      match (if o.captured.isEmpty
+                             then applyFunc ctx n h₃ fn (some (.ref r)) [k, x] []
+                             else applyClosure ctx n h₃ fn (("self", .ref r) :: o.captured)
+                                    [k, x] []) with
+                      | (h₄, .val _)     => (h₄, .normal ρ)
+                      | (h₄, .exn ex)    => (h₄, .exn ex)
+                      | (h₄, .hole l)    => (h₄, .hole l)
+                      | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+                    | none => (h₃, .hole s!"setIndex:{o.cls}")
+                  else (h₃, .hole s!"setIndex:{o.cls}:no-own-__setitem__")
+                | p =>
+                  match payloadStore h₃ p k x with
+                  | .ok p'   => (h₃.setPayload r p', .normal ρ)
+                  | .exn ex  => (h₃, .exn (.str ex))
+                  | .hole l  => (h₃, .hole l)
+            | c =>
+              match valueSubscriptWrite ctx.dialect c "setIndex" with
+              | .exn ex => (h₃, .exn ex)
+              | .hole l => (h₃, .hole l)
+              | _       => (h₃, .hole "setIndex:immutable-containers")
+          | (h₃, .exn ex)    => (h₃, .exn ex)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .exn ex)    => (h₂, .exn ex)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  -- `del e[i]`: CPython evaluates `e`, then `i`. Mirrors `setIndex`.
+  | n+1, h, ρ, .delIndex e i =>
+      if !ctx.dialect.isPython then (h, .hole "op:delete-index") else
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val c) =>
+        match evalExpr ctx n h₁ ρ i with
+        | (h₂, .val k) =>
+          match c with
+          | .ref r =>
+            match h₂.get r with
+            | none => (h₂, .hole "delIndex:dangling-ref")
+            | some o =>
+              match o.payload with
+              | .none =>
+                if ctx.classResponds o.cls "__delitem__" then
+                  match ctx.resolveMethod o.cls "__delitem__" with
+                  | some fn =>
+                    match (if o.captured.isEmpty
+                           then applyFunc ctx n h₂ fn (some (.ref r)) [k] []
+                           else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured)
+                                  [k] []) with
+                    | (h₃, .val _)     => (h₃, .normal ρ)
+                    | (h₃, .exn ex)    => (h₃, .exn ex)
+                    | (h₃, .hole l)    => (h₃, .hole l)
+                    | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+                  | none => (h₂, .hole s!"delIndex:{o.cls}")
+                else (h₂, .hole s!"delIndex:{o.cls}:no-own-__delitem__")
+              | p =>
+                match payloadDelete h₂ p k with
+                | .ok p'   => (h₂.setPayload r p', .normal ρ)
+                | .exn ex  => (h₂, .exn (.str ex))
+                | .hole l  => (h₂, .hole l)
+          | c =>
+            match valueSubscriptWrite ctx.dialect c "delIndex" with
+            | .exn ex => (h₂, .exn ex)
+            | .hole l => (h₂, .hole l)
+            | _       => (h₂, .hole "delIndex:immutable-containers")
+        | (h₂, .exn ex)    => (h₂, .exn ex)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` an interior-pointer VALUE --
   -- requires the pointer operand to evaluate to `Val.iref r sel` and delegates,
   -- unconditionally, to the unchanged `Heap.setField`.
@@ -2145,7 +2699,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, r)          => (h₁, r)
   | n+1, h, ρ, .ifte c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v)     => if v.truthy then execStmt ctx n h₁ ρ t
+      | (h₁, .val v)     => if (h₁.view v).truthy then execStmt ctx n h₁ ρ t
                             else execStmt ctx n h₁ ρ e
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
@@ -2169,7 +2723,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
       | (h₁, .val v) =>
-          if v.truthy then
+          if (h₁.view v).truthy then
             match execStmt ctx n h₁ ρ body with
             | (h₂, .normal ρ') => execStmt ctx n h₂ ρ' (.loop c body)
             | (h₂, .cont ρ')   => execStmt ctx n h₂ ρ' (.loop c body)
@@ -2191,8 +2745,21 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .forIn x e body =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
-        | some vs => execFor ctx n h₁ ρ x vs body
+        match (h₁.view v).iterable with
+        | some vs =>
+          match v with
+          -- A boxed container is iterated over a SNAPSHOT, and the snapshot is only
+          -- faithful if nothing wrote to the object meanwhile: CPython's list iterator
+          -- would have seen the write, and its dict iterator raises `RuntimeError`. So a
+          -- moved `version` turns the outcome into a hole rather than an answer.
+          | .ref r =>
+            let ver := h₁.version r
+            match execFor ctx n h₁ ρ x vs body with
+            | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+            | (h₂, c) =>
+              if h₂.version r == ver then (h₂, c)
+              else (h₂, .hole "forIn:container-mutated-during-iteration")
+          | _ => execFor ctx n h₁ ρ x vs body
         | none    => (h₁, .hole "forIn:non-iterable")
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)

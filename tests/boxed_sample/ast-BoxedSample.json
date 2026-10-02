@@ -1,0 +1,4175 @@
+[
+ {
+  "name": "boxed.py:<module>.alias",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "b",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "0"
+       },
+       {
+        "k": "int",
+        "v": "5"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "name",
+       "v": "b"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setIndex",
+        "r": {
+         "k": "name",
+         "v": "b"
+        },
+        "i": {
+         "k": "int",
+         "v": "0"
+        },
+        "v": {
+         "k": "int",
+         "v": "1"
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "index",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "int",
+          "v": "0"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.neg",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       },
+       {
+        "k": "int",
+        "v": "2"
+       },
+       {
+        "k": "int",
+        "v": "3"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "xs"
+      },
+      "i": {
+       "k": "unop",
+       "op": "-",
+       "a": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "v": {
+       "k": "int",
+       "v": "9"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "binop",
+       "op": "+",
+       "a": {
+        "k": "index",
+        "a": {
+         "k": "name",
+         "v": "xs"
+        },
+        "b": {
+         "k": "unop",
+         "op": "-",
+         "a": {
+          "k": "int",
+          "v": "1"
+         }
+        }
+       },
+       "b": {
+        "k": "index",
+        "a": {
+         "k": "name",
+         "v": "xs"
+        },
+        "b": {
+         "k": "int",
+         "v": "0"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.neg_read",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "index",
+    "a": {
+     "k": "tupleE",
+     "items": [
+      {
+       "k": "int",
+       "v": "7"
+      },
+      {
+       "k": "int",
+       "v": "8"
+      },
+      {
+       "k": "int",
+       "v": "9"
+      }
+     ]
+    },
+    "b": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "1"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.oob",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "xs"
+      },
+      "i": {
+       "k": "int",
+       "v": "3"
+      },
+      "v": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.oob_neg",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "xs"
+      },
+      "i": {
+       "k": "unop",
+       "op": "-",
+       "a": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "v": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.oob_read",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "index",
+      "a": {
+       "k": "name",
+       "v": "xs"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.dset",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "name",
+      "v": "tmp0"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "d"
+      },
+      "i": {
+       "k": "str",
+       "v": "k"
+      },
+      "v": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "e",
+        "e": {
+         "k": "name",
+         "v": "d"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setIndex",
+          "r": {
+           "k": "name",
+           "v": "e"
+          },
+          "i": {
+           "k": "str",
+           "v": "j"
+          },
+          "v": {
+           "k": "int",
+           "v": "2"
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "binop",
+            "op": "*",
+            "a": {
+             "k": "index",
+             "a": {
+              "k": "name",
+              "v": "d"
+             },
+             "b": {
+              "k": "str",
+              "v": "j"
+             }
+            },
+            "b": {
+             "k": "int",
+             "v": "10"
+            }
+           },
+           "b": {
+            "k": "index",
+            "a": {
+             "k": "name",
+             "v": "d"
+            },
+            "b": {
+             "k": "str",
+             "v": "k"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.dlit",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "tmp0"
+      },
+      "i": {
+       "k": "str",
+       "v": "a"
+      },
+      "v": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setIndex",
+       "r": {
+        "k": "name",
+        "v": "tmp0"
+       },
+       "i": {
+        "k": "str",
+        "v": "b"
+       },
+       "v": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "name",
+        "v": "tmp0"
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "d"
+       },
+       "b": {
+        "k": "str",
+        "v": "b"
+       }
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.kerr",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "name",
+      "v": "tmp0"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "d"
+       },
+       "b": {
+        "k": "str",
+        "v": "missing"
+       }
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.app",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": []
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "name",
+       "v": "a"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "b"
+         },
+         "m": "append",
+         "args": [
+          {
+           "k": "int",
+           "v": "1"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "exprS",
+          "e": {
+           "k": "mcall",
+           "recv": {
+            "k": "name",
+            "v": "b"
+           },
+           "m": "append",
+           "args": [
+            {
+             "k": "int",
+             "v": "2"
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "x",
+            "e": {
+             "k": "mcall",
+             "recv": {
+              "k": "name",
+              "v": "a"
+             },
+             "m": "pop",
+             "args": []
+            }
+           },
+           "b": {
+            "k": "ret",
+            "e": {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "binop",
+              "op": "*",
+              "a": {
+               "k": "call",
+               "f": "len",
+               "args": [
+                {
+                 "k": "name",
+                 "v": "a"
+                }
+               ]
+              },
+              "b": {
+               "k": "int",
+               "v": "10"
+              }
+             },
+             "b": {
+              "k": "name",
+              "v": "x"
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.pop_tmp",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "tmp0"
+      },
+      "i": {
+       "k": "str",
+       "v": "k"
+      },
+      "v": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "assign",
+      "x": "d",
+      "e": {
+       "k": "name",
+       "v": "tmp0"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "t",
+      "e": {
+       "k": "name",
+       "v": "d"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "t"
+         },
+         "m": "pop",
+         "args": [
+          {
+           "k": "str",
+           "v": "k"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "ret",
+          "e": {
+           "k": "call",
+           "f": "len",
+           "args": [
+            {
+             "k": "name",
+             "v": "d"
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "skip"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.ext",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "name",
+       "v": "a"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "b"
+         },
+         "m": "extend",
+         "args": [
+          {
+           "k": "boxContainer",
+           "e": {
+            "k": "listE",
+            "items": [
+             {
+              "k": "int",
+              "v": "2"
+             },
+             {
+              "k": "int",
+              "v": "3"
+             }
+            ]
+           }
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "exprS",
+          "e": {
+           "k": "mcall",
+           "recv": {
+            "k": "name",
+            "v": "b"
+           },
+           "m": "insert",
+           "args": [
+            {
+             "k": "int",
+             "v": "0"
+            },
+            {
+             "k": "int",
+             "v": "0"
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "binop",
+            "op": "*",
+            "a": {
+             "k": "index",
+             "a": {
+              "k": "name",
+              "v": "a"
+             },
+             "b": {
+              "k": "int",
+              "v": "0"
+             }
+            },
+            "b": {
+             "k": "int",
+             "v": "100"
+            }
+           },
+           "b": {
+            "k": "call",
+            "f": "len",
+            "args": [
+             {
+              "k": "name",
+              "v": "a"
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.setdef",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "name",
+      "v": "tmp0"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "tmp1",
+       "e": {
+        "k": "mcall",
+        "recv": {
+         "k": "name",
+         "v": "d"
+        },
+        "m": "setdefault",
+        "args": [
+         {
+          "k": "str",
+          "v": "k"
+         },
+         {
+          "k": "boxContainer",
+          "e": {
+           "k": "listE",
+           "items": []
+          }
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "exprS",
+       "e": {
+        "k": "mcall",
+        "recv": {
+         "k": "name",
+         "v": "tmp1"
+        },
+        "m": "append",
+        "args": [
+         {
+          "k": "int",
+          "v": "1"
+         }
+        ]
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ret",
+        "e": {
+         "k": "call",
+         "f": "len",
+         "args": [
+          {
+           "k": "index",
+           "a": {
+            "k": "name",
+            "v": "d"
+           },
+           "b": {
+            "k": "str",
+            "v": "k"
+           }
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.nested",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "boxContainer",
+        "e": {
+         "k": "listE",
+         "items": [
+          {
+           "k": "int",
+           "v": "0"
+          }
+         ]
+        }
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "b"
+         },
+         "m": "append",
+         "args": [
+          {
+           "k": "int",
+           "v": "1"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "call",
+          "f": "len",
+          "args": [
+           {
+            "k": "index",
+            "a": {
+             "k": "name",
+             "v": "a"
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.mut",
+  "file": "boxed.py",
+  "params": [
+   "xs"
+  ],
+  "body": {
+   "k": "exprS",
+   "e": {
+    "k": "mcall",
+    "recv": {
+     "k": "name",
+     "v": "xs"
+    },
+    "m": "append",
+    "args": [
+     {
+      "k": "int",
+      "v": "9"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.call_mut",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": []
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "call",
+       "f": "boxed.py:<module>.mut",
+       "args": [
+        {
+         "k": "name",
+         "v": "a"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ret",
+        "e": {
+         "k": "call",
+         "f": "len",
+         "args": [
+          {
+           "k": "name",
+           "v": "a"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "skip"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.comp_len",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "listE",
+       "items": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "tmp2",
+        "e": {
+         "k": "boxContainer",
+         "e": {
+          "k": "listE",
+          "items": [
+           {
+            "k": "int",
+            "v": "1"
+           },
+           {
+            "k": "int",
+            "v": "2"
+           },
+           {
+            "k": "int",
+            "v": "3"
+           }
+          ]
+         }
+        }
+       },
+       "b": {
+        "k": "forIn",
+        "x": "y",
+        "e": {
+         "k": "name",
+         "v": "tmp2"
+        },
+        "body": {
+         "k": "exprS",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "tmp0"
+          },
+          "m": "append",
+          "args": [
+           {
+            "k": "binop",
+            "op": "*",
+            "a": {
+             "k": "name",
+             "v": "y"
+            },
+            "b": {
+             "k": "int",
+             "v": "2"
+            }
+           }
+          ]
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "assign",
+       "x": "ys",
+       "e": {
+        "k": "name",
+        "v": "tmp0"
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "call",
+       "f": "len",
+       "args": [
+        {
+         "k": "name",
+         "v": "ys"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.comp_sum",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "listE",
+       "items": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "tmp2",
+        "e": {
+         "k": "boxContainer",
+         "e": {
+          "k": "listE",
+          "items": [
+           {
+            "k": "int",
+            "v": "1"
+           },
+           {
+            "k": "int",
+            "v": "2"
+           },
+           {
+            "k": "int",
+            "v": "3"
+           }
+          ]
+         }
+        }
+       },
+       "b": {
+        "k": "forIn",
+        "x": "y",
+        "e": {
+         "k": "name",
+         "v": "tmp2"
+        },
+        "body": {
+         "k": "exprS",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "tmp0"
+          },
+          "m": "append",
+          "args": [
+           {
+            "k": "binop",
+            "op": "*",
+            "a": {
+             "k": "name",
+             "v": "y"
+            },
+            "b": {
+             "k": "int",
+             "v": "2"
+            }
+           }
+          ]
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "assign",
+       "x": "ys",
+       "e": {
+        "k": "name",
+        "v": "tmp0"
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "call",
+       "f": "sum",
+       "args": [
+        {
+         "k": "name",
+         "v": "ys"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.delk",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "tmp0"
+      },
+      "i": {
+       "k": "str",
+       "v": "a"
+      },
+      "v": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "assign",
+      "x": "d",
+      "e": {
+       "k": "name",
+       "v": "tmp0"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "delIndex",
+      "r": {
+       "k": "name",
+       "v": "d"
+      },
+      "i": {
+       "k": "str",
+       "v": "a"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ret",
+        "e": {
+         "k": "call",
+         "f": "len",
+         "args": [
+          {
+           "k": "name",
+           "v": "d"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "skip"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.del_pos",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       },
+       {
+        "k": "int",
+        "v": "2"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "delIndex",
+      "r": {
+       "k": "name",
+       "v": "xs"
+      },
+      "i": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "xs"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.del_missing",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "name",
+      "v": "tmp0"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "delIndex",
+      "r": {
+       "k": "name",
+       "v": "d"
+      },
+      "i": {
+       "k": "str",
+       "v": "zz"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.truth",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": []
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "name",
+       "v": "a"
+      },
+      "t": {
+       "k": "ret",
+       "e": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "e": {
+       "k": "skip"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.not_empty",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "!",
+    "a": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": []
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.tup",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "tupleE",
+     "items": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "int",
+       "v": "2"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "t"
+      },
+      "i": {
+       "k": "int",
+       "v": "0"
+      },
+      "v": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.unhash",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "name",
+      "v": "tmp0"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "d"
+      },
+      "i": {
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "int",
+          "v": "1"
+         }
+        ]
+       }
+      },
+      "v": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.eq",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "==",
+    "a": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.is_",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "isOp",
+    "neg": false,
+    "a": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.in_",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "inOp",
+    "neg": false,
+    "a": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "boxContainer",
+        "e": {
+         "k": "listE",
+         "items": [
+          {
+           "k": "int",
+           "v": "1"
+          }
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.order",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "name",
+      "v": "tmp0"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "d"
+      },
+      "i": {
+       "k": "str",
+       "v": "b"
+      },
+      "v": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setIndex",
+        "r": {
+         "k": "name",
+         "v": "d"
+        },
+        "i": {
+         "k": "str",
+         "v": "a"
+        },
+        "v": {
+         "k": "int",
+         "v": "2"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setIndex",
+          "r": {
+           "k": "name",
+           "v": "d"
+          },
+          "i": {
+           "k": "str",
+           "v": "b"
+          },
+          "v": {
+           "k": "int",
+           "v": "3"
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "binop",
+           "op": "==",
+           "a": {
+            "k": "call",
+            "f": "list",
+            "args": [
+             {
+              "k": "name",
+              "v": "d"
+             }
+            ]
+           },
+           "b": {
+            "k": "boxContainer",
+            "e": {
+             "k": "listE",
+             "items": [
+              {
+               "k": "str",
+               "v": "b"
+              },
+              {
+               "k": "str",
+               "v": "a"
+              }
+             ]
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.dict_eq",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "name",
+      "v": "tmp0"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "d"
+      },
+      "i": {
+       "k": "str",
+       "v": "b"
+      },
+      "v": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setIndex",
+        "r": {
+         "k": "name",
+         "v": "d"
+        },
+        "i": {
+         "k": "str",
+         "v": "a"
+        },
+        "v": {
+         "k": "int",
+         "v": "2"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "tmp1",
+           "e": {
+            "k": "boxContainer",
+            "e": {
+             "k": "dictE",
+             "pairs": []
+            }
+           }
+          },
+          "b": {
+           "k": "assign",
+           "x": "e",
+           "e": {
+            "k": "name",
+            "v": "tmp1"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setIndex",
+            "r": {
+             "k": "name",
+             "v": "e"
+            },
+            "i": {
+             "k": "str",
+             "v": "a"
+            },
+            "v": {
+             "k": "int",
+             "v": "2"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setIndex",
+             "r": {
+              "k": "name",
+              "v": "e"
+             },
+             "i": {
+              "k": "str",
+              "v": "b"
+             },
+             "v": {
+              "k": "int",
+              "v": "3"
+             }
+            },
+            "b": {
+             "k": "ret",
+             "e": {
+              "k": "binop",
+              "op": "==",
+              "a": {
+               "k": "name",
+               "v": "d"
+              },
+              "b": {
+               "k": "name",
+               "v": "e"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.copy_fresh",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "call",
+       "f": "list",
+       "args": [
+        {
+         "k": "name",
+         "v": "a"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "b"
+         },
+         "m": "append",
+         "args": [
+          {
+           "k": "int",
+           "v": "2"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "ret",
+          "e": {
+           "k": "call",
+           "f": "len",
+           "args": [
+            {
+             "k": "name",
+             "v": "a"
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "skip"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.iter_sum",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "int",
+     "v": "0"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "tmp1",
+       "e": {
+        "k": "boxContainer",
+        "e": {
+         "k": "listE",
+         "items": [
+          {
+           "k": "int",
+           "v": "1"
+          },
+          {
+           "k": "int",
+           "v": "2"
+          },
+          {
+           "k": "int",
+           "v": "3"
+          }
+         ]
+        }
+       }
+      },
+      "b": {
+       "k": "forIn",
+       "x": "x",
+       "e": {
+        "k": "name",
+        "v": "tmp1"
+       },
+       "body": {
+        "k": "assign",
+        "x": "t",
+        "e": {
+         "k": "binop",
+         "op": "+",
+         "a": {
+          "k": "name",
+          "v": "t"
+         },
+         "b": {
+          "k": "name",
+          "v": "x"
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "t"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.mutate_iter",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "n",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "forIn",
+        "x": "x",
+        "e": {
+         "k": "name",
+         "v": "xs"
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "n",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "n"
+           },
+           "b": {
+            "k": "int",
+            "v": "1"
+           }
+          }
+         },
+         "b": {
+          "k": "ifte",
+          "c": {
+           "k": "binop",
+           "op": "==",
+           "a": {
+            "k": "name",
+            "v": "x"
+           },
+           "b": {
+            "k": "int",
+            "v": "1"
+           }
+          },
+          "t": {
+           "k": "exprS",
+           "e": {
+            "k": "mcall",
+            "recv": {
+             "k": "name",
+             "v": "xs"
+            },
+            "m": "append",
+            "args": [
+             {
+              "k": "int",
+              "v": "2"
+             }
+            ]
+           }
+          },
+          "e": {
+           "k": "skip"
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "ret",
+          "e": {
+           "k": "name",
+           "v": "n"
+          }
+         },
+         "b": {
+          "k": "skip"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.keys_view",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "tmp0"
+      },
+      "i": {
+       "k": "str",
+       "v": "a"
+      },
+      "v": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "assign",
+      "x": "d",
+      "e": {
+       "k": "name",
+       "v": "tmp0"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "call",
+       "f": "len",
+       "args": [
+        {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "d"
+         },
+         "m": "keys",
+         "args": []
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "skip"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>.slc",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       },
+       {
+        "k": "int",
+        "v": "2"
+       },
+       {
+        "k": "int",
+        "v": "3"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "holeS",
+      "label": "assign:lhs:slice"
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "xs"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "<module-objects>:<module>",
+  "file": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setGlobal",
+    "x": "<module>boxed.py",
+    "e": {
+     "k": "alloc",
+     "cls": "<module>boxed.py",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>boxed.py"
+     },
+     "f": "alias",
+     "v": {
+      "k": "fnref",
+      "v": "boxed.py:<module>.alias"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "<module>boxed.py"
+      },
+      "f": "app",
+      "v": {
+       "k": "fnref",
+       "v": "boxed.py:<module>.app"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setField",
+       "r": {
+        "k": "name",
+        "v": "<module>boxed.py"
+       },
+       "f": "call_mut",
+       "v": {
+        "k": "fnref",
+        "v": "boxed.py:<module>.call_mut"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "<module>boxed.py"
+        },
+        "f": "comp_len",
+        "v": {
+         "k": "fnref",
+         "v": "boxed.py:<module>.comp_len"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "<module>boxed.py"
+         },
+         "f": "comp_sum",
+         "v": {
+          "k": "fnref",
+          "v": "boxed.py:<module>.comp_sum"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "<module>boxed.py"
+          },
+          "f": "copy_fresh",
+          "v": {
+           "k": "fnref",
+           "v": "boxed.py:<module>.copy_fresh"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "<module>boxed.py"
+           },
+           "f": "del_missing",
+           "v": {
+            "k": "fnref",
+            "v": "boxed.py:<module>.del_missing"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setField",
+            "r": {
+             "k": "name",
+             "v": "<module>boxed.py"
+            },
+            "f": "del_pos",
+            "v": {
+             "k": "fnref",
+             "v": "boxed.py:<module>.del_pos"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setField",
+             "r": {
+              "k": "name",
+              "v": "<module>boxed.py"
+             },
+             "f": "delk",
+             "v": {
+              "k": "fnref",
+              "v": "boxed.py:<module>.delk"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "<module>boxed.py"
+              },
+              "f": "dict_eq",
+              "v": {
+               "k": "fnref",
+               "v": "boxed.py:<module>.dict_eq"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setField",
+               "r": {
+                "k": "name",
+                "v": "<module>boxed.py"
+               },
+               "f": "dlit",
+               "v": {
+                "k": "fnref",
+                "v": "boxed.py:<module>.dlit"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "setField",
+                "r": {
+                 "k": "name",
+                 "v": "<module>boxed.py"
+                },
+                "f": "dset",
+                "v": {
+                 "k": "fnref",
+                 "v": "boxed.py:<module>.dset"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "setField",
+                 "r": {
+                  "k": "name",
+                  "v": "<module>boxed.py"
+                 },
+                 "f": "eq",
+                 "v": {
+                  "k": "fnref",
+                  "v": "boxed.py:<module>.eq"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setField",
+                  "r": {
+                   "k": "name",
+                   "v": "<module>boxed.py"
+                  },
+                  "f": "ext",
+                  "v": {
+                   "k": "fnref",
+                   "v": "boxed.py:<module>.ext"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "setField",
+                   "r": {
+                    "k": "name",
+                    "v": "<module>boxed.py"
+                   },
+                   "f": "in_",
+                   "v": {
+                    "k": "fnref",
+                    "v": "boxed.py:<module>.in_"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "setField",
+                    "r": {
+                     "k": "name",
+                     "v": "<module>boxed.py"
+                    },
+                    "f": "is_",
+                    "v": {
+                     "k": "fnref",
+                     "v": "boxed.py:<module>.is_"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "setField",
+                     "r": {
+                      "k": "name",
+                      "v": "<module>boxed.py"
+                     },
+                     "f": "iter_sum",
+                     "v": {
+                      "k": "fnref",
+                      "v": "boxed.py:<module>.iter_sum"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "setField",
+                      "r": {
+                       "k": "name",
+                       "v": "<module>boxed.py"
+                      },
+                      "f": "kerr",
+                      "v": {
+                       "k": "fnref",
+                       "v": "boxed.py:<module>.kerr"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "setField",
+                       "r": {
+                        "k": "name",
+                        "v": "<module>boxed.py"
+                       },
+                       "f": "keys_view",
+                       "v": {
+                        "k": "fnref",
+                        "v": "boxed.py:<module>.keys_view"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "setField",
+                        "r": {
+                         "k": "name",
+                         "v": "<module>boxed.py"
+                        },
+                        "f": "mut",
+                        "v": {
+                         "k": "fnref",
+                         "v": "boxed.py:<module>.mut"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "setField",
+                         "r": {
+                          "k": "name",
+                          "v": "<module>boxed.py"
+                         },
+                         "f": "mutate_iter",
+                         "v": {
+                          "k": "fnref",
+                          "v": "boxed.py:<module>.mutate_iter"
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "setField",
+                          "r": {
+                           "k": "name",
+                           "v": "<module>boxed.py"
+                          },
+                          "f": "neg",
+                          "v": {
+                           "k": "fnref",
+                           "v": "boxed.py:<module>.neg"
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "setField",
+                           "r": {
+                            "k": "name",
+                            "v": "<module>boxed.py"
+                           },
+                           "f": "neg_read",
+                           "v": {
+                            "k": "fnref",
+                            "v": "boxed.py:<module>.neg_read"
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "setField",
+                            "r": {
+                             "k": "name",
+                             "v": "<module>boxed.py"
+                            },
+                            "f": "nested",
+                            "v": {
+                             "k": "fnref",
+                             "v": "boxed.py:<module>.nested"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "setField",
+                             "r": {
+                              "k": "name",
+                              "v": "<module>boxed.py"
+                             },
+                             "f": "not_empty",
+                             "v": {
+                              "k": "fnref",
+                              "v": "boxed.py:<module>.not_empty"
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "setField",
+                              "r": {
+                               "k": "name",
+                               "v": "<module>boxed.py"
+                              },
+                              "f": "oob",
+                              "v": {
+                               "k": "fnref",
+                               "v": "boxed.py:<module>.oob"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "setField",
+                               "r": {
+                                "k": "name",
+                                "v": "<module>boxed.py"
+                               },
+                               "f": "oob_neg",
+                               "v": {
+                                "k": "fnref",
+                                "v": "boxed.py:<module>.oob_neg"
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "setField",
+                                "r": {
+                                 "k": "name",
+                                 "v": "<module>boxed.py"
+                                },
+                                "f": "oob_read",
+                                "v": {
+                                 "k": "fnref",
+                                 "v": "boxed.py:<module>.oob_read"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "setField",
+                                 "r": {
+                                  "k": "name",
+                                  "v": "<module>boxed.py"
+                                 },
+                                 "f": "order",
+                                 "v": {
+                                  "k": "fnref",
+                                  "v": "boxed.py:<module>.order"
+                                 }
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "setField",
+                                  "r": {
+                                   "k": "name",
+                                   "v": "<module>boxed.py"
+                                  },
+                                  "f": "pop_tmp",
+                                  "v": {
+                                   "k": "fnref",
+                                   "v": "boxed.py:<module>.pop_tmp"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "setField",
+                                   "r": {
+                                    "k": "name",
+                                    "v": "<module>boxed.py"
+                                   },
+                                   "f": "setdef",
+                                   "v": {
+                                    "k": "fnref",
+                                    "v": "boxed.py:<module>.setdef"
+                                   }
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "setField",
+                                    "r": {
+                                     "k": "name",
+                                     "v": "<module>boxed.py"
+                                    },
+                                    "f": "slc",
+                                    "v": {
+                                     "k": "fnref",
+                                     "v": "boxed.py:<module>.slc"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setField",
+                                     "r": {
+                                      "k": "name",
+                                      "v": "<module>boxed.py"
+                                     },
+                                     "f": "truth",
+                                     "v": {
+                                      "k": "fnref",
+                                      "v": "boxed.py:<module>.truth"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "setField",
+                                      "r": {
+                                       "k": "name",
+                                       "v": "<module>boxed.py"
+                                      },
+                                      "f": "tup",
+                                      "v": {
+                                       "k": "fnref",
+                                       "v": "boxed.py:<module>.tup"
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setField",
+                                       "r": {
+                                        "k": "name",
+                                        "v": "<module>boxed.py"
+                                       },
+                                       "f": "unhash",
+                                       "v": {
+                                        "k": "fnref",
+                                        "v": "boxed.py:<module>.unhash"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "skip"
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "boxed.py:<module>",
+  "file": "boxed.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setGlobal",
+    "x": "len",
+    "e": {
+     "k": "fnref",
+     "v": "__builtin.len"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setGlobal",
+     "x": "sum",
+     "e": {
+      "k": "fnref",
+      "v": "__builtin.sum"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setGlobal",
+      "x": "list",
+      "e": {
+       "k": "fnref",
+       "v": "__builtin.list<meta>"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "exprS",
+       "e": {
+        "k": "str",
+        "v": "Differential cases for boxed Python containers (docs/boxed-containers.md).\n\nEvery function here takes no arguments and returns an int or a bool, or raises. The\nexporter's output for this file is committed beside it as `ast-BoxedSample.json`;\n`tests/test_boxed_containers.py` runs each function under CPython and under the Lean\ninterpreter and compares. Regenerate the AST with the command in that test's docstring.\n"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setGlobal",
+        "x": "alias",
+        "e": {
+         "k": "fnref",
+         "v": "boxed.py:<module>.alias"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setGlobal",
+         "x": "neg",
+         "e": {
+          "k": "fnref",
+          "v": "boxed.py:<module>.neg"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setGlobal",
+          "x": "neg_read",
+          "e": {
+           "k": "fnref",
+           "v": "boxed.py:<module>.neg_read"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setGlobal",
+           "x": "oob",
+           "e": {
+            "k": "fnref",
+            "v": "boxed.py:<module>.oob"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setGlobal",
+            "x": "oob_neg",
+            "e": {
+             "k": "fnref",
+             "v": "boxed.py:<module>.oob_neg"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setGlobal",
+             "x": "oob_read",
+             "e": {
+              "k": "fnref",
+              "v": "boxed.py:<module>.oob_read"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setGlobal",
+              "x": "dset",
+              "e": {
+               "k": "fnref",
+               "v": "boxed.py:<module>.dset"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setGlobal",
+               "x": "dlit",
+               "e": {
+                "k": "fnref",
+                "v": "boxed.py:<module>.dlit"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "setGlobal",
+                "x": "kerr",
+                "e": {
+                 "k": "fnref",
+                 "v": "boxed.py:<module>.kerr"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "setGlobal",
+                 "x": "app",
+                 "e": {
+                  "k": "fnref",
+                  "v": "boxed.py:<module>.app"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setGlobal",
+                  "x": "pop_tmp",
+                  "e": {
+                   "k": "fnref",
+                   "v": "boxed.py:<module>.pop_tmp"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "setGlobal",
+                   "x": "ext",
+                   "e": {
+                    "k": "fnref",
+                    "v": "boxed.py:<module>.ext"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "setGlobal",
+                    "x": "setdef",
+                    "e": {
+                     "k": "fnref",
+                     "v": "boxed.py:<module>.setdef"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "setGlobal",
+                     "x": "nested",
+                     "e": {
+                      "k": "fnref",
+                      "v": "boxed.py:<module>.nested"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "setGlobal",
+                      "x": "mut",
+                      "e": {
+                       "k": "fnref",
+                       "v": "boxed.py:<module>.mut"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "setGlobal",
+                       "x": "call_mut",
+                       "e": {
+                        "k": "fnref",
+                        "v": "boxed.py:<module>.call_mut"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "setGlobal",
+                        "x": "comp_len",
+                        "e": {
+                         "k": "fnref",
+                         "v": "boxed.py:<module>.comp_len"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "setGlobal",
+                         "x": "comp_sum",
+                         "e": {
+                          "k": "fnref",
+                          "v": "boxed.py:<module>.comp_sum"
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "setGlobal",
+                          "x": "delk",
+                          "e": {
+                           "k": "fnref",
+                           "v": "boxed.py:<module>.delk"
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "setGlobal",
+                           "x": "del_pos",
+                           "e": {
+                            "k": "fnref",
+                            "v": "boxed.py:<module>.del_pos"
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "setGlobal",
+                            "x": "del_missing",
+                            "e": {
+                             "k": "fnref",
+                             "v": "boxed.py:<module>.del_missing"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "setGlobal",
+                             "x": "truth",
+                             "e": {
+                              "k": "fnref",
+                              "v": "boxed.py:<module>.truth"
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "setGlobal",
+                              "x": "not_empty",
+                              "e": {
+                               "k": "fnref",
+                               "v": "boxed.py:<module>.not_empty"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "setGlobal",
+                               "x": "tup",
+                               "e": {
+                                "k": "fnref",
+                                "v": "boxed.py:<module>.tup"
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "setGlobal",
+                                "x": "unhash",
+                                "e": {
+                                 "k": "fnref",
+                                 "v": "boxed.py:<module>.unhash"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "setGlobal",
+                                 "x": "eq",
+                                 "e": {
+                                  "k": "fnref",
+                                  "v": "boxed.py:<module>.eq"
+                                 }
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "setGlobal",
+                                  "x": "is_",
+                                  "e": {
+                                   "k": "fnref",
+                                   "v": "boxed.py:<module>.is_"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "setGlobal",
+                                   "x": "in_",
+                                   "e": {
+                                    "k": "fnref",
+                                    "v": "boxed.py:<module>.in_"
+                                   }
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "setGlobal",
+                                    "x": "order",
+                                    "e": {
+                                     "k": "fnref",
+                                     "v": "boxed.py:<module>.order"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setGlobal",
+                                     "x": "dict_eq",
+                                     "e": {
+                                      "k": "fnref",
+                                      "v": "boxed.py:<module>.dict_eq"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "setGlobal",
+                                      "x": "copy_fresh",
+                                      "e": {
+                                       "k": "fnref",
+                                       "v": "boxed.py:<module>.copy_fresh"
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setGlobal",
+                                       "x": "iter_sum",
+                                       "e": {
+                                        "k": "fnref",
+                                        "v": "boxed.py:<module>.iter_sum"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "setGlobal",
+                                        "x": "mutate_iter",
+                                        "e": {
+                                         "k": "fnref",
+                                         "v": "boxed.py:<module>.mutate_iter"
+                                        }
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "setGlobal",
+                                         "x": "keys_view",
+                                         "e": {
+                                          "k": "fnref",
+                                          "v": "boxed.py:<module>.keys_view"
+                                         }
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "setGlobal",
+                                          "x": "slc",
+                                          "e": {
+                                           "k": "fnref",
+                                           "v": "boxed.py:<module>.slc"
+                                          }
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "skip"
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "skip"
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "skip"
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "skip"
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "skip"
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "skip"
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "skip"
+                                                },
+                                                "b": {
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "skip"
+                                                 },
+                                                 "b": {
+                                                  "k": "seq",
+                                                  "a": {
+                                                   "k": "skip"
+                                                  },
+                                                  "b": {
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "skip"
+                                                   },
+                                                   "b": {
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "skip"
+                                                    },
+                                                    "b": {
+                                                     "k": "seq",
+                                                     "a": {
+                                                      "k": "skip"
+                                                     },
+                                                     "b": {
+                                                      "k": "seq",
+                                                      "a": {
+                                                       "k": "skip"
+                                                      },
+                                                      "b": {
+                                                       "k": "seq",
+                                                       "a": {
+                                                        "k": "skip"
+                                                       },
+                                                       "b": {
+                                                        "k": "seq",
+                                                        "a": {
+                                                         "k": "skip"
+                                                        },
+                                                        "b": {
+                                                         "k": "seq",
+                                                         "a": {
+                                                          "k": "skip"
+                                                         },
+                                                         "b": {
+                                                          "k": "seq",
+                                                          "a": {
+                                                           "k": "skip"
+                                                          },
+                                                          "b": {
+                                                           "k": "seq",
+                                                           "a": {
+                                                            "k": "skip"
+                                                           },
+                                                           "b": {
+                                                            "k": "seq",
+                                                            "a": {
+                                                             "k": "skip"
+                                                            },
+                                                            "b": {
+                                                             "k": "seq",
+                                                             "a": {
+                                                              "k": "skip"
+                                                             },
+                                                             "b": {
+                                                              "k": "seq",
+                                                              "a": {
+                                                               "k": "skip"
+                                                              },
+                                                              "b": {
+                                                               "k": "seq",
+                                                               "a": {
+                                                                "k": "skip"
+                                                               },
+                                                               "b": {
+                                                                "k": "seq",
+                                                                "a": {
+                                                                 "k": "skip"
+                                                                },
+                                                                "b": {
+                                                                 "k": "seq",
+                                                                 "a": {
+                                                                  "k": "skip"
+                                                                 },
+                                                                 "b": {
+                                                                  "k": "seq",
+                                                                  "a": {
+                                                                   "k": "skip"
+                                                                  },
+                                                                  "b": {
+                                                                   "k": "seq",
+                                                                   "a": {
+                                                                    "k": "skip"
+                                                                   },
+                                                                   "b": {
+                                                                    "k": "seq",
+                                                                    "a": {
+                                                                     "k": "skip"
+                                                                    },
+                                                                    "b": {
+                                                                     "k": "seq",
+                                                                     "a": {
+                                                                      "k": "skip"
+                                                                     },
+                                                                     "b": {
+                                                                      "k": "seq",
+                                                                      "a": {
+                                                                       "k": "skip"
+                                                                      },
+                                                                      "b": {
+                                                                       "k": "seq",
+                                                                       "a": {
+                                                                        "k": "skip"
+                                                                       },
+                                                                       "b": {
+                                                                        "k": "seq",
+                                                                        "a": {
+                                                                         "k": "skip"
+                                                                        },
+                                                                        "b": {
+                                                                         "k": "seq",
+                                                                         "a": {
+                                                                          "k": "skip"
+                                                                         },
+                                                                         "b": {
+                                                                          "k": "seq",
+                                                                          "a": {
+                                                                           "k": "skip"
+                                                                          },
+                                                                          "b": {
+                                                                           "k": "seq",
+                                                                           "a": {
+                                                                            "k": "skip"
+                                                                           },
+                                                                           "b": {
+                                                                            "k": "seq",
+                                                                            "a": {
+                                                                             "k": "skip"
+                                                                            },
+                                                                            "b": {
+                                                                             "k": "seq",
+                                                                             "a": {
+                                                                              "k": "skip"
+                                                                             },
+                                                                             "b": {
+                                                                              "k": "seq",
+                                                                              "a": {
+                                                                               "k": "skip"
+                                                                              },
+                                                                              "b": {
+                                                                               "k": "seq",
+                                                                               "a": {
+                                                                                "k": "skip"
+                                                                               },
+                                                                               "b": {
+                                                                                "k": "skip"
+                                                                               }
+                                                                              }
+                                                                             }
+                                                                            }
+                                                                           }
+                                                                          }
+                                                                         }
+                                                                        }
+                                                                       }
+                                                                      }
+                                                                     }
+                                                                    }
+                                                                   }
+                                                                  }
+                                                                 }
+                                                                }
+                                                               }
+                                                              }
+                                                             }
+                                                            }
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       }
+                                                      }
+                                                     }
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

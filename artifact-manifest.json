@@ -17,11 +17,11 @@
       "render_sha256": "d3a662ae60f3eb5133ea14d12d4d5f99afc5d7bd066eff2b7e3d8297d4a86cb2"
     },
     "Cachetools": {
-      "ast_bytes": 575027,
-      "ast_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
+      "ast_bytes": 588720,
+      "ast_sha256": "9c0e04b839b6ae06b28ae039289f560cb47bc3e5cf03b095a6eb441cd985b639",
       "ast_tracked": true,
-      "render_bytes": 305920,
-      "render_sha256": "6bfedca65be153a940b1f18c19cd6cb5d359b87675684fbe5ae64f6523672ce3"
+      "render_bytes": 312108,
+      "render_sha256": "3f983d23afe4d85ca4fec91e93838735bd300cd38446836173ebc237af04d5df"
     },
     "LangC": {
       "ast_bytes": 175419,
@@ -132,7 +132,7 @@
   "specs": {
     "Specs/CachetoolsSpec": {
       "corpus": "Cachetools",
-      "corpus_ast_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
+      "corpus_ast_sha256": "9c0e04b839b6ae06b28ae039289f560cb47bc3e5cf03b095a6eb441cd985b639",
       "source": "ast-Cachetools.json"
     },
     "Specs/V8Spec": {
@@ -142,7 +142,7 @@
     },
     "SpecsGen/Cachetools": {
       "corpus": "Cachetools",
-      "corpus_ast_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
+      "corpus_ast_sha256": "9c0e04b839b6ae06b28ae039289f560cb47bc3e5cf03b095a6eb441cd985b639",
       "source": "ast-Cachetools.json"
     },
     "SpecsGen/LinuxLib": {
@@ -164,6 +164,20 @@
       "corpus": "V8BaseSample",
       "corpus_ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
       "source": "ast-V8BaseSample.json"
+    }
+  },
+  "untracked_by_policy": {
+    "Ansible": {
+      "reason": "Gitignored by policy (docs/integrity.md): the AST is larger than its render, and neither the corpus source commit nor the exporter version that produced the pinned ast_sha256 was recorded, so a re-export cannot reproduce it and no copy exists outside the original workspace. No spec module is pinned to it. What this costs: the figures in docs/evidence-ansible.md and evidence-Ansible.summary.json were measured on this AST and cannot be re-derived from a clone. At 136.6 MB it also exceeds GitHub's 100 MB per-file limit.",
+      "reviewed": "2026-10-02, STRATEGY.md section 59 (item N)"
+    },
+    "LinuxCrypto": {
+      "reason": "Gitignored by policy (docs/integrity.md): the AST is larger than its render, and neither the corpus source commit nor the exporter version that produced the pinned ast_sha256 was recorded, so a re-export cannot reproduce it and no copy exists outside the original workspace. No spec module is pinned to it. What this costs: the figures in docs/evidence-LinuxCrypto.md and evidence-LinuxCrypto.json / core-oracle-LinuxCrypto.json were measured on this AST and cannot be re-derived from a clone.",
+      "reviewed": "2026-10-02, STRATEGY.md section 59 (item N)"
+    },
+    "LinuxLib": {
+      "reason": "Gitignored by policy (docs/integrity.md): the AST is larger than its render, and neither the corpus source commit nor the exporter version that produced the pinned ast_sha256 was recorded, so a re-export cannot reproduce it and no copy exists outside the original workspace. No spec module is pinned to it. What this costs: the figures in docs/evidence-LinuxLib.md and evidence-LinuxLib.json / core-oracle-LinuxLib.json were measured on this AST and cannot be re-derived from a clone. SpecsGen/LinuxLib is pinned to LinuxLibSample, a tracked subset, not to this.",
+      "reviewed": "2026-10-02, STRATEGY.md section 59 (item N)"
     }
   }
 }

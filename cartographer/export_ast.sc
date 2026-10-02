@@ -225,6 +225,18 @@ import scala.annotation.tailrec
 
   def hole(label: String): ujson.Obj  = ujson.Obj("k" -> "hole", "label" -> label)
   def holeS(label: String): ujson.Obj = ujson.Obj("k" -> "holeS", "label" -> label)
+
+  /** A Python `yield` / `yield from`. pysrc2cpg has no YIELD node: it emits a RETURN
+    * whose code is the yield's own text (`yield curr.key`, `yield from xs`, `yield`),
+    * and a plain `return` never starts with that keyword. Callers check `.py` first. */
+  def isYield(r: Return): Boolean =
+    r.code.trim.stripPrefix("(").trim.matches("""(?s)yield\b.*""")
+
+  /** A Python generator function: one whose OWN body contains a `yield` (a yield inside a
+    * nested `def`/`lambda` makes that function the generator, not this one). */
+  def isGeneratorFunction(m: Method): Boolean =
+    m.filename.toLowerCase.endsWith(".py") &&
+      m.body.ast.isReturn.l.exists(r => isYield(r) && r.method.fullName == m.fullName)
   val skip = ujson.Obj("k" -> "skip")
 
   /** Kernel synchronisation primitives, which a SEQUENTIAL semantics cannot observe.
@@ -1100,6 +1112,43 @@ import scala.annotation.tailrec
     free.filter(x => bindingScopeOf(fn, x).exists(o => cellsOwnedBy.getOrElse(o, Set.empty).contains(x)))
   }
 
+  val bindingCountCache = scala.collection.mutable.Map.empty[(String, String), Int]
+
+  /** Python's scope rule for a bare name `x` read in function `fn`: the function scope
+    * that binds it -- `fn` itself, else the nearest enclosing FUNCTION (a lambda counts;
+    * class bodies and `<module>` do not, as in Python) -- or `None` when it is a global or
+    * a builtin. A `global x` in any scope on the way out ends the search at the globals. */
+  def pyBindingScope(fn: String, x: String): Option[String] = {
+    def isFnScope(f: String): Boolean =
+      methodByName.get(f).exists(p => !p.name.startsWith("<") || p.name.startsWith("<lambda>"))
+    // `boundOf` is not used here: `m.body.ast` reaches into nested definitions, so it
+    // also counts names a NESTED function assigns (and un-localises a name a nested
+    // function declares `nonlocal`). `bindingCount`, `globalDeclOf` and `nonlocalOf`
+    // (the cell-conversion section above) look at `cur`'s own body only; a
+    // `nonlocal x` in `cur` defers to the enclosing scopes, as in Python.
+    def go(cur: String): Option[String] =
+      if (globalDeclOf.getOrElse(cur, Set.empty).contains(x)) None
+      else if (isFnScope(cur) && bindingCount(cur, x) > 0 &&
+               !nonlocalOf.getOrElse(cur, Set.empty).contains(x)) Some(cur)
+      else {
+        val i = cur.lastIndexOf('.')
+        if (i < 0) None else go(cur.substring(0, i))
+      }
+    go(fn)
+  }
+
+  /** How many times scope `fn` binds `x`: once per parameter of that name and once per
+    * identifier assignment to it (a nested `def x` is one, an import `x` is one). */
+  def bindingCount(fn: String, x: String): Int = bindingCountCache.getOrElseUpdate((fn, x),
+    methodByName.get(fn).map { m =>
+      m.parameter.name.l.count(_ == x) +
+        m.body.ast.isCall.filter(c => c.methodFullName.startsWith("<operator>.assignment")).l
+          .count(c => kidsOf(c).headOption.exists {
+            case i: Identifier => i.name == x && i.method.fullName == fn
+            case _             => false
+          })
+    }.getOrElse(0))
+
   // ---- module objects ---------------------------------------------------------
   //
   // ## What a module is, in Core
@@ -1352,6 +1401,10 @@ import scala.annotation.tailrec
     * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
     * implicit `this`, and stack object construction are C++ facts, not `cLike` facts. */
   var cppFile         = false
+  /** JavaScript/TypeScript (the extensions `render_lean.py` maps to `.javascript`). The
+    * jssrc2cpg frontend erases `==`/`===`, `!=`/`!==` and `>>`/`>>>`; see
+    * `jsAmbiguousBinop`. */
+  var jsFile          = false
   /** `010-reach-90pct-hole-free`: is a single-quoted literal in THIS file a numeric
     * character/rune constant (C/C++/Java/Kotlin/Go: `'x'` is an integer, its codepoint)
     * rather than an alternative string-quoting style (JS/TS: `'x'` and `"x"` are the
@@ -6569,6 +6622,40 @@ import scala.annotation.tailrec
   }
   def localName(n: String): String = if (cppFile && n == "this") "self" else n
 
+  /** The function `x = <function>` binds in scope `fn`'s own body, when that assignment
+    * (a nested `def x`, or `x = lambda ...`) has a bare function reference as its value. */
+  def singleFunctionBinding(fn: String, x: String): Option[String] =
+    methodByName.get(fn).toList.flatMap { m =>
+      m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+        .flatMap(c => kidsOf(c) match {
+          case (i: Identifier) :: (r: MethodRef) :: Nil
+              if i.name == x && i.method.fullName == fn => Some(r.methodFullName)
+          case _ => None
+        })
+    } match {
+      case List(one) => Some(one)
+      case _         => None
+    }
+
+  /** The callee of a Python call, when it must be called THROUGH a local or captured
+    * variable rather than by the function Joern resolved: `Some(name)` when the callee is
+    * a bare identifier that some function scope binds (`pyBindingScope`) and Joern's
+    * `mfn` is not provably that binding. `mfn` is accepted only when the binding scope
+    * binds the name exactly once, and that one binding assigns `mfn` itself (a nested
+    * `def`, or `x = lambda ...`); then the existing paths (full name, or the variable for a
+    * capturing closure) are already right, and `None` leaves them in charge. A global or
+    * builtin name is `None` too: those resolve by module, which is a different question.
+    * Reads the per-method `currentMethodFull`, so it is only meaningful inside `emit`. */
+  def pyLocalCallee(callee: Option[AstNode], mfn: String): Option[String] = callee match {
+    case Some(i: Identifier) =>
+      pyBindingScope(currentMethodFull, i.name).flatMap { scope =>
+        val isItsOwnDef = methodByName.contains(mfn) && bindingCount(scope, i.name) == 1 &&
+          singleFunctionBinding(scope, i.name).contains(mfn)
+        if (isItsOwnDef) None else Some(i.name)
+      }
+    case _ => None
+  }
+
   // ---- expressions ----------------------------------------------------------
   /** Parse a C/C++/Java integer literal.
     *
@@ -7032,6 +7119,9 @@ import scala.annotation.tailrec
     // frontend fix (`DO`, a macro body) or a real language feature Core lacks, so the
     // label carries it instead of merging them all under one count.
     case cs: ControlStructure => controlStructureExpr(cs)
+    // `y = yield v`: a yield used as a value (what `send` delivers). Same reason as the
+    // statement case: Core has no suspension.
+    case r: Return if pyFile && isYield(r) => hole("gen:yield")
     case other                => hole("expr:" + other.label)
   }
 
@@ -7303,8 +7393,69 @@ import scala.annotation.tailrec
     * the missing *type* rather than pretending to a semantics.
     *
     * A `char*` operand cannot reach here (shifting a pointer is not C). */
+  /** JS/TS: the binary-operator token jssrc2cpg erased, recovered from source text.
+    *
+    * jssrc2cpg (`AstForExpressionsCreator.astForBinaryExpression`, Joern v4.0.606) maps
+    * `==` and `===` both to `<operator>.equals`, `!=` and `!==` both to
+    * `<operator>.notEquals`, and `>>` and `>>>` both to `<operator>.arithmeticShiftRight`.
+    * Those pairs differ in JS (`1 == "1"` is `true`, `1 === "1"` is `false`; `-1 >> 0` is
+    * `-1`, `-1 >>> 0` is `4294967295`), so the operator name alone cannot be translated.
+    * What survives is the call's CODE, Babel's source span of the whole expression, and
+    * each operand's span. The token is what lies between them: `full` = (parens) `left`
+    * (parens/space) TOKEN (space/parens) `right`. Anything that does not have exactly
+    * that shape -- a comment between operand and operator, truncated code, a span that
+    * does not start with the left operand -- yields `None`, and the caller emits a hole
+    * naming the lost token rather than guessing either operator.
+    *
+    * Returns `None` when the call is not one of the three ambiguous operators in a JS/TS
+    * file, else `Some(Right(coreOp))` or `Some(Left(holeLabel))`. */
+  def jsAmbiguousBinop(c: Call): Option[Either[String, String]] = {
+    val mfn = c.methodFullName
+    val allowed: Map[String, Set[String]] = Map(
+      "<operator>.equals"               -> Set("==", "==="),
+      "<operator>.notEquals"            -> Set("!=", "!=="),
+      "<operator>.arithmeticShiftRight" -> Set(">>", ">>>"))
+    val kids = kidsOf(c)
+    if (!jsFile || !allowed.contains(mfn) || kids.size != 2) None
+    else {
+      val tok = jsOperatorToken(c.code, kids(0).code, kids(1).code, allowed(mfn).toList)
+      Some(tok.toRight("op:js-token-unrecovered:" + mfn.stripPrefix("<operator>.")))
+    }
+  }
+
+  /** Which of `candidates` sits between two operand spans in a binary expression's
+    * source text. Longest candidate first (`===` before `==`), and a candidate only
+    * counts if the RIGHT operand's span follows it, so `a === !b` is `===`, not `===!`.
+    * Pure string function, so it can be checked without a CPG. */
+  def jsOperatorToken(full: String, left: String, right: String,
+                      candidates: List[String]): Option[String] = {
+    def skip(s: String, i: Int, cs: String): Int = {
+      var j = i
+      while (j < s.length && (cs.contains(s(j)) || s(j).isWhitespace)) j += 1
+      j
+    }
+    if (full == null || left == null || right == null || left.isEmpty || right.isEmpty) None
+    else {
+      // The left operand's span starts the expression, possibly after opening parens
+      // that belong to it (Babel spans exclude a parenthesised operand's parens).
+      val starts = (0 to skip(full, 0, "(")).filter(i => full.startsWith(left, i))
+      starts.headOption.flatMap { i =>
+        val t0 = skip(full, i + left.length, ")")
+        candidates.sortBy(-_.length).find { tok =>
+          full.startsWith(tok, t0) && {
+            val r = skip(full, t0 + tok.length, "(")
+            full.startsWith(right, r) &&
+              // the right operand must END the expression (modulo closing parens)
+              skip(full, r + right.length, ")") == full.length
+          }
+        }
+      }
+    }
+  }
+
   def shiftRightOp(lhs: AstNode): Option[String] =
-    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, JS, Python: the token is unambiguous
+    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, Python: the token is unambiguous; JS
+                                 // never reaches here (`jsAmbiguousBinop` runs first)
     else {
       val b = bareType(staticTypeOf(lhs))
       if (signedTypeNames.contains(b)) Some(">>")
@@ -7970,7 +8121,16 @@ import scala.annotation.tailrec
     // evidence for a bare `0` (so `n == 0` on an integer is untouched); a
     // `NULL`/`nullptr`/`(T*)0` operand is its own evidence. Only the non-null
     // side is evaluated, once, so no purity condition is needed.
-    if (pointerNullTest(c).isDefined) {
+    // JS/TS `==`/`===`/`!=`/`!==`/`>>`/`>>>`: FIRST, before the C-family null test
+    // below, which would turn `x == null` into `x in (None, 0)` -- `0 == null` is
+    // `false` in JS. See `jsAmbiguousBinop`; Core's `.javascript` arms decide `null`.
+    if (jsAmbiguousBinop(c).isDefined)
+      jsAmbiguousBinop(c).get match {
+        case Right(op) => ujson.Obj("k" -> "binop", "op" -> op,
+                                    "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+        case Left(lbl) => hole(lbl)
+      }
+    else if (pointerNullTest(c).isDefined) {
       val (other, neg) = pointerNullTest(c).get
       nullTestExpr(expr(other), neg)
     }
@@ -8225,14 +8385,20 @@ import scala.annotation.tailrec
                 "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (mfn == "<operator>.conditional" && kids.size == 3)
       ujson.Obj("k" -> "cond", "c" -> expr(kids(0)), "t" -> expr(kids(1)), "e" -> expr(kids(2)))
+    // A Python list/dict display is a fresh OBJECT (`Expr.boxContainer`,
+    // `docs/boxed-containers.md`): `b = a` then shares it, so `b[0] = 1` is visible
+    // through `a`. Other front ends that reach these operators keep value semantics.
     else if (mfn == "<operator>.listLiteral")
-      ujson.Obj("k" -> "listE", "items" -> exprs(kids))
+      (if (pyFile) ujson.Obj("k" -> "boxContainer", "e" -> ujson.Obj("k" -> "listE", "items" -> exprs(kids)))
+       else ujson.Obj("k" -> "listE", "items" -> exprs(kids)))
     else if (mfn == "<operator>.tupleLiteral")
       ujson.Obj("k" -> "tupleE", "items" -> exprs(kids))
     else if (mfn == "<operator>.dictLiteral")
       // The Python frontend emits `{}` here and fills it with indexed stores; a
       // dictLiteral with children would be a shape we have not seen and must not guess at.
-      (if (kids.isEmpty) ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
+      (if (kids.isEmpty && pyFile)
+         ujson.Obj("k" -> "boxContainer", "e" -> ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr()))
+       else if (kids.isEmpty) ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
        else hole("op:dictLiteral-nonempty"))
     // `static_cast<uint8_t>(e)` — a **width conversion**, which Core does model.
     //
@@ -8900,6 +9066,22 @@ import scala.annotation.tailrec
               // WITH its captured frame. Calling it by its full name reached the right
               // `Func` with no environment at all: every captured read unbound, every
               // `nonlocal` write a hole. Non-capturing targets keep the full name.
+              // A call through a LOCAL or CAPTURED Python name (`cache(self)` where `cache`
+              // is a parameter of `_locked`; `_wrapper(...)` after a function-local
+              // `from ._cached import _wrapper`). Python resolves the name in the scope
+              // that binds it; pysrc2cpg resolves it by NAME, to whatever function has
+              // that short name -- `_WrapperBase.cache`, a property of another class, or
+              // `_cachedmethod.py`'s `_wrapper` for an import from `_cached.py`
+              // (docs/conformance.md, finding 2). Its `methodFullName` is trusted only
+              // when it is the one `def` that binds the name in that very scope; anything
+              // else is called through the variable, whose value is what Python calls.
+              // A `nonlocal` cell holds the function one field down, and `Expr.call` takes
+              // a name, not a value: that shape is a hole rather than a call of the cell.
+              else if (pyFile && !moduleScope && pyLocalCallee(callee, mfn).isDefined) {
+                val v = pyLocalCallee(callee, mfn).get
+                if (boxedLocals.contains(v) || pyCellRefs.contains(v)) hole("call:through-cell")
+                else ujson.Obj("k" -> "call", "f" -> v, "args" -> argExprs(args, kwArgs))
+              }
               else if (methodByName.contains(mfn) && pyFile && capturesEnv.getOrElse(mfn, false) &&
                        callee.exists { case i: Identifier => true; case _ => false })
                 ujson.Obj("k" -> "call", "f" -> callee.collect { case i: Identifier => i.name }.get,
@@ -10638,6 +10820,15 @@ import scala.annotation.tailrec
       exprV(macroCommaBlock(c).get)
     // Compound-expression pass-through (research.md §3, point 2): thread and
     // concatenate sub-preludes left-to-right, matching source evaluation order.
+    // JS/TS: the erased token, recovered (see `callExpr`'s matching branch).
+    case c: Call if jsAmbiguousBinop(c).isDefined =>
+      val List(a, b) = kidsOf(c)
+      jsAmbiguousBinop(c).get match {
+        case Right(op) =>
+          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+          (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+        case Left(lbl) => (Nil, hole(lbl))
+      }
     case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
       shiftRightOp(a) match {
@@ -10999,6 +11190,13 @@ import scala.annotation.tailrec
     // ANY(1)`), checked BEFORE any other Call case so the synthetic expansion
     // Block is never even looked at.
     case c: Call if c.name == "UNUSED_PARAMETER" || c.name == "UNUSED_PARAMETER2" => skip
+    // `yield` / `yield from`. pysrc2cpg lowers each to a RETURN node whose code is the
+    // `yield` text, and the case below translated it as `return` -- "return the first
+    // element" for `TTLCache.__iter__`, which agreed with an equally wrong recorder and
+    // so read as conformance (docs/conformance.md, finding 1). A generator suspends;
+    // Core has no suspension. Each yield is a hole, and `emit` holes the whole function
+    // (`gen:generator`), because calling a generator runs none of its body at all.
+    case r: Return if pyFile && isYield(r) => holeS("gen:yield")
     case r: Return =>
       kidsOf(r).headOption match {
         case Some(e) =>
@@ -11052,6 +11250,13 @@ import scala.annotation.tailrec
         case (i: Identifier) :: Nil => ujson.Obj("k" -> "del", "x" -> i.name)
         // `del d[k]` / `del o.f` remove a binding from a container or object; Core's
         // `del` only unbinds a variable, so translating them would be a lie.
+        // Python only: `del e[i]` is `Stmt.delIndex`, which removes the key / position from
+        // a BOXED container (`docs/boxed-containers.md`) and runs a class's own
+        // `__delitem__`. Every other language keeps the hole.
+        case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") && pyFile &&
+                                    kidsOf(x).size == 2 =>
+          val ks = kidsOf(x)
+          ujson.Obj("k" -> "delIndex", "r" -> expr(ks(0)), "i" -> expr(ks(1)))
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
         case (x: Call) :: Nil if x.methodFullName.startsWith("<operator>") =>
@@ -11392,6 +11597,7 @@ import scala.annotation.tailrec
   // below as initializers, so they never inflate the function count either.
   lazy val cLikeExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".js", ".ts", ".kt", ".go")
   lazy val cppExts   = List(".c", ".h", ".cpp", ".cc", ".hpp")
+  lazy val jsExts    = List(".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs")
   // `010-reach-90pct-hole-free`: `cLikeExts` minus `.js`/`.ts` -- see
   // `charLiteralIsNumeric`'s own doc comment for why those two are excluded.
   lazy val charLiteralExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".kt", ".go")
@@ -11875,6 +12081,7 @@ import scala.annotation.tailrec
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
     cppFile      = cppExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    jsFile       = jsExts.exists(e => m.filename.toLowerCase.endsWith(e))
     charLiteralIsNumeric = charLiteralExts.exists(e => m.filename.toLowerCase.endsWith(e))
     def fieldReceiverNames(op: String): Set[String] =
       m.body.ast.isCall.filter(_.methodFullName == op).l.flatMap { c =>
@@ -12228,8 +12435,15 @@ import scala.annotation.tailrec
     // reused by BOTH `boxedStructs` below and `boxedStructArrayMembers` just
     // after it, so a struct's member list is only ever read from the CPG once
     // per candidate name.
+    // NOT for Python. A Python local whose static type is a CLASS -- `LFUCache` read as a
+    // value inside `LFUCache.__setitem__` -- is a reference to that class, not a struct
+    // held by value, and boxing it rebinds the name to a fresh `<local>` object: the
+    // class value disappears (`LFUCache._Link(1)` then dispatches on the box). Measured on
+    // cachetools 7.1.7: 43 of 209 methods gained such a prologue. Value-typed aggregates
+    // are a C/C++ notion; Python has none.
+    val pyMethod = m.filename.toLowerCase.endsWith(".py")
     val structCandidateDecls: Map[String, TypeDecl] =
-      if (moduleScope) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
+      if (moduleScope || pyMethod) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
         val (name, isParam, ty) = l match {
           case ll: Local             => (ll.name, false, localTypes.get(ll.name))
           case pp: MethodParameterIn => (pp.name, true, localTypes.get(pp.name))
@@ -12905,7 +13119,16 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "assign", "x" -> (nm + "$off"), "e" -> ujson.Obj("k" -> "int", "v" -> 0))
     }
     val allPrologues = prologues ++ aggPrologues ++ strCursorPrologues
-    val body = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    val body1 = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    // Calling a generator function runs NONE of its body: it returns a generator object,
+    // and the body runs lazily, one `next()` at a time, interleaved with the consumer.
+    // Core has no suspension and no generator value, so the call itself is a hole. The
+    // translated body is kept after it (its yields are `gen:yield` holes) so the shape
+    // stays readable, exactly as `param:signature-unparsed` keeps it; nothing past the
+    // leading hole ever runs. Eagerly materialising the yields into a list was rejected:
+    // it is wrong for an infinite generator, for one whose consumer stops early, and for
+    // `TTLCache.__iter__`, which reads the timer and the linked list between yields.
+    val body = if (isGeneratorFunction(m)) seqOf(List(holeS("gen:generator"), body1)) else body1
     moduleScope = false
     localTypes = Map.empty
     genuineLocalNames = Set.empty

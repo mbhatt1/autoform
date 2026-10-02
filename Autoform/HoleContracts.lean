@@ -354,13 +354,20 @@ def topSContract (site label : String) : SContract :=
     post := fun _ _ _ => True }
 
 /-- **Effect footprint: attributes.** Every object that existed before still exists after,
-with the same class, the same attributes (`fields`) and the same captured bindings. The
-container payload and version are *not* constrained — they are what `del d[k]` changes. -/
+with the same class, the same attributes (`fields`), the same captured bindings, and the
+same *kind*: a builtin container stays one and an ordinary instance stays one. The
+container's *contents* and version are not constrained — they are what `del d[k]` changes.
+
+The kind clause was added when boxed containers (`Payload.list`/`.dict`) entered the
+semantics: attribute reads and writes on an object with a container payload now hole
+(`field:…:builtin-container`), so a footprint that let a hole turn `self` into a container
+would not fix the attributes it claims to fix. `del d[k]` never changes what `d` is. -/
 def AttrFrame (h h' : Heap) : Prop :=
   ∀ r o, h.get r = some o →
     ∃ o', h'.get r = some o' ∧ o'.cls = o.cls ∧ o'.fields = o.fields ∧ o'.captured = o.captured
+      ∧ o'.payload.toVal.isSome = o.payload.toVal.isSome
 
-theorem AttrFrame.refl (h : Heap) : AttrFrame h h := fun _ o ho => ⟨o, ho, rfl, rfl, rfl⟩
+theorem AttrFrame.refl (h : Heap) : AttrFrame h h := fun _ o ho => ⟨o, ho, rfl, rfl, rfl, rfl⟩
 
 /-- **"Completes or raises, touching no attribute."** The result relation: control leaves
 normally with the environment unchanged, or by raising; never `return`/`break`/`continue`,
@@ -422,7 +429,10 @@ def __delitem__(self, key):
 ```
 
 The generated `f_cachetools___init___py__module__Cache___delitem__` is **partially
-translated**: `del self.__data[key]` is `Stmt.hole "op:delete-index"`. Today that hole
+translated**: `del self.__data[key]` is `Stmt.hole "op:delete-index"`. (This is the
+render of the *committed* `ast-Cachetools.json`; the merged exporter emits `Stmt.delIndex`
+there, so after regeneration this example should be retired in favour of an unconditional
+theorem and re-pointed at `op:delete-slice` — see `docs/contracts.md`.) Today that hole
 puts the function outside every unconditional statement (`delitem_reaches_hole`). The
 theorem below is about the generated `Program` *unmodified* — `Autoform.Generated.
 Cachetools.program`, all functions, imported — instantiated at that one site.
@@ -460,7 +470,8 @@ def delitemName : String := "cachetools/__init__.py:<module>.Cache.__delitem__"
 def delContract : SContract :=
   completesOrRaisesFramed delitemName "op:delete-index"
     "`del self.__data[key]` in Cache.__delitem__ completes normally (environment unchanged) \
-     or raises, and changes no object's class, attributes or captured bindings"
+     or raises, and changes no object's class, attributes, captured bindings, or whether it \
+     is a builtin container"
 
 def Γdel : SContractEnv := [delContract]
 
@@ -473,8 +484,8 @@ def CacheShape (h : Heap) (r d : Ref) (c : Int) : Prop :=
   ∃ o od, h.get r = some o
     ∧ o.fields.find? (·.1 == "_Cache__size") = some ("_Cache__size", .ref d)
     ∧ o.fields.find? (·.1 == "_Cache__currsize") = some ("_Cache__currsize", .int c)
-    ∧ o.captured = []
-    ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = []
+    ∧ o.captured = [] ∧ o.payload = .none
+    ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = [] ∧ od.payload = .none
 
 /-- What is proved of every admissible instantiation. -/
 def DelitemPost (q : Program) : Prop :=
@@ -504,7 +515,7 @@ theorem getField_setField_self (h : Heap) (r : Ref) (f : String) (v : Val) {o : 
 theorem delitem_under : UnderS Γdel P DelitemPost := by
   intro τ hc ht h r d c key hshape fuel hfuel
   obtain ⟨s, hlk, hpost⟩ := filled_hole hc ht (c := delContract) (by simp [Γdel])
-  obtain ⟨o, od, hro, hsz, hcur, hcap, hdo, hdcls, hdcap⟩ := hshape
+  obtain ⟨o, od, hro, hsz, hcur, hcap, hpay, hdo, hdcls, hdcap, hdpay⟩ := hshape
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   have hpop : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
@@ -519,6 +530,7 @@ theorem delitem_under : UnderS Γdel P DelitemPost := by
   simp only [hlk]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
     execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop,
+    hdpay, Heap.payload, Heap.view,
     f_cachetools___init___py__module___DefaultSize_pop]
   -- The only thing known about the filled site is its contract.
   have hP := hpost (k + 8) (by omega) h
@@ -527,11 +539,12 @@ theorem delitem_under : UnderS Γdel P DelitemPost := by
     [("size", Val.int 1), ("tmp0", Val.ref d), ("key", key), ("self", Val.ref r)] s = E at hP ⊢
   obtain ⟨h', ctl⟩ := E
   obtain ⟨hframe, hctl⟩ := hP
-  obtain ⟨o', ho', -, hf', -⟩ := hframe r o hro
+  obtain ⟨o', ho', -, hf', -, hpay'⟩ := hframe r o hro
+  have hnc : o'.payload.toVal.isSome = false := by rw [hpay', hpay]; rfl
   rcases hctl with hn | ⟨v, hx⟩
   · simp only at hn; subst hn
     left
-    simp [ho', hf', hcur, hdial]
+    simp [ho', hf', hcur, hdial, hnc]
     exact getField_setField_self h' r _ _ ho'
   · simp only at hx; subst hx
     right
@@ -550,7 +563,7 @@ theorem delitem_reaches_hole_of (τ : SImpl)
     (h : Heap) (r d : Ref) (c : Int) (key : Val) (hshape : CacheShape h r d c) (k : Nat) :
     (runMethodIn (τ.onProgram P) (k + 12) h delitemName (.ref r) [key]).2
       = .hole "op:delete-index" := by
-  obtain ⟨o, od, hro, hsz, hcur, hcap, hdo, hdcls, hdcap⟩ := hshape
+  obtain ⟨o, od, hro, hsz, hcur, hcap, hpay, hdo, hdcls, hdcap, hdpay⟩ := hshape
   have hpop : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
     rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_pop]
@@ -563,6 +576,7 @@ theorem delitem_reaches_hole_of (τ : SImpl)
   simp only [hfill]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
     execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop,
+    hdpay,
     f_cachetools___init___py__module___DefaultSize_pop]
 
 /-- **On the generated program itself**, `Cache.__delitem__` reaches the hole. -/
@@ -578,7 +592,7 @@ def sampleHeap : Heap :=
   , { cls := "_DefaultSize", fields := [] } ]
 
 theorem sample_shape : CacheShape sampleHeap 0 1 5 :=
-  ⟨_, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  ⟨_, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- The site filled with itself. Legal under `topSContract`, which is the point. -/
 def idImplS : SImpl := [((delitemName, "op:delete-index"), .hole "op:delete-index")]

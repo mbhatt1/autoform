@@ -66,7 +66,8 @@ def has_hole(body):
 
 STORAGE = {"static", "SQLITE_PRIVATE", "SQLITE_API", "SQLITE_NOINLINE", "inline",
            "__inline", "SQLITE_INLINE", "SQLITE_EXPERIMENTAL", "SQLITE_DEPRECATED",
-           "SQLITE_CDECL", "SQLITE_STDCALL", "SQLITE_APICALL", "SQLITE_SYSAPI"}
+           "SQLITE_CDECL", "SQLITE_STDCALL", "SQLITE_APICALL", "SQLITE_SYSAPI",
+           "SQLITE_OPT_INLINE"}
 
 
 def definitions(text, name):
@@ -98,7 +99,12 @@ INT_TYPES = {"int", "signed", "signed int", "unsigned", "unsigned int", "short",
              "unsigned long long", "unsigned long long int", "char", "signed char",
              "unsigned char", "u8", "u16", "u32", "u64", "i8", "i16", "i64", "LogEst",
              "tRowcnt", "Pgno", "sqlite_int64", "sqlite_uint64", "sqlite3_int64",
-             "sqlite3_uint64"}
+             "sqlite3_uint64",
+             # Added with the typed C leg (ctypes.json): their width and signedness
+             # are resolved by the compiler (`probe_types`), not by this table.
+             "_Bool", "bool", "Bitmask", "ht_slot", "i32", "int8_t", "int16_t",
+             "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t", "uint64_t",
+             "size_t", "long unsigned int", "short unsigned int", "unsigned long long int"}
 PARAM = re.compile(r'\s*(?:const\s+)?([A-Za-z_][\w ]*?)\s+([A-Za-z_]\w*)\s*')
 
 
@@ -116,6 +122,41 @@ def int_signature(ret_toks, params):
             return None, "parameter `%s`" % " ".join(p.split())
         out.append((" ".join(m.group(1).split()), m.group(2)))
     return (out, ret), None
+
+
+def probe_types(types, amalg, workdir):
+    """{C type spelling: {"bits", "signed", "bool"}}, as the compiler resolves them.
+
+    A typedef's width is a property of the configuration (`tRowcnt` is `u64` or `u32`
+    depending on SQLITE_64BIT_STATS), so it is read from a program compiled against the
+    same amalgamation, never from the spelling. `_Generic` refuses anything that is not
+    an integer type (an enum is compatible with an integer type and is accepted); a
+    type that is not one makes the probe fail to compile, which is an error here."""
+    src = os.path.join(workdir, "probe_types.c")
+    lines = ['#include "%s"' % os.path.abspath(amalg), "#include <stdio.h>",
+             "#define AF_INT(T) _Generic((T)0, _Bool: 1, char: 1, signed char: 1, "
+             "unsigned char: 1, short: 1, unsigned short: 1, int: 1, unsigned: 1, "
+             "long: 1, unsigned long: 1, long long: 1, unsigned long long: 1)",
+             "int main(void) {"]
+    for t in sorted(types):
+        lines.append('  printf("%%s|%%d|%%d|%%d|%%d\\n", "%s", (int)(8 * sizeof(%s)), '
+                     '(int)((%s)-1 < (%s)0), (int)((%s)2 == (%s)1), AF_INT(%s));'
+                     % (t, t, t, t, t, t, t))
+    lines += ["  return 0;", "}"]
+    open(src, "w").write("\n".join(lines) + "\n")
+    exe = os.path.join(workdir, "probe_types")
+    r = subprocess.run(["cc", "-O0", "-o", exe, src, "-lm", "-lpthread", "-ldl"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit("cc failed on the type probe:\n" + r.stderr[-2000:])
+    out = subprocess.run([exe], capture_output=True, text=True, check=True).stdout
+    os.remove(exe)
+    res = {}
+    for ln in out.splitlines():
+        name, bits, signed, isbool, isint = ln.split("|")
+        assert isint == "1", name
+        res[name] = {"bits": int(bits), "signed": signed == "1", "bool": isbool == "1"}
+    return res
 
 
 def names_read_and_bound(body):
@@ -207,27 +248,18 @@ def main():
         for n in names:
             lines.append("#define %s %s__autoform_sqlite" % (n, n))
         lines.append('#include "%s"' % os.path.abspath(a.amalg))
-        lines.append("#include <stdlib.h>")
-        lines.append("#include <limits.h>")
-        # IN-RANGE ONLY. differential.py passes and reads `c_int`. An argument the
-        # parameter type cannot hold, or a result `int` cannot hold, is a value the
-        # Lean side would see unconverted -- so the wrapper refuses it (abort), which
-        # differential.py records as a skipped native call, never as a comparison.
-        lines.append("#define AF_SIGNED(T) ((T)-1 < (T)0)")
-        lines.append("#define AF_ARG_OK(T, a) (((a) >= 0 || AF_SIGNED(T)) && "
-                     "(long long)(T)(a) == (long long)(a))")
-        lines.append("#define AF_RET_OK(T, r) (AF_SIGNED(T) ? ((long long)(r) >= INT_MIN "
-                     "&& (long long)(r) <= INT_MAX) : ((unsigned long long)(r) <= INT_MAX))")
+        # EXACT TYPES. The wrapper has the function's own signature, so nothing is
+        # converted on the way in or out: differential.py reads csrc/ctypes.json
+        # (written below from the compiler's own `sizeof`/signedness) and passes and
+        # reads each value at its real width. The int-only leg this replaces had to
+        # refuse (abort) every argument or result `int` could not hold.
         for n in names:
             ps, ts, rt = info[n]["params"], info[n]["ptypes"], info[n]["ret"]
-            args = ", ".join("int a%d" % i for i in range(len(ps)))
-            chk = " ".join("if (!AF_ARG_OK(%s, a%d)) abort();" % (t, i)
-                           for i, t in enumerate(ts))
+            args = ", ".join("%s a%d" % (t, i) for i, t in enumerate(ts))
             call = "%s__autoform_sqlite(%s)" % (n, ", ".join(
-                "(%s)a%d" % (t, i) for i, t in enumerate(ts)))
+                "a%d" % i for i in range(len(ts))))
             lines += ["#undef %s" % n,
-                      "int %s(%s){ %s %s r = %s; if (!AF_RET_OK(%s, r)) abort(); "
-                      "return (int)r; }" % (n, args, chk, rt, call, rt)]
+                      "%s %s(%s){ return %s; }" % (rt, n, args, call)]
         open(csrc, "w").write("\n".join(lines) + "\n")
 
     # The amalgamation's DEFAULT configuration does not compile every file the tree
@@ -269,6 +301,15 @@ def main():
     ast_out = os.path.join(a.outdir, "ast-%s.json" % a.module)
     json.dump([by_name[n][0] for n in sample], open(ast_out, "w"), indent=1)
     write_c(sample)
+    tys = probe_types({t for n in sample for t in info[n]["ptypes"] + [info[n]["ret"]]},
+                      a.amalg, a.outdir)
+    json.dump({"_": "Per-function C signatures for scripts/differential.py's typed C "
+                    "leg; widths/signedness from a program compiled against %s."
+                    % os.path.abspath(a.amalg),
+               "functions": {n: {"params": [dict(c=t, **tys[t]) for t in info[n]["ptypes"]],
+                                 "ret": dict(c=info[n]["ret"], **tys[info[n]["ret"]])}
+                             for n in sample}},
+              open(os.path.join(a.outdir, "csrc", "ctypes.json"), "w"), indent=1)
 
     tally = {}
     for v in verdict.values():

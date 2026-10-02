@@ -60,6 +60,8 @@ def eCalls : Expr → List (Bool × String)
   | .cond c a b   => eCalls c ++ eCalls a ++ eCalls b
   | .isOp _ a b   => eCalls a ++ eCalls b
   | .inOp _ a b   => eCalls a ++ eCalls b
+  -- A Python list/dict display: calls inside it are calls of the function.
+  | .boxContainer a => eCalls a
   | _             => []
 /-- Names called across a list of expressions. -/
 def eCallsL : List Expr → List (Bool × String)
@@ -87,6 +89,7 @@ def eRisk : Expr → Nat
   | .cond c a b   => eRisk c + eRisk a + eRisk b
   | .isOp _ a b   => eRisk a + eRisk b
   | .inOp _ a b   => 1 + eRisk a + eRisk b
+  | .boxContainer a => eRisk a
   | _             => 0
 /-- Risk across a list of expressions. -/
 def eRiskL : List Expr → Nat
@@ -104,6 +107,7 @@ def sCalls : Stmt → List (Bool × String)
   | .assign _ e     => eCalls e
   | .setField r _ v => eCalls r ++ eCalls v
   | .setIndex r i v => eCalls r ++ eCalls i ++ eCalls v
+  | .delIndex r i   => eCalls r ++ eCalls i
   | .seq a b        => sCalls a ++ sCalls b
   | .ifte c a b     => eCalls c ++ sCalls a ++ sCalls b
   | .loop c a       => eCalls c ++ sCalls a
@@ -119,6 +123,7 @@ def sRisk : Stmt → Nat
   | .assign _ e     => eRisk e
   | .setField r _ v => 1 + eRisk r + eRisk v
   | .setIndex _ _ _ => 1
+  | .delIndex _ _   => 1
   | .seq a b        => sRisk a + sRisk b
   | .ifte c a b     => eRisk c + sRisk a + sRisk b
   | .loop c a       => eRisk c + sRisk a
@@ -292,6 +297,7 @@ def sHoleSites : Stmt → List (Bool × String)
   | .assign _ e      => e.holes.map (false, ·)
   | .setField r _ v  => (r.holes ++ v.holes).map (false, ·)
   | .setIndex r i v  => (r.holes ++ i.holes ++ v.holes).map (false, ·)
+  | .delIndex r i    => (r.holes ++ i.holes).map (false, ·)
   | .setDerefIref p v => (p.holes ++ v.holes).map (false, ·)
   | .seq a b         => sHoleSites a ++ sHoleSites b
   | .ifte c a b      => c.holes.map (false, ·) ++ sHoleSites a ++ sHoleSites b
