@@ -38,7 +38,15 @@ hdr "3/5 axiom + escape-hatch audit"
 # built first. autoform.sh only builds the generated module; without this the sweep aborts
 # on a missing .olean and reports FAIL for a reason that has nothing to do with soundness.
 lake build >/dev/null 2>&1 || echo "  (library build failed; audit will report it)"
-python3 scripts/audit_all.py || echo "  audit: findings recorded"
+# The independent kernel replay (`leanchecker --fresh`) takes HOURS on the full library (about
+# 2.5-3 h, extrapolated; see docs/running.md), so by default this step does not run it: the
+# audit reports it as DELEGATED, which is not a pass, and sacm.py records that status in the
+# assurance case rather than claiming a replay. To include it:
+#     AUTOFORM_AUDIT_FLAGS= ./assure.sh <src> <Module>        # runs the replay here
+#     python3 scripts/audit_all.py --kernel-only --strict     # or run it on its own
+AUDIT_FLAGS=${AUTOFORM_AUDIT_FLAGS---skip-kernel}
+# shellcheck disable=SC2086
+python3 scripts/audit_all.py $AUDIT_FLAGS || echo "  audit: findings recorded"
 
 hdr "4/5 specification teeth (mutation gate)"
 # Mutate the module under assurance, not the toy reference semantics. This step used to

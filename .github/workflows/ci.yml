@@ -412,9 +412,10 @@ jobs:
       # `Autoform.Generated.<Module>`, so cachetools and V8 coexist in one build.
       #
       # Do NOT re-add a step like that for a module you merely hope is checked: check that
-      # Autoform.lean imports it. `Autoform.SpecsGen.V8Base` is the one module still
-      # outside, for elaboration cost rather than namespaces (see Autoform.lean), and it
-      # is gated by scripts/check_specs.py, not by grep.
+      # Autoform.lean imports it. `Autoform.SpecsGen.V8Base` is imported too: it is now just
+      # the 73 `V8Base.Part<N>` imports, built one at a time by the staged steps above (an
+      # older version of this comment called it the one module still outside the graph,
+      # for elaboration cost; that was true of the unsplit module).
 
       # SpecsGen/Cachetools.lean used to be pinned here as KNOWN BROKEN. It elaborates
       # again as of this change, and is built by the step above. Its `C_tfFree` premise
