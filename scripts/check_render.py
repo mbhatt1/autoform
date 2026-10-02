@@ -52,7 +52,34 @@ Usage:
   scripts/check_render.py [--typecheck] [Module ...]
   scripts/check_render.py --record [Module ...]     # re-record hashes after an intended change
 
-Exit: 0 every module verified; 1 a module mismatched; 2 nothing could be checked at all;
+## Not tracked by policy is a verdict, not a pass
+
+Three corpora (`Ansible`, `LinuxCrypto`, `LinuxLib`) have an AST that is gitignored by
+policy (`docs/integrity.md`): it is larger than its render, and neither its source commit
+nor its exporter version was recorded, so a re-export cannot reproduce the pinned hash.
+Its absence from a clone is the expected state. Reporting that as UNVERIFIABLE on every
+run kept CI permanently red, which trains everyone to ignore exit 3 -- including on the
+day it means something.
+
+So `artifact-manifest.json` carries a hand-edited, reviewed allowlist,
+`untracked_by_policy`. A module whose AST is absent gets the verdict **NOT-TRACKED**
+(printed, counted separately, never counted as verified, does not fail the run) only if
+ALL of these hold, each checked here rather than assumed:
+
+* it has an allowlist entry with non-empty `reason` and `reviewed` fields;
+* `git check-ignore` confirms `ast-<M>.json` is ignored and `git ls-files` that it is not
+  tracked -- the policy is real in this tree, not merely asserted in the manifest;
+* its manifest entry says `ast_tracked: false`;
+* no spec module in the manifest's `specs` is pinned to it -- tracked theorems about a
+  corpus no clone can produce are exactly the case STRATEGY 55 made UNVERIFIABLE.
+
+Anything else with an absent AST is UNVERIFIABLE, as before. If the AST IS on disk the
+allowlist is irrelevant and the module is fully checked. `--strict` ignores the allowlist
+entirely. A run in which nothing was verified still exits 2. `--record` never writes the
+allowlist.
+
+Exit: 0 every module verified or NOT-TRACKED by reviewed policy (at least one verified);
+      1 a module mismatched; 2 nothing could be checked at all;
       3 some modules verified but others were unverifiable.
 """
 from __future__ import annotations
@@ -109,10 +136,60 @@ def first_diff(a_path: str, b_path: str, a_name: str, b_name: str) -> str:
     return f"{len(body)} differing lines\n{head}{more}"
 
 
-def check(m: str, entry: dict, typecheck: bool) -> tuple[str, str]:
-    """Returns (verdict, detail) with verdict in {OK, MISMATCH, UNVERIFIABLE}."""
+def _git(*args: str) -> subprocess.CompletedProcess | None:
+    try:
+        return subprocess.run(["git", "-C", ROOT, *args], capture_output=True,
+                              text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def policy_untracked(m: str, entry: dict, man: dict) -> tuple[bool, str]:
+    """Is the absence of ast-<M>.json the reviewed policy, checked against this tree?
+
+    Returns (True, reason) only if every condition in the module docstring holds;
+    otherwise (False, why-not), and the caller reports UNVERIFIABLE with that text."""
+    allow = (man.get("untracked_by_policy") or {}).get(m)
+    if not allow:
+        return False, "no untracked_by_policy entry"
+    if not (isinstance(allow, dict) and str(allow.get("reason", "")).strip()
+            and str(allow.get("reviewed", "")).strip()):
+        return False, ("its untracked_by_policy entry lacks a non-empty 'reason' and "
+                       "'reviewed' field, so it is not a reviewed exception")
+    if entry.get("ast_tracked") is not False:
+        return False, ("artifact-manifest.json does not record ast_tracked: false, which "
+                       "contradicts the allowlist")
+    name = f"ast-{m}.json"
+    ign = _git("check-ignore", "-q", "--no-index", name)
+    if ign is None or ign.returncode != 0:
+        return False, (f"git does not confirm {name} is ignored here (not a git checkout, "
+                       f"or .gitignore no longer lists it), so the policy is only asserted")
+    ls = _git("ls-files", "--error-unmatch", name)
+    if ls is None or ls.returncode == 0:
+        return False, f"{name} is tracked in git yet absent from the working tree"
+    pinned = sorted(k for k, v in (man.get("specs") or {}).items()
+                    if isinstance(v, dict) and v.get("corpus") == m)
+    if pinned:
+        return False, (f"spec module(s) {', '.join(pinned)} are pinned to this corpus; "
+                       f"theorems about an AST no clone can produce are unverifiable "
+                       f"(STRATEGY 55), and no allowlist entry can change that")
+    return True, str(allow["reason"]).strip()
+
+
+def check(m: str, entry: dict, typecheck: bool, man: dict | None = None,
+          strict: bool = False) -> tuple[str, str]:
+    """Returns (verdict, detail), verdict in {OK, MISMATCH, UNVERIFIABLE, NOT-TRACKED}."""
     ast = ast_path(m, entry)
     if ast is None:
+        if not strict and (man or {}).get("untracked_by_policy", {}).get(m):
+            ok, why = policy_untracked(m, entry, man or {})
+            if ok:
+                return ("NOT-TRACKED",
+                        f"AST absent and gitignored by reviewed policy -- NOT checked. "
+                        f"Pinned ast_sha256 {str(entry.get('ast_sha256'))[:12]}. {why}")
+            return ("UNVERIFIABLE",
+                    f"AST not found, and its untracked_by_policy entry does not "
+                    f"apply: {why}.")
         hint = entry.get("ast_hint") or "(no out-of-tree hint recorded)"
         return ("UNVERIFIABLE",
                 f"AST not found: neither ast-{m}.json nor {hint} exists. "
@@ -225,6 +302,9 @@ def main() -> int:
                     help="materialise the render and lake build it")
     ap.add_argument("--record", action="store_true",
                     help="re-record AST and render hashes (do this only after review)")
+    ap.add_argument("--strict", action="store_true",
+                    help="ignore the untracked_by_policy allowlist: an absent AST is "
+                         "UNVERIFIABLE whatever the policy says")
     args = ap.parse_args()
 
     man = load_manifest()
@@ -249,7 +329,7 @@ def main() -> int:
                             f"recorded hash to check it against. If ast-{m}.json is real "
                             f"and reviewed, run: scripts/check_render.py --record {m}"))
             continue
-        v, d = check(m, entry, args.typecheck)
+        v, d = check(m, entry, args.typecheck, man, args.strict)
         results.append((m, v, d))
 
     for m, v, d in results:
@@ -259,8 +339,11 @@ def main() -> int:
     ok = sum(1 for _, v, _ in results if v == "OK")
     mism = sum(1 for _, v, _ in results if v == "MISMATCH")
     unv = sum(1 for _, v, _ in results if v == "UNVERIFIABLE")
-    print(f"\ncheck_render: {ok} verified, {mism} mismatched, {unv} unverifiable "
-          f"(of {len(results)})", file=sys.stderr if mism or unv else sys.stdout)
+    nt = [m for m, v, _ in results if v == "NOT-TRACKED"]
+    ntmsg = (f", {len(nt)} NOT checked (untracked by reviewed policy: {', '.join(nt)})"
+             if nt else "")
+    print(f"\ncheck_render: {ok} verified, {mism} mismatched, {unv} unverifiable"
+          f"{ntmsg} (of {len(results)})", file=sys.stderr if mism or unv else sys.stdout)
     if mism:
         return 1
     if ok == 0:

@@ -60,6 +60,7 @@ import Autoform.Specs.CppCastSpec
 -- 73/73 in about ten minutes.
 import Autoform.SpecsGen.V8Base
 import Autoform.Specs.DoWhileSpec
+import Autoform.Specs.AddressSpec
 
 -- ---------------------------------------------------------------------------
 -- The one module still outside this graph, and why.

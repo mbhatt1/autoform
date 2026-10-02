@@ -141,6 +141,20 @@ def test_no_hole_contract_is_an_axiom(path):
     assert not re.search(r"\bnative_decide\b", code), path
 
 
+def test_ledger_names_every_hole_when_present():
+    """`Func.holeSites_labels` proves the inventory equals `Func.holes`; this checks the
+    emitted artifact agrees (it once missed the holes in parameter defaults)."""
+    path = os.path.join(ROOT, "ledger-Cachetools.json")
+    if not os.path.exists(path):
+        pytest.skip("ledger-Cachetools.json not generated (scripts/ledger.lean.tmpl)")
+    led = json.load(open(path))
+    if "holeAssumptions" not in led:
+        pytest.skip("ledger predates per-hole assumptions")
+    assert len(led["holeAssumptions"]) == led["holes"]
+    ids = [h["id"] for h in led["holeAssumptions"]]
+    assert len(set(ids)) == len(ids), "hole assumption names must be unique"
+
+
 def test_emitter_reads_the_combined_registry():
     """`emit_contracts.py` must render the registry that includes statement-hole
     records; rendering only `Contracts.Demo.contractRecords` would silently drop them."""

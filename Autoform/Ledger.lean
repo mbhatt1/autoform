@@ -317,8 +317,17 @@ theorem holeSites_labels (s : Stmt) : (sHoleSites s).map (·.2) = s.holes := by
 
 end Analysis
 
-/-- Hole occurrences of a function, tagged `true` for statement position. -/
-def Func.holeSites (f : Func) : List (Bool × String) := Analysis.sHoleSites f.body
+/-- Hole occurrences of a function, tagged `true` for statement position: the body's,
+then those in non-constant parameter defaults (`Func.defaults`, expression position) —
+the same order as `Func.holes`. -/
+def Func.holeSites (f : Func) : List (Bool × String) :=
+  Analysis.sHoleSites f.body ++ (f.defaults.flatMap (·.2.holes)).map (false, ·)
+
+/-- The per-function inventory is exactly `Func.holes`: a hole in a parameter default is
+named like any other, so no occurrence the ledger counts can be missing from it. -/
+theorem Func.holeSites_labels (f : Func) : f.holeSites.map (·.2) = f.holes := by
+  simp [Func.holeSites, Func.holes, Analysis.holeSites_labels, List.map_map,
+    Function.comp_def]
 
 /-- Has holes, and is otherwise call-closed: every hole is a place a named contract can be
 assumed, and nothing else is missing. Disjoint from `callClosed` by construction. -/

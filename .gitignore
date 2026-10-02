@@ -43,6 +43,9 @@ Autoform/Generated/*.lean
 # 300 KB its diff is still reviewable -- the two conditions under which tracking a render
 # earns its drift risk. It stays tracked and check_render.py diffs it every run.
 !Autoform/Generated/Cachetools.lean
+# Exception, same two conditions: `Autoform/Specs/AddressSpec.lean` checks the C address
+# model on this module by name, and at ~21 KB its diff is reviewable.
+!Autoform/Generated/CAddr.lean
 # Exception: SC.lean has no ast-SC.json anywhere in the repo, so the AST-only policy has
 # nothing to regenerate it from. Untracking it would delete it outright rather than move
 # it upstream. It stays tracked until it has a source, and check_render.py cannot speak

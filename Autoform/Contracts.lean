@@ -133,6 +133,7 @@ def substE (σ : Impl) : Expr → Expr
   | .derefIref a   => .derefIref (substE σ a)
   | .strByte a b   => .strByte (substE σ a) (substE σ b)
   | .strFrom a b   => .strFrom (substE σ a) (substE σ b)
+  | .ptrOp o z a b => .ptrOp o z (substE σ a) (substE σ b)
   | .boxContainer a => .boxContainer (substE σ a)
   | .lit l         => .lit l
   | .name x        => .name x
@@ -225,6 +226,7 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .derefIref a   => by rw [substE, substE_nil a]
   | .strByte a b   => by rw [substE, substE_nil a, substE_nil b]
   | .strFrom a b   => by rw [substE, substE_nil a, substE_nil b]
+  | .ptrOp o z a b => by rw [substE, substE_nil a, substE_nil b]
   | .boxContainer a => by rw [substE, substE_nil a]
 
 theorem substEL_nil : ∀ es : List Expr, substEL [] es = es
