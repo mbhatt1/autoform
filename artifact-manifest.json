@@ -13,57 +13,57 @@
       "ast_bytes": 4564,
       "ast_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
       "ast_tracked": true,
-      "render_bytes": 3554,
-      "render_sha256": "ea75b9f54e0c923015eb92a4a07a33cc1507efc2e230f792b43fc0e7e669f9dd"
+      "render_bytes": 4746,
+      "render_sha256": "d3a662ae60f3eb5133ea14d12d4d5f99afc5d7bd066eff2b7e3d8297d4a86cb2"
     },
     "Cachetools": {
       "ast_bytes": 575027,
       "ast_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
       "ast_tracked": true,
-      "render_bytes": 304728,
-      "render_sha256": "5467d3c4d6b5eb4c2b55514c04b67dd8c48a3171c6a921bc559dfba1ba5d2686"
+      "render_bytes": 305920,
+      "render_sha256": "6bfedca65be153a940b1f18c19cd6cb5d359b87675684fbe5ae64f6523672ce3"
     },
     "LangC": {
       "ast_bytes": 175419,
       "ast_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
       "ast_tracked": true,
-      "render_bytes": 75851,
-      "render_sha256": "c609038da4f075a0c862e71efc4f3cc86fe4f4fb182278fa474efb438f7ad2c6"
+      "render_bytes": 77043,
+      "render_sha256": "2135c3a723e8aa804323777fecfbaece00a3436b09d20da2bba1a033c1fd5f64"
     },
     "LangGo": {
       "ast_bytes": 408379,
       "ast_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
       "ast_tracked": true,
-      "render_bytes": 178029,
-      "render_sha256": "4f37b5154fccd9fa82e3bdd856b9d417b35d86fa295d5d95ce5dae74a759e925"
+      "render_bytes": 179221,
+      "render_sha256": "9852bb0d7e9f90af648e2452c1ab6ad4ac8c7307505e9cc820b77a9b92cf5648"
     },
     "LangJS": {
       "ast_bytes": 110740,
       "ast_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
       "ast_tracked": true,
-      "render_bytes": 48630,
-      "render_sha256": "abf5f56d98c7361de9a2e740d854c848cac8dde26d1fa62c4e51347006167f54"
+      "render_bytes": 49832,
+      "render_sha256": "cffd21dde521f7cc0c91f021e34de0484b2adb54e5f61edc11758dd26c6e31a9"
     },
     "LangJava": {
       "ast_bytes": 1131529,
       "ast_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
       "ast_tracked": true,
-      "render_bytes": 802044,
-      "render_sha256": "58fea5e61ae0672836c257375b3edc85072254d4e840cc9aa82c511ee6e73088"
+      "render_bytes": 803236,
+      "render_sha256": "254148b08771e9b605428d706c77dfc5904cc964be85690524cae1f0c4b0e213"
     },
     "LangKt": {
       "ast_bytes": 3550,
       "ast_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
       "ast_tracked": true,
-      "render_bytes": 3206,
-      "render_sha256": "9aafb78dcb95b43d576abe56ac23dc60b1a66ee215af5818fe08252e6b21fe71"
+      "render_bytes": 4398,
+      "render_sha256": "0f3a6d3e30dcb8936e7c317c470f6c81de82377634ce2327d968586ac6fa23f9"
     },
     "LangTS": {
       "ast_bytes": 226862,
       "ast_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
       "ast_tracked": true,
-      "render_bytes": 116218,
-      "render_sha256": "f3909c054f5d4cbad7599c1bd38383a7075b4bbccabaaf3673653cdd3ab9e669"
+      "render_bytes": 117420,
+      "render_sha256": "90861a61a8281e335f62d08f15731c7f0aafa6a37d06db107ee3cd15c270d4b6"
     },
     "LinuxCrypto": {
       "ast_bytes": 18888160,
@@ -87,22 +87,22 @@
       "ast_bytes": 1324,
       "ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
       "ast_tracked": true,
-      "render_bytes": 3309,
-      "render_sha256": "935b692090250865c7a21058c1a715d02100edea2007bbbfde5d53783b52b3ce"
+      "render_bytes": 4501,
+      "render_sha256": "b41fc8183c2ec42e7c56b7758ccd39bd5140c276387e8e9708d28ea403ca5a23"
     },
     "Sample": {
       "ast_bytes": 6416,
       "ast_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
       "ast_tracked": true,
-      "render_bytes": 4435,
-      "render_sha256": "a90963858818f648a60b5fbb89d3bbf9a79a74cb0356d5386e518111ff1139a1"
+      "render_bytes": 5627,
+      "render_sha256": "fafaff9de5ca5c603a98fe9c98c883022adf7529946470fd3b2a2156c6967aed"
     },
     "Stress": {
       "ast_bytes": 4324,
       "ast_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
       "ast_tracked": true,
-      "render_bytes": 3750,
-      "render_sha256": "0625a76aa80405f0fff3fce1668b2c08e27dd72c6c98ff951834a77b0607d83e"
+      "render_bytes": 4942,
+      "render_sha256": "7a37d691a93225662c46024b8308969147b4365bfd71e36e37376cb9bc0cff27"
     },
     "V8Base": {
       "ast_bytes": 3198007,
@@ -110,22 +110,22 @@
       "ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
       "ast_tracked": true,
       "provenance": "AST tracked in git (3.2 MB). The 74 spec files under Autoform/SpecsGen/V8Base/ are pinned to it, so a fresh clone can verify them; see STRATEGY 55.",
-      "render_bytes": 1818414,
-      "render_sha256": "bf6b2e1ef9f656ef3f11c0ffb59cb75b8dc66d32928fbe5e179eb6fbc46f5763"
+      "render_bytes": 1819606,
+      "render_sha256": "c93fb9363dcce65e6cbf537df74bf12eaf89c905f9d0cc3b3a8dbe75f1017809"
     },
     "V8BaseSample": {
       "ast_bytes": 1539,
       "ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
       "ast_tracked": true,
-      "render_bytes": 3594,
-      "render_sha256": "5fecb27b09384b58e403dcca3f696a97fd1d8256c7e11d11d825cae8ba2f1af2"
+      "render_bytes": 4786,
+      "render_sha256": "6cd7c869b0897bfe07e9eaa7c433b14c60b237dbea111af035c6f0a612e1af75"
     },
     "V8Numbers": {
       "ast_bytes": 427703,
       "ast_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
       "ast_tracked": true,
-      "render_bytes": 221465,
-      "render_sha256": "bb8655a789de83b0f0e929be15c91264d670d0657c29ff3577e3dbec63fc5bcb"
+      "render_bytes": 222657,
+      "render_sha256": "8a8343b8bd9a50b174a4aab8bcc3043074548d6f958c868702d22e2962c87513"
     }
   },
   "policy": "The AST is the tracked source of truth; Autoform/Generated/*.lean is a build product and is not tracked. See docs/integrity.md. Hashes here pin the identity of both halves; scripts/check_render.py verifies them.",
