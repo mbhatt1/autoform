@@ -128,12 +128,27 @@ share the dialect), and the harness reads a `bool` result as 0/1 (the C return
 conversion). Same sample, same 20 random cases each: **170/170 agree, 0 diverge, 10
 inconclusive**. The C leg is now typed (`csrc/ctypes.json`: real widths, signedness and
 `_Bool`, arguments over each type's full range): **168/168 agree, 12 inconclusive**. The
-inconclusive cases are holes or `outOfFuel` where `cc` has an answer, and both trace to one
-remaining gap: Core computes C `i64`/`u64` arithmetic at 32 bits
-(`validJulianDay`'s `<< 32` holes; `vdbeSorterTreeDepth`'s `i64` loop wraps and runs out
-of fuel). A 15-case fixture, `tests/test_cboolint_cc.py`, pins the fix against `cc`.
+inconclusive cases were holes or `outOfFuel` where `cc` has an answer, and both traced to
+Core computing C `i64`/`u64` arithmetic at 32 bits (`validJulianDay`'s `<< 32`;
+`vdbeSorterTreeDepth`'s `i64` loop wrapped and ran out of fuel). With width-typed integer
+operators (STRATEGY.md §63; `Lang/Core/TypedInt.lean`) the re-selected sample gives
+**198/198 agree, 2 inconclusive**, both genuine C undefined-behaviour shifts in
+`sqlite3LogEstToInt`. A 15-case fixture, `tests/test_cboolint_cc.py`, pins the fix against `cc`.
 `.cLike` float `%` is now Java's truncated remainder (`-5.5 % 2.0` is `-1.5`), not
 Python's floored one. See `docs/scale.md`.
+
+**Address model and integer widths (STRATEGY.md §60, §63).** Two later changes moved the
+census in opposite directions, both for honest reasons. The block-plus-offset address
+model (`Expr.ptrOp`) translates pointer comparison, `&p[i]` and pointer arithmetic within
+one array: on the amalgamation, hole-free went **1,907 → 1,985** with no function gaining a
+hole. Width-typed integer arithmetic then made every C integer operation carry its type and
+turned an unresolvable type into the hole `op:int:unresolved-type` instead of a 32-bit
+default: amalgamation hole-free **1,985 → 1,774** (the 211 lost functions had been counted
+hole-free while computing at the wrong width; 1,073 `op:int:unresolved-type` holes remain,
+mostly members of nested/anonymous structs). Full tree with both: **5,295 of 8,105**
+hole-free; there is no full-tree run isolating each change. Fixtures pin both against the
+real compilers: 282/282 address cases agree with `cc` (38 refused as undefined
+behaviour), 23/23 C width cases with `cc -fwrapv`, 22/22 Java cases with `java`.
 
 ## The oracle
 
