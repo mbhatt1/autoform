@@ -2,13 +2,13 @@
  "artifact": "ast-LangKt.json",
  "artifact_bytes": 3570,
  "artifact_sha256": "0826b109503371401250b46471b24d5e1b3b02f935a1a691d9d89da4f4fce8da",
- "command": "kotlin2cpg tests/fixtures/langkt --output <cpg>; joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-LangKt.json. Joern 4.0.606 from Maven Central: io.joern:kotlin2cpg_3:4.0.606 (runtime scope, org.gradle:gradle-tooling-api excluded) run as io.joern.kotlin2cpg.Main on the /opt/joern-mvn/lib classpath plus its jars; the export ran as io.joern.joerncli.console.ReplBridge --script, CPG schema 1.7.70. tests/fixtures/langkt/T.kt is a reconstruction of the original hand-written toy (gcd, addAll) from the committed AST; the function set is identical and the arithmetic operators now carry Kotlin width tags (`%` -> `%:k32`, `+` -> `+:k32`), the exporter change of STRATEGY.md section 64.",
+ "command": "kotlin2cpg tests/fixtures/langkt --output <cpg>; joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-LangKt.json. Joern 4.0.606 from Maven Central: io.joern:kotlin2cpg_3:4.0.606 (runtime scope, org.gradle:gradle-tooling-api excluded) run as io.joern.kotlin2cpg.Main on the /opt/joern-mvn/lib classpath plus its jars; the export ran as io.joern.joerncli.console.ReplBridge --script, CPG schema 1.7.70. tests/fixtures/langkt/T.kt is a reconstruction of the original hand-written toy (gcd, addAll) from the committed AST; the function set is identical and the arithmetic operators now carry Kotlin width tags (`%` -> `%:k32`, `+` -> `+:k32`), the exporter change of STRATEGY.md section 64. Re-verified at the merged exporter (sha 0f6b40b9eb37, items Q+R+S): a fresh export of the same source with the same frontend is byte-identical to the committed artifact (cmp), so only exporter_sha256 moved.",
  "cpg_schema_version": "1.7.70",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "7b620d25a8aa06c629c5cf62db302b302320d37b2d3645d343b674d9d2bb637e",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
  "joern_version": "4.0.606",
  "recorded_by": "scripts/provenance.py record",
  "schema_version": 1,
- "source_path": "/home/user/autoform/.claude/worktrees/agent-a57a5f3af5bb02c8d/tests/fixtures/langkt",
- "source_revision": "git:4dc1f19f9d8094a51c7d59917113ae6950c00db8+dirty"
+ "source_path": "/home/user/autoform/tests/fixtures/langkt",
+ "source_revision": "git:4fd01890be333d1e774b7f7396e6b9b43eaec197+dirty"
 }
