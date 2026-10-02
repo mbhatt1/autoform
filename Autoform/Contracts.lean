@@ -133,6 +133,7 @@ def substE (σ : Impl) : Expr → Expr
   | .derefIref a   => .derefIref (substE σ a)
   | .strByte a b   => .strByte (substE σ a) (substE σ b)
   | .strFrom a b   => .strFrom (substE σ a) (substE σ b)
+  | .boxContainer a => .boxContainer (substE σ a)
   | .lit l         => .lit l
   | .name x        => .name x
   | .fnref f       => .fnref f
@@ -160,6 +161,7 @@ def substS (σ : Impl) : Stmt → Stmt
   | .assign x e      => .assign x (substE σ e)
   | .setField r f v  => .setField (substE σ r) f (substE σ v)
   | .setIndex r i v  => .setIndex (substE σ r) (substE σ i) (substE σ v)
+  | .delIndex r i    => .delIndex (substE σ r) (substE σ i)
   | .setDerefIref p v => .setDerefIref (substE σ p) (substE σ v)
   | .seq a b         => .seq (substS σ a) (substS σ b)
   | .ifte c a b      => .ifte (substE σ c) (substS σ a) (substS σ b)
@@ -223,6 +225,7 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .derefIref a   => by rw [substE, substE_nil a]
   | .strByte a b   => by rw [substE, substE_nil a, substE_nil b]
   | .strFrom a b   => by rw [substE, substE_nil a, substE_nil b]
+  | .boxContainer a => by rw [substE, substE_nil a]
 
 theorem substEL_nil : ∀ es : List Expr, substEL [] es = es
   | []      => rfl
@@ -239,6 +242,7 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .assign x e      => by rw [substS, substE_nil e]
   | .setField r f v  => by rw [substS, substE_nil r, substE_nil v]
   | .setIndex r i v  => by rw [substS, substE_nil r, substE_nil i, substE_nil v]
+  | .delIndex r i    => by rw [substS, substE_nil r, substE_nil i]
   | .setDerefIref p v => by rw [substS, substE_nil p, substE_nil v]
   | .seq a b         => by rw [substS, substS_nil a, substS_nil b]
   | .ifte c a b      => by rw [substS, substE_nil c, substS_nil a, substS_nil b]

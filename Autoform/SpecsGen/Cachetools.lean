@@ -887,11 +887,14 @@ changes, and each half of the change is real).
   branch spelled out, so nothing is dropped from the domain.
 * A `<module>` receiver is excluded. `applyFunc` reads a module object's attribute through
   the globals frame rather than through `fieldOf`, so the two agree only off that class;
-  this is the same side condition `applyFunc_doc_ret_field_self` now carries. -/
+  this is the same side condition `applyFunc_doc_ret_field_self` now carries.
+* A boxed `list`/`dict` receiver is excluded too (`o.payload.toVal = none`): reading an
+  absent attribute off one is a hole under Python, as `AttributeError` is in CPython. -/
 theorem uproj_cachetools___init___py__module__Cache_maxsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.maxsize" 5
       (fun h self _ => ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false ∧
+          o.payload.toVal = none)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (fieldOf h r "_Cache__maxsize")
@@ -904,7 +907,8 @@ theorem uproj_cachetools___init___py__module__Cache_maxsize :
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl hmod
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl (fun o ho => (hmod o ho).1)
+        (Or.inr fun o ho => (hmod o ho).2)
   | cons a as =>
     simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
@@ -1040,11 +1044,14 @@ changes, and each half of the change is real).
   branch spelled out, so nothing is dropped from the domain.
 * A `<module>` receiver is excluded. `applyFunc` reads a module object's attribute through
   the globals frame rather than through `fieldOf`, so the two agree only off that class;
-  this is the same side condition `applyFunc_doc_ret_field_self` now carries. -/
+  this is the same side condition `applyFunc_doc_ret_field_self` now carries.
+* A boxed `list`/`dict` receiver is excluded too (`o.payload.toVal = none`): reading an
+  absent attribute off one is a hole under Python, as `AttributeError` is in CPython. -/
 theorem uproj_cachetools___init___py__module__Cache_currsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.currsize" 5
       (fun h self _ => ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false ∧
+          o.payload.toVal = none)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (fieldOf h r "_Cache__currsize")
@@ -1057,7 +1064,8 @@ theorem uproj_cachetools___init___py__module__Cache_currsize :
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl hmod
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl (fun o ho => (hmod o ho).1)
+        (Or.inr fun o ho => (hmod o ho).2)
   | cons a as =>
     simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
@@ -1555,11 +1563,14 @@ changes, and each half of the change is real).
   branch spelled out, so nothing is dropped from the domain.
 * A `<module>` receiver is excluded. `applyFunc` reads a module object's attribute through
   the globals frame rather than through `fieldOf`, so the two agree only off that class;
-  this is the same side condition `applyFunc_doc_ret_field_self` now carries. -/
+  this is the same side condition `applyFunc_doc_ret_field_self` now carries.
+* A boxed `list`/`dict` receiver is excluded too (`o.payload.toVal = none`): reading an
+  absent attribute off one is a hole under Python, as `AttributeError` is in CPython. -/
 theorem uproj_cachetools___init___py__module___TimedCache_timer :
     MRefines P "cachetools/__init__.py:<module>._TimedCache.timer" 5
       (fun h self _ => ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false ∧
+          o.payload.toVal = none)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (fieldOf h r "_TimedCache__timer")
@@ -1572,7 +1583,8 @@ theorem uproj_cachetools___init___py__module___TimedCache_timer :
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl hmod
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl (fun o ho => (hmod o ho).1)
+        (Or.inr fun o ho => (hmod o ho).2)
   | cons a as =>
     simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module___TimedCache_timer]
