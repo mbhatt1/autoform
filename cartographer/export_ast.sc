@@ -78,8 +78,11 @@ import scala.annotation.tailrec
 
   // CPG operator name -> Core binary operator.
   //
-  // `floorDiv` is Python's `//`. It maps to "/" because the Core semantics is
-  // dialect-parameterized: `Dialect.python` already floors, `Dialect.cLike` truncates.
+  // `floorDiv` is Python's `//` (only pysrc2cpg emits it) and maps to its OWN operator,
+  // "//": floor division. `<operator>.division` is "/" in every frontend, and `Dialect.python`
+  // gives "/" on two ints TRUE division (CPython: `7 / 2 == 3.5`), `Dialect.cLike` truncating
+  // division. It used to map to "/" too, and Core's python "/" floored, so a real `/` was
+  // answered `3` where CPython says `3.5`.
   //
   // `<operator>.and` / `.or` / `.xor` / the shifts are **bitwise**, not logical
   // (`logicalAnd` / `logicalOr` are the logical ones). They used to be mapped to
@@ -96,7 +99,7 @@ import scala.annotation.tailrec
   val binops = Map(
     "<operator>.addition" -> "+", "<operator>.subtraction" -> "-",
     "<operator>.multiplication" -> "*", "<operator>.division" -> "/",
-    "<operator>.floorDiv" -> "/",
+    "<operator>.floorDiv" -> "//",
     "<operator>.modulo" -> "%", "<operator>.lessThan" -> "<",
     "<operator>.lessEqualsThan" -> "<=", "<operator>.greaterThan" -> ">",
     "<operator>.greaterEqualsThan" -> ">=", "<operator>.equals" -> "==",

@@ -3916,3 +3916,64 @@ test against). Argument conversion at call sites. Nested/anonymous aggregate mem
 `activeStructText` does for `sizeof`. Untyped `.cLike` arithmetic survives in byte-cursor
 `$off` bookkeeping and pointer-index arithmetic, whose values are offsets. Java `(char)`
 casts still hole as C's `char` does, although Java's `char` is `u16`.
+
+## 64. Python `/` floored, and `True == 1` was `False`
+
+Two silent wrong answers in Python's numeric semantics, both reproduced against CPython
+3.11 on the base commit (4dc1f19) and then fixed at the root.
+
+**True division.** `applyBinop .python "/" (.int 7) (.int 2)` was `int 3` (CPython: `3.5`),
+and `6 / 3` was `int 2` (CPython: the float `2.0`). The cause was recorded in `Semantics.lean`
+("Floating point") and never fixed: the exporter spelled both `<operator>.division` and
+`<operator>.floorDiv` as `"/"`, and Core's `.python` `"/"` floored. Now `floorDiv` is exported
+as `"//"` (floor division; `Int.fdiv`; its float form stays the hole
+`binop://:float-floordiv`), and `"/"` on two ints under `.python` is `pyIntTrueDiv`:
+
+* zero divisor: `ZeroDivisionError`;
+* both operands `|n| <= 2^53` (exact binary64s): ONE IEEE division in binary64, which is
+  CPython's correctly rounded `long_true_divide` exactly (`-0.0` for `0 / -3` included);
+* otherwise the named hole `binop:/:int-true-division-beyond-2^53`. Converting each operand
+  and dividing rounds twice; CPython rounds once; a double-rounded answer can be an ulp off,
+  and a hole beats a wrong translation (CONTRIBUTING rule 1).
+
+C/Java/JS/Go/Kotlin keep `<operator>.division` = `"/"` with their own dialects' semantics;
+`"//"` under a non-Python dialect is now a hole (`binop://:non-python`) rather than the
+truncating division it silently was.
+
+**`bool` is an `int`.** `True == 1` was `False`, `True + 1` the hole `binop:+`, `-True` a hole,
+and `{1: 'a'}[True]` a `KeyError`. Round-2 item K had extended `Dialect.promotesBool` to `.cLike`;
+it is now `true` for `.python` too (JavaScript has its own coercion table, `jsEqE`, and is
+untouched). The integer rule a promoted Python `bool` follows is `pyIntBinop` (unbounded, `/` is
+true division, `//` floors), proved equal to `applyBinop .python` on the same integers
+(`PyArith.pyIntBinop_eq`). `bool & bool`, `|`, `^` stay `bool`. `Val.beq` identifies a `bool` with
+the `int`/`float` of the same value, which is what makes dict-key lookup, `in`, and container
+equality (`(True, 2) == (1, 2)`) right without touching them; `eqPy` inherits it.
+
+**Checked against the runtime.** `tests/fixtures/pyarith/pyarith_cases.py` (45 cases: `7/2`,
+`-7/2`, `6/3`, `1/0`, `0/-3`, `7//2`, `-7//2`, `2**53` boundary and beyond, the bool cases) is
+exported (pysrc2cpg 4.0.606), rendered to `Autoform/PyArithProgram.lean`, pinned with
+`#guard_msgs` in `Autoform/PyArith.lean`, and compared with CPython by
+`tests/test_pyarith_cpython.py`. Before the change 35 of the 45 pins disagreed with CPython (a
+Lean build of the same file against the base `Semantics.lean`/`Syntax.lean`/exporter); after,
+45/45 agree, three of them as the documented hole. The ten that agreed before are `//`, `%`,
+`1/0` and the float cases: regression guards.
+
+**Re-exported / repaired.** The only tracked Python ASTs containing a floor division was
+`ast-Stress.json` (`ops.py` `fdiv`); `ast-Cachetools.json` has none and re-exports byte-identical
+(provenance re-recorded at the new exporter digest, as is `ast-CAddr.json`, also byte-identical).
+`ast-Stress.json`'s source is not in the repository: `fdiv` was patched `"/"` -> `"//"` by hand
+after reconstructing `ops.py` from the AST and checking a real pysrc2cpg export of it agrees
+(`provenance/unattributed.json` says so). `Refine.fdiv_refines` still proves `Int.fdiv`, now from
+`"//"` (`applyBinop_py_floordiv`); `applyBinop_py_div` is restated as true division (it was a
+theorem about `Int.fdiv`, which is false of `/`), with `applyBinop_py_div_big` for the hole.
+
+`Overflow.applyBinop_agrees` (and `exact_sound`, `no_ub_of_condsHold`, `terminates_of_condsHold`)
+modelled `/` as integer quotient and held for `.python` only while Core floored; they now carry
+`hdiv : op = "/" -> d = .cLike` / `slashFree e` (Python's integer division is `//`, outside the
+analysed fragment), so under `.python` they cover `+ - * %` and comparisons, not `/`. Everything
+else that mentions `"/"` under Python (`Contracts`, `HoleContracts`, `FuelMono`, `SpecsGen/*`,
+`Specs/*`, the PyScoping/PyMro/BoxedContainers fixtures) was checked: none depended on it, and all build.
+
+**Not done.** `int ** int`, `abs`/`sum`/`min`/`max` on `bool`, `bool` as a list index, and the
+shortest-repr of the float a `/` returns (`float()`/`str()` are not modelled) remain as before.
+A `/` on operands beyond 2^53 is a hole until CPython's exact big-integer rounding is modelled.
