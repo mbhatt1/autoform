@@ -384,17 +384,20 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 - **`pytest (Python tooling)`**: the whole `tests/` suite and `check_provenance`. No Lean, no
   Joern. Minutes.
-- **`build + trust audit`**: a default `lake build` (every module, including the 73 V8Base
-  spec parts), then the axiom and source audit (`audit_all.py --strict --skip-kernel`),
-  `check_render`, `check_specs_fresh`, the cachetools conformance oracle (must compare more
-  than zero functions), a regenerated ledger and `check_docs`, three guard checks (the
-  FuelMono exclusion list is exactly `["Stmt.tryFinally"]`; the proof-inventory floors do not
-  shrink; the cachetools spec still records the refutation, not the premise), and the demo.
-  The build runs on one core to stay under a hosted runner's memory, and a cold build is
-  slow: in the first run to get past 60 minutes it had built 472 of 497 modules, with no
-  Lean error, after 108 minutes, when the runner was shut down. The job limit is therefore
-  340 minutes, the `.lake` cache is restored and saved as separate steps, and the save runs
-  even when the build fails, so a partial build carries over to the next run.
+- **`build + trust audit`**: the build, in stages, then the axiom and source audit
+  (`audit_all.py --strict --skip-kernel`), `check_render`, `check_specs_fresh`, the cachetools
+  conformance oracle (must compare more than zero functions), a regenerated ledger and
+  `check_docs`, three guard checks (the FuelMono exclusion list is exactly
+  `["Stmt.tryFinally"]`; the proof-inventory floors do not shrink; the cachetools spec still
+  records the refutation, not the premise), and the demo. The build is staged because a single
+  `lake build` ran several V8Base parts at once, and one heavy part alone peaks at 6.6-8.7 GB
+  (measured), so the runner ran out of memory and was shut down partway through (runs 115 and
+  117, exit 143, no Lean error): stage 1 builds everything except the 73 V8Base parts; stages
+  2-6 build them one at a time (`scripts/ci_build_v8base_parts.sh FROM TO`); a final default
+  `lake build` checks completeness. Each stage is followed by its own `.lake` cache save that
+  runs even when the stage fails, so a runner loss costs at most one stage. The job limit is
+  340 minutes. A cold build is slow: in the first run to get past 60 minutes, 472 of 497
+  modules were built after 108 minutes.
 - **`kernel-replay`**: `audit_all.py --kernel-only --strict`, the independent kernel replay,
   single-threaded and measured in hours. It needs the build job, restores the `.lake` that
   job saved, and fails fast on a cache miss instead of becoming a second build.
@@ -402,9 +405,10 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   is removed.
 - **`end-to-end pipeline (Joern, manual only)`**: not part of the gate.
 
-**Status (2026-10-02):** `pytest` and `check_provenance` pass on `main`. The first run of
-this layout, on the merge of PR #8, was still in its cold build when this was written, so
-the build job's later steps and the `kernel-replay` job had not yet been observed passing.
+**Status (2026-10-02):** `pytest` and `check_provenance` pass on `main`. The staged build
+has not yet run on a real runner, and neither have the build job's later steps or the
+`kernel-replay` job: the single-`lake build` layout that preceded it was ended by the
+runner's memory limit in every run that got far enough (see STRATEGY.md section 67).
 Three corpora (Ansible, LinuxCrypto, LinuxLib) have no committed AST by policy, and
 `check_render` reports them as *not checked* (never as verified).
 

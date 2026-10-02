@@ -4186,13 +4186,21 @@ code, but it exposes the remaining weakness: a cache written only at the end of 
 two-hour step is lost to any runner loss. Staged saves (core first, then V8Base in
 batches) would fix it and were **not done**.
 
-### The V8Base parts need about 4 GB each, and three at once do not fit in 15 GB
+### One heavy V8Base part peaks at 6.6-8.7 GB, and several at once do not fit in 15 GB
 
 Verifying the final tree locally: a plain `lake build` runs four heavy parts at once. With
 other work on the box, 26 of the 73 parts were killed with exit 137 (OOM); rerunning with
 three parts at a time and nothing else running still killed 18. All 18 built when run one at
 a time, so **73 of 73 elaborate and the default `lake build` (497 jobs) succeeds**. Lake has
-no job-limit flag in 5.0.0; build the heavy parts at most two at a time.
+no job-limit flag in 5.0.0.
+
+The peak of a single part, measured by sampling `VmHWM` of one `lean` process building it
+alone (so it includes the mapped `.olean` pages, which are file-backed and reclaimable): `Part60`
+**8.7 GB** in 575 s, `Part33` **6.6 GB** in 325 s. The 3-4 GB figures I first quoted were
+instantaneous samples taken mid-run and were too low. Consequences: building one part at a
+time fits a 16 GB runner and does not fit a 7 GB one, and two at once do not fit 16 GB. The
+repo is public, which should mean the standard 16 GB runner; the CI now prints `nproc`,
+`free -m` and `df -h` in a "Runner resources" step so that is read off a run, not assumed.
 
 ### The kernel replay takes hours; the audit's limit killed its wrapper and leaked the checker
 

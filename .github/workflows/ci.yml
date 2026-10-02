@@ -74,6 +74,15 @@ jobs:
           python3 cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.lean V8Base
           test -s Autoform/Generated/V8Base.lean
 
+      # What this runner actually has. The comments in this file once assumed ~7 GB; the repo
+      # is public, which should mean the standard 4-vCPU / 16 GB runner. The heaviest V8Base part
+      # peaks at 8.7 GB, so the answer decides whether building it one at a time is enough.
+      - name: Runner resources
+        run: |
+          nproc
+          free -m
+          df -h /
+
       - name: Restore .lake
         id: lake-cache
         uses: actions/cache/restore@v4
@@ -92,9 +101,9 @@ jobs:
       #
       # * `lake build` has no job-count flag (Lake 5.0.0: `lake build --help` lists none), so
       #   it starts as many V8Base parts at once as there are workers. Each heavy part is an
-      #   `rfl`-by-computation file that holds about 4 GB while it elaborates, so on a
-      #   hosted runner the build exhausted memory partway through the heavy parts and the
-      #   runner was shut down (`The runner has received a shutdown signal`, exit 143):
+      #   `rfl`-by-computation file with a large peak (measured alone: Part60 8.7 GB, Part33
+      #   6.6 GB resident, STRATEGY.md section 67), so on a hosted runner the build exhausted
+      #   memory partway through the heavy parts and the runner was shut down (`The runner has received a shutdown signal`, exit 143):
       #   run 115 at 108 minutes (472 of 497 modules built, no Lean error) and run 117 at
       #   20 minutes into a run that had restored 427 modules from the cache. `taskset -c 0`
       #   (which this step used to carry) does not help: it shares one core among the
