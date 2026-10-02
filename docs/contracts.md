@@ -9,8 +9,8 @@ superlinearly with program size. Hence: **verified core + contracts**, never
 whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is the
 other half.
 
-On `cachetools`, 180 of 209 functions are
-hole-free and 101 are call-closed. A single untranslated construct anywhere in a function
+On `cachetools`, 184 of 209 functions are
+hole-free and 105 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
@@ -210,7 +210,7 @@ What `scripts/sacm.py` should do with it:
 
 > **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
 > `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
-> fails on a mismatch. Current: 209 functions, 180 hole-free, 101 call-closed, 40 holes.
+> fails on a mismatch. Current: 209 functions, 184 hole-free, 105 call-closed, 26 holes.
 > Historical figures elsewhere in this repository (238 functions, 208 functions, cores of
 > 45, 69, 74) are superseded snapshots taken before the exporter changes that removed
 > `<metaClassCallHandler>` synthetics and closed `op:starredUnpack`.

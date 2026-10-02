@@ -8,7 +8,11 @@ and every property is a theorem about `eval` applied to it.
 
 **Generalization:** Joern's code property graph is a universal AST. C, C++, Java,
 JavaScript, Python, Kotlin and binaries normalize to one node vocabulary, so one semantics
-and one exporter cover all of them. There is no per-language transpiler.
+and one exporter cover all of them. There is no per-language transpiler. How far that
+holds is measured per language in `docs/languages.md`: Python is checked against CPython,
+and C against `cc` only on integer-argument functions (the harness crashed on `sds`'s
+`char *` API); Java, Go, JS and TS translate but have no runtime oracle, real Kotlin
+fails in the Joern frontend, and binaries were not tested.
 
 ## Use
 
@@ -29,6 +33,13 @@ source ──Joern──▶ CPG ──▶ neutral JSON AST ──▶ Lean Core p
 > prints the assurance case. `docs/` explains what each number means.
 
 ## Verified end to end
+
+Figures in this table were measured at or before commit `16f7c88` (2026-08-20) and have
+not been re-run since. Of the small corpora only the ASTs of `stress` and `sample` are
+tracked (`ast-Stress.json`, `ast-Sample.json`: 6 and 5 functions, matching the table);
+`ctest` and `shortcircuit` are not in the repository. Current `cachetools` figures are in
+`docs/scale.md` and `docs/languages.md`, which `scripts/check_docs.py` checks against
+`ledger-Cachetools.json`.
 
 | Corpus | Language | Functions | Verifiable core | Conformance vs real runtime |
 |---|---|---|---|---|
@@ -102,6 +113,8 @@ not match the runtime — caught automatically rather than by inspection.
 |---|---|---|
 | `Autoform/Lang/Core/Syntax.lean` | 3 | Universal deep embedding: objects, heap, exceptions, containers, iteration. `Expr.hole`/`Stmt.hole` are the effect boundary. |
 | `Autoform/Lang/Core/Semantics.lean` | 2 | Fuel-indexed total interpreter with an explicit heap, method dispatch, exceptions. Dialect-parameterized. No `sorry`, no `partial`. |
+| `Autoform/Lang/Core/Float.lean` | 2 | IEEE-754 binary32/binary64 as explicit bit patterns (`Fl`), exact-rational rounding, Python float semantics. Wired into `Val.float` (see "Not yet built" for what still holes). |
+| `Autoform/Contracts.lean` | 5 | Contracts at holes: `RefinesUnder`, refinement relative to stated assumptions about named holes. See `docs/contracts.md`. |
 | `Autoform/Ledger.lean` | 6 | Coverage, holes-by-cause, verifiable core; JSON evidence for the assurance case. |
 | `Autoform/Tactics/Portfolio.lean` | 5 | Tiered proof portfolio; records open obligations instead of admitting them. |
 | `scripts/audit_all.py` | 6 | Axiom sweep over every declaration + source sweep for escape hatches. |
@@ -164,7 +177,11 @@ not match the runtime — caught automatically rather than by inspection.
 
 ## Trust chain
 
-Every link is mechanically checked, and each check is a different kind of oracle:
+Every link is mechanically checked, and each check is a different kind of oracle. The
+status column was last measured at commit `16f7c88` (2026-08-20), except the hole count
+(`99f386e`, 2026-08-22; `scripts/check_docs.py` re-checks it against `ast-Cachetools.json`
+on every run). The differential and mutation rows predate the current 209-function
+population (see `docs/languages.md`) and have not been re-run against it.
 
 | link | oracle | status |
 |---|---|---|
@@ -183,6 +200,12 @@ was no per-theorem attribution behind it. The on-subject score against
 docstring deletions, 1 is an observably identical `.ret unit` → `.expr unit`, 2 are
 operand swaps under a self-comparison witness, 2 sit behind a `Stmt.hole`. G4 is recorded
 UNSUPPORTED rather than suppressing the equivalent mutants to turn it green.
+
+The 78/88 run's output is not in the repository. The tracked `mutation-Cachetools.json`
+is a *different* run (seed 20260819, `generated-ast` operators, against
+`Autoform/Specs/CachetoolsSpec.lean`): 57 mutants, 2 invalid, and 50 of the remaining 55
+killed by at least one theorem (counted from its `mutants[].verdict`). Do not quote one
+run's score as the other's.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
@@ -205,22 +228,42 @@ so instances are opaque `Val.ref`s while CPython's instance *is* a tuple. It sur
 a counted `representation:value-vs-object` INCONCLUSIVE, not as a divergence, because the
 oracle cannot compare the two encodings.
 
-`leanchecker` ships with the Lean toolchain (v4.28.0+) — `lean4checker` is deprecated and
-there is no Homebrew formula. **Use `--fresh`**: without it the checker can silently pass
+`leanchecker` ships with the Lean toolchain itself from v4.28.0 onward, so the pinned
+toolchain (`lean-toolchain`: v4.30.0-rc1, see Dependencies) already includes it as
+`lake env leanchecker`. The standalone `lean4checker` is deprecated and there is no
+Homebrew formula. **Use `--fresh`**: without it the checker can silently pass
 a root module that has only imports, which is `Autoform.lean`'s shape.
 
 ## Not yet built
 
-Boxed mutable containers (`Stmt.setIndex` is still a hole — design in
-`docs/boxed-containers.md`); cross-scope *writes* (`nonlocal`; reads and closures work);
-contracts at holes, so partially-translated functions can be reasoned about under stated
-assumptions; `Val.float` (an IEEE-754 model exists in `Autoform/Lang/Core/Float.lean` and
-is **not yet wired into the semantics**, so floats still hole). `op:starredUnpack` is
-**closed** (STRATEGY.md §35) — Core now has a variadic calling convention; what is left of
-it is default parameter values, keyword-only parameters, and starred *destructuring*.
+- **Boxed mutable containers.** Steps 1 and 2 of `docs/boxed-containers.md` are in the
+  tree (`Obj.payload`/`version`, still inert; `Val.identical`, `Val.eqPy`), but nothing
+  allocates a container payload yet, so `Stmt.setIndex` is still the hole
+  `setIndex:immutable-containers` and mutating container methods still hole.
+- **Cross-scope writes** (`nonlocal` is the hole `scope:nonlocal-write`; reads and closures
+  work).
+- **Floats, partially.** `Val.float`/`Lit.float` exist and are wired: the exporter emits
+  float literals, `render_lean.py` encodes them as exact binary64 bit patterns, and
+  `Semantics.lean` evaluates `+ - * / %` (with int→float promotion), the six comparisons
+  (exact int/float comparison under `.python`, promote-then-compare under `.cLike` and
+  `.javascript`), unary `-`, truthiness and `==` (NaN ≠ NaN, `-0.0 == 0.0`). Still holes:
+  float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), casts to a floating
+  type in C (`op:cast:float`), and `float()`/`str()`/`repr()` conversions (the Python
+  stdlib model has no float builtins). Two known gaps that are *not* holes: Python's `/`
+  on two ints still floors, because the exporter maps `//` onto `/`
+  (`Semantics.lean`, "Floating point"); and float `%` uses Python's floored remainder in
+  every dialect, so under `.javascript` `-5.5 % 2.0` evaluates to `0.5` where JavaScript
+  gives `-1.5`. The differential harness still refuses float arguments
+  (`Unencodable("float")`), so none of this is oracle-checked yet.
+- **Calling convention, remainder.** `op:starredUnpack` is **closed** (STRATEGY.md §35);
+  what is left is default parameter values, keyword-only parameters, and starred
+  *destructuring* (`op:starred-outside-call`).
+
+Contracts at holes, listed here earlier, now exist: `Autoform/Contracts.lean`, described in
+`docs/contracts.md`.
 
 ## Dependencies
 
-Lean 4.30.0-rc1 · [Specimen](https://github.com/strata-org/specimen) ·
+Lean 4.30.0-rc1 (pinned in `lean-toolchain`; includes `leanchecker`) · [Specimen](https://github.com/strata-org/specimen) ·
 [Plausible](https://github.com/leanprover-community/plausible) ·
 [Joern](https://github.com/joernio/joern) 4.0.606 · Python 3 · a C compiler (for C conformance)

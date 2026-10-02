@@ -16,6 +16,7 @@ is the design record, which carries the reasoning behind everything here.
 | [`languages.md`](languages.md) | Per-language support, and what each front end does and does not provide. |
 | [`scale.md`](scale.md) | How the pipeline behaves on codebases larger than the reference corpus. |
 | [`ledger-schema.md`](ledger-schema.md) | The trust ledger as a SACM profile: node vocabulary, evidence types, combination rules. |
+| `evidence-*.md` | Per-corpus evidence snapshots: [`V8Base`](evidence-V8Base.md), [`LinuxLib`](evidence-LinuxLib.md), [`LinuxCrypto`](evidence-LinuxCrypto.md), [`Ansible`](evidence-ansible.md). Each carries a staleness notice; the figures are dated snapshots, not current. |
 | [`fvspec.md`](fvspec.md) | The FVSpec benchmark harness and the anti-vacuity screen run across it. |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | The project's working rules. Read them before submitting anything. |
 
