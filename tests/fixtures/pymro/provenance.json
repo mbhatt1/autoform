@@ -6,12 +6,12 @@
   "automatically; re-running the command and diffing ast.json is how to find out."
  ],
  "source": "tests/fixtures/pymro/pymro_cases.py",
- "source_sha256": "dead9dc10382d7cd7750cc14cbae39e9ee5b72be751c2b4e6e1773f5c249b165",
- "ast_sha256": "b47955bf7962e6b07e447d8d3294d8c7015a47b4147792fbbfd6327c2c4d022d",
+ "source_sha256": "279f1fbed84ee2ef2edfcbd516d58f0e129db7cb61ce17812a2bf5d64a9f3b38",
+ "ast_sha256": "124c8ad89cd1d771fe30df3c1d15c5408da0fe0f4d6deda4456bffd380708500",
  "joern_version": "4.0.606",
  "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "7a959e1a1c7dbba3a763dddef90465adc5d45ad21faa642758382fb33e281a8b",
+ "exporter_sha256": "105421dbf218d7138bdd7ed0cd16b2032ae0792328fdc35aab33e8d377b8a30f",
  "command": [
   "joern-parse tests/fixtures/pymro --language pythonsrc --output pymro.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=pymro.cpg --param out=tests/fixtures/pymro/ast.json",

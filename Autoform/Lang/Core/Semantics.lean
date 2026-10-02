@@ -1,6 +1,7 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
 import Autoform.Lang.Core.Stdlib
+import Autoform.Lang.Core.Address
 import Autoform.Lang.Core.Boxed
 
 /-!
@@ -963,6 +964,11 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   | "cast:u32", .bool b => .val (.int (if b then 1 else 0))
   | "cast:i64", .bool b => .val (.int (if b then 1 else 0))
   | "cast:u64", .bool b => .val (.int (if b then 1 else 0))
+  -- The C address model (`Address.lean`): a cast to a pointer type whose operand's
+  -- static type was not resolved -- the identity on pointer values, a hole on a
+  -- non-zero integer. Pointer-to-INTEGER casts are the `cast:<w>` arms above, which
+  -- have no case for a pointer value and so stay holes: Core blocks have no address.
+  | "cast:ptr", v => ptrCast v
   | _, _        => .hole s!"unop:{op}"
 
 /-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
@@ -1344,7 +1350,7 @@ def Ctx.resolveMethodLegacy (ctx : Ctx) (cls meth : String) : Option Func :=
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
 
-/-! ### Python method resolution (STRATEGY.md §60)
+/-! ### Python method resolution (STRATEGY.md §62)
 
 With a class table (`Program.pyClasses`), a method is looked up the way CPython looks it
 up on an instance: along `type(obj).__mro__`, the C3 linearisation of the class and its
@@ -1757,7 +1763,7 @@ def unboundBuiltinMethod (d : Dialect) (g : String) (vs : List Val) : Option ERe
 
 /-! #### The legacy rules, as rewrites
 
-A program without a class table (every corpus exported before §60, every non-Python one)
+A program without a class table (every corpus exported before §62, every non-Python one)
 runs exactly the rules it always did. These equations say so per helper, as `simp` lemmas
 conditional on `ctx.pyClasses = none`, so that proofs about such programs evaluate through
 the new helpers without unfolding them. -/
@@ -1994,6 +2000,15 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .val _) => (h₂, .hole "strFrom:non-integer-index")
         | (h₂, r) => (h₂, r)
       | (h₁, .val _) => (h₁, .hole "strFrom:non-string-receiver")
+      | (h₁, r) => (h₁, r)
+  -- The C address model (`Address.lean`): strict, left then right, then the
+  -- heap-reading, fuel-free `applyPtrOp`.
+  | n+1, h, ρ, .ptrOp op esz a b =>
+      match evalExpr ctx n h ρ a with
+      | (h₁, .val x) =>
+        match evalExpr ctx n h₁ ρ b with
+        | (h₂, .val y) => (h₂, applyPtrOp h₂ op esz x y)
+        | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .field a f =>
       match evalExpr ctx n h ρ a with
@@ -2344,7 +2359,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val (.int len)) =>
         if len < 0 then (h₁, .hole "boxArray:negative-length")
         else
-          let fields := (List.range len.toNat).map (fun i => (toString i, Val.unit))
+          -- The C address model: the block's elements are BYTES (the exporter emits
+          -- `boxArray` only for a `malloc`-shaped byte count assigned to a `char`/`u8`
+          -- pointer), recorded in-band as `$esz` so typed pointer arithmetic
+          -- (`Expr.ptrOp`) can check its stride. No decimal key, so `Heap.extent` and
+          -- every element read are unaffected.
+          let fields := (List.range len.toNat).map (fun i => (toString i, Val.unit)) ++
+                        [("$esz", Val.int 1)]
           let (h₂, r) := h₁.alloc { cls := "<local>", fields := fields }
           (h₂, .val (.ref r))
       | (h₁, .val _) => (h₁, .hole "boxArray:non-int-length")
@@ -2375,7 +2396,14 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- unconditionally, to the unchanged `Heap.getField` -- no `Heap`-level change.
   | n+1, h, ρ, .derefIref a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val (.iref r sel)) => (h₁, .val (h₁.getField r sel.key))
+      -- The C address model: an element read outside the array (one past the end
+      -- included) is undefined behaviour, a hole -- it used to read the absent key as
+      -- `.unit`, a value C never produced. Member selectors are unchanged.
+      | (h₁, .val (.iref r sel)) =>
+          match sel with
+          | .idx i => if h₁.idxPos r i == .inside then (h₁, .val (h₁.getField r sel.key))
+                      else (h₁, .hole "ub:ptr-deref-out-of-bounds")
+          | .fld _ => (h₁, .val (h₁.getField r sel.key))
       | (h₁, .val _)             => (h₁, .hole "derefIref:non-iref")
       | (h₁, res)                => (h₁, res)
   | n+1, h, ρ, .alloc cls args =>
@@ -2695,7 +2723,14 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       match evalExpr ctx n h ρ p with
       | (h₁, .val (.iref r sel)) =>
         match evalExpr ctx n h₁ ρ v with
-        | (h₂, .val vv)    => (h₂.setField r sel.key vv, .normal ρ)
+        -- The C address model: a write outside the array is undefined behaviour --
+        -- it used to ADD a key, silently growing the block (and breaking the
+        -- contiguity `Heap.extent` relies on).
+        | (h₂, .val vv)    =>
+            match sel with
+            | .idx i => if h₂.idxPos r i == .inside then (h₂.setField r sel.key vv, .normal ρ)
+                        else (h₂, .hole "ub:ptr-store-out-of-bounds")
+            | .fld _ => (h₂.setField r sel.key vv, .normal ρ)
         | (h₂, .exn e)     => (h₂, .exn e)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)

@@ -645,7 +645,7 @@ import scala.annotation.tailrec
     builtinBaseRows.filterNot(r => conflictingBaseNames.contains(r._2))
       .groupBy(_._1).map { case (f, rs) => f -> rs.map(r => r._2 -> r._3).toMap }
 
-  // ---- the Python class table (STRATEGY.md §60) ------------------------------
+  // ---- the Python class table (STRATEGY.md §62) ------------------------------
   //
   // Core resolves a method along `type(obj).__mro__` when the program carries a class
   // table (`Program.pyClasses`); without one it falls back to a name-suffix rule that
@@ -8031,6 +8031,188 @@ import scala.annotation.tailrec
     bareType(ty).matches("""(signed|unsigned)?char(\*|\[\d*\])""")
   def isSingleCharPointer(n: AstNode): Boolean = isSingleCharPointerType(staticTypeOf(n))
 
+  // ---- The C address model (`Autoform/Lang/Core/Address.lean`) -----------------
+  //
+  // `Expr.ptrOp` answers pointer comparison and arithmetic AT RUN TIME, from the heap:
+  // a pointer is a block plus an offset, the block knows its extent and element size,
+  // and every case ISO C leaves undefined or unspecified (cross-object ordering,
+  // one-past-the-end compared with another object, leaving the array, a stride that
+  // does not match the block) is a dynamic hole. So the exporter no longer has to PROVE
+  // where a pointer came from before translating an operation on it -- which is what
+  // `isIrefExpr`/`strCursorParams` exist to do, and why every pointer of unknown
+  // provenance (a parameter, a field load) was a static hole. It only has to state the
+  // operation and, for arithmetic, the static pointee size. All of this is gated on
+  // `cppFile` (C/C++): `cLikeFile` also covers Java/JS/Go/Kotlin, whose `T[]` would
+  // otherwise look like pointer evidence.
+
+  /** C address model: `n` is translated to a `Val.str` under the string model on EVERY
+    * execution -- a string literal, a `char` array that is not boxed (a `char[]`
+    * global or local bound to its literal), or a byte-cursor name (`strFrom z z$off`).
+    * A `Val.str` has no address, so a pointer comparison involving one is a dynamic
+    * hole on every run; such a site keeps its static `cstr:*` label instead of
+    * trading it for a guaranteed dynamic one (the rule `strFrom`'s `p - n` refusal
+    * already follows). */
+  def isStaticStringModel(n: AstNode): Boolean = unwrapMacro(n) match {
+    case l: Literal => l.code.trim.startsWith("\"")
+    case i: Identifier =>
+      val nm = localName(i.name)
+      val ty = staticTypeOf(i)
+      (isCStringType(ty) && bareType(ty).contains("[") && !boxedArrays.contains(nm)) ||
+      strCursorParams.contains(nm)
+    case _ => false
+  }
+
+  /** C address model: the relational/equality operators `ptrOp` answers. A `def`, not
+    * a `val`: a `val` here would be a forward-reference barrier for every earlier `def`
+    * that reaches `callExpr`. */
+  def ptrRelOps: Map[String, String] = Map(
+    "<operator>.lessThan" -> "<", "<operator>.lessEqualsThan" -> "<=",
+    "<operator>.greaterThan" -> ">", "<operator>.greaterEqualsThan" -> ">=",
+    "<operator>.equals" -> "==", "<operator>.notEquals" -> "!="
+  )
+
+  /** C address model: `a OP b` is a POINTER comparison -- C/C++, not a null test
+    * (`pointerNullTest` answers those, and handles both null spellings), and at least
+    * one operand has static pointer evidence. One side suffices: C allows a pointer to
+    * be compared only with a pointer or a null pointer constant (6.5.8p2, 6.5.9p2), so
+    * in a well-formed program the other side is one of those too -- and if the type
+    * evidence was wrong, `applyPtrOp` sees two integers and holes
+    * (`ptr:non-pointer-operand`) rather than comparing them as addresses. Excluded:
+    * an operand that is a `Val.str` on every run (`isStaticStringModel`). Returns the
+    * Core operator. */
+  def ptrRelOp(c: Call): Option[String] = {
+    val kids = kidsOf(c)
+    if (!cppFile || kids.size != 2 || !ptrRelOps.contains(c.methodFullName)) None
+    else if (pointerNullTest(c).isDefined) None
+    else if (!kids.exists(k => hasPointerEvidence(k) || isOp(k, "<operator>.addressOf"))) None
+    else if (kids.exists(isStaticStringModel)) None
+    else Some(ptrRelOps(c.methodFullName))
+  }
+
+  /** C address model: no static type evidence for `n` (see `addrKind`). */
+  def castOperandTypeUnknown(n: AstNode): Boolean = {
+    val k = addrKind(staticTypeOf(n))
+    k == "unknown-type" || k == "opaque-type"
+  }
+
+  /** C address model: an integer constant expression built from literals only
+    * (`8`, `-1`, `(T)0`, `1<<3`). */
+  def isIntConstantExpr(n: AstNode): Boolean = unwrapMacro(n) match {
+    case l: Literal => !l.code.trim.startsWith("\"")
+    case c: Call if c.methodFullName.startsWith("<operator>.") && c.methodFullName != "<operator>.cast" =>
+      kidsOf(c).nonEmpty && kidsOf(c).forall(isIntConstantExpr)
+    case c: Call if c.methodFullName == "<operator>.cast" =>
+      kidsOf(c) match { case List(_, o) => isIntConstantExpr(o); case _ => false }
+    case _ => false
+  }
+
+  /** C address model: the translated comparison -- unless an operand's TRANSLATION is
+    * a string-model value (`Expr.strFrom`, a string literal), which has no address on
+    * any run: then the site keeps the static `cstr:address-*` label it had before
+    * (`isStaticStringModel` catches the names; this catches the expressions, e.g.
+    * `&z[i]` on a byte cursor). */
+  def ptrStrModel(v: ujson.Value): Boolean = v match {
+    case o: ujson.Obj => o.value.get("k").exists(k => k == ujson.Str("strFrom") || k == ujson.Str("str"))
+    case _ => false
+  }
+
+  /** C address model: `p - q` (`"diff"`) or `p - n` (`"-"`) on a `char`-family pointer
+    * `p` -- the sites `cstr:pointer-arith` refuses -- with the pointee size. */
+  def ptrArithOp(c: Call): Option[(String, Int)] = {
+    val kids = kidsOf(c)
+    if (!cppFile || kids.size != 2 || c.methodFullName != "<operator>.subtraction") None
+    else {
+      val (a, b) = (kids(0), kids(1))
+      def ptrTyped(n: AstNode) = bareType(staticTypeOf(n)).endsWith("*")
+      if (!ptrTyped(a) || !isCString(a) || isStaticStringModel(a)) None
+      else if (ptrTyped(b) || isCString(b) || isOp(b, "<operator>.addressOf")) {
+        if (!ptrTyped(b) || isStaticStringModel(b)) None
+        else (pointeeBytes(a), pointeeBytes(b)) match {
+          case (Some(x), Some(y)) if x == y => Some(("diff", x))
+          case _ => None
+        }
+      }
+      else if (isPointerType(staticTypeOf(b)) || castOperandIsPointerShaped(b)) None
+      else pointeeBytes(a).map(sz => ("-", sz))
+    }
+  }
+
+  def ptrRelE(c: Call, op: String, a: ujson.Value, b: ujson.Value): ujson.Obj = {
+    val (a1, b1) = (strFromAsPtrAdd(a), strFromAsPtrAdd(b))
+    if (ptrStrModel(a1) || ptrStrModel(b1))
+      hole(cStringUnsafe.getOrElse(c.methodFullName, "cstr:address-compare"))
+    else ptrOpE(op, 0, a1, b1)
+  }
+
+  /** C address model: an operand the exporter translated as `strFrom p n` because `p`
+    * is an untracked single-level `char*` (`callExpr`'s `p + n` case) -- in a pointer
+    * COMPARISON that translation can only hole (a `Val.str` has no address, and a
+    * `strFrom` of an interior pointer is `strFrom:non-string-receiver`). Re-spelled as
+    * `ptrOp "+" 1 p n`, which on a `Val.str` yields the same suffix (or a hole where
+    * `strFrom`'s past-the-end clamp would have invented `""`) and on an interior pointer
+    * yields the element pointer the comparison needs. Not for a `strFrom` whose base is
+    * a string literal, a byte cursor or an unboxed `char[]`: those are `Val.str` on
+    * every run, and stay string-model (and so keep their static hole). */
+  def strFromAsPtrAdd(v: ujson.Value): ujson.Value = v match {
+    case o: ujson.Obj if o.value.get("k").contains(ujson.Str("strFrom")) =>
+      val base = o("a")
+      val stringOnly = base match {
+        case bo: ujson.Obj if bo.value.get("k").contains(ujson.Str("str")) => true
+        case bo: ujson.Obj if bo.value.get("k").contains(ujson.Str("name")) =>
+          val nm = bo("v").str
+          strCursorParams.contains(nm) ||
+          localTypes.get(nm).exists(t => isCStringType(t) && bareType(t).contains("[") && !boxedArrays.contains(nm))
+        case _ => false
+      }
+      if (stringOnly) v else ptrOpE("+", 1, base, o("b"))
+    case _ => v
+  }
+
+  def ptrOpE(op: String, esz: Int, a: ujson.Value, b: ujson.Value): ujson.Obj =
+    ujson.Obj("k" -> "ptrOp", "op" -> op, "esz" -> esz, "a" -> a, "b" -> b)
+
+  /** C address model: the byte size of what a pointer-typed expression points to, for
+    * pointer ARITHMETIC (`u8*` -> 1, `u32*` -> 4, `char**` -> the pointer width). `None`
+    * for `void*`, an unresolved type, a non-pointer -- and for an AGGREGATE pointee
+    * (`Mem*`, `WhereTerm*`): Core has no block whose elements are structs (a struct is
+    * its own object, `Val.ref`), so stepping a struct pointer could only ever produce a
+    * pointer whose every `p->f` is a dynamic hole, and the static
+    * `op:postIncrement:pointer` / `op:addressOf:element:object` label says that more
+    * honestly than a translation that holes on every run. */
+  def pointeeBytes(n: AstNode): Option[Int] = {
+    val b = bareType(staticTypeOf(n))
+    if (!b.endsWith("*")) None
+    else {
+      val pt = b.dropRight(1)
+      val kind = addrKind(pt)
+      if (pt.isEmpty || pt == "void" || pt == "ANY" || !(kind == "scalar" || kind == "pointer")) None
+      else memberSizeofBytes(pt).filter(_ > 0)
+    }
+  }
+
+  /** C address model: the element byte size of an array type (`u8[32]` -> 1), for the
+    * `$esz` tag on the block a boxed array is allocated as. */
+  def arrayElemBytes(ty: String): Option[Int] =
+    """^(.+)\[[^\[\]]*\]$""".r.findFirstMatchIn(bareType(ty))
+      .flatMap(m => memberSizeofBytes(m.group(1))).filter(_ > 0)
+
+  /** C address model: `&p[i]` -- `p` a POINTER (not an array) of any provenance whose
+    * pointee size is known, `i` not pointer-typed. C defines `&p[i]` as `p + i`
+    * (6.5.3.2p3, 6.5.2.1p2), and `ptrOp "+" esz p i` is that addition with the stride
+    * and bounds checked against the block `p` points into at run time. A `Val.str`
+    * receiver steps under the string model (byte strides only, never past the
+    * terminator). Not for a receiver whose value is a `Val.str` on every run
+    * (`isStaticStringModel`), nor for the `&((T*)0)[k]` integer-smuggling idiom
+    * (`addressOfResidueLabel`), which stay holes. */
+  def ptrElementAddrOf(operand: AstNode): Option[ujson.Obj] =
+    if (!cppFile) None
+    else asIndex(operand).flatMap { case (recv, idx) =>
+      val rty = bareType(staticTypeOf(recv))
+      if (!rty.endsWith("*") || isPointerType(staticTypeOf(idx)) || isStaticStringModel(recv) ||
+          addressOfResidueLabel(operand).isDefined) None
+      else pointeeBytes(recv).map(sz => ptrOpE("+", sz, expr(recv), expr(idx)))
+    }
+
   /** Pointer-arith family: static evidence that `n` is a POINTER (so that a `0`
     * compared against it is the null-pointer constant, not the integer zero). */
   def hasPointerEvidence(n: AstNode): Boolean =
@@ -8186,8 +8368,16 @@ import scala.annotation.tailrec
              // Pointer-arith family: `isIrefOperand`, so a decayed boxed-array
              // name (`p - buf`, `p == buf`, `p < aBuf`) counts too -- `expr()`
              // renders it as `irefIndex buf 0`, a `Val.iref` like any other.
-             isIrefOperand(kids(0)) && isIrefOperand(kids(1)))
-      ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+             isIrefOperand(kids(0)) && isIrefOperand(kids(1))) {
+      // C address model: the comparisons go through `ptrOp`, whose answer consults the
+      // blocks -- `applyBinop`'s heap-free `iref` arms answer `false` for a
+      // one-past-the-end pointer compared with another object's start, where C leaves
+      // the result unspecified, and order out-of-bounds offsets C never allows to
+      // exist. The difference keeps `binop "-"`: its stride is proven statically here.
+      if (mfn == "<operator>.subtraction")
+        ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+      else ptrOpE(binops(mfn), 0, expr(kids(0)), expr(kids(1)))
+    }
     // `010-reach-90pct-hole-free` US4: `p < end` / `p == q` / ... -- TWO tracked
     // byte cursors, compared. Sound exactly when both provably measure offsets
     // into the SAME underlying string (`strCursorBase`'s own doc comment has the
@@ -8274,6 +8464,23 @@ import scala.annotation.tailrec
              }) {
       val (p, n) = if (isSingleCharPointer(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
       ujson.Obj("k" -> "strFrom", "a" -> expr(p), "b" -> expr(n))
+    }
+    // C address model: a pointer comparison of any provenance -- see `ptrRelOp`.
+    // After every proven-provenance case above (same-base byte cursors compare their
+    // `$off`s), before the `cstr:address-*` refusal and the generic `binop`, whose
+    // `Val.beq`/`applyBinop` answer is not C's for pointers.
+    else if (ptrRelOp(c).isDefined)
+      ptrRelE(c, ptrRelOp(c).get, expr(kids(0)), expr(kids(1)))
+    // C address model: `p - q` and `p - n` on a `char`-family pointer the cases above
+    // could not place (the residue of `cstr:pointer-arith`). `ptrOp "diff"` / `"-"` with
+    // the static pointee size: same-block, same-stride, in-bounds only, everything else
+    // a dynamic hole. A difference needs both pointees to have the SAME size, which is
+    // what makes the element count C defines (6.5.6p9) the block's element count.
+    else if (ptrArithOp(c).isDefined) {
+      val (op, esz) = ptrArithOp(c).get
+      val a = expr(kids(0)); val b = expr(kids(1))
+      if (ptrStrModel(a) || (op == "diff" && ptrStrModel(b))) hole("cstr:pointer-arith")
+      else ptrOpE(op, esz, a, b)
     }
     else if (cLikeFile && kids.size == 2 && kids.exists(isCString) &&
         cStringUnsafe.contains(mfn) && !isNullCheck)
@@ -8542,6 +8749,18 @@ import scala.annotation.tailrec
             if (isNullLiteral(kids(1))) ujson.Obj("k" -> "unit")
             else if (castOperandIsPointerShaped(kids(1)) || castFieldOperandPointerShaped(kids(1)))
               expr(kids(1))
+            // C address model: the operand's static type did not resolve, so the
+            // exporter cannot tell a pointer-to-pointer cast (the identity, as just
+            // above) from an int-to-pointer conversion (a hole). `unop "cast:ptr"`
+            // (`Address.lean`'s `ptrCast`) makes the same split at RUN TIME, on the
+            // value: every pointer value passes unchanged, a non-zero integer is the
+            // `op:cast:pointer:int-to-pointer` hole. Only for an operand with no type
+            // evidence at all (`unknown-type`/`opaque-type`); one known to be an integer
+            // keeps the static hole, and so does an integer CONSTANT whatever its
+            // reported type (`(sqlite3_destructor_type)-1`), whose dynamic outcome is
+            // already certain.
+            else if (cppFile && castOperandTypeUnknown(kids(1)) && !isIntConstantExpr(kids(1)))
+              ujson.Obj("k" -> "unop", "op" -> "cast:ptr", "a" -> expr(kids(1)))
             else hole("op:cast:pointer:int-to-pointer")
           }
           else resolveIntType(tty) match {
@@ -8680,6 +8899,9 @@ import scala.annotation.tailrec
       // translated `&` site can change shape.
       lazy val irefElemAddr = irefElementAddrOf(kids(0))
       lazy val literalElemAddr = literalElementAddrOf(kids(0))
+      // C address model: `&p[i]` on a pointer of any provenance, tried LAST so that no
+      // site an earlier case translates changes shape. See `ptrElementAddrOf`.
+      lazy val ptrElemAddr = ptrElementAddrOf(kids(0))
       if (cursorAddrOf.isDefined) {
         cursorAddrOf.get
       } else if (arrIref.isDefined) {
@@ -8713,6 +8935,7 @@ import scala.annotation.tailrec
       else if (fnIdentity) expr(kids(0))
       else if (irefElemAddr.isDefined) irefElemAddr.get
       else if (literalElemAddr.isDefined) literalElemAddr.get
+      else if (ptrElemAddr.isDefined) ptrElemAddr.get
       else {
         val k = if (kind == "unknown-type" && nm.exists(ptrReceivers.contains)) "pointer"
                 else kind
@@ -9032,7 +9255,7 @@ import scala.annotation.tailrec
             // Zero-argument `super()` directly in a method of class `C` whose receiver is
             // `self` IS `super(C, self)`: the compiler supplies `__class__` and the first
             // argument. Core has no `__class__` cell, so the exporter writes the class in
-            // (`Ctx.makeSuper`, STRATEGY.md §60). Anywhere else -- a nested function, a
+            // (`Ctx.makeSuper`, STRATEGY.md §62). Anywhere else -- a nested function, a
             // `classmethod` whose first parameter is `cls` -- it stays `super()`, which Core
             // holes as `call:super`.
             case None if pyFile && c.name == "super" && mfn == "__builtin.super" &&
@@ -9092,7 +9315,7 @@ import scala.annotation.tailrec
               // `_cachedmethod.py` to the property `_WrapperBase.cache` rather than the
               // enclosing function's parameter (docs/conformance.md finding 2). Such a target
               // is dropped and the call is emitted by its NAME, which Core then resolves the
-              // way CPython does (local, global, builtin; STRATEGY.md §60).
+              // way CPython does (local, global, builtin; STRATEGY.md §62).
               else if (pyFile && methodByName.contains(mfn) &&
                        callee.exists(_.isInstanceOf[Identifier]) &&
                        !pyBareNameReaches(mfn, currentMethodFull))
@@ -10110,6 +10333,24 @@ import scala.annotation.tailrec
         val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
         ujson.Obj("k" -> k, "x" -> nm,
                   "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> rhsE))
+      // C address model: `p += n` / `p -= n` on any other unboxed `char`-family pointer
+      // local of unknown provenance -- `p = ptrOp "±" esz p n`, the stride-checked,
+      // bounds-checked pointer step (`Address.lean`'s `ptrAdd`): an interior pointer
+      // steps within its block, a `Val.str` steps forward under the string model, and
+      // anything C leaves undefined (leaving the array, stepping before a string's
+      // start, a block of another element size) is a dynamic hole. Only the sites the
+      // refusal just below would otherwise hole; other pointer types keep their
+      // existing translation.
+      case i: Identifier if cppFile && (aug.contains("+") || aug.contains("-")) &&
+                             isCString(i) && bareType(staticTypeOf(i)).endsWith("*") &&
+                             !boxedLocals.contains(localName(i.name)) &&
+                             !boxedArrays.contains(localName(i.name)) &&
+                             !isPointerType(staticTypeOf(rhs)) && !isCString(rhs) &&
+                             pointeeBytes(i).isDefined =>
+        val nm = localName(i.name)
+        val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> nm,
+                  "e" -> ptrOpE(aug.get, pointeeBytes(i).get, ujson.Obj("k" -> "name", "v" -> nm), rhsE))
       // `s += n` on a `char*` advances a pointer; see `cStringUnsafe`. The augmented form
       // never reaches `callExpr`, so it is guarded here too.
       case _ if cLikeFile && aug.isDefined && (isCString(lhs) || isCString(rhs)) =>
@@ -10430,6 +10671,26 @@ import scala.annotation.tailrec
       val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
       ujson.Obj("k" -> k, "x" -> nm,
                 "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> one))
+    }
+    // C address model: `p++`/`p--` on an unboxed pointer local or parameter of
+    // unknown provenance, or on a pointer-typed field of a pure receiver -- `p = ptrOp
+    // "±" esz p 1`: C's own scaling by `sizeof(*p)` is exactly the stride `ptrOp`
+    // checks against the block, so the objection above (Core cannot scale `+1`) no
+    // longer applies. A pointee whose size does not resolve keeps the hole.
+    else if (cppFile && bareType(staticTypeOf(tgt)).endsWith("*") && pointeeBytes(tgt).isDefined &&
+             (tgt match { case _: Identifier => true; case _ => false }) &&
+             rawLocalOrParamName(tgt).map(localName).exists(nm =>
+               !boxedLocals.contains(nm) && !boxedArrays.contains(nm))) {
+      val nm = rawLocalOrParamName(tgt).map(localName).get
+      val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+      ujson.Obj("k" -> k, "x" -> nm,
+                "e" -> ptrOpE(op, pointeeBytes(tgt).get, ujson.Obj("k" -> "name", "v" -> nm), one))
+    }
+    else if (cppFile && bareType(staticTypeOf(tgt)).endsWith("*") && pointeeBytes(tgt).isDefined &&
+             asField(tgt).exists { case (r, _) => pureNode(r) }) {
+      val (r, f) = asField(tgt).get
+      ujson.Obj("k" -> "setField", "r" -> expr(r), "f" -> f,
+                "v" -> ptrOpE(op, pointeeBytes(tgt).get, ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f), one))
     }
     else if (isPointerType(staticTypeOf(tgt)) || isCString(tgt)) holeS("op:" + opName + ":pointer")
     else tgt match {
@@ -10844,6 +11105,12 @@ import scala.annotation.tailrec
       val (other, neg) = pointerNullTest(c).get
       val (po, oe) = exprV(other)
       (po, nullTestExpr(oe, neg))
+    // C address model: a pointer comparison, prelude-aware -- `callExpr`'s `ptrRelOp`
+    // case, which must agree with this one.
+    case c: Call if ptrRelOp(c).isDefined =>
+      val List(a, b) = kidsOf(c)
+      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+      (pa ++ pb, ptrRelE(c, ptrRelOp(c).get, ae, be))
     case c: Call if binops.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(c.methodFullName)) =>
       val List(a, b) = kidsOf(c)
@@ -13088,14 +13355,28 @@ import scala.annotation.tailrec
     // semantics/proof consuming it (`evalPairs`, `sizeP`, `holesP`), is
     // completely unchanged; only how the ARGUMENT is spelled as Lean source
     // text differs. */
-    def boxRangeExpr(n: Int): ujson.Obj = ujson.Obj("k" -> "boxFieldsRange", "n" -> n)
+    // C address model: `esz`, the element byte size, when the declared element type's
+    // size resolves -- recorded on the block as `$esz` (`Heap.elemSize`), so `ptrOp`'s
+    // typed arithmetic can check its stride against it. Absent: the block is untyped,
+    // and stride-dependent `ptrOp` arithmetic on it is a hole (comparisons still work).
+    // `member`: the block is an array MEMBER of a boxed struct, boxed separately --
+    // recorded as `$member` (`Heap.isMemberBox`), because its address coincides with a
+    // member address of the enclosing struct's block, so `ptrOp` must not answer
+    // "different blocks, different addresses" for it.
+    def boxRangeExpr(n: Int, esz: Option[Int] = None, member: Boolean = false): ujson.Obj = {
+      val o = ujson.Obj("k" -> "boxFieldsRange", "n" -> n)
+      esz.foreach(sz => o("esz") = ujson.Num(sz))
+      if (member) o("member") = ujson.Bool(true)
+      o
+    }
 
     def boxFieldsExpr(keys: List[String], seedFrom: Option[String] = None,
-                       arrayMembers: Map[String, Int] = Map.empty): ujson.Obj =
+                       arrayMembers: Map[String, Int] = Map.empty,
+                       memberElemBytes: Map[String, Int] = Map.empty): ujson.Obj =
       ujson.Obj("k" -> "boxFields", "fields" -> ujson.Arr.from(
         keys.map { k =>
           val v: ujson.Value = arrayMembers.get(k) match {
-            case Some(n) => boxRangeExpr(n)
+            case Some(n) => boxRangeExpr(n, memberElemBytes.get(k), member = true)
             case None =>
               seedFrom.map(nm => ujson.Obj("k" -> "field", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "f" -> k))
                 .getOrElse(ujson.Obj("k" -> "unit"))
@@ -13105,12 +13386,19 @@ import scala.annotation.tailrec
     val boxedStructParamNames = m.parameter.l.map(_.name).map(localName).filter(boxedStructs.contains).toSet
     val aggPrologues: List[ujson.Obj] =
       boxedArrays.toList.sortBy(_._1).map { case (nm, n) =>
-        ujson.Obj("k" -> "assign", "x" -> nm, "e" -> boxRangeExpr(n))
+        ujson.Obj("k" -> "assign", "x" -> nm,
+                  "e" -> boxRangeExpr(n, localTypes.get(nm).flatMap(arrayElemBytes)))
       } ++
       boxedStructs.toList.sortBy(_._1).map { case (nm, members) =>
         val seedFrom = if (boxedStructParamNames.contains(nm)) Some(nm) else None
         val arrayMembers = boxedStructArrayMembers.getOrElse(nm, Map.empty)
-        ujson.Obj("k" -> "assign", "x" -> nm, "e" -> boxFieldsExpr(members, seedFrom, arrayMembers))
+        // C address model: each array member's element size, from the member's
+        // declared type on the struct's own declaration (`memberTypes`).
+        val owner = localTypes.get(nm).map(t => bareType(t).reverse.dropWhile(_ == '*').reverse)
+        val memberElemBytes = arrayMembers.keys.flatMap { mem =>
+          owner.flatMap(o => memberTypes.get((o, mem))).flatMap(arrayElemBytes).map(mem -> _)
+        }.toMap
+        ujson.Obj("k" -> "assign", "x" -> nm, "e" -> boxFieldsExpr(members, seedFrom, arrayMembers, memberElemBytes))
       }
     // `009-reduce-remaining-holes-4`: every byte-cursor parameter's own offset local
     // starts at `0` -- `z` itself is the incoming parameter binding already, needing

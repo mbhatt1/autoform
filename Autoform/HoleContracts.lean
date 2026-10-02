@@ -196,7 +196,7 @@ theorem resolve_onProgram (τ : SImpl) (p : Program) (n : String) :
 
 /-- For a program under the legacy lookup rules (`hp`: no class table). With a class table
 an unanswerable lookup is `holeFunc`, whose hole an implementation may fill, so the
-equation would not hold as stated (STRATEGY.md §60). -/
+equation would not hold as stated (STRATEGY.md §62). -/
 theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String)
     (hp : p.pyClasses = none) :
     (ctxOf (τ.onProgram p)).resolveMethod cls meth
@@ -522,7 +522,7 @@ theorem delitem_under : UnderS Γdel P DelitemPost := by
     rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_pop]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
   -- `obj.pop(…)` resolves through `resolveMethodOn`, which is `resolveMethod` on the
-  -- object's class for a program without a class table (STRATEGY.md §60).
+  -- object's class for a program without a class table (STRATEGY.md §62).
   have hpopOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
     rw [Ctx.resolveMethodOn_of_none rfl, hdcls, hpop]
@@ -574,7 +574,7 @@ theorem delitem_reaches_hole_of (τ : SImpl)
     rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_pop]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
   -- `obj.pop(…)` resolves through `resolveMethodOn`, which is `resolveMethod` on the
-  -- object's class for a program without a class table (STRATEGY.md §60).
+  -- object's class for a program without a class table (STRATEGY.md §62).
   have hpopOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
     rw [Ctx.resolveMethodOn_of_none rfl, hdcls, hpop]

@@ -1,4 +1,4 @@
-"""CPython differential test for Python method resolution and name scoping (STRATEGY.md §60).
+"""CPython differential test for Python method resolution and name scoping (STRATEGY.md §62).
 
 The same three-link chain as `tests/test_pyscoping_cpython.py`:
 

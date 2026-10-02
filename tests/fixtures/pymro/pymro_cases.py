@@ -1,4 +1,4 @@
-"""Differential fixture for Python method resolution and name scoping (STRATEGY.md §60).
+"""Differential fixture for Python method resolution and name scoping (STRATEGY.md §62).
 
 Every `case_*` function takes no arguments. `tests/test_pymro_cpython.py` runs each one under
 CPython and compares the result with the value Core computes for the SAME source after the

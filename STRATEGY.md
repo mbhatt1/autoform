@@ -3474,7 +3474,158 @@ make the one-argument re-application hit `param:default-nonliteral`; they are no
 modules elaborated against the new AST: `synth_specs.py` would regenerate `C_tfFree`, which
 `C_not_tfFree` refutes, so it cannot regenerate `SpecsGen/Cachetools.lean` as-is.
 
-## 60. Python method resolution along the C3 MRO, `super()`, and bare names by Python scoping
+## 60. A C address model: provenance, not addresses
+
+`cstr:address-compare`, `op:addressOf:element:*`, `op:*crement:pointer` and the int-to-pointer
+casts were the largest SQLite hole family, and they had one cause: Core could only operate on
+a pointer the exporter had *proven* to be an interior pointer into a block Core itself
+allocated (`isIrefExpr`, `strCursorParams`). Every pointer loaded from a field or received as
+a parameter -- SQLite's page buffers, `pPage->aData`, every `u8 *data` -- was a static hole.
+
+The fix is to move the provenance check from export time to run time, where the blocks are.
+`Autoform/Lang/Core/Address.lean` (design and justification in its module doc and in
+`docs/core-language.md` §2.1) gives each array block an extent and an element size, and
+`Expr.ptrOp` answers comparison, `p ± n` and `p − q` from them -- CompCert's `Vptr b ofs`,
+with ISO C's undefined and unspecified cases (cross-object ordering, leaving the array,
+one-past-the-end compared with another object, a stride that is not the block's) as holes.
+Comparisons are stride-free and need no element size; arithmetic carries the static pointee
+size and checks it, which is what makes `&p[i]` safe on a pointer that may have come
+through `(u32*)bytes`. Pointer ↔ integer stays a hole, deliberately: a block has no
+number, and every SQLite use of `SQLITE_PTR_TO_INT` would hole under an abstract encoding
+anyway. `unop "cast:ptr"` is the run-time form of the existing pointer-to-pointer
+pass-through for operands whose type the frontend lost.
+
+Two semantic corrections came with it, both "a value where C has none": `derefIref` read an
+out-of-bounds element as `.unit` and `setDerefIref` silently grew the block; both are now
+`ub:ptr-*-out-of-bounds` holes. And `applyBinop`'s heap-free `iref` equality answered
+`false` for one-past-the-end against another object's start, which C leaves unspecified.
+
+Two restrictions keep it honest. A site whose operand is a `Val.str` on every run (a
+literal, an unboxed `char[]`, a byte cursor, a `strFrom` expression) keeps its static
+`cstr:*` label instead of becoming a guaranteed dynamic hole. And arithmetic on a pointer to
+a *struct* stays a hole: Core has no block of structs, so the step could only produce a
+pointer whose every `p->f` holes -- translating it measured +28 hole-free functions on the
+amalgamation (2015 vs 1987), all of them of that kind, and they were taken back out.
+
+### Measured
+
+All with `/opt/corpus/measure.sh` and a per-function hole-multiset diff against the
+baseline export (`/opt/corpus/addrmodel/holediff.py`): no function gained a hole or lost
+hole-freedom.
+
+| corpus | holeFree before | after | holes before | after |
+|---|---|---|---|---|
+| SQLite amalgamation (2433 fns), on base `46c65fc` | 1909 (78.5%) | 1987 (81.7%) | 2280 | 1818 |
+| SQLite amalgamation, merged onto integration head `6d7000e` | 1907 (78.4%) | 1985 (81.6%) | 2296 | 1834 |
+
+Amalgamation labels, before → after: `op:addressOf:element:scalar` 386 → 30,
+`cstr:address-compare` 41 → 21, `cstr:address-equality` 52 → 39, `cstr:pointer-arith`
+45 → 19, `op:postIncrement:pointer` 200 → 184, `op:cast:pointer:int-to-pointer` 16 → 8.
+
+**The full tree is not measured.** `/opt/corpus/measure.sh <exporter> <out> full` was run
+twice with this exporter and Joern was OOM-killed both times (exit 137; the box was shared
+with other agents' Lean builds, `MemAvailable` fell under the 13 GB the full export needs).
+The baseline to compare against is `/opt/corpus/final/full` (holeFree 5054 of 7772,
+`cstr:address-compare` 1478), whose exporter produces an amalgamation export identical to
+this work's base (per-function diff: 0 changes). Run it on an idle machine before quoting
+a full-tree figure.
+
+Conformance: `tests/c_address/addr.c` (14 functions; 5 hole-free before, 14 after) under
+`scripts/differential.py ast-CAddr.json tests/c_address CAddr 40`: 282/282 agree with `cc`,
+0 divergences, 38 INCONCLUSIVE -- every one the model refusing undefined or unspecified
+behaviour (`ub:ptr-arith-out-of-bounds` ×37, `ptr:eq-one-past-unspecified` ×1).
+`Autoform/Specs/AddressSpec.lean` pins the same functions to `cc`'s outputs in the kernel.
+
+### Not addressed
+
+* **Dynamic-hole risk.** A statically hole-free function now answers only when its
+  pointers are Core blocks at run time; page buffers from the (unmodelled) pager, and
+  `char*` arguments that are `Val.str`, hole. That is the trade every `isIrefExpr`
+  relaxation already made, but it moves more functions across the static line.
+* `cstr:address-compare` in `sqlite3__wasm_enum_json` (1,244 of the full tree's): `zPos` points
+  into a `static char aBuffer[]`, which is not boxed (mutable static locals need
+  persistent per-function storage). Boxing it would make every one of those comparisons a
+  same-block `ptrOp`.
+* `char*` under the string model has no address; comparing two of them is still refused.
+  Closing it means representing `char*` as byte blocks.
+* Struct arrays: `Mem *p; p++` needs blocks whose elements are structs and field access
+  through an interior pointer.
+* A C comparison in value position yields `Val.bool` where C yields `int`
+  (`return a == b;` diverges from `cc` in the harness) -- pre-existing, not specific to
+  pointers; the fixture writes `? 1 : 0`.
+* `p[i]` reads on a pointer of unknown provenance still translate to Python `Expr.index`,
+  which answers `.list` element `i.toNat` for a negative `i` -- pre-existing, reported here
+  because it sits next to this work.
+
+## 61. CI was red on every fresh checkout, at three steps; and JS `==`, `===`, `>>>` were one operator each
+
+### `check_render` exit 3, by policy rather than by accident
+
+§55/§56 left `Ansible`, `LinuxCrypto` and `LinuxLib` pinned in `artifact-manifest.json`
+with no AST in git, so `check_render.py` reported them UNVERIFIABLE and exited 3 on
+every CI run. Measured in a fresh clone of `86a161b`: `14 verified, 0 mismatched, 3
+unverifiable (of 17)`, exit 3. Tracking them was the first option considered and is not
+available: no copy of any of the three exists on this machine (searched the filesystem),
+neither the corpus commit nor the exporter version that produced the pinned hashes was
+recorded, so a re-export cannot reproduce them, and Ansible's 136.6 MB exceeds GitHub's
+100 MB per-file limit.
+
+A gate that is red on every run is a gate nobody reads, and exit 3 would have meant
+nothing the day a *new* AST went missing. So the absence became a fourth verdict,
+NOT-TRACKED, granted only by a hand-edited `untracked_by_policy` entry (non-empty
+`reason` and `reviewed`) and only when the tree confirms it: `git check-ignore` says the
+AST is ignored, `git ls-files` that it is untracked, the manifest says `ast_tracked:
+false`, and no spec module is pinned to the corpus (the §55 case cannot be allowlisted).
+NOT-TRACKED is named on every run, counted separately, never counted as verified; an
+allowlisted AST that is present is fully checked; `--strict` ignores the list, and CI's
+"for the log" step now runs `--strict`. Measured in the worktree: default `14 verified, 0
+mismatched, 0 unverifiable, 3 NOT checked (untracked by reviewed policy: Ansible,
+LinuxCrypto, LinuxLib)`, exit 0; `--strict` exit 3. Eight tests in
+`tests/test_check_render.py` pin each refusal (`pytest`: 211 passed, 1 xfailed).
+
+### The proof-inventory step could not pass either
+
+`grep -c '^ *theorem ' Autoform/SpecsGen/V8Base.lean` is 0: since `e36b8f1` that file only
+imports `V8Base/Part1..Part73`, and under `set -e` a zero `grep -c` killed the step. It
+now counts the umbrella plus its parts (285, floor 229) and fails on a missing file.
+
+### Steps not fully simulated
+
+Each `run:` block was executed in a fresh clone (`runstep.py`, bash `-e`). Passing:
+V8Base render, `check_specs_fresh` (0), proof inventory, FuelMono guard, the
+`C_not_tfFree` grep, the pinned cachetools clone. `taskset -c 0 lake build` was attempted
+in the clone and one `SpecsGen/V8Base/Part*` was OOM-killed (exit 137) with the shared
+4-core/15 GB box at 13 GB used by other builds — an environment limit here, not a
+verdict on the 7 GB runner, which the existing `taskset` comment addresses (nine
+`V8Base/Part*` jobs were killed this way before the attempt was stopped). On the partial
+build: ledger regeneration exit 0, `check_docs` exit 0 (10 figures match),
+`check_specs.py Basis` exit 0 (21 theorems), conformance oracle `60 COMPARED` (passes the
+`> 0` gate). Not run here: the trust audit (`audit_all.py --strict` replays every
+`.olean`) and the demo, which imports the root `Autoform` module and so needs the full
+build. These were simulated on `86a161b` content plus this branch's scripts, before the
+merge of round-1 item G, whose `Ledger`/`HoleContracts` build failures are being fixed
+separately.
+
+### JavaScript: three erased operator pairs
+
+jssrc2cpg v4.0.606 (`AstForExpressionsCreator.astForBinaryExpression`, read at that tag)
+maps `==`/`===` to `<operator>.equals`, `!=`/`!==` to `notEquals`, and **`>>`/`>>>` both
+to `arithmeticShiftRight`**. The exporter now recovers the token from the call's source
+span (`jsAmbiguousBinop`; anything unparseable is `op:js-token-unrecovered:<op>`), ahead
+of the C null-test rewrite, which had been turning JS `x == null` into `x in (None, 0)`
+(`0 == null` is `false` in Node). Core's `.javascript` arms: `===` is strict equality;
+`==` is exact on same-type operands and on `null`/`undefined`, a hole for cross-type
+coercion; heap objects compare by identity, not Python `__eq__`; the bitwise operators
+apply ToInt32/ToUint32 with a 5-bit count, and operands beyond 2^53 hole. 43 `example`/`#eval`
+checks in `Semantics.lean`, each against `node -e` (v22.22.2); `docs/languages.md` §4/§7.
+Not done: jssrc2cpg is not installed here, so the exporter change is checked on 15
+synthetic spans through Joern (and a C export is byte-identical before and after), not on
+a JS CPG; `ast-LangJS.json` was not re-exported. `.unit` is both `null` and `undefined`,
+so `===` between two of them is a hole. jssrc2cpg also maps `??` to `logicalOr`
+(`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed, and not recoverable the same way without a
+new Core operator.
+
+## 62. Python method resolution along the C3 MRO, `super()`, and bare names by Python scoping
 
 *(Item M. The number is provisional; the merger renumbers.)*
 
@@ -3589,71 +3740,3 @@ function-local class, refused because the ancestor's method may close over anoth
   switches cachetools to the new rules and moves the specs bound to its hash.
 * `synth_specs.py`'s context (`def C : Ctx := …`) omits `pyClasses`, like `builtinBases`;
   harmless until a corpus with a class table is synthesised.
-
-## 61. CI was red on every fresh checkout, at three steps; and JS `==`, `===`, `>>>` were one operator each
-
-### `check_render` exit 3, by policy rather than by accident
-
-§55/§56 left `Ansible`, `LinuxCrypto` and `LinuxLib` pinned in `artifact-manifest.json`
-with no AST in git, so `check_render.py` reported them UNVERIFIABLE and exited 3 on
-every CI run. Measured in a fresh clone of `86a161b`: `14 verified, 0 mismatched, 3
-unverifiable (of 17)`, exit 3. Tracking them was the first option considered and is not
-available: no copy of any of the three exists on this machine (searched the filesystem),
-neither the corpus commit nor the exporter version that produced the pinned hashes was
-recorded, so a re-export cannot reproduce them, and Ansible's 136.6 MB exceeds GitHub's
-100 MB per-file limit.
-
-A gate that is red on every run is a gate nobody reads, and exit 3 would have meant
-nothing the day a *new* AST went missing. So the absence became a fourth verdict,
-NOT-TRACKED, granted only by a hand-edited `untracked_by_policy` entry (non-empty
-`reason` and `reviewed`) and only when the tree confirms it: `git check-ignore` says the
-AST is ignored, `git ls-files` that it is untracked, the manifest says `ast_tracked:
-false`, and no spec module is pinned to the corpus (the §55 case cannot be allowlisted).
-NOT-TRACKED is named on every run, counted separately, never counted as verified; an
-allowlisted AST that is present is fully checked; `--strict` ignores the list, and CI's
-"for the log" step now runs `--strict`. Measured in the worktree: default `14 verified, 0
-mismatched, 0 unverifiable, 3 NOT checked (untracked by reviewed policy: Ansible,
-LinuxCrypto, LinuxLib)`, exit 0; `--strict` exit 3. Eight tests in
-`tests/test_check_render.py` pin each refusal (`pytest`: 211 passed, 1 xfailed).
-
-### The proof-inventory step could not pass either
-
-`grep -c '^ *theorem ' Autoform/SpecsGen/V8Base.lean` is 0: since `e36b8f1` that file only
-imports `V8Base/Part1..Part73`, and under `set -e` a zero `grep -c` killed the step. It
-now counts the umbrella plus its parts (285, floor 229) and fails on a missing file.
-
-### Steps not fully simulated
-
-Each `run:` block was executed in a fresh clone (`runstep.py`, bash `-e`). Passing:
-V8Base render, `check_specs_fresh` (0), proof inventory, FuelMono guard, the
-`C_not_tfFree` grep, the pinned cachetools clone. `taskset -c 0 lake build` was attempted
-in the clone and one `SpecsGen/V8Base/Part*` was OOM-killed (exit 137) with the shared
-4-core/15 GB box at 13 GB used by other builds — an environment limit here, not a
-verdict on the 7 GB runner, which the existing `taskset` comment addresses (nine
-`V8Base/Part*` jobs were killed this way before the attempt was stopped). On the partial
-build: ledger regeneration exit 0, `check_docs` exit 0 (10 figures match),
-`check_specs.py Basis` exit 0 (21 theorems), conformance oracle `60 COMPARED` (passes the
-`> 0` gate). Not run here: the trust audit (`audit_all.py --strict` replays every
-`.olean`) and the demo, which imports the root `Autoform` module and so needs the full
-build. These were simulated on `86a161b` content plus this branch's scripts, before the
-merge of round-1 item G, whose `Ledger`/`HoleContracts` build failures are being fixed
-separately.
-
-### JavaScript: three erased operator pairs
-
-jssrc2cpg v4.0.606 (`AstForExpressionsCreator.astForBinaryExpression`, read at that tag)
-maps `==`/`===` to `<operator>.equals`, `!=`/`!==` to `notEquals`, and **`>>`/`>>>` both
-to `arithmeticShiftRight`**. The exporter now recovers the token from the call's source
-span (`jsAmbiguousBinop`; anything unparseable is `op:js-token-unrecovered:<op>`), ahead
-of the C null-test rewrite, which had been turning JS `x == null` into `x in (None, 0)`
-(`0 == null` is `false` in Node). Core's `.javascript` arms: `===` is strict equality;
-`==` is exact on same-type operands and on `null`/`undefined`, a hole for cross-type
-coercion; heap objects compare by identity, not Python `__eq__`; the bitwise operators
-apply ToInt32/ToUint32 with a 5-bit count, and operands beyond 2^53 hole. 43 `example`/`#eval`
-checks in `Semantics.lean`, each against `node -e` (v22.22.2); `docs/languages.md` §4/§7.
-Not done: jssrc2cpg is not installed here, so the exporter change is checked on 15
-synthetic spans through Joern (and a C export is byte-identical before and after), not on
-a JS CPG; `ast-LangJS.json` was not re-exported. `.unit` is both `null` and `undefined`,
-so `===` between two of them is a hole. jssrc2cpg also maps `??` to `logicalOr`
-(`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed, and not recoverable the same way without a
-new Core operator.

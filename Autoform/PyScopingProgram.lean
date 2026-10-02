@@ -1091,7 +1091,7 @@ def moduleInits : List Func := [f__module_objects___module_, f_pyscoping_cases_p
 /-- Source dialect: `.python` (integer division/modulo convention).
 
 `pyClasses` is the class table: methods resolve along the C3 MRO, and bare
-names by Python scoping (STRATEGY.md §60). -/
+names by Python scoping (STRATEGY.md §62). -/
 def program : Program := { dialect := .python, pyClasses := some [{ name := "Shelf", bases := [], attrs := [] }], funcs := [
   f_pyscoping_cases_py__module__dflt_lits,
   f_pyscoping_cases_py__module__case_default_all,
