@@ -642,6 +642,13 @@ in that module is recorded as having killed it, so per-theorem attribution is co
 aggregate claim (these mutants are now caught) is sound; the per-theorem breakdown is not
 yet trustworthy and should be refined by isolating theorems into separate modules.
 
+*Superseded (2026-10):* re-run with per-theorem attribution on Lean 4.30.0-rc1 over all 48
+mutants of `Autoform/Lang/Imp/*`, with 0 coarse attributions (`mutation-Imp.json`). At the
+theorems above, 18/27 valid `Semantics.lean` mutants and 0/9 store mutants were killed. The
+8/8 figure was not a property of the theorems. The characterization lemmas, evalExpr/store
+laws, `evalStmt_complete` and `evalStmt_hole_complete` raise it to 24/27 and 7/9. The 5
+survivors are equivalent mutants; README "Findings" has the breakdown.
+
 ### Tier 3: audit, portfolio, assurance case
 
 * `scripts/audit_all.py` sweeps all **952** declarations: axiom basis is `propext` (225),

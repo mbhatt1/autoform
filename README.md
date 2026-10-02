@@ -136,14 +136,27 @@ not match the runtime — caught automatically rather than by inspection.
 - **Vacuity the dependency check cannot see.** The mutation gate scored `evalStmt_sound`
   at 25% (WEAK) — all six survivors were `evalBExpr` mutations, because `BigStep`'s side
   conditions are stated in terms of `evalBExpr` itself, so a mutation changes both sides
-  of the equation. Adding independent characterization lemmas raised the reported score
-  to 100%. That figure is **not attributable**: it was produced by the same
-  `scripts/mutate.py` whose `error_lines` regex never matched this toolchain's
-  diagnostics, so every "kill" came from the coarse build-failure fallback rather than
-  from any individual theorem (see the trust chain below). The vacuity the lemmas were
-  added to fix is real and was found by mutation; the 100% is not evidence that they
-  fixed it. Re-running the gate on `Autoform/Lang/Imp/*` would settle it and has not been
-  done.
+  of the equation. Adding independent characterization lemmas raised the *reported* score
+  to 100%, but that run had no per-theorem attribution. Re-run with attribution
+  (`mutation-Imp.json`; Lean 4.30.0-rc1, every one of the 48 mutants of
+  `Autoform/Lang/Imp/*` run, 0 coarse attributions): at the 46c65fc theorems, **18 of 27**
+  valid `Semantics.lean` mutants and **0 of 9** `Syntax.lean` (store) mutants were killed by
+  any theorem; `evalStmt_sound` itself killed 7/27. The `evalBExpr` lemmas do kill their
+  mutants. Two of them (`evalBExpr_and_ne_or`, `evalBExpr_tt_ne_ff`) killed nothing, because
+  they were proved by `simp` through lemmas that had already failed, and Lean's error
+  recovery kept those lemmas. The same vacuity reached `evalExpr` (`+`/`-`/`*` swaps
+  survived everything), the store (`State.get`/`set`), and the hole/fuel distinction
+  (reporting a hole as `.outOfFuel` survived, since `evalStmt_sound` constrains only
+  `.ok`). Now added: `evalExpr_add/sub/mul`; the read-over-write laws `State.get_empty`,
+  `get_set_self` and `get_set_ne`; `evalStmt_complete` (formerly an open obligation in
+  `Portfolio.lean`); and `evalStmt_hole_complete` against an independent `HitsHole`
+  relation. With those, **24/27** and **7/9** are killed. All 5 survivors are equivalent
+  mutants: 3 are `_+1`→`_+0` fuel patterns already shadowed by the `0` arm, and 2 are
+  store paddings that only append zeros, which `State.get` cannot observe. The rerun also
+  fixed two `mutate.py` attribution bugs. A declaration-level error is reported at the doc
+  comment above the keyword, and that comment was being credited to the *previous*
+  theorem. A mutated definition that no longer elaborated was being scored as a kill,
+  which caused 8 of `evalStmt_sound`'s 15 "kills" in the first rerun.
 - **41% of the FVSpec benchmark is vacuous under static screening.** 3,833 of 9,352
   analyzed problems. The dominant pattern: Python determinism tests (`f(x) == f(x)`)
   transliterated into Lean, where purity makes them `rfl`. Spec *translation* is not spec

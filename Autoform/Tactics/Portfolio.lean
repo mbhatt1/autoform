@@ -987,24 +987,28 @@ example : ∀ (n : Nat) (s : State) (h : Nat),
 /-! ### Goals the portfolio correctly refuses
 
 `#portfolio_check` runs the same ladder but introduces no declaration, so a refusal is
-visible in the build log without anything being admitted. Both of these need induction
-over a derivation and over fuel simultaneously — beyond the bounded search too, and the
+visible in the build log without anything being admitted. Determinism needs induction
+over a derivation with inversion on the second — beyond the bounded search too, and the
 portfolio says so instead of guessing. -/
 
 #portfolio_check ∀ (s : State) (c : Stmt) (s₁ s₂ : State),
   BigStep s c s₁ → BigStep s c s₂ → s₁ = s₂
 
+/-! Completeness (`BigStep → ∃ fuel, evalStmt … = .ok`) used to be the second refusal. It
+is now proved by hand as `Autoform.Imp.evalStmt_complete` in `Lang/Imp/Semantics.lean`
+(needed for `evalStmt_hole_complete`, which the mutation gate showed was missing), so the
+check below closes at tier 2 by `exact?` *citing that theorem* — the search did not find
+an induction, it found a lemma. Kept as a demonstration that the ladder reuses proved
+library facts rather than re-deriving them. -/
 #portfolio_check ∀ (s s' : State) (c : Stmt),
   BigStep s c s' → ∃ n, evalStmt n s c = .ok s'
 
-/-! The refusals are then recorded as structured open obligations rather than as
+/-! The refusal is then recorded as a structured open obligation rather than as
 `sorry`-backed theorems. Nothing below is provable-by-citation: `#obligation` produces
 no proof term, only an `Obligation` record. -/
 #obligation Imp.bigStep_deterministic :
   ∀ (s : State) (c : Stmt) (s₁ s₂ : State), BigStep s c s₁ → BigStep s c s₂ → s₁ = s₂
 
-#obligation Imp.evalStmt_complete :
-  ∀ (s s' : State) (c : Stmt), BigStep s c s' → ∃ n, evalStmt n s c = .ok s'
 
 /-! ### The SMT path, kept on the evidence side of the line
 
