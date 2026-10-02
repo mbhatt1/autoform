@@ -27,7 +27,7 @@ partial def eCalls : Expr → List (String × Nat)
                           | _ => false)
       then sub else (f, as.length) :: sub
   | .binop _ a b | .index a b | .isOp _ a b | .inOp _ a b => eCalls a ++ eCalls b
-  | .unop _ a | .field a _ | .starred a | .kwargE _ a | .dstarred a => eCalls a
+  | .unop _ a | .field a _ | .starred a | .kwargE _ a | .dstarred a | .boxContainer a => eCalls a
   | .mcall r _ as => eCalls r ++ (as.map eCalls).flatten
   | .alloc _ as | .listE as | .tupleE as => (as.map eCalls).flatten
   | .dictE kvs => (kvs.map (fun kv => eCalls kv.1 ++ eCalls kv.2)).flatten
@@ -38,6 +38,7 @@ partial def sCalls : Stmt → List (String × Nat)
   | .expr e | .assign _ e | .ret e | .raise e => eCalls e
   | .setField r _ v => eCalls r ++ eCalls v
   | .setIndex r i v => eCalls r ++ eCalls i ++ eCalls v
+  | .delIndex r i => eCalls r ++ eCalls i
   | .seq a b => sCalls a ++ sCalls b
   | .ifte c a b => eCalls c ++ sCalls a ++ sCalls b
   | .loop c a => eCalls c ++ sCalls a

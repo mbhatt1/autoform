@@ -1,6 +1,7 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
 import Autoform.Lang.Core.Stdlib
+import Autoform.Lang.Core.Boxed
 
 /-!
 # Core — semantics
@@ -252,10 +253,16 @@ no structural compare of two refs can see that. Everything else stays on `applyB
 is heap-free and reducible -- the property `Refine.lean` is built on. Named rather than
 inlined so proofs can discharge it by `simp` on concrete operands. -/
 def binopNeedsHeap (op : String) (x y : Val) : Bool :=
-  (op == "==" || op == "!=") && (x.kind == 8 || y.kind == 8)
+  (op == "==" || op == "!=") &&
+    -- A reference, or a VALUE container (list 5, tuple 6, dict 7, builtin-based 12) that may
+    -- hold one: `(xs,) == ([1],)` compares a boxed list at depth 1, and `Val.beq` would
+    -- compare it by address.
+    (x.kind == 5 || x.kind == 6 || x.kind == 7 || x.kind == 8 || x.kind == 12 ||
+     y.kind == 5 || y.kind == 6 || y.kind == 7 || y.kind == 8 || y.kind == 12)
 
 @[simp] theorem binopNeedsHeap_int_left (op : String) (i : Int) (y : Val) :
-    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") && y.kind == 8) := by
+    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") &&
+      (y.kind == 5 || y.kind == 6 || y.kind == 7 || y.kind == 8 || y.kind == 12)) := by
   simp [binopNeedsHeap, Val.kind]
 
 @[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
@@ -1114,7 +1121,8 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .dstarred _    => (h, .hole "op:starred-outside-call")
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op v)
+      -- Through the heap: `not xs` on a boxed empty list is `True`.
+      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op (h₁.view v))
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .binop op a b =>
       match evalExpr ctx n h ρ a with
@@ -1130,9 +1138,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- value position; it survived because cachetools only uses them in
         -- conditions, where truthiness makes the two indistinguishable.
         -- C is the opposite: `&&`/`||` genuinely yield 0/1.
-        if op == "&&" && !x.truthy then
+        if op == "&&" && !(h₁.view x).truthy then
           (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false))
-        else if op == "||" && x.truthy then
+        else if op == "||" && (h₁.view x).truthy then
           (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true))
         else
           match evalExpr ctx n h₁ ρ b with
@@ -1146,12 +1154,17 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               match Val.eqPy h₂ (Val.eqFuel h₂) x y with
               | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
               | none   => (h₂, .outOfFuel)
-            else (h₂, applyBinop ctx.dialect op x y)
+            -- `and`/`or` yield an OPERAND, which must stay the object itself; every other
+            -- operator sees a boxed container's contents (`xs + ys` concatenates them into a
+            -- fresh value; the rest hole on containers exactly as before).
+            else if op == "&&" || op == "||" then (h₂, applyBinop ctx.dialect op x y)
+            else (h₂, applyBinop ctx.dialect op (h₂.view x) (h₂.view y))
           | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .cond c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v) => if v.truthy then evalExpr ctx n h₁ ρ t else evalExpr ctx n h₁ ρ e
+      | (h₁, .val v) => if (h₁.view v).truthy then evalExpr ctx n h₁ ρ t
+                        else evalExpr ctx n h₁ ρ e
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .isOp neg a b =>
       match evalExpr ctx n h ρ a with
@@ -1173,7 +1186,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val x) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val c) =>
-            match valIn x c with
+            match valInH ctx.dialect h₂ x c with
             | .val (.bool r) => (h₂, .val (.bool (if neg then !r else r)))
             | r              => (h₂, r)
         | (h₂, r) => (h₂, r)
@@ -1183,27 +1196,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
-          -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
-          -- A NEGATIVE index counts from the end in Python (`xs[-1]` is the last
-          -- element). `Int.toNat` clamps it to `0`, so this used to answer the FIRST
-          -- element for `xs[-1]` -- a silently wrong value for one of the commonest
-          -- idioms in the language, found when `p, *q, r = "abcd"` (which Joern lowers to
-          -- `r = tmp[-1]`) gave `r == 'a'`. Python wraps; no other dialect has a
-          -- meaning Core models for it, so there it is a hole rather than a guess.
-          match c.unbuiltin, k with
-          | .list vs, .int i =>
-              if i < 0 && ctx.dialect != .python then (h₂, .hole "index:negative") else
-              match Stdlib.seqIndex vs.length i with
-              | some j => if hh : j < vs.length then (h₂, .val (vs[j]))
-                          else (h₂, .exn (.str "IndexError"))
-              | none   => (h₂, .exn (.str "IndexError"))
-          | .tuple vs, .int i =>
-              if i < 0 && ctx.dialect != .python then (h₂, .hole "index:negative") else
-              match Stdlib.seqIndex vs.length i with
-              | some j => if hh : j < vs.length then (h₂, .val (vs[j]))
-                          else (h₂, .exn (.str "IndexError"))
-              | none   => (h₂, .exn (.str "IndexError"))
+          -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`; a boxed container is
+          -- read through the heap. A NEGATIVE index counts from the end under Python
+          -- (`seqRead`); `Int.toNat` used to clamp it, so `xs[-1]` answered the FIRST
+          -- element. Other dialects hole on it rather than guess.
+          match (h₂.view c).unbuiltin, k with
+          | .list vs, .int i  => (h₂, seqRead ctx.dialect vs i)
+          | .tuple vs, .int i => (h₂, seqRead ctx.dialect vs i)
           | .dict kvs, key =>
+              if ctx.dialect.isPython && h₂.unhashable key then (h₂, .exn (.str "TypeError"))
+              else
               match kvs.find? (fun kv => Val.beq kv.1 key) with
               | some (_, v) => (h₂, .val v)
               | none        => (h₂, .exn (.str "KeyError"))
@@ -1270,6 +1272,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            | none        =>
                              if o.cls.startsWith "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
+                             -- A boxed list or dict has no instance attributes (its fields
+                             -- are always empty: it is allocated with none and
+                             -- `Stmt.setField` refuses it), so an attribute read always lands
+                             -- here. CPython raises `AttributeError`; `unit` would be a silent
+                             -- wrong answer, so it is a hole.
+                             else if ctx.dialect.isPython && (o.payload).toVal.isSome then
+                               (h₁, .hole s!"field:{f}:builtin-container")
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -1288,6 +1297,26 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
   -- here (a dict display is `dictE`), so a keyword group in a list/tuple literal is a
   -- shape we do not model and it says so.
+  -- `docs/boxed-containers.md` step 3: a Python list/dict display is a fresh object.
+  -- A dict display's pairs are stored the way repeated `d[k] = v` would store them, so a
+  -- repeated key keeps its first position and its last value, and an unhashable key is
+  -- CPython's `TypeError`.
+  | n+1, h, ρ, .boxContainer e =>
+      -- Only Python has boxed containers; the exporter emits this node for `.py` only, and
+      -- refusing it elsewhere keeps "a payload object exists" a Python-only fact.
+      if !ctx.dialect.isPython then (h, .hole "boxContainer:non-python") else
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val (.list vs)) =>
+          let (h₂, r) := h₁.alloc { cls := "list", fields := [], payload := .list vs }
+          (h₂, .val (.ref r))
+      | (h₁, .val (.dict kvs)) =>
+          if kvs.any (fun kv => h₁.unhashable kv.1) then (h₁, .exn (.str "TypeError"))
+          else
+          let ps := kvs.foldl (fun acc kv => dictStore acc kv.1 kv.2) []
+          let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict ps }
+          (h₂, .val (.ref r))
+      | (h₁, .val _) => (h₁, .hole "boxContainer:non-container")
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .listE es =>
       match evalList ctx n h ρ es with
       | (h₁, .inr (vs, []))  => (h₁, .val (.list vs))
@@ -1368,7 +1397,17 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- `Stdlib.builtin` takes positional arguments only: a keyword argument to a
             -- builtin is *not* passed silently, it is a named hole.
             if kws.isEmpty then
-              match Stdlib.builtin ctx.dialect h₁ f (builtinSeeThrough f vs) with
+              -- A boxed container is seen through the heap only by the builtins for which
+              -- that is exact (`Boxed.builtinArgs`); a fresh container a builtin builds is
+              -- itself boxed under Python, because in CPython it is a new object.
+              if builtinRefused h₁ f vs then (h₁, .hole s!"call:{f}:boxed-key")
+              else
+              match Stdlib.builtin ctx.dialect h₁ f (builtinSeeThrough f (builtinArgs h₁ f vs)) with
+              | some (h₂, .val v) =>
+                  if ctx.dialect.isPython && freshBuiltins.contains f then
+                    let (h₃, v') := h₂.boxFresh v
+                    (h₃, .val v')
+                  else (h₂, .val v)
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
@@ -1380,7 +1419,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .inr (vs, kws)) =>
           match h₂.get r with
           | none   => (h₂, .hole "mcall:dangling-ref")
+          -- A boxed list/dict: its builtin methods, on the payload, written back to the SAME
+          -- reference. Checked BEFORE `resolveMethod`, whose free-function fallback would
+          -- otherwise let a global `append` answer `xs.append(1)`.
           | some o =>
+            match o.payload with
+            | .list ps =>
+                if kws.isEmpty then boxedMethod ctx.dialect h₂ r (.list ps) m vs
+                else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+            | .dict ps =>
+                if kws.isEmpty then boxedMethod ctx.dialect h₂ r (.dict ps) m vs
+                else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+            | _ =>
             match ctx.resolveMethod o.cls m with
             | none    =>
               -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
@@ -1463,6 +1513,10 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .inl e)  => (h₂, e)
         | (h₂, .inr (_, _ :: _)) => (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
         | (h₂, .inr (vs, [])) =>
+          match methodRefusal h₂ recv m vs with
+          | some l => (h₂, .hole l)
+          | none =>
+          if methodKeyError ctx.dialect h₂ recv m vs then (h₂, .exn (.str "TypeError")) else
           match Stdlib.method ctx.dialect h₂ recv m vs with
           | some (h₃, .pure r)       => (h₃, r)
           -- A mutating container method cannot be honoured while containers are values:
@@ -1563,7 +1617,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match ctx.builtinBase cls with
         -- `class X(tuple)` and friends: the instance IS the builtin, not an opaque
         -- reference. See `Val.bobj`.
-        | some b => (h₁, allocBuiltin ctx cls b vs)
+        | some b => (h₁, allocBuiltin ctx cls b (vs.map h₁.view))
         | none =>
         -- A class defined inside a function is a *value*; instances carry the bindings it
         -- captured, so its methods can read the enclosing scope.
@@ -1645,7 +1699,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .starred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
+        match (h₁.view v).iterable with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some xs =>
           match evalList ctx n h₁ ρ as with
@@ -1662,7 +1716,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .dstarred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match strKeyed v with
+        match strKeyed (h₁.view v) with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some ks =>
           match evalList ctx n h₁ ρ as with
@@ -1739,6 +1793,10 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .setField r f v =>
       match evalExpr ctx n h ρ r with
       | (h₁, .val (.ref addr)) =>
+        -- CPython: `AttributeError: 'list' object has no attribute ...`. Not modelled as
+        -- that exception (a `list` SUBCLASS would accept it), so a hole.
+        if (h₁.payload addr).toVal.isSome then (h₁, .hole s!"setField:{f}:builtin-container")
+        else
         match evalExpr ctx n h₁ ρ v with
         | (h₂, .val vv)    => (h₂.setField addr f vv, .normal ρ)
         | (h₂, .exn e)     => (h₂, .exn e)
@@ -1764,9 +1822,104 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .exn e) => (h₁, .exn e)
       | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
-  | n+1, h, ρ, .setIndex _ _ _ =>
-      -- Container mutation needs boxed containers, which Core does not have yet.
-      (h, .hole "setIndex:immutable-containers")
+  -- `docs/boxed-containers.md` step 4. Only Python has boxed containers; every other
+  -- dialect keeps the original hole, unevaluated, exactly as before.
+  --
+  -- CPython's order for `e[i] = v` is `v`, then `e`, then `i`. A boxed container is
+  -- written with `Heap.setPayload` on the reference `e` evaluated to -- never through the
+  -- expression `e`, which is what makes a write through one alias visible through every
+  -- other. A plain object runs its class's own `__setitem__`; anything else is
+  -- `valueSubscriptWrite`'s `TypeError` (immutable values) or hole (unboxed containers).
+  | n+1, h, ρ, .setIndex e i v =>
+      if !ctx.dialect.isPython then (h, .hole "setIndex:immutable-containers") else
+      match evalExpr ctx n h ρ v with
+      | (h₁, .val x) =>
+        match evalExpr ctx n h₁ ρ e with
+        | (h₂, .val c) =>
+          match evalExpr ctx n h₂ ρ i with
+          | (h₃, .val k) =>
+            match c with
+            | .ref r =>
+              match h₃.get r with
+              | none => (h₃, .hole "setIndex:dangling-ref")
+              | some o =>
+                match o.payload with
+                | .none =>
+                  if ctx.classDefines o.cls "__setitem__" then
+                    match ctx.resolveMethod o.cls "__setitem__" with
+                    | some fn =>
+                      match (if o.captured.isEmpty
+                             then applyFunc ctx n h₃ fn (some (.ref r)) [k, x] []
+                             else applyClosure ctx n h₃ fn (("self", .ref r) :: o.captured)
+                                    [k, x] []) with
+                      | (h₄, .val _)     => (h₄, .normal ρ)
+                      | (h₄, .exn ex)    => (h₄, .exn ex)
+                      | (h₄, .hole l)    => (h₄, .hole l)
+                      | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+                    | none => (h₃, .hole s!"setIndex:{o.cls}")
+                  else (h₃, .hole s!"setIndex:{o.cls}:no-own-__setitem__")
+                | p =>
+                  match payloadStore h₃ p k x with
+                  | .ok p'   => (h₃.setPayload r p', .normal ρ)
+                  | .exn ex  => (h₃, .exn (.str ex))
+                  | .hole l  => (h₃, .hole l)
+            | c =>
+              match valueSubscriptWrite ctx.dialect c "setIndex" with
+              | .exn ex => (h₃, .exn ex)
+              | .hole l => (h₃, .hole l)
+              | _       => (h₃, .hole "setIndex:immutable-containers")
+          | (h₃, .exn ex)    => (h₃, .exn ex)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .exn ex)    => (h₂, .exn ex)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  -- `del e[i]`: CPython evaluates `e`, then `i`. Mirrors `setIndex`.
+  | n+1, h, ρ, .delIndex e i =>
+      if !ctx.dialect.isPython then (h, .hole "op:delete-index") else
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val c) =>
+        match evalExpr ctx n h₁ ρ i with
+        | (h₂, .val k) =>
+          match c with
+          | .ref r =>
+            match h₂.get r with
+            | none => (h₂, .hole "delIndex:dangling-ref")
+            | some o =>
+              match o.payload with
+              | .none =>
+                if ctx.classDefines o.cls "__delitem__" then
+                  match ctx.resolveMethod o.cls "__delitem__" with
+                  | some fn =>
+                    match (if o.captured.isEmpty
+                           then applyFunc ctx n h₂ fn (some (.ref r)) [k] []
+                           else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured)
+                                  [k] []) with
+                    | (h₃, .val _)     => (h₃, .normal ρ)
+                    | (h₃, .exn ex)    => (h₃, .exn ex)
+                    | (h₃, .hole l)    => (h₃, .hole l)
+                    | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+                  | none => (h₂, .hole s!"delIndex:{o.cls}")
+                else (h₂, .hole s!"delIndex:{o.cls}:no-own-__delitem__")
+              | p =>
+                match payloadDelete h₂ p k with
+                | .ok p'   => (h₂.setPayload r p', .normal ρ)
+                | .exn ex  => (h₂, .exn (.str ex))
+                | .hole l  => (h₂, .hole l)
+          | c =>
+            match valueSubscriptWrite ctx.dialect c "delIndex" with
+            | .exn ex => (h₂, .exn ex)
+            | .hole l => (h₂, .hole l)
+            | _       => (h₂, .hole "delIndex:immutable-containers")
+        | (h₂, .exn ex)    => (h₂, .exn ex)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` an interior-pointer VALUE --
   -- requires the pointer operand to evaluate to `Val.iref r sel` and delegates,
   -- unconditionally, to the unchanged `Heap.setField`.
@@ -1788,7 +1941,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, r)          => (h₁, r)
   | n+1, h, ρ, .ifte c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v)     => if v.truthy then execStmt ctx n h₁ ρ t
+      | (h₁, .val v)     => if (h₁.view v).truthy then execStmt ctx n h₁ ρ t
                             else execStmt ctx n h₁ ρ e
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
@@ -1812,7 +1965,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
       | (h₁, .val v) =>
-          if v.truthy then
+          if (h₁.view v).truthy then
             match execStmt ctx n h₁ ρ body with
             | (h₂, .normal ρ') => execStmt ctx n h₂ ρ' (.loop c body)
             | (h₂, .cont ρ')   => execStmt ctx n h₂ ρ' (.loop c body)
@@ -1834,8 +1987,21 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .forIn x e body =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
-        | some vs => execFor ctx n h₁ ρ x vs body
+        match (h₁.view v).iterable with
+        | some vs =>
+          match v with
+          -- A boxed container is iterated over a SNAPSHOT, and the snapshot is only
+          -- faithful if nothing wrote to the object meanwhile: CPython's list iterator
+          -- would have seen the write, and its dict iterator raises `RuntimeError`. So a
+          -- moved `version` turns the outcome into a hole rather than an answer.
+          | .ref r =>
+            let ver := h₁.version r
+            match execFor ctx n h₁ ρ x vs body with
+            | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+            | (h₂, c) =>
+              if h₂.version r == ver then (h₂, c)
+              else (h₂, .hole "forIn:container-mutated-during-iteration")
+          | _ => execFor ctx n h₁ ρ x vs body
         | none    => (h₁, .hole "forIn:non-iterable")
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
