@@ -1,0 +1,20 @@
+{
+ "_": [
+  "How tests/fixtures/pyscoping/ast.json was produced. `tests/test_pyscoping_cpython.py`",
+  "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
+  "exporter_sha256 is informational: an exporter change does not invalidate this fixture",
+  "automatically; re-running the command and diffing ast.json is how to find out."
+ ],
+ "source": "tests/fixtures/pyscoping/pyscoping_cases.py",
+ "source_sha256": "d71f0ff5c4ff06df6017a05b0b6da8122a0991311087672741dc810658d82748",
+ "ast_sha256": "ee45f8e48e6853232faf1ebc2ede0a4df56cd5c659d889f18b5713203a30b3f6",
+ "joern_version": "4.0.606",
+ "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "d024416b47d5ec4f4e98a9c1c1343955cee5b8be1b11cd8eed2b302357ebf489",
+ "command": [
+  "joern-parse tests/fixtures/pyscoping --language pythonsrc --output pyscoping.cpg",
+  "joern --script cartographer/export_ast.sc --param cpgPath=pyscoping.cpg --param out=tests/fixtures/pyscoping/ast.json",
+  "python3 cartographer/render_lean.py tests/fixtures/pyscoping/ast.json Autoform/PyScopingProgram.lean PyScoping"
+ ]
+}

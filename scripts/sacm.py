@@ -252,7 +252,7 @@ def analyse_ast(ast):
     kinds = {}
     for fn in ast:
         found = []
-        walk_holes(fn.get("body"), found)
+        walk_holes([fn.get("body"), fn.get("defaults")], found)  # a default is part of the function (Func.holes)
         if not found:
             holefree += 1
         for label, kind in found:

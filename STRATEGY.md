@@ -3300,3 +3300,137 @@ Tests: `Autoform/BuiltinBase.lean` §4.1/§4.2 (`len`, every refusal with its ow
 end to end keep the class), `tests/test_builtin_base_oracle.py` (26 tests: encoding,
 refusals, class-aware comparison, and reconstructions of the old class-dropping
 behaviour).
+
+## 58. Python calling convention and scoping: `nonlocal`, defaults, keyword-only, starred assignment
+
+Four gaps §22 and §36 recorded as open. Three were not holes at all but silent
+mistranslations, which is why the hole count below goes *up*.
+
+### What Joern gives, checked rather than assumed
+
+A probe file through `pysrc2cpg` 4.0.606 (the pinned version, fetched from Maven Central
+because this box's Joern is a C-only assembly) shows:
+
+* **Default expressions are dropped.** `def f(b=1)` and `def f(b)` produce the same CPG:
+  the parameter node has a name and an `OFFSET`, no children, and the `def` site evaluates
+  nothing. So defaults were never translated *and never holed* -- an omitted argument read
+  `unit`, which is right for `=None` by accident and wrong for `=128`.
+* **`*` and `/` markers are dropped.** `def f(a, *, b)` is three plain parameters, so
+  `def f(*args, key=None)` called as `f(1, 2)` bound `key = 2` (CPython: `args == (1, 2)`).
+* **`a, *b, c = xs`** is lowered to `tmp = xs; a = tmp[0]; b = tmp[1:-1:1]; c = tmp[-1]`.
+  The slice made it `op:slice`.
+* **`nonlocal x`** is an `UNKNOWN` node carrying its text (`scope:nonlocal-write`, 8 on
+  `cachetools`).
+
+### What was done
+
+* **Signatures from source** (`pySig` in `export_ast.sc`), the same move §36 made for
+  `**kwargs`: the parameter list is re-read at the parameters' offsets and must parse into
+  exactly the CPG's parameters, or the function gets `param:signature-unparsed`. It yields
+  `Func.kwonly`, `Func.posonly` and `Func.defaults`. Only the default's *text* exists, so
+  only literals are translated (`None`, booleans, numbers, escape-free strings, `()`) --
+  for those, CPython's evaluate-once-at-`def` rule and evaluate-per-call cannot be told
+  apart. Every other default is `param:default-nonliteral`, stored in `Func.defaults` (so
+  `Func.holes` and the ledger count it) and raised by `Func.guardedBody` only on a call that
+  omits the argument. Evaluating `acc=[]` per call would silently invert the aliasing
+  CPython has; evaluating `Cache.__setitem__` per call is right only until someone rebinds
+  `Cache`.
+* **`bindParams`** binds positional arguments to `posParams` (now excluding keyword-only
+  parameters), keywords to `kwParams` (excluding positional-only ones; such a keyword goes
+  to `**kwargs` or is a `TypeError`), and puts literal defaults *under* the call's own
+  bindings, so a supplied argument always shadows its default.
+* **`nonlocal` by cell conversion, entirely in the exporter.** §22 said this needed every
+  scope to become a heap frame. It does not: only the variables some inner function
+  declares `nonlocal` need to be shared, and Core already had one-field heap cells
+  (`Expr.boxNew`, from `003-box-address-taken-locals`). The owner (`bindingScopeOf`, the
+  LEGB walk over enclosing `def`s, skipping class bodies, stopping at `global`) allocates
+  the cell in its prologue; every read is `x.v` and every write `x.v = e`, in the owner and
+  in every function that reaches `x`; closures capture the cell's reference by value. No
+  change to `Env`, and none to the refinement layer.
+* **One Core change to make it reachable**: `Expr.call f` applies a `Val.clos` bound to `f`
+  in the environment *before* consulting the function table. The exporter calls a
+  capturing nested function by its variable name; before, it called `...outer.inc` by full
+  name, which reached the right `Func` through `applyFunc` with **no captured environment**.
+* **Starred assignment**: the exporter recognises Joern's lowering and emits
+  `tmp = <unpackEx>(xs, nb, na)` (`Stdlib.unpackEx`: any iterable, starred name always a
+  list, `ValueError` when too short, no answer for an object whose iterability depends on
+  `__iter__`).
+
+### Two silent bugs found on the way
+
+* **`xs[-1]` returned the first element.** `Expr.index` used `Int.toNat`, which clamps -1
+  to 0. Found because `p, *q, r = "abcd"` (Joern's lowering reads `r = tmp[-1]`) gave
+  `r == 'a'`. Python now wraps (`Stdlib.seqIndex`); other dialects hole `index:negative`.
+* **C struct boxing fired on Python.** `x = Cls()` in a Python function whose class has
+  methods made `x` -- and `Cls` -- boxed "structs" and holed the assignment
+  `op:arrayDecl:boxed-initializer`. Now gated off for `.py`.
+
+### Evidence
+
+`Autoform/PyScoping.lean`: kernel-checked theorems for each rule on hand-written programs
+(`literal_default_is_bound`, `nonliteral_default_holes_only_when_needed`,
+`kwonly_after_varargs`, `posonly_name_goes_to_kwargs`, `negative_index_counts_from_the_end`,
+`unpackEx_*`, `nonlocal_write_is_seen_by_the_owner`), then end-to-end: the 28 `case_*`
+functions of `tests/fixtures/pyscoping/pyscoping_cases.py`, exported, rendered
+(`Autoform/PyScopingProgram.lean`), run with `runMain` and pinned with `#guard_msgs`.
+`tests/test_pyscoping_cpython.py` runs the same 28 under CPython 3.11 and checks every pin:
+26 equal CPython's value; 2 (`dflt_mutable(1)` with `acc=[]`, `dflt_global(1)` with
+`lim=GLOBAL_LIMIT`) are the hole `param:default-nonliteral`, each listed with its reason.
+A pin that is a *different value* fails the test unconditionally.
+
+### `cachetools` (v7.1.7), before and after
+
+The committed `ast-Cachetools.json` is unattributed (`provenance/unattributed.json`), so
+the comparison is between two exports of the same CPG (`src/` of tag v7.1.7, which is the
+`__version__` the committed AST carries), with `export_ast.sc` at 46c65fc and with this
+change. The 46c65fc export has exactly the committed AST's hole table (byte content differs
+in 53 functions; hole labels and counts are identical).
+
+| label | before | after |
+|---|--:|--:|
+| `scope:nonlocal-write` | 8 | **0** |
+| `param:default-nonliteral` | -- | **30** |
+| `param:signature-unparsed` | -- | 0 |
+| everything else | 18 | 18 |
+| **total holes** | **26** | **48** |
+| hole-free functions (of 209) | 184 | 167 |
+
+Counted by walking every function's `body` *and* `defaults` for `hole`/`holeS` nodes (the
+walk `sacm.py` and `label_function_counts.py` now do). The two exports: `joern-parse
+cachetools/src --language pythonsrc`, then `joern --script <exporter> --param cpgPath=...
+--param out=...`, once with `export_ast.sc` as of 46c65fc and once with this one.
+
+8 functions became hole-free (the `wrapper`/`cache_clear` pairs of the four `_*_info`
+factories in `_cached.py`); 25 stopped being hole-free. All 25 are functions with a
+non-literal default -- 30 of the corpus' 77 recorded defaults: `cache_setitem=
+Cache.__setitem__` and its siblings, `default=__marker`, `key=keys.hashkey`,
+`timer=time.monotonic`, `choice=random.choice`, `hash=tuple.__hash__`. Every one of them
+used to read `unit` when its argument was omitted. That was not coverage; it was the
+§31 category, now counted. (`cachetools` has no keyword-only or positional-only
+parameters and no starred assignment, so those two changes are measured only on the
+fixture.) The first run of the new exporter also reported 7 `param:signature-unparsed`:
+`Character.isUnicodeIdentifierStart('_')` is false in Java, so every parameter spelled
+`_key` failed the reader. Fixed, and `case_underscored_default` added to the fixture.
+
+`ast-Cachetools.json` and `Autoform/Generated/Cachetools.lean` are **not** regenerated in
+this change: the 25 newly-holed functions would move the theorems in
+`SpecsGen/Cachetools.lean`, and re-attributing that artifact is a separate decision.
+
+### What remains
+
+* **Non-literal defaults** need Core to execute `def` statements (a function value that
+  carries the values computed when it was created) and a CPG node for the expression,
+  which `pysrc2cpg` does not emit.
+* **A missing required argument** (`f()` into `def f(a)`) still reads `unit` instead of
+  raising `TypeError`: a function rendered before signatures were recorded cannot be told
+  from one with no defaults.
+* **The unbound-method arity rule** in `Expr.call` (`vs.length == params.length + 1`) does
+  not know about defaults, so `m = C.get; m(obj, k)` against `def get(self, key,
+  default=None)` still binds `key := obj`, as before.
+* **Late-binding reads**: variables that no inner function declares `nonlocal` keep
+  by-value capture, so `g = lambda: x; x = 2; g()` reads the value at closure creation.
+  Converting every captured-and-reassigned variable to a cell is the same mechanism and
+  is not done here.
+* `del x` on a cell (`scope:del-cell`), `global` rebinding from a function, starred
+  targets outside an assignment statement, and plain unpacking's missing length check
+  (`a, b = [1, 2, 3]` binds without the `ValueError`).

@@ -485,7 +485,9 @@ class TestVarargContract:
             ext = os.path.splitext(f.get("file", ""))[1].lower()
             if ext in PY_EXTS:
                 continue
-            for key in ("vararg", "kwarg"):
+            # `kwonly`/`posonly`/`defaults` come from the same source read
+            # (`pySig`, STRATEGY.md §58) and are just as Python-only.
+            for key in ("vararg", "kwarg", "kwonly", "posonly", "defaults"):
                 if f.get(key) is not None:
                     yield (f.get("name"), f.get("file"), key)
 

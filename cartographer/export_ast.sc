@@ -825,6 +825,79 @@ import scala.annotation.tailrec
     else ujson.Obj("k" -> "fnref", "v" -> target)
   }
 
+  // ---- Python `nonlocal`: cell conversion --------------------------------------
+  //
+  // `Expr.closure` captures its environment BY VALUE, so a `nonlocal x; x += 1` in an
+  // inner function used to be the hole `scope:nonlocal-write`: emitting the plain
+  // assignment would update the closure's private copy and leave the enclosing frame --
+  // and every other closure over it -- reading the old value.
+  //
+  // CPython's own implementation is the fix: a variable that an inner function declares
+  // `nonlocal` lives in a CELL, a heap object shared by the owning frame and every
+  // closure over it. Core already has the pieces (`003-box-address-taken-locals`): the
+  // owning function allocates `x = boxNew(x)` in its prologue, every read of `x` becomes
+  // `x.v` and every write `x.v = e`, and an inner function, capturing `x` by value,
+  // captures the REFERENCE to the cell, not the integer in it. Reads and writes from
+  // anywhere then meet in one heap object, which is exactly cell semantics.
+  //
+  // Which names: the cells an owner allocates are exactly the names some function nested
+  // in it declares `nonlocal` and resolves to it (`bindingScopeOf`, Python's LEGB walk
+  // over enclosing FUNCTION scopes, skipping class bodies). Every function that reads or
+  // writes such a name freely -- whether or not it says `nonlocal` -- goes through the
+  // cell too, because a plain read of a variable another closure rebinds must see the
+  // rebinding. Variables nobody declares `nonlocal` are NOT converted: they keep the
+  // by-value capture, and the late-binding read that capture still gets wrong
+  // (`g = lambda: x; x = 2; g()`) is recorded in STRATEGY.md §57 rather than fixed here.
+
+  /** Names a method's OWN body declares with `kw` (`nonlocal` / `global`). */
+  def scopeDeclsOf(m: Method, kw: String): Set[String] =
+    m.body.ast.collect { case u: Unknown if u.code.trim.startsWith(kw + " ") => u }
+      .filter(u => scala.util.Try(u.method.fullName).toOption.forall(_ == m.fullName)).l
+      .flatMap(u => u.code.trim.stripPrefix(kw).takeWhile(_ != '#').split(",")
+                     .map(_.trim).filter(_.nonEmpty))
+      .toSet
+  val nonlocalOf: Map[String, Set[String]] =
+    allMethods.map(m => m.fullName -> scopeDeclsOf(m, "nonlocal")).toMap
+  val globalDeclOf: Map[String, Set[String]] =
+    allMethods.map(m => m.fullName -> scopeDeclsOf(m, "global")).toMap
+
+  /** A real `def` scope: not `<module>`, a class `<body>`, or a `<lambda>` (which cannot
+    * assign, so never owns a cell). */
+  def pyFunctionScope(fn: String): Boolean =
+    methodByName.get(fn).exists(p => !p.name.startsWith("<"))
+
+  /** The function scope a free `x` in `fn` refers to: the nearest enclosing `def` that
+    * binds it, skipping class bodies, stopping (with `None`) at one that declares it
+    * `global` -- Python's rule for `nonlocal x` and for a free read alike. */
+  def bindingScopeOf(fn: String, x: String): Option[String] = {
+    @annotation.tailrec def go(cur: String): Option[String] = {
+      val i = cur.lastIndexOf('.')
+      if (i < 0) None
+      else {
+        val parent = cur.substring(0, i)
+        if (pyFunctionScope(parent) && globalDeclOf.getOrElse(parent, Set.empty).contains(x)) None
+        else if (pyFunctionScope(parent) && boundOf.getOrElse(parent, Set.empty).contains(x)) Some(parent)
+        else go(parent)
+      }
+    }
+    go(fn)
+  }
+
+  /** Owner function -> the names it must allocate as cells. */
+  val cellsOwnedBy: Map[String, Set[String]] =
+    (for {
+      m <- allMethods
+      x <- nonlocalOf.getOrElse(m.fullName, Set.empty).toList
+      o <- bindingScopeOf(m.fullName, x).toList
+    } yield o -> x).groupBy(_._1).map { case (k, v) => k -> v.map(_._2).toSet }
+
+  /** The cells `fn` reaches without owning: free names that resolve to an owner's cell. */
+  def cellRefsOf(fn: String): Set[String] = {
+    val free = (usedOf.getOrElse(fn, Set.empty) ++ nonlocalOf.getOrElse(fn, Set.empty)) --
+               boundOf.getOrElse(fn, Set.empty)
+    free.filter(x => bindingScopeOf(fn, x).exists(o => cellsOwnedBy.getOrElse(o, Set.empty).contains(x)))
+  }
+
   // ---- module objects ---------------------------------------------------------
   //
   // ## What a module is, in Core
@@ -1162,6 +1235,15 @@ import scala.annotation.tailrec
     * binding (`expr`'s `Identifier`/`MethodParameterIn` cases, `assignTo`, `incrStmt`,
     * and the `<operator>.addressOf` case in `callExpr`). */
   var boxedLocals = Set.empty[String]
+
+  /** Python cells this method reaches but does not own (`cellRefsOf`): boxed like
+    * `boxedLocals`, so every read is `x.v` and every write `x.v = e`, but with NO prologue
+    * allocation -- the cell arrives in the captured environment, and allocating a fresh
+    * one here would disconnect this function from the owner's. */
+  var pyCellRefs = Set.empty[String]
+
+  /** `fullName` of the method `emit` is translating. */
+  var currentMethodFull = ""
 
   /** `003-box-address-taken-locals`: `pointerLocalName -> boxedLocalName`, for a
     * pointer-typed local that is PROVABLY, syntactically, an alias of one specific
@@ -6329,6 +6411,248 @@ import scala.annotation.tailrec
     if (v.abs <= BigInt(2).pow(53)) ujson.Obj("k" -> "int", "v" -> v.toLong)
     else ujson.Obj("k" -> "int", "v" -> v.toString)
 
+  // ---- Python signatures: defaults, keyword-only, positional-only ---------------
+  //
+  // `pysrc2cpg` keeps a parameter's NAME and OFFSET and drops everything else about the
+  // signature: the default expression (`def f(b=1)` and `def f(b)` produce identical
+  // CPGs -- checked on Joern 4.0.606 with a probe file, the `METHOD_PARAMETER_IN` has no
+  // children and the `def` site no evaluation of `1`), the bare `*` that makes the
+  // following parameters keyword-only, and the `/` that makes the preceding ones
+  // positional-only. Treating all three as plain positional parameters was silently
+  // wrong: `def f(*args, key=None)` bound `f(1, 2)` as `key = 2`.
+  //
+  // So, exactly as `paramStars` does for `*args`/`**kwargs`, the signature is read back
+  // from the source text at the parameters' offsets. Only the TEXT of a default is
+  // available, never a CPG node for it, so a default is translated only when it is a
+  // literal (`pyDefaultLiteral`); anything else -- `[]`, `Cache.__setitem__`,
+  // `time.monotonic` -- becomes `param:default-nonliteral`, which Core raises only on a
+  // call that actually needs the default. A signature this cannot parse is the hole
+  // `param:signature-unparsed` on the whole function: unknown defaults mean every
+  // under-supplied call could be wrong.
+
+  case class PySig(kwonly: List[String], posonly: List[String], defaults: List[(String, String)])
+
+  /** Index of the first character at bracket depth 0, from `from`, satisfying `stop`,
+    * skipping string literals and comments; -1 when there is none before an unbalanced
+    * closing bracket or the end of the text. */
+  def pyScanTop(txt: String, from: Int, stop: Char => Boolean): Int = {
+    var i = from
+    var depth = 0
+    while (i < txt.length) {
+      val c = txt.charAt(i)
+      if (c == '#') {
+        while (i < txt.length && txt.charAt(i) != '\n') i += 1
+      } else if (c == '"' || c == '\'') {
+        val q = if (txt.startsWith(s"$c$c$c", i)) s"$c$c$c" else c.toString
+        i += q.length
+        var closed = false
+        while (!closed && i < txt.length) {
+          if (txt.charAt(i) == '\\') i += 2
+          else if (txt.startsWith(q, i)) { i += q.length; closed = true }
+          else if (q.length == 1 && txt.charAt(i) == '\n') return -1
+          else i += 1
+        }
+        if (!closed) return -1
+        i -= 1
+      } else if (depth == 0 && stop(c)) {
+        return i
+      } else if ("([{".indexOf(c) >= 0) {
+        depth += 1
+      } else if (")]}".indexOf(c) >= 0) {
+        if (depth == 0) return -1
+        depth -= 1
+      }
+      i += 1
+    }
+    -1
+  }
+
+  /** `txt` with `#` comments removed (outside string literals). */
+  def pyStripComments(txt: String): String = {
+    val sb = new StringBuilder
+    var i = 0
+    while (i < txt.length) {
+      val c = txt.charAt(i)
+      if (c == '#') {
+        while (i < txt.length && txt.charAt(i) != '\n') i += 1
+      } else if (c == '"' || c == '\'') {
+        val q = if (txt.startsWith(s"$c$c$c", i)) s"$c$c$c" else c.toString
+        var k = i + q.length
+        var closed = false
+        while (!closed && k < txt.length) {
+          if (txt.charAt(k) == '\\') k += 2
+          else if (txt.startsWith(q, k)) { k += q.length; closed = true }
+          else k += 1
+        }
+        val end = math.min(k, txt.length)
+        sb.append(txt.substring(i, end))
+        i = end
+      } else {
+        sb.append(c)
+        i += 1
+      }
+    }
+    sb.toString
+  }
+
+  /** The signature facts of a Python `def` or `lambda`, read from its source; `None` when
+    * the text does not parse into exactly the parameters the CPG has, in order. */
+  def pySig(m: Method): Option[PySig] = {
+    val ps = m.parameter.l.sortBy(_.index)
+    if (ps.isEmpty) return Some(PySig(Nil, Nil, Nil))
+    if (!ps.forall(_.offset.isDefined)) return None
+    val txt = fileText(m.filename).getOrElse(return None)
+    val first = ps.map(_.offset.get).min
+    if (first > txt.length) return None
+    var j = first - 1
+    while (j >= 0 && " \t\r\n*,/\\".indexOf(txt.charAt(j)) >= 0) j -= 1
+    if (j < 0) return None
+    val (start, term) =
+      if (txt.charAt(j) == '(') (j + 1, ')')
+      else if (j >= 5 && txt.substring(j - 5, j + 1) == "lambda") (j + 1, ':')
+      else return None
+    var segs = List.empty[String]
+    var pos = start
+    var done = false
+    while (!done) {
+      val e = pyScanTop(txt, pos, c => c == ',' || c == term)
+      if (e < 0) return None
+      segs = segs :+ pyStripComments(txt.substring(pos, e)).trim
+      if (txt.charAt(e) == term) done = true else pos = e + 1
+    }
+    def ident(s: String): String = s.takeWhile(ch => Character.isUnicodeIdentifierPart(ch))
+    var names    = List.empty[String]
+    var kwonly   = List.empty[String]
+    var posonly  = List.empty[String]
+    var defaults = List.empty[(String, String)]
+    var kwMode   = false
+    for (s <- segs if s.nonEmpty) {
+      if (s == "*") kwMode = true
+      else if (s == "/") posonly = names
+      else if (s.startsWith("**")) names = names :+ ident(s.drop(2).trim)
+      else if (s.startsWith("*")) { names = names :+ ident(s.drop(1).trim); kwMode = true }
+      else {
+        val nm = ident(s)
+        if (nm.isEmpty || !(nm.head == '_' || Character.isUnicodeIdentifierStart(nm.head))) return None
+        val rest = s.drop(nm.length).trim
+        val dflt =
+          if (rest.isEmpty) None
+          else if (rest.startsWith("=")) Some(rest.drop(1).trim)
+          else if (rest.startsWith(":")) {
+            val eq = pyScanTop(rest, 1, _ == '=')
+            if (eq < 0) None else Some(rest.substring(eq + 1).trim)
+          } else return None
+        names = names :+ nm
+        if (kwMode) kwonly = kwonly :+ nm
+        dflt.foreach(d => defaults = defaults :+ (nm -> d))
+      }
+    }
+    if (names != ps.map(_.name)) None
+    else Some(PySig(kwonly, posonly, defaults))
+  }
+
+  /** A default's source text as a Core literal, when it is one whose value cannot depend
+    * on WHEN it is evaluated: `None`, `True`/`False`, an integer, a float, a plain string
+    * without escapes, or `()`. Everything else is `None` (and the caller holes it). */
+  def pyDefaultLiteral(t0: String): Option[ujson.Obj] = {
+    val t = t0.trim
+    val floatRe = """[-+]?(\d+\.\d*|\.\d+|\d+)([eE][-+]?\d+)?"""
+    if (t == "None") Some(ujson.Obj("k" -> "unit"))
+    else if (t == "True")  Some(ujson.Obj("k" -> "bool", "v" -> true))
+    else if (t == "False") Some(ujson.Obj("k" -> "bool", "v" -> false))
+    else if (t.matches("""[-+]?(0|[1-9][0-9]*)""")) Some(intLit(BigInt(t.stripPrefix("+"))))
+    else if (t.matches(floatRe) && t.exists(ch => ch == '.' || ch == 'e' || ch == 'E'))
+      Some(ujson.Obj("k" -> "float", "v" -> t))
+    else if (!t.contains('\\') && !t.contains('\n') && pyStringLit(t).isDefined &&
+             !t.head.isLetter)
+      Some(ujson.Obj("k" -> "str", "v" -> pyStringLit(t).get))
+    else if (t.replace(" ", "") == "()") Some(ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr()))
+    else None
+  }
+
+  // ---- Python starred assignment: `a, *b, c = xs` --------------------------------
+  //
+  // `pysrc2cpg` lowers it to `tmp = xs; a = tmp[0]; b = tmp[1:-1:1]; c = tmp[-1]`. That
+  // is not what CPython does in three ways: the starred name is always a LIST (a slice of
+  // a tuple is a tuple), any iterable is accepted (a slice needs a sequence), and too few
+  // elements is `ValueError` (the slice is silently empty and `tmp[0]` an `IndexError`).
+  // The slice used to make the whole statement `op:slice`. The lowering is recognised
+  // here and replaced by `tmp = <unpackEx>(xs, nb, na)` -- `Stdlib.unpackEx`, which does
+  // all three -- after which the fixed targets read `tmp[i]` / `tmp[-k]` exactly as
+  // before (both still index the right element of the returned tuple) and the starred
+  // target reads `tmp[nb]`.
+
+  /** Write a Python NAME, honouring the cell/global conversions `assignTo` applies. */
+  def pyNameWrite(nm: String, e: ujson.Obj): ujson.Obj =
+    if (boxedLocals.contains(nm)) ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> e)
+    else if (isGlobalWrite(nm)) ujson.Obj("k" -> "setGlobal", "x" -> nm, "e" -> e)
+    else ujson.Obj("k" -> "assign", "x" -> nm, "e" -> e)
+
+  def pyStarredUnpack(b: Block): Option[ujson.Obj] = {
+    def intLitOf(n: AstNode): Option[Int] = n match {
+      case l: Literal => l.code.trim.toIntOption
+      case _          => None
+    }
+    def isNoneLit(n: AstNode): Boolean = n match {
+      case l: Literal => l.code.trim == "None"
+      case _          => false
+    }
+    val kids = kidsOf(b).filterNot(_.isInstanceOf[Local])
+    kids match {
+      case (first: Call) :: targets if first.methodFullName == "<operator>.assignment" && targets.nonEmpty =>
+        kidsOf(first) match {
+          case List(tmp: Identifier, rhs) =>
+            // Each target: (assignment call, lhs, Left(index) | Right(slice start, stop))
+            val parsed = targets.map {
+              case a: Call if a.methodFullName == "<operator>.assignment" =>
+                kidsOf(a) match {
+                  case List(lhs, acc: Call) if acc.methodFullName == "<operator>.indexAccess" =>
+                    kidsOf(acc) match {
+                      case List(t: Identifier, i) if t.name == tmp.name => intLitOf(i).map(ix => (a, lhs, Left(ix)))
+                      case _ => None
+                    }
+                  case List(lhs, acc: Call) if acc.methodFullName == "<operator>.slice" =>
+                    kidsOf(acc) match {
+                      case List(t: Identifier, lo, hi, st) if t.name == tmp.name && intLitOf(st).contains(1) =>
+                        val hiV: Option[Int] = if (isNoneLit(hi)) Some(0) else intLitOf(hi).map(v => -v)
+                        (intLitOf(lo), hiV) match {
+                          case (Some(l), Some(na)) => Some((a, lhs, Right((l, na))))
+                          case _ => None
+                        }
+                      case _ => None
+                    }
+                  case _ => None
+                }
+              case _ => None
+            }
+            if (parsed.exists(_.isEmpty)) None
+            else {
+              val ts = parsed.flatten
+              val slices = ts.zipWithIndex.collect { case ((_, lhs, Right((lo, na))), k) => (lhs, lo, na, k) }
+              slices match {
+                case List((sLhs: Identifier, nb, na, k))
+                    if nb == k && na == ts.length - k - 1 && na >= 0 &&
+                       ts.take(k).zipWithIndex.forall { case ((_, _, ix), i) => ix == Left(i) } &&
+                       ts.drop(k + 1).zipWithIndex.forall { case ((_, _, ix), i) => ix == Left(i - na) } =>
+                  val (prelude, rhsE) = valueOf(rhs)
+                  val call = ujson.Obj("k" -> "call", "f" -> "<unpackEx>",
+                    "args" -> ujson.Arr(rhsE, intLit(nb), intLit(na)))
+                  val tmpNm = localName(tmp.name)
+                  val tmpRead = expr(tmp)
+                  val starW = pyNameWrite(localName(sLhs.name),
+                    ujson.Obj("k" -> "index", "a" -> tmpRead, "b" -> intLit(nb)))
+                  val fixed = ts.zipWithIndex.collect { case ((a, _, Left(_)), i) => (i, stmt(a)) }
+                  val body = fixed.filter(_._1 < k).map(_._2) ++ List(starW) ++ fixed.filter(_._1 > k).map(_._2)
+                  Some(seqOf(prelude ++ List(pyNameWrite(tmpNm, call)) ++ body))
+                case _ => None
+              }
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
   /** `010-reach-90pct-hole-free`: the integer value of a C/C++/Java/Kotlin/Go character
     * (rune) literal's INNER text (already stripped of its surrounding `'...'`) -- see
     * `charLiteralIsNumeric`'s own doc comment for why this exists at all. Handles a
@@ -8353,6 +8677,16 @@ import scala.annotation.tailrec
               // `_cached.py` distinguishable from `_wrapper` in `_cachedmethod.py`:
               // `Ctx.resolve` matches the full name exactly, where its short-name fallback
               // needs a *unique* suffix and so resolved neither.
+              // A CLOSURE called through the local variable that holds it (`inc()` after
+              // `def inc(): nonlocal n ...`) is called by that variable's name, so that
+              // Core's `Expr.call` finds the `Val.clos` in the environment and applies it
+              // WITH its captured frame. Calling it by its full name reached the right
+              // `Func` with no environment at all: every captured read unbound, every
+              // `nonlocal` write a hole. Non-capturing targets keep the full name.
+              else if (methodByName.contains(mfn) && pyFile && capturesEnv.getOrElse(mfn, false) &&
+                       callee.exists { case i: Identifier => true; case _ => false })
+                ujson.Obj("k" -> "call", "f" -> callee.collect { case i: Identifier => i.name }.get,
+                          "args" -> argExprs(args, kwArgs))
               else if (methodByName.contains(mfn))
                 ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn),
                           "args" -> argExprs(args, kwArgs))
@@ -10387,6 +10721,7 @@ import scala.annotation.tailrec
   }
 
   def stmt(n: AstNode): ujson.Obj = unwrapMacro(n) match {
+    case b: Block if pyFile && pyStarredUnpack(b).isDefined => pyStarredUnpack(b).get
     case b: Block =>
       val kids = kidsOf(b)
       // An empty `kidsOf` is ambiguous by itself: it is the correct shape for a real
@@ -10480,6 +10815,11 @@ import scala.annotation.tailrec
       }
     case c: Call if c.methodFullName == "<operator>.delete" =>
       kidsOf(c) match {
+        // `del x` on a Python cell unbinds the CELL's contents, visibly to every closure;
+        // Core's `del` would drop this frame's reference to the cell instead, so a later
+        // read would hole on the box rather than raise `NameError`. Named, not guessed.
+        case (i: Identifier) :: Nil if pyFile && boxedLocals.contains(localName(i.name)) =>
+          holeS("scope:del-cell")
         case (i: Identifier) :: Nil => ujson.Obj("k" -> "del", "x" -> i.name)
         // `del d[k]` / `del o.f` remove a binding from a container or object; Core's
         // `del` only unbinds a variable, so translating them would be a lie.
@@ -10695,8 +11035,17 @@ import scala.annotation.tailrec
     // answer, which is the one outcome worse than a hole.
     case u: Unknown if u.code.trim.startsWith("global ") =>
       seqOf(globalDeclNames(u).map(x => ujson.Obj("k" -> "declGlobal", "x" -> x)))
+    //
+    // `nonlocal` now IS representable, by cell conversion (`cellsOwnedBy`): every
+    // reference to the name, in the owner and in every closure, already goes through the
+    // shared cell, so the declaration itself has nothing left to do. It stays a hole only
+    // when the name resolves to no enclosing function binding -- a `SyntaxError` in
+    // CPython, and nothing this exporter should invent a target for.
     case u: Unknown if u.code.trim.startsWith("nonlocal ") =>
-      holeS("scope:nonlocal-write")
+      val names = u.code.trim.stripPrefix("nonlocal").takeWhile(_ != '#').split(",")
+                    .map(_.trim).filter(_.nonEmpty).toList
+      if (names.nonEmpty && names.forall(x => bindingScopeOf(currentMethodFull, x).isDefined)) skip
+      else holeS("scope:nonlocal-write")
     // The label carries the frontend's PARSER NODE TYPE, not the source text.
     //
     // It used to be the first word of the code, which made the label space unbounded:
@@ -11293,6 +11642,7 @@ import scala.annotation.tailrec
     * the file-level pseudo-method, where every identifier assignment is a global write. */
   def emit(m: Method, isModule: Boolean): ujson.Obj = {
     moduleScope  = isModule
+    currentMethodFull = m.fullName
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
     cppFile      = cppExts.exists(e => m.filename.toLowerCase.endsWith(e))
@@ -11360,6 +11710,13 @@ import scala.annotation.tailrec
         case _       => None
       }).groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2) }
     boxedLocals = candidates.keySet
+    // Python cells (see `cellsOwnedBy`): owned ones get the prologue allocation below,
+    // reached ones (`pyCellRefs`) only the boxed reads and writes.
+    if (m.filename.toLowerCase.endsWith(".py")) {
+      val owned = cellsOwnedBy.getOrElse(m.fullName, Set.empty)
+      pyCellRefs = cellRefsOf(m.fullName) -- owned
+      boxedLocals = boxedLocals ++ owned ++ pyCellRefs
+    }
     // `p -> n`: every pointer-typed local provably aliasing exactly one boxed local
     // for its whole lifetime -- `p = &n` is the ONLY assignment to `p` anywhere in
     // this method (see `ptrAliases`'s own doc comment for why this must be stricter
@@ -11668,7 +12025,12 @@ import scala.annotation.tailrec
           (localName(name), hasArrayMember, td)
         }
       }.filterNot(_._2).map { case (nm, _, td) => nm -> td }.toMap
-    boxedStructs = if (moduleScope) Map.empty else {
+    // NOT for Python. A C struct local is a VALUE that boxing gives an address; a Python
+    // local holding an instance is already a reference. Without this gate `x = Cls()`
+    // in a Python function whose class has methods made `x` (and `Cls` itself) a boxed
+    // "struct" of unit fields and holed the assignment `op:arrayDecl:boxed-initializer`
+    // -- found by the `tests/fixtures/pyscoping` fixture (`case_method_default`).
+    boxedStructs = if (moduleScope || m.filename.toLowerCase.endsWith(".py")) Map.empty else {
       val candidates = structCandidateDecls.map { case (nm, td) => nm -> td.member.l.map(_.name) }
       candidates.filter { case (nm, _) => nameSafelyBoxable(nm, wholeObjectAddressOk = true) }
     }
@@ -12238,7 +12600,7 @@ import scala.annotation.tailrec
     // prologue sidesteps the question entirely: the box exists before ANY branch of
     // the body can run, for every control-flow shape, not just the straight-line one.
     val boxedParamNames = m.parameter.l.map(_.name).filter(boxedLocals.contains).toSet
-    val prologues: List[ujson.Obj] = boxedLocals.toList.sorted.map { nm =>
+    val prologues: List[ujson.Obj] = boxedLocals.toList.sorted.filterNot(pyCellRefs.contains).map { nm =>
       val init = if (boxedParamNames.contains(nm)) boxRef(nm) else ujson.Obj("k" -> "unit")
       ujson.Obj("k" -> "assign", "x" -> nm, "e" -> ujson.Obj("k" -> "boxNew", "e" -> init))
     }
@@ -12325,6 +12687,7 @@ import scala.annotation.tailrec
     boundMethods = Map.empty
     attrsOf = Map.empty
     boxedLocals = Set.empty
+    pyCellRefs = Set.empty
     ptrAliases = Map.empty
     closedOutParams = Set.empty
     fnPtrVars = Map.empty
@@ -12389,6 +12752,24 @@ import scala.annotation.tailrec
       ps.find(p => stars(p.name) == 1 || (stars(p.name) == 0 && p.isVariadic))
         .foreach(p => obj("vararg") = p.name)
       ps.find(p => stars(p.name) == 2).foreach(p => obj("kwarg") = p.name)
+      // Keyword-only / positional-only parameters and defaults (`pySig`). Emitted only
+      // when present, so a function with a plain signature renders exactly as before.
+      // `self` is filtered as it is from `params`: `applyFunc` binds the receiver itself.
+      pySig(m) match {
+        case Some(sig) =>
+          val keep = ps.map(_.name).toSet
+          val ko = sig.kwonly.filter(keep)
+          val po = sig.posonly.filter(keep)
+          val ds = sig.defaults.filter(d => keep(d._1))
+          if (ko.nonEmpty) obj("kwonly") = ujson.Arr.from(ko.map(ujson.Str(_)))
+          if (po.nonEmpty) obj("posonly") = ujson.Arr.from(po.map(ujson.Str(_)))
+          if (ds.nonEmpty)
+            obj("defaults") = ujson.Arr.from(ds.map { case (p, t) =>
+              ujson.Arr(ujson.Str(p), pyDefaultLiteral(t).getOrElse(hole("param:default-nonliteral")))
+            })
+        case None =>
+          obj("body") = seqOf(List(holeS("param:signature-unparsed"), body))
+      }
     }
     obj
   }

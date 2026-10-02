@@ -2147,7 +2147,7 @@ def main():
               ".cLike, .javascript exist), so %s runs under an approximation "
               "(java64/go64 NumConfigs exist but are unwired)." % (lang, lang))
 
-    holefree = [f for f in funcs if not has_hole(f["body"])]
+    holefree = [f for f in funcs if not has_hole([f["body"], f.get("defaults")])]
     # NOTE ON MEASUREMENT BASIS. `skip_varargs` used to exist here and was removed
     # deliberately: a `*args`/`**kwargs` callee binds a tuple and a dict, which Core
     # models exactly, so those calls are now *attempted* (bound positionally against
@@ -2886,7 +2886,7 @@ def main():
     status = {}
     for f in funcs:
         status[f["name"]] = ("not-translated-fully (holes): untestable until translated"
-                             if has_hole(f["body"]) else "hole-free, no case built")
+                             if has_hole([f["body"], f.get("defaults")]) else "hole-free, no case built")
     for c in cases:
         status[c["name"]] = "cases built, all inconclusive"
     for n in compared_fns:
@@ -2932,7 +2932,7 @@ def main():
         labels.setdefault(fn, set()).add(lab.split(":")[0])
     for f in funcs:
         n = f["name"]
-        if n in compared_fns or has_hole(f["body"]): continue
+        if n in compared_fns or has_hole([f["body"], f.get("defaults")]): continue
         labs = labels.get(n, set())
         if labs and labs <= {"representation", "exception-payload-unmodelled"}:
             status[n] = "blocked (value model): " + ", ".join(sorted(labs))
