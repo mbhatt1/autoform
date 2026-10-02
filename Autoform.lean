@@ -12,6 +12,7 @@ import Autoform.FuelMono
 import Autoform.CallingConvention
 import Autoform.PyScoping
 import Autoform.CBoolInt
+import Autoform.BoxedContainers
 
 -- The synthesised specification modules. These were NOT in the build until this merge,
 -- and the omission was not cosmetic: `lake build` was green, `audit_all.py` printed PASS,
