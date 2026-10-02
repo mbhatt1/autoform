@@ -62,19 +62,21 @@ propagating into `gcdish`. That is what the conformance oracle is for.
 
 Unused by `applyBinop` (superseded by `NumConfig.quot`, per this section's own intro);
 kept, and kept exhaustive, because `Numeric.lean` cites it as the pattern's first
-instance. `.javascript` mirrors `.python`'s arm: `Dialect.toNumConfig .javascript` is
-`NumConfig.python`, whose `divRound` is `.floor`. -/
+instance. JavaScript has no integer division at all (`7 / 2` is `3.5`; `applyBinop`
+routes `.javascript` through `jsIntDiv`), so its arm is the truncating quotient that
+matches its truncating remainder below -- NOT `.python`'s floor, which was this arm's
+earlier, wrong answer. -/
 def Dialect.idiv : Dialect → Int → Int → Int
   | .python,     a, b => Int.fdiv a b
   | .cLike,      a, b => Int.tdiv a b
-  | .javascript, a, b => Int.fdiv a b
+  | .javascript, a, b => Int.tdiv a b
 
 /-- Integer remainder under a dialect. See `idiv` — unused, kept exhaustive and
-consistent with it. -/
+consistent with it. JS `%` truncates (`-7 % 3` is `-1`), like C. -/
 def Dialect.imod : Dialect → Int → Int → Int
   | .python,     a, b => Int.fmod a b
   | .cLike,      a, b => Int.tmod a b
-  | .javascript, a, b => Int.fmod a b
+  | .javascript, a, b => Int.tmod a b
 
 
 /-- Result of executing a statement: how control left it. -/
@@ -185,8 +187,12 @@ def ordToE (op : String) (o : Option Ordering) : EResult :=
 /-- Binary operators where at least one operand is a float. -/
 def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   match op with
-  | "&&" => .val (.bool (a.truthy && b.truthy))
-  | "||" => .val (.bool (a.truthy || b.truthy))
+  -- Reached only when the left operand did not decide the result (`evalExpr`
+  -- short-circuits first), exactly as for `applyBinop`'s own `&&`/`||` arms, so under
+  -- value semantics the answer is the right operand: Node's `0.0 || 2` is `2`, and
+  -- CPython's `0.0 or 2` is `2`, not `True`.
+  | "&&" => .val (if d.boolOpsAreValues then b else .bool (a.truthy && b.truthy))
+  | "||" => .val (if d.boolOpsAreValues then b else .bool (a.truthy || b.truthy))
   | "<" | "<=" | ">" | ">=" | "==" | "!=" => ordToE op (flCmp d a b)
   | "+" | "-" | "*" | "/" | "%" =>
       match flOfVal d a, flOfVal d b with
@@ -197,7 +203,12 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                    | "-" => fc.sub x y
                    | "*" => fc.mul x y
                    | "/" => fc.div x y
-                   | _   => fc.pyMod x y)
+                   -- JS `%` on a `Number` is the remainder of TRUNCATED division
+                   -- (sign of the dividend): Node's `-7.5 % 2` is `-1.5`, CPython's
+                   -- is `0.5`. That is C's `fmod`, which IEEE makes exact.
+                   | _   => match d with
+                            | .javascript => fc.fmod x y
+                            | _           => fc.pyMod x y)
         -- a failed promotion (Python's `OverflowError` on a huge int) is the answer
       | some r, some (.ok _) => fresToE r
       | some (.ok _), some r => fresToE r
@@ -212,6 +223,27 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- implement. See `Float.lean`'s "what is deliberately NOT modelled".
   | "**" => .hole "float:pow"
   | _    => .hole s!"binop:{op}"
+
+/-- JavaScript `x / y` on two operands that Core holds as `.int`s.
+
+A JS `Number` is a binary64, so the answer is IEEE division of the two doubles. When the
+quotient is an exact integer it is returned as `.int` (`6 / 3` is `2`), keeping integer
+code on the integer path; otherwise -- a fraction, division by zero (`Infinity`/`NaN`),
+or `0 / -3` (`-0`, which `.int` cannot represent) -- it is computed by `flBinop` as
+IEEE division under `Dialect.toFConfig .javascript` (`cDouble`, `onDivZero := .ieee`).
+The usual `.javascript` caveat applies: past 2^53 the `.int` path is exact where Node
+would round. -/
+def jsIntDiv (x y : Int) : EResult :=
+  if y != 0 && Int.tmod x y == 0 && !(x == 0 && y < 0) then .val (.int (Int.tdiv x y))
+  else flBinop .javascript "/" (.int x) (.int y)
+
+/-- JavaScript `x % y` on two `.int`s: the remainder of TRUNCATED division, taking the
+sign of the dividend (`-7 % 3` is `-1`). `x % 0` is `NaN` and a zero remainder of a
+negative dividend is `-0` (`-6 % 3`); neither is an `.int`, so both go to the float path
+(`flBinop`, which uses `fmod` under `.javascript`). -/
+def jsIntMod (x y : Int) : EResult :=
+  if y != 0 && (Int.tmod x y != 0 || x >= 0) then .val (.int (Int.tmod x y))
+  else flBinop .javascript "%" (.int x) (.int y)
 
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
@@ -250,8 +282,20 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "+",  .tuple x, .tuple y => .val (.tuple (x ++ y))
   | "-",  .int x, .int y => numToE (nc.sub x y)
   | "*",  .int x, .int y => numToE (nc.mul x y)
-  | "/",  .int x, .int y => numToE (nc.div x y)
-  | "%",  .int x, .int y => numToE (nc.mod x y)
+  -- JavaScript has no integer division. `NumConfig.python` (which `.javascript`
+  -- borrows for its unbounded `+`/`-`/`*`) FLOORS, and answering with it reproduced the
+  -- measured `.tsx`-as-Python bug (`docs/languages.md` §2) under a new name: `-7 % 3`
+  -- gave `2` (Node: `-1`), `7 / 2` gave `3` (Node: `3.5`), `5 / 0` raised
+  -- `ZeroDivisionError` (Node: `Infinity`). So `.javascript` splits off here; see
+  -- `jsIntDiv`/`jsIntMod`.
+  | "/",  .int x, .int y =>
+      match d with
+      | .javascript => jsIntDiv x y
+      | _           => numToE (nc.div x y)
+  | "%",  .int x, .int y =>
+      match d with
+      | .javascript => jsIntMod x y
+      | _           => numToE (nc.mod x y)
   -- ### Bitwise operators
   --
   -- These are `&`, `|`, `^`, `<<`, `>>` and `>>>` — the **bitwise** operations, not the
@@ -420,6 +464,22 @@ give (32-bit wraparound). -/
 example : applyBinop .javascript "+" (.int 2147483647) (.int 1) = .val (.int 2147483648) := rfl
 #eval applyBinop .javascript "+" (.int 2147483647) (.int 1)  -- val (int 2147483648)
 
+/-! `/` and `%`: the `docs/languages.md` §2/§3 rows, which the `.javascript` dialect
+first got wrong by inheriting Python's floor (`-7 % 3` was `2`, `7 / 2` was `3`). -/
+example : applyBinop .javascript "%" (.int (-7)) (.int 3) = .val (.int (-1)) := rfl
+example : applyBinop .javascript "%" (.int 7) (.int (-3)) = .val (.int 1) := rfl
+example : applyBinop .javascript "/" (.int 6) (.int (-3)) = .val (.int (-2)) := rfl
+#eval applyBinop .javascript "%" (.int (-7)) (.int 3)   -- val (int (-1)), matches Node
+#eval applyBinop .javascript "/" (.int 7) (.int 2)      -- val (float 3.5), matches Node
+#eval applyBinop .javascript "/" (.int (-7)) (.int 2)   -- val (float -3.5), matches Node
+#eval applyBinop .javascript "/" (.int 5) (.int 0)      -- val (float +inf), matches Node
+#eval applyBinop .javascript "%" (.int 5) (.int 0)      -- val (float NaN), matches Node
+#eval applyBinop .javascript "%" (.int (-6)) (.int 3)   -- val (float -0), matches Node
+#eval applyBinop .javascript "%" (.float (Fl.ofBits (Float.toBits (-7.5)).toNat)) (.int 2)
+  -- val (float -1.5), matches Node (CPython's floored `%` gives 0.5)
+#eval applyBinop .javascript "||" (.float (Fl.ofBits (Float.toBits 0.0).toNat)) (.int 2)
+  -- val (int 2), matches Node's `0.0 || 2` (was `bool true`)
+
 /-! ### Float equations, and the two that must not regress
 
 `Val.beq` on floats is the place where a plausible-looking implementation is wrong. Both
@@ -446,7 +506,7 @@ theorem float_negzero_bits_differ :
 
 /-- `-0.0` is false, like `0.0`. -/
 @[simp] theorem truthy_float_negzero :
-    Val.truthy (.float (Fl.zero Format.binary64 true)) = false := by decide
+    Val.truthy (.float (Fl.zero Format.binary64 true)) = false := rfl
 
 /-- Representability under the 32-bit signed C configuration. -/
 abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true

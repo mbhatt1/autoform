@@ -288,8 +288,17 @@ def nodeOK (c : NumConfig) (op : String) (x y : Int) : Prop :=
 /-- **Operator soundness.** Under its node obligations, every fragment binary operator
 computes exactly what `binExact` says — no wrap, no trap, no `ub`. This is where
 `Numeric.lean`'s four-way case analysis is discharged: the obligation makes the
-non-`ok` branches of `finish` unreachable. -/
+non-`ok` branches of `finish` unreachable.
+
+`hjs`: the exact model's `/` and `%` are INTEGER division under `NumConfig`'s rounding,
+and JavaScript has no integer division (`7 / 2` is `3.5`, `-7 % 3` is `-1` while
+`NumConfig.python` floors to `2`), so `applyBinop` deliberately leaves `NumConfig` for
+those two operators under `.javascript` (`Semantics.jsIntDiv`/`jsIntMod`). This
+theorem -- and `exact_sound` and its corollaries -- held for `.javascript` only while
+the semantics was giving JS those wrong answers; they are now stated for the dialects
+whose integer division the model actually describes. -/
 theorem applyBinop_agrees {d : Dialect} {op : String} {x y : Int} {v : Val}
+    (hjs : d ≠ .javascript)
     (hb : binExact d.toNumConfig op x y = some v)
     (hn : nodeOK d.toNumConfig op x y) :
     applyBinop d op (.int x) (.int y) = .val v := by
@@ -304,11 +313,15 @@ theorem applyBinop_agrees {d : Dialect} {op : String} {x y : Int} {v : Val}
   · obtain ⟨hy, hq⟩ := hn
     simp only [hy, if_false, reduceIte] at hb
     cases hb
-    simp [applyBinop, NumConfig.div, finish_of_inRange hq, numToE, hy]
+    cases d <;> first
+      | exact absurd rfl hjs
+      | simp [applyBinop, NumConfig.div, finish_of_inRange hq, numToE, hy]
   · obtain ⟨hy, hq, hr⟩ := hn
     simp only [hy, if_false, reduceIte] at hb
     cases hb
-    simp [applyBinop, NumConfig.mod, numToE, hy, hq, IntType.wrap_of_inRange hr]
+    cases d <;> first
+      | exact absurd rfl hjs
+      | simp [applyBinop, NumConfig.mod, numToE, hy, hq, IntType.wrap_of_inRange hr]
   · cases hb; simp [applyBinop, numToE]
   · cases hb; simp [applyBinop, numToE]
   · cases hb; simp [applyBinop, numToE]
@@ -374,7 +387,7 @@ Induction is on **fuel**, not on `Expr`: `evalExpr` burns one unit per node, so 
 least the depth" is precisely the induction measure, and it avoids needing the nested
 recursor for `List Expr`. -/
 
-theorem exact_sound (ctx : Ctx) (h : Heap) (ρ : Env) :
+theorem exact_sound (ctx : Ctx) (h : Heap) (ρ : Env) (hjs : ctx.dialect ≠ .javascript) :
     ∀ (n : Nat) (e : Expr) (v : Val),
       depth e ≤ n →
       exact ctx.dialect.toNumConfig ρ e = some v →
@@ -426,7 +439,7 @@ theorem exact_sound (ctx : Ctx) (h : Heap) (ρ : Env) :
           have hea := ih a (.int x) hda hxa hsplit2.1
           have heb := ih b (.int y) hdb hxb hsplit2.2
           have hn := nodeOK_of_condsHold hxa hxb hsplit.2
-          have hop := applyBinop_agrees (d := ctx.dialect) hex hn
+          have hop := applyBinop_agrees (d := ctx.dialect) hjs hex hn
           have hne1 : ¬ (op = "&&") := by
             rintro rfl; exact absurd hex (by simp [binExact])
           have hne2 : ¬ (op = "||") := by
@@ -448,23 +461,25 @@ that out — which is the whole content of "the analysis is sound rather than he
 /-- **No undefined behaviour.** Under its generated obligations, an analysable expression
 never evaluates to a hole. -/
 theorem no_ub_of_condsHold (ctx : Ctx) (h : Heap) (ρ : Env) (n : Nat) (e : Expr) (v : Val)
+    (hjs : ctx.dialect ≠ .javascript)
     (hd : depth e ≤ n)
     (hex : exact ctx.dialect.toNumConfig ρ e = some v)
     (hc : CondsHold ctx.dialect.toNumConfig ρ (conds e)) :
     ∀ s, (evalExpr ctx n h ρ e).2 ≠ .hole s := by
   intro s
-  rw [exact_sound ctx h ρ n e v hd hex hc]
+  rw [exact_sound ctx h ρ hjs n e v hd hex hc]
   simp
 
 /-- …and never runs out of fuel, and never raises. Together with `exact_sound` this says
 the generated domain is a *sufficient* condition for the deep term to agree with its
 mathematical model, which is exactly what `Refines.dom` is asked to supply. -/
 theorem terminates_of_condsHold (ctx : Ctx) (h : Heap) (ρ : Env) (n : Nat) (e : Expr)
-    (v : Val) (hd : depth e ≤ n)
+    (v : Val) (hjs : ctx.dialect ≠ .javascript)
+    (hd : depth e ≤ n)
     (hex : exact ctx.dialect.toNumConfig ρ e = some v)
     (hc : CondsHold ctx.dialect.toNumConfig ρ (conds e)) :
     (evalExpr ctx n h ρ e).2 ≠ .outOfFuel ∧ (∀ w, (evalExpr ctx n h ρ e).2 ≠ .exn w) := by
-  rw [exact_sound ctx h ρ n e v hd hex hc]
+  rw [exact_sound ctx h ρ hjs n e v hd hex hc]
   exact ⟨by simp, by intro w; simp⟩
 
 /-! ## 7. Demonstration on the real translated functions
