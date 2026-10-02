@@ -15,6 +15,7 @@ import Autoform.PyMro
 import Autoform.CBoolInt
 import Autoform.CIntWidth
 import Autoform.JavaIntWidth
+import Autoform.JsNode
 import Autoform.BoxedContainers
 
 -- The synthesised specification modules. These were NOT in the build until this merge,

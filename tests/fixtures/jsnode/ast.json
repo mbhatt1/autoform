@@ -1,0 +1,3054 @@
+[
+ {
+  "name": "jsnode_cases.js::program:case_strict_str_vs_num",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "===",
+    "a": {
+     "k": "int",
+     "v": "1"
+    },
+    "b": {
+     "k": "str",
+     "v": "1"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "skip"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "skip"
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "skip"
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "skip"
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "skip"
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "skip"
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "skip"
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "skip"
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "skip"
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "skip"
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "skip"
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "skip"
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "skip"
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "skip"
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "skip"
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "skip"
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "skip"
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "skip"
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "skip"
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "skip"
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "skip"
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "skip"
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "skip"
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "skip"
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "skip"
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "skip"
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "skip"
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "skip"
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "skip"
+                                                },
+                                                "b": {
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "skip"
+                                                 },
+                                                 "b": {
+                                                  "k": "seq",
+                                                  "a": {
+                                                   "k": "skip"
+                                                  },
+                                                  "b": {
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "skip"
+                                                   },
+                                                   "b": {
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "skip"
+                                                    },
+                                                    "b": {
+                                                     "k": "seq",
+                                                     "a": {
+                                                      "k": "skip"
+                                                     },
+                                                     "b": {
+                                                      "k": "seq",
+                                                      "a": {
+                                                       "k": "skip"
+                                                      },
+                                                      "b": {
+                                                       "k": "seq",
+                                                       "a": {
+                                                        "k": "skip"
+                                                       },
+                                                       "b": {
+                                                        "k": "seq",
+                                                        "a": {
+                                                         "k": "skip"
+                                                        },
+                                                        "b": {
+                                                         "k": "seq",
+                                                         "a": {
+                                                          "k": "skip"
+                                                         },
+                                                         "b": {
+                                                          "k": "seq",
+                                                          "a": {
+                                                           "k": "assign",
+                                                           "x": "case_strict_str_vs_num",
+                                                           "e": {
+                                                            "k": "fnref",
+                                                            "v": "jsnode_cases.js::program:case_strict_str_vs_num"
+                                                           }
+                                                          },
+                                                          "b": {
+                                                           "k": "seq",
+                                                           "a": {
+                                                            "k": "assign",
+                                                            "x": "case_loose_same_type",
+                                                            "e": {
+                                                             "k": "fnref",
+                                                             "v": "jsnode_cases.js::program:case_loose_same_type"
+                                                            }
+                                                           },
+                                                           "b": {
+                                                            "k": "seq",
+                                                            "a": {
+                                                             "k": "assign",
+                                                             "x": "case_strict_same_type",
+                                                             "e": {
+                                                              "k": "fnref",
+                                                              "v": "jsnode_cases.js::program:case_strict_same_type"
+                                                             }
+                                                            },
+                                                            "b": {
+                                                             "k": "seq",
+                                                             "a": {
+                                                              "k": "assign",
+                                                              "x": "case_strict_ne_cross",
+                                                              "e": {
+                                                               "k": "fnref",
+                                                               "v": "jsnode_cases.js::program:case_strict_ne_cross"
+                                                              }
+                                                             },
+                                                             "b": {
+                                                              "k": "seq",
+                                                              "a": {
+                                                               "k": "assign",
+                                                               "x": "case_loose_ne_same",
+                                                               "e": {
+                                                                "k": "fnref",
+                                                                "v": "jsnode_cases.js::program:case_loose_ne_same"
+                                                               }
+                                                              },
+                                                              "b": {
+                                                               "k": "seq",
+                                                               "a": {
+                                                                "k": "assign",
+                                                                "x": "case_strict_ne_same",
+                                                                "e": {
+                                                                 "k": "fnref",
+                                                                 "v": "jsnode_cases.js::program:case_strict_ne_same"
+                                                                }
+                                                               },
+                                                               "b": {
+                                                                "k": "seq",
+                                                                "a": {
+                                                                 "k": "assign",
+                                                                 "x": "case_strict_bool_vs_num",
+                                                                 "e": {
+                                                                  "k": "fnref",
+                                                                  "v": "jsnode_cases.js::program:case_strict_bool_vs_num"
+                                                                 }
+                                                                },
+                                                                "b": {
+                                                                 "k": "seq",
+                                                                 "a": {
+                                                                  "k": "assign",
+                                                                  "x": "case_single_quote_eq",
+                                                                  "e": {
+                                                                   "k": "fnref",
+                                                                   "v": "jsnode_cases.js::program:case_single_quote_eq"
+                                                                  }
+                                                                 },
+                                                                 "b": {
+                                                                  "k": "seq",
+                                                                  "a": {
+                                                                   "k": "assign",
+                                                                   "x": "case_single_quote_ne",
+                                                                   "e": {
+                                                                    "k": "fnref",
+                                                                    "v": "jsnode_cases.js::program:case_single_quote_ne"
+                                                                   }
+                                                                  },
+                                                                  "b": {
+                                                                   "k": "seq",
+                                                                   "a": {
+                                                                    "k": "assign",
+                                                                    "x": "case_single_quote_cross",
+                                                                    "e": {
+                                                                     "k": "fnref",
+                                                                     "v": "jsnode_cases.js::program:case_single_quote_cross"
+                                                                    }
+                                                                   },
+                                                                   "b": {
+                                                                    "k": "seq",
+                                                                    "a": {
+                                                                     "k": "assign",
+                                                                     "x": "case_strict_nan",
+                                                                     "e": {
+                                                                      "k": "fnref",
+                                                                      "v": "jsnode_cases.js::program:case_strict_nan"
+                                                                     }
+                                                                    },
+                                                                    "b": {
+                                                                     "k": "seq",
+                                                                     "a": {
+                                                                      "k": "assign",
+                                                                      "x": "case_nan_ne",
+                                                                      "e": {
+                                                                       "k": "fnref",
+                                                                       "v": "jsnode_cases.js::program:case_nan_ne"
+                                                                      }
+                                                                     },
+                                                                     "b": {
+                                                                      "k": "seq",
+                                                                      "a": {
+                                                                       "k": "assign",
+                                                                       "x": "case_inf_strict",
+                                                                       "e": {
+                                                                        "k": "fnref",
+                                                                        "v": "jsnode_cases.js::program:case_inf_strict"
+                                                                       }
+                                                                      },
+                                                                      "b": {
+                                                                       "k": "seq",
+                                                                       "a": {
+                                                                        "k": "assign",
+                                                                        "x": "case_inf_vs_big",
+                                                                        "e": {
+                                                                         "k": "fnref",
+                                                                         "v": "jsnode_cases.js::program:case_inf_vs_big"
+                                                                        }
+                                                                       },
+                                                                       "b": {
+                                                                        "k": "seq",
+                                                                        "a": {
+                                                                         "k": "assign",
+                                                                         "x": "case_strict_negzero",
+                                                                         "e": {
+                                                                          "k": "fnref",
+                                                                          "v": "jsnode_cases.js::program:case_strict_negzero"
+                                                                         }
+                                                                        },
+                                                                        "b": {
+                                                                         "k": "seq",
+                                                                         "a": {
+                                                                          "k": "assign",
+                                                                          "x": "case_strict_int_float",
+                                                                          "e": {
+                                                                           "k": "fnref",
+                                                                           "v": "jsnode_cases.js::program:case_strict_int_float"
+                                                                          }
+                                                                         },
+                                                                         "b": {
+                                                                          "k": "seq",
+                                                                          "a": {
+                                                                           "k": "assign",
+                                                                           "x": "case_null_loose_zero",
+                                                                           "e": {
+                                                                            "k": "fnref",
+                                                                            "v": "jsnode_cases.js::program:case_null_loose_zero"
+                                                                           }
+                                                                          },
+                                                                          "b": {
+                                                                           "k": "seq",
+                                                                           "a": {
+                                                                            "k": "assign",
+                                                                            "x": "case_zero_loose_null",
+                                                                            "e": {
+                                                                             "k": "fnref",
+                                                                             "v": "jsnode_cases.js::program:case_zero_loose_null"
+                                                                            }
+                                                                           },
+                                                                           "b": {
+                                                                            "k": "seq",
+                                                                            "a": {
+                                                                             "k": "assign",
+                                                                             "x": "case_empty_str_loose_null",
+                                                                             "e": {
+                                                                              "k": "fnref",
+                                                                              "v": "jsnode_cases.js::program:case_empty_str_loose_null"
+                                                                             }
+                                                                            },
+                                                                            "b": {
+                                                                             "k": "seq",
+                                                                             "a": {
+                                                                              "k": "assign",
+                                                                              "x": "case_false_loose_null",
+                                                                              "e": {
+                                                                               "k": "fnref",
+                                                                               "v": "jsnode_cases.js::program:case_false_loose_null"
+                                                                              }
+                                                                             },
+                                                                             "b": {
+                                                                              "k": "seq",
+                                                                              "a": {
+                                                                               "k": "assign",
+                                                                               "x": "case_null_loose_null",
+                                                                               "e": {
+                                                                                "k": "fnref",
+                                                                                "v": "jsnode_cases.js::program:case_null_loose_null"
+                                                                               }
+                                                                              },
+                                                                              "b": {
+                                                                               "k": "seq",
+                                                                               "a": {
+                                                                                "k": "assign",
+                                                                                "x": "case_undef_loose_null",
+                                                                                "e": {
+                                                                                 "k": "fnref",
+                                                                                 "v": "jsnode_cases.js::program:case_undef_loose_null"
+                                                                                }
+                                                                               },
+                                                                               "b": {
+                                                                                "k": "seq",
+                                                                                "a": {
+                                                                                 "k": "assign",
+                                                                                 "x": "case_null_loose_undef",
+                                                                                 "e": {
+                                                                                  "k": "fnref",
+                                                                                  "v": "jsnode_cases.js::program:case_null_loose_undef"
+                                                                                 }
+                                                                                },
+                                                                                "b": {
+                                                                                 "k": "seq",
+                                                                                 "a": {
+                                                                                  "k": "assign",
+                                                                                  "x": "case_null_ne_zero",
+                                                                                  "e": {
+                                                                                   "k": "fnref",
+                                                                                   "v": "jsnode_cases.js::program:case_null_ne_zero"
+                                                                                  }
+                                                                                 },
+                                                                                 "b": {
+                                                                                  "k": "seq",
+                                                                                  "a": {
+                                                                                   "k": "assign",
+                                                                                   "x": "case_null_ne_null",
+                                                                                   "e": {
+                                                                                    "k": "fnref",
+                                                                                    "v": "jsnode_cases.js::program:case_null_ne_null"
+                                                                                   }
+                                                                                  },
+                                                                                  "b": {
+                                                                                   "k": "seq",
+                                                                                   "a": {
+                                                                                    "k": "assign",
+                                                                                    "x": "case_zero_strict_null",
+                                                                                    "e": {
+                                                                                     "k": "fnref",
+                                                                                     "v": "jsnode_cases.js::program:case_zero_strict_null"
+                                                                                    }
+                                                                                   },
+                                                                                   "b": {
+                                                                                    "k": "seq",
+                                                                                    "a": {
+                                                                                     "k": "assign",
+                                                                                     "x": "case_null_strict_null",
+                                                                                     "e": {
+                                                                                      "k": "fnref",
+                                                                                      "v": "jsnode_cases.js::program:case_null_strict_null"
+                                                                                     }
+                                                                                    },
+                                                                                    "b": {
+                                                                                     "k": "seq",
+                                                                                     "a": {
+                                                                                      "k": "assign",
+                                                                                      "x": "case_null_strict_undefined",
+                                                                                      "e": {
+                                                                                       "k": "fnref",
+                                                                                       "v": "jsnode_cases.js::program:case_null_strict_undefined"
+                                                                                      }
+                                                                                     },
+                                                                                     "b": {
+                                                                                      "k": "seq",
+                                                                                      "a": {
+                                                                                       "k": "assign",
+                                                                                       "x": "case_undef_strict_undef",
+                                                                                       "e": {
+                                                                                        "k": "fnref",
+                                                                                        "v": "jsnode_cases.js::program:case_undef_strict_undef"
+                                                                                       }
+                                                                                      },
+                                                                                      "b": {
+                                                                                       "k": "seq",
+                                                                                       "a": {
+                                                                                        "k": "assign",
+                                                                                        "x": "case_null_strict_ne_undefined",
+                                                                                        "e": {
+                                                                                         "k": "fnref",
+                                                                                         "v": "jsnode_cases.js::program:case_null_strict_ne_undefined"
+                                                                                        }
+                                                                                       },
+                                                                                       "b": {
+                                                                                        "k": "seq",
+                                                                                        "a": {
+                                                                                         "k": "assign",
+                                                                                         "x": "case_sar_neg",
+                                                                                         "e": {
+                                                                                          "k": "fnref",
+                                                                                          "v": "jsnode_cases.js::program:case_sar_neg"
+                                                                                         }
+                                                                                        },
+                                                                                        "b": {
+                                                                                         "k": "seq",
+                                                                                         "a": {
+                                                                                          "k": "assign",
+                                                                                          "x": "case_shr_neg",
+                                                                                          "e": {
+                                                                                           "k": "fnref",
+                                                                                           "v": "jsnode_cases.js::program:case_shr_neg"
+                                                                                          }
+                                                                                         },
+                                                                                         "b": {
+                                                                                          "k": "seq",
+                                                                                          "a": {
+                                                                                           "k": "assign",
+                                                                                           "x": "case_sar_neg16",
+                                                                                           "e": {
+                                                                                            "k": "fnref",
+                                                                                            "v": "jsnode_cases.js::program:case_sar_neg16"
+                                                                                           }
+                                                                                          },
+                                                                                          "b": {
+                                                                                           "k": "seq",
+                                                                                           "a": {
+                                                                                            "k": "assign",
+                                                                                            "x": "case_shr_neg16",
+                                                                                            "e": {
+                                                                                             "k": "fnref",
+                                                                                             "v": "jsnode_cases.js::program:case_shr_neg16"
+                                                                                            }
+                                                                                           },
+                                                                                           "b": {
+                                                                                            "k": "seq",
+                                                                                            "a": {
+                                                                                             "k": "assign",
+                                                                                             "x": "case_shl_sign",
+                                                                                             "e": {
+                                                                                              "k": "fnref",
+                                                                                              "v": "jsnode_cases.js::program:case_shl_sign"
+                                                                                             }
+                                                                                            },
+                                                                                            "b": {
+                                                                                             "k": "seq",
+                                                                                             "a": {
+                                                                                              "k": "assign",
+                                                                                              "x": "case_shr_var",
+                                                                                              "e": {
+                                                                                               "k": "fnref",
+                                                                                               "v": "jsnode_cases.js::program:case_shr_var"
+                                                                                              }
+                                                                                             },
+                                                                                             "b": {
+                                                                                              "k": "seq",
+                                                                                              "a": {
+                                                                                               "k": "assign",
+                                                                                               "x": "case_sar_var_call",
+                                                                                               "e": {
+                                                                                                "k": "fnref",
+                                                                                                "v": "jsnode_cases.js::program:case_sar_var_call"
+                                                                                               }
+                                                                                              },
+                                                                                              "b": {
+                                                                                               "k": "seq",
+                                                                                               "a": {
+                                                                                                "k": "assign",
+                                                                                                "x": "case_nullish_zero",
+                                                                                                "e": {
+                                                                                                 "k": "fnref",
+                                                                                                 "v": "jsnode_cases.js::program:case_nullish_zero"
+                                                                                                }
+                                                                                               },
+                                                                                               "b": {
+                                                                                                "k": "seq",
+                                                                                                "a": {
+                                                                                                 "k": "assign",
+                                                                                                 "x": "case_nullish_empty",
+                                                                                                 "e": {
+                                                                                                  "k": "fnref",
+                                                                                                  "v": "jsnode_cases.js::program:case_nullish_empty"
+                                                                                                 }
+                                                                                                },
+                                                                                                "b": {
+                                                                                                 "k": "seq",
+                                                                                                 "a": {
+                                                                                                  "k": "assign",
+                                                                                                  "x": "case_nullish_false",
+                                                                                                  "e": {
+                                                                                                   "k": "fnref",
+                                                                                                   "v": "jsnode_cases.js::program:case_nullish_false"
+                                                                                                  }
+                                                                                                 },
+                                                                                                 "b": {
+                                                                                                  "k": "seq",
+                                                                                                  "a": {
+                                                                                                   "k": "assign",
+                                                                                                   "x": "case_nullish_null",
+                                                                                                   "e": {
+                                                                                                    "k": "fnref",
+                                                                                                    "v": "jsnode_cases.js::program:case_nullish_null"
+                                                                                                   }
+                                                                                                  },
+                                                                                                  "b": {
+                                                                                                   "k": "seq",
+                                                                                                   "a": {
+                                                                                                    "k": "assign",
+                                                                                                    "x": "case_nullish_undef",
+                                                                                                    "e": {
+                                                                                                     "k": "fnref",
+                                                                                                     "v": "jsnode_cases.js::program:case_nullish_undef"
+                                                                                                    }
+                                                                                                   },
+                                                                                                   "b": {
+                                                                                                    "k": "seq",
+                                                                                                    "a": {
+                                                                                                     "k": "assign",
+                                                                                                     "x": "case_nullish_chain",
+                                                                                                     "e": {
+                                                                                                      "k": "fnref",
+                                                                                                      "v": "jsnode_cases.js::program:case_nullish_chain"
+                                                                                                     }
+                                                                                                    },
+                                                                                                    "b": {
+                                                                                                     "k": "seq",
+                                                                                                     "a": {
+                                                                                                      "k": "assign",
+                                                                                                      "x": "case_nullish_value",
+                                                                                                      "e": {
+                                                                                                       "k": "fnref",
+                                                                                                       "v": "jsnode_cases.js::program:case_nullish_value"
+                                                                                                      }
+                                                                                                     },
+                                                                                                     "b": {
+                                                                                                      "k": "seq",
+                                                                                                      "a": {
+                                                                                                       "k": "assign",
+                                                                                                       "x": "case_nullish_single_quote",
+                                                                                                       "e": {
+                                                                                                        "k": "fnref",
+                                                                                                        "v": "jsnode_cases.js::program:case_nullish_single_quote"
+                                                                                                       }
+                                                                                                      },
+                                                                                                      "b": {
+                                                                                                       "k": "seq",
+                                                                                                       "a": {
+                                                                                                        "k": "assign",
+                                                                                                        "x": "case_nullish_single_quote_null",
+                                                                                                        "e": {
+                                                                                                         "k": "fnref",
+                                                                                                         "v": "jsnode_cases.js::program:case_nullish_single_quote_null"
+                                                                                                        }
+                                                                                                       },
+                                                                                                       "b": {
+                                                                                                        "k": "seq",
+                                                                                                        "a": {
+                                                                                                         "k": "assign",
+                                                                                                         "x": "case_nullish_var_zero",
+                                                                                                         "e": {
+                                                                                                          "k": "fnref",
+                                                                                                          "v": "jsnode_cases.js::program:case_nullish_var_zero"
+                                                                                                         }
+                                                                                                        },
+                                                                                                        "b": {
+                                                                                                         "k": "seq",
+                                                                                                         "a": {
+                                                                                                          "k": "assign",
+                                                                                                          "x": "case_nullish_var_null",
+                                                                                                          "e": {
+                                                                                                           "k": "fnref",
+                                                                                                           "v": "jsnode_cases.js::program:case_nullish_var_null"
+                                                                                                          }
+                                                                                                         },
+                                                                                                         "b": {
+                                                                                                          "k": "seq",
+                                                                                                          "a": {
+                                                                                                           "k": "assign",
+                                                                                                           "x": "case_nullish_short_circuit",
+                                                                                                           "e": {
+                                                                                                            "k": "fnref",
+                                                                                                            "v": "jsnode_cases.js::program:case_nullish_short_circuit"
+                                                                                                           }
+                                                                                                          },
+                                                                                                          "b": {
+                                                                                                           "k": "seq",
+                                                                                                           "a": {
+                                                                                                            "k": "assign",
+                                                                                                            "x": "case_nullish_right_effect",
+                                                                                                            "e": {
+                                                                                                             "k": "fnref",
+                                                                                                             "v": "jsnode_cases.js::program:case_nullish_right_effect"
+                                                                                                            }
+                                                                                                           },
+                                                                                                           "b": {
+                                                                                                            "k": "seq",
+                                                                                                            "a": {
+                                                                                                             "k": "assign",
+                                                                                                             "x": "case_nullish_impure_left",
+                                                                                                             "e": {
+                                                                                                              "k": "fnref",
+                                                                                                              "v": "jsnode_cases.js::program:case_nullish_impure_left"
+                                                                                                             }
+                                                                                                            },
+                                                                                                            "b": {
+                                                                                                             "k": "seq",
+                                                                                                             "a": {
+                                                                                                              "k": "assign",
+                                                                                                              "x": "case_nullish_in_cond",
+                                                                                                              "e": {
+                                                                                                               "k": "fnref",
+                                                                                                               "v": "jsnode_cases.js::program:case_nullish_in_cond"
+                                                                                                              }
+                                                                                                             },
+                                                                                                             "b": {
+                                                                                                              "k": "seq",
+                                                                                                              "a": {
+                                                                                                               "k": "assign",
+                                                                                                               "x": "case_or_zero",
+                                                                                                               "e": {
+                                                                                                                "k": "fnref",
+                                                                                                                "v": "jsnode_cases.js::program:case_or_zero"
+                                                                                                               }
+                                                                                                              },
+                                                                                                              "b": {
+                                                                                                               "k": "seq",
+                                                                                                               "a": {
+                                                                                                                "k": "assign",
+                                                                                                                "x": "case_and_zero",
+                                                                                                                "e": {
+                                                                                                                 "k": "fnref",
+                                                                                                                 "v": "jsnode_cases.js::program:case_and_zero"
+                                                                                                                }
+                                                                                                               },
+                                                                                                               "b": {
+                                                                                                                "k": "assign",
+                                                                                                                "x": "case_or_then_nullish",
+                                                                                                                "e": {
+                                                                                                                 "k": "fnref",
+                                                                                                                 "v": "jsnode_cases.js::program:case_or_then_nullish"
+                                                                                                                }
+                                                                                                               }
+                                                                                                              }
+                                                                                                             }
+                                                                                                            }
+                                                                                                           }
+                                                                                                          }
+                                                                                                         }
+                                                                                                        }
+                                                                                                       }
+                                                                                                      }
+                                                                                                     }
+                                                                                                    }
+                                                                                                   }
+                                                                                                  }
+                                                                                                 }
+                                                                                                }
+                                                                                               }
+                                                                                              }
+                                                                                             }
+                                                                                            }
+                                                                                           }
+                                                                                          }
+                                                                                         }
+                                                                                        }
+                                                                                       }
+                                                                                      }
+                                                                                     }
+                                                                                    }
+                                                                                   }
+                                                                                  }
+                                                                                 }
+                                                                                }
+                                                                               }
+                                                                              }
+                                                                             }
+                                                                            }
+                                                                           }
+                                                                          }
+                                                                         }
+                                                                        }
+                                                                       }
+                                                                      }
+                                                                     }
+                                                                    }
+                                                                   }
+                                                                  }
+                                                                 }
+                                                                }
+                                                               }
+                                                              }
+                                                             }
+                                                            }
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       }
+                                                      }
+                                                     }
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_loose_same_type",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "==",
+    "a": {
+     "k": "int",
+     "v": "2"
+    },
+    "b": {
+     "k": "int",
+     "v": "2"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_strict_same_type",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "===",
+    "a": {
+     "k": "int",
+     "v": "2"
+    },
+    "b": {
+     "k": "int",
+     "v": "2"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_strict_ne_cross",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "!==",
+    "a": {
+     "k": "int",
+     "v": "1"
+    },
+    "b": {
+     "k": "str",
+     "v": "1"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_loose_ne_same",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "!=",
+    "a": {
+     "k": "int",
+     "v": "3"
+    },
+    "b": {
+     "k": "int",
+     "v": "3"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_strict_ne_same",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "!==",
+    "a": {
+     "k": "str",
+     "v": "a"
+    },
+    "b": {
+     "k": "str",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_strict_bool_vs_num",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "===",
+    "a": {
+     "k": "bool",
+     "v": true
+    },
+    "b": {
+     "k": "int",
+     "v": "1"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_single_quote_eq",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "===",
+    "a": {
+     "k": "str",
+     "v": "a"
+    },
+    "b": {
+     "k": "str",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_single_quote_ne",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "!==",
+    "a": {
+     "k": "str",
+     "v": "a"
+    },
+    "b": {
+     "k": "str",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_single_quote_cross",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "===",
+    "a": {
+     "k": "str",
+     "v": "a"
+    },
+    "b": {
+     "k": "str",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_strict_nan",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "===",
+     "a": {
+      "k": "float",
+      "v": "nan"
+     },
+     "b": {
+      "k": "float",
+      "v": "nan"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nan_ne",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "!==",
+     "a": {
+      "k": "float",
+      "v": "nan"
+     },
+     "b": {
+      "k": "float",
+      "v": "nan"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_inf_strict",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "===",
+     "a": {
+      "k": "float",
+      "v": "1e999"
+     },
+     "b": {
+      "k": "float",
+      "v": "1e999"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_inf_vs_big",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": ">",
+     "a": {
+      "k": "float",
+      "v": "1e999"
+     },
+     "b": {
+      "k": "int",
+      "v": "1000000"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_strict_negzero",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "===",
+    "a": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "int",
+     "v": "0"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_strict_int_float",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "===",
+    "a": {
+     "k": "int",
+     "v": "1"
+    },
+    "b": {
+     "k": "float",
+     "v": "1.0"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_loose_zero",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "==",
+    "a": {
+     "k": "jsnull"
+    },
+    "b": {
+     "k": "int",
+     "v": "0"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_zero_loose_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "name",
+       "v": "z"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_empty_str_loose_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "str",
+      "v": ""
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "name",
+       "v": "s"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_false_loose_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "f",
+     "e": {
+      "k": "bool",
+      "v": false
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "name",
+       "v": "f"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_loose_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "n",
+     "e": {
+      "k": "jsnull"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_undef_loose_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "u",
+      "e": {
+       "k": "unit"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "binop",
+       "op": "==",
+       "a": {
+        "k": "name",
+        "v": "u"
+       },
+       "b": {
+        "k": "jsnull"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_loose_undef",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "jsnull"
+     },
+     "b": {
+      "k": "unit"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_ne_zero",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "!=",
+      "a": {
+       "k": "name",
+       "v": "z"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_ne_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "n",
+     "e": {
+      "k": "jsnull"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "!=",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_zero_strict_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "===",
+      "a": {
+       "k": "name",
+       "v": "z"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_strict_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "n",
+     "e": {
+      "k": "jsnull"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "===",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "jsnull"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_strict_undefined",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "===",
+     "a": {
+      "k": "jsnull"
+     },
+     "b": {
+      "k": "unit"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_undef_strict_undef",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "u",
+      "e": {
+       "k": "unit"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "binop",
+       "op": "===",
+       "a": {
+        "k": "name",
+        "v": "u"
+       },
+       "b": {
+        "k": "unit"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_null_strict_ne_undefined",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "!==",
+     "a": {
+      "k": "jsnull"
+     },
+     "b": {
+      "k": "unit"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_sar_neg",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": ">>",
+    "a": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "int",
+     "v": "0"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_shr_neg",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": ">>>",
+    "a": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "int",
+     "v": "0"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_sar_neg16",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": ">>",
+    "a": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "16"
+     }
+    },
+    "b": {
+     "k": "int",
+     "v": "2"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_shr_neg16",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": ">>>",
+    "a": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "16"
+     }
+    },
+    "b": {
+     "k": "int",
+     "v": "28"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_shl_sign",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "<<",
+    "a": {
+     "k": "int",
+     "v": "1"
+    },
+    "b": {
+     "k": "int",
+     "v": "31"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_shr_var",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-",
+      "a": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>>",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_sar_var_call",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-",
+      "a": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_zero",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "int",
+      "v": "0"
+     },
+     "b": {
+      "k": "jsnull"
+     }
+    },
+    "t": {
+     "k": "int",
+     "v": "5"
+    },
+    "e": {
+     "k": "int",
+     "v": "0"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_empty",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "str",
+      "v": ""
+     },
+     "b": {
+      "k": "jsnull"
+     }
+    },
+    "t": {
+     "k": "str",
+     "v": "d"
+    },
+    "e": {
+     "k": "str",
+     "v": ""
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_false",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "bool",
+      "v": false
+     },
+     "b": {
+      "k": "jsnull"
+     }
+    },
+    "t": {
+     "k": "int",
+     "v": "5"
+    },
+    "e": {
+     "k": "bool",
+     "v": false
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "jsnull"
+     },
+     "b": {
+      "k": "jsnull"
+     }
+    },
+    "t": {
+     "k": "int",
+     "v": "5"
+    },
+    "e": {
+     "k": "jsnull"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_undef",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "u",
+      "e": {
+       "k": "unit"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "cond",
+       "c": {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "name",
+         "v": "u"
+        },
+        "b": {
+         "k": "jsnull"
+        }
+       },
+       "t": {
+        "k": "int",
+        "v": "7"
+       },
+       "e": {
+        "k": "name",
+        "v": "u"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_chain",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "u",
+       "e": {
+        "k": "unit"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "n",
+        "e": {
+         "k": "jsnull"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "$exprV$16",
+         "e": {
+          "k": "cond",
+          "c": {
+           "k": "binop",
+           "op": "==",
+           "a": {
+            "k": "name",
+            "v": "u"
+           },
+           "b": {
+            "k": "jsnull"
+           }
+          },
+          "t": {
+           "k": "name",
+           "v": "n"
+          },
+          "e": {
+           "k": "name",
+           "v": "u"
+          }
+         }
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "cond",
+          "c": {
+           "k": "binop",
+           "op": "==",
+           "a": {
+            "k": "name",
+            "v": "$exprV$16"
+           },
+           "b": {
+            "k": "jsnull"
+           }
+          },
+          "t": {
+           "k": "int",
+           "v": "3"
+          },
+          "e": {
+           "k": "name",
+           "v": "$exprV$16"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_value",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "int",
+      "v": "9"
+     },
+     "b": {
+      "k": "jsnull"
+     }
+    },
+    "t": {
+     "k": "int",
+     "v": "5"
+    },
+    "e": {
+     "k": "int",
+     "v": "9"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_single_quote",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "str",
+      "v": ""
+     },
+     "b": {
+      "k": "jsnull"
+     }
+    },
+    "t": {
+     "k": "str",
+     "v": "d"
+    },
+    "e": {
+     "k": "str",
+     "v": ""
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_single_quote_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "jsnull"
+     },
+     "b": {
+      "k": "jsnull"
+     }
+    },
+    "t": {
+     "k": "str",
+     "v": "d"
+    },
+    "e": {
+     "k": "jsnull"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_var_zero",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "5"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "cond",
+        "c": {
+         "k": "binop",
+         "op": "==",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "jsnull"
+         }
+        },
+        "t": {
+         "k": "name",
+         "v": "b"
+        },
+        "e": {
+         "k": "name",
+         "v": "a"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_var_null",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "jsnull"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "5"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "cond",
+        "c": {
+         "k": "binop",
+         "op": "==",
+         "a": {
+          "k": "name",
+          "v": "a"
+         },
+         "b": {
+          "k": "jsnull"
+         }
+        },
+        "t": {
+         "k": "name",
+         "v": "b"
+        },
+        "e": {
+         "k": "name",
+         "v": "a"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_short_circuit",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "c",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "$exprV$17",
+        "e": {
+         "k": "int",
+         "v": "1"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "$exprV$17"
+          },
+          "b": {
+           "k": "jsnull"
+          }
+         },
+         "t": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "c",
+           "e": {
+            "k": "int",
+            "v": "9"
+           }
+          },
+          "b": {
+           "k": "assign",
+           "x": "$exprV$18",
+           "e": {
+            "k": "name",
+            "v": "c"
+           }
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "assign",
+         "x": "r",
+         "e": {
+          "k": "cond",
+          "c": {
+           "k": "binop",
+           "op": "==",
+           "a": {
+            "k": "name",
+            "v": "$exprV$17"
+           },
+           "b": {
+            "k": "jsnull"
+           }
+          },
+          "t": {
+           "k": "name",
+           "v": "$exprV$18"
+          },
+          "e": {
+           "k": "name",
+           "v": "$exprV$17"
+          }
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "c"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_right_effect",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "c",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "$exprV$19",
+        "e": {
+         "k": "jsnull"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "$exprV$19"
+          },
+          "b": {
+           "k": "jsnull"
+          }
+         },
+         "t": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "c",
+           "e": {
+            "k": "int",
+            "v": "9"
+           }
+          },
+          "b": {
+           "k": "assign",
+           "x": "$exprV$20",
+           "e": {
+            "k": "name",
+            "v": "c"
+           }
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "assign",
+         "x": "r",
+         "e": {
+          "k": "cond",
+          "c": {
+           "k": "binop",
+           "op": "==",
+           "a": {
+            "k": "name",
+            "v": "$exprV$19"
+           },
+           "b": {
+            "k": "jsnull"
+           }
+          },
+          "t": {
+           "k": "name",
+           "v": "$exprV$20"
+          },
+          "e": {
+           "k": "name",
+           "v": "$exprV$19"
+          }
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "+",
+        "a": {
+         "k": "name",
+         "v": "c"
+        },
+        "b": {
+         "k": "name",
+         "v": "r"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_impure_left",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "c",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "$exprV$21",
+        "e": {
+         "k": "name",
+         "v": "c"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "c",
+         "e": {
+          "k": "binop",
+          "op": "+",
+          "a": {
+           "k": "name",
+           "v": "c"
+          },
+          "b": {
+           "k": "int",
+           "v": 1
+          }
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "$exprV$22",
+          "e": {
+           "k": "name",
+           "v": "$exprV$21"
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "r",
+          "e": {
+           "k": "cond",
+           "c": {
+            "k": "binop",
+            "op": "==",
+            "a": {
+             "k": "name",
+             "v": "$exprV$22"
+            },
+            "b": {
+             "k": "jsnull"
+            }
+           },
+           "t": {
+            "k": "int",
+            "v": "4"
+           },
+           "e": {
+            "k": "name",
+            "v": "$exprV$22"
+           }
+          }
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "+",
+        "a": {
+         "k": "binop",
+         "op": "*",
+         "a": {
+          "k": "name",
+          "v": "r"
+         },
+         "b": {
+          "k": "int",
+          "v": "100"
+         }
+        },
+        "b": {
+         "k": "name",
+         "v": "c"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_nullish_in_cond",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "===",
+      "a": {
+       "k": "cond",
+       "c": {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "name",
+         "v": "z"
+        },
+        "b": {
+         "k": "jsnull"
+        }
+       },
+       "t": {
+        "k": "int",
+        "v": "5"
+       },
+       "e": {
+        "k": "name",
+        "v": "z"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_or_zero",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "||",
+    "a": {
+     "k": "int",
+     "v": "0"
+    },
+    "b": {
+     "k": "int",
+     "v": "5"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_and_zero",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "&&",
+    "a": {
+     "k": "int",
+     "v": "0"
+    },
+    "b": {
+     "k": "int",
+     "v": "5"
+    }
+   }
+  }
+ },
+ {
+  "name": "jsnode_cases.js::program:case_or_then_nullish",
+  "file": "jsnode_cases.js",
+  "params": [
+   "this"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "$exprV$23",
+      "e": {
+       "k": "binop",
+       "op": "||",
+       "a": {
+        "k": "name",
+        "v": "z"
+       },
+       "b": {
+        "k": "int",
+        "v": "8"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "cond",
+       "c": {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "name",
+         "v": "$exprV$23"
+        },
+        "b": {
+         "k": "jsnull"
+        }
+       },
+       "t": {
+        "k": "int",
+        "v": "1"
+       },
+       "e": {
+        "k": "name",
+        "v": "$exprV$23"
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

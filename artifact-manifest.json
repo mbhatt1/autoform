@@ -45,11 +45,11 @@
    "render_sha256": "9852bb0d7e9f90af648e2452c1ab6ad4ac8c7307505e9cc820b77a9b92cf5648"
   },
   "LangJS": {
-   "ast_bytes": 110740,
-   "ast_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
+   "ast_bytes": 118082,
+   "ast_sha256": "3d77df284c09b6dcc865db87e51d9fc8eaabafcabea23587f54bc1955d52e754",
    "ast_tracked": true,
-   "render_bytes": 49832,
-   "render_sha256": "cffd21dde521f7cc0c91f021e34de0484b2adb54e5f61edc11758dd26c6e31a9"
+   "render_bytes": 51155,
+   "render_sha256": "66345ea46166eb90edb01e029738e927132a74f38e0eceb282071912d445d8e3"
   },
   "LangJava": {
    "ast_bytes": 1131529,
@@ -66,11 +66,11 @@
    "render_sha256": "0f3a6d3e30dcb8936e7c317c470f6c81de82377634ce2327d968586ac6fa23f9"
   },
   "LangTS": {
-   "ast_bytes": 226862,
-   "ast_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
+   "ast_bytes": 240270,
+   "ast_sha256": "fa0807c4dc9a3a597b38bb3c58ca22873c37852ace627c960f0058e7ca6f0a05",
    "ast_tracked": true,
-   "render_bytes": 117420,
-   "render_sha256": "90861a61a8281e335f62d08f15731c7f0aafa6a37d06db107ee3cd15c270d4b6"
+   "render_bytes": 121879,
+   "render_sha256": "d890cff9f49412b18de8da6b23272a5309620dc095fc06da47e41fa30216a97e"
   },
   "LinuxCrypto": {
    "ast_bytes": 18888160,

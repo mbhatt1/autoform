@@ -23,7 +23,8 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `str : String → Val` | A string *or* a C `char*`. One constructor: see §7, where the operators are dialect-split instead. |
 | `bool : Bool → Val` | A boolean. |
 | `float : Fl → Val` | An IEEE-754 float as a bit pattern plus its format (`Autoform/Lang/Core/Float.lean`). The format comes from the dialect (`Dialect.toFConfig`: `.python` → `FConfig.python`, `.cLike`/`.javascript` → `FConfig.cDouble`). `Val.beq` routes floats through `Fl.eqv`, never bit equality: NaN ≠ NaN and `-0.0 == 0.0`. |
-| `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
+| `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. Under `Dialect.javascript` it is `undefined`. |
+| `jsnull : Val` | JavaScript's `null` (the source literal), distinct from `undefined` so that `null === undefined` is `false` and `null == undefined` is `true`. Only the JS/TS exporter produces it; falsy, like `unit`. |
 | `list : List Val → Val` | A list VALUE. Immutable: a Python list *display* is not one of these but a `ref` to a heap object whose `Payload` is the list (`Expr.boxContainer`, see `docs/boxed-containers.md`). A `Val.list` still arises from C aggregate initializers, `dict.keys()`-style results and the oracle's encoder, and a write to one is the hole `setIndex:immutable-containers`. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
 | `dict : List (Val × Val) → Val` | An association list, *not* a hash map. Key order is observable in real languages and differs between them, so imposing one language's iteration order would be an invented answer. |
@@ -237,7 +238,7 @@ traded for a guaranteed dynamic hole.
 
 | Constructor | Meaning |
 |---|---|
-| `lit : Lit → Expr` | An `int` / `str` / `bool` / `float` / `unit` literal. |
+| `lit : Lit → Expr` | An `int` / `str` / `bool` / `float` / `unit` literal; `Lit.jsnull` is JS/TS `null`. |
 | `name : String → Expr` | Variable read. Resolution order: local `Env`, then the globals frame, then the function table (yielding `Val.fn`), then `unit`. The function-table fallback is what makes higher-order code translatable instead of holed. |
 | `binop : String → Expr → Expr → Expr` | Binary operator by name. `&&`/`\|\|` short-circuit (§5); everything else evaluates left then right. |
 | `unop : String → Expr → Expr` | Unary operator by name (`-`, `!`). |

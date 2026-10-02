@@ -7015,6 +7015,11 @@ import scala.annotation.tailrec
           // and was mislabeled `import:operand` (a label meant for Python's `import` operand
           // shape) on every C/C++ file, live-CPG-sampled at 1,927 of 1,927 non-Python
           // `import:operand` hits on the SQLite corpus (research.md US1 sampling results).
+          // JS/TS `null` is NOT `undefined`: `null === undefined` is `false`. Core's one
+          // `Val.unit` is `undefined` there (what a missing return, property or unassigned
+          // variable evaluates to) and `null` is `Val.jsnull`, so the two stay apart.
+          else if (jsFile && c == "null")
+            ujson.Obj("k" -> "jsnull")
           else if (c == "None" || c == "null" || c == "nil" || c == "nullptr" || c == "NULL")
             ujson.Obj("k" -> "unit")
           // A float is not a string. Core has no floats, so this is a hole, not a lie.
@@ -7111,6 +7116,20 @@ import scala.annotation.tailrec
     case i: Identifier if boxedArrays.contains(localName(i.name)) =>
       ujson.Obj("k" -> "irefIndex", "a" -> ujson.Obj("k" -> "name", "v" -> localName(i.name)),
                 "i" -> intLit(0))
+    // JS/TS `undefined` (the global, not a local or parameter that shadows it): Core's
+    // one `Val.unit`, which is also what a missing return value, a missing property and
+    // `null` evaluate to. It was an unbound `name "undefined"` -- a read of a variable that
+    // never exists. Core cannot tell it from `null`, so `null === undefined` stays the
+    // hole `js:===:null-vs-undefined` (`jsEqE`) rather than a wrong `true`/`false`.
+    case i: Identifier if jsFile && i.name == "undefined" && !jsShadowedGlobals.contains(i.name) =>
+      ujson.Obj("k" -> "unit")
+    // JS/TS `NaN` and `Infinity`: global constants, not variables. Core reads any name
+    // bound nowhere as `Val.unit` under the non-Python rules (`Ctx.unboundName`), so they
+    // were `null`/`undefined` -- silently, and `Infinity > 5` was a hole only by accident.
+    // They are the IEEE binary64 values `render_lean.py` converts exactly.
+    case i: Identifier if jsFile && (i.name == "NaN" || i.name == "Infinity") &&
+                          !jsShadowedGlobals.contains(i.name) =>
+      ujson.Obj("k" -> "float", "v" -> (if (i.name == "NaN") "nan" else "1e999"))  // 1e999 parses to +inf; `inf` would lose its `f` to the suffix strip
     case i: Identifier        => ujson.Obj("k" -> "name", "v" -> localName(i.name))
     case p: MethodParameterIn if boxedLocals.contains(p.name) => boxField(p.name)
     case p: MethodParameterIn => ujson.Obj("k" -> "name", "v" -> p.name)
@@ -7432,12 +7451,66 @@ import scala.annotation.tailrec
     }
   }
 
+  /** JS/TS `||` versus `??`. jssrc2cpg 4.0.606 lowers `a ?? b` to `<operator>.logicalOr`,
+    * the operator of `a || b` (measured on a real CPG, STRATEGY section 64), so the two
+    * are told apart exactly as `jsAmbiguousBinop` tells `==` from `===`: by the token
+    * between the operand spans. `Some(Right("||"))` and `Some(Right("??"))` are the two
+    * readings; `Some(Left(label))` is a `logicalOr` whose source text contains `??` but
+    * whose token could not be recovered -- a hole, never a guess, because `0 ?? 5` is `0`
+    * and `0 || 5` is `5`. `None`: not a JS/TS `logicalOr`. A call whose text has no `??`
+    * at all cannot be a nullish coalescing, so it stays `||` even when a comment between
+    * the operand and the operator defeats `jsOperatorToken`. */
+  def jsLogicalOr(c: Call): Option[Either[String, String]] = {
+    val kids = kidsOf(c)
+    if (!jsFile || c.methodFullName != "<operator>.logicalOr" || kids.size != 2) None
+    else jsOperatorToken(c.code, kids(0).code, kids(1).code, List("||", "??")) match {
+      case Some(t) => Some(Right(t))
+      case None =>
+        if (c.code == null || c.code.contains("??")) Some(Left("op:js-token-unrecovered:logicalOr"))
+        else Some(Right("||"))
+    }
+  }
+
+  /** `a ?? b` in JS/TS (a recovered `??`), or the hole label for an unrecovered one. */
+  def jsNullishCall(c: Call): Option[Either[String, Unit]] =
+    jsLogicalOr(c).flatMap {
+      case Right("??") => Some(Right(()))
+      case Left(l)     => Some(Left(l))
+      case _           => None
+    }
+
+  /** Which of the JS globals `undefined`/`NaN`/`Infinity` a program rebinds: as a
+    * parameter name or as the target of an assignment/declaration anywhere in the CPG.
+    * jssrc2cpg gives every identifier bound nowhere a synthetic `Local` in its method, so
+    * a `Local` of that name says nothing about shadowing (measured: `NaN` has one). Any
+    * hit anywhere keeps the name an ordinary variable everywhere. */
+  lazy val jsShadowedGlobals: Set[String] = {
+    val g = Set("undefined", "NaN", "Infinity")
+    (cpg.parameter.name.l.filter(g.contains) ++
+     cpg.call.name("<operator>.assignment").argument.argumentIndex(1).isIdentifier.name.l
+       .filter(g.contains)).toSet
+  }
+
+  /** `v == null`: JS loose equality with the null literal, which is true exactly for
+    * `null` (`Val.jsnull`) and `undefined` (`Val.unit`) and false for `0`, `""`, `false`
+    * and every object -- `jsEqE`, `Semantics.lean`. */
+  def jsIsNullish(v: ujson.Obj): ujson.Obj =
+    ujson.Obj("k" -> "binop", "op" -> "==", "a" -> v, "b" -> ujson.Obj("k" -> "jsnull"))
+
   /** Which of `candidates` sits between two operand spans in a binary expression's
     * source text. Longest candidate first (`===` before `==`), and a candidate only
     * counts if the RIGHT operand's span follows it, so `a === !b` is `===`, not `===!`.
     * Pure string function, so it can be checked without a CPG. */
-  def jsOperatorToken(full: String, left: String, right: String,
+  def jsOperatorToken(full0: String, left0: String, right0: String,
                       candidates: List[String]): Option[String] = {
+    // The operand CODE is not the source text: jssrc2cpg re-quotes a string literal as
+    // `"..."` whatever quote the source used, so `typeof x === 'number'` has the right
+    // operand `"number"` inside a call whose code still says `'number'`. Measured on a real
+    // CPG (p-queue, STRATEGY section 64): without this every `=== 'string'` was an
+    // unrecovered token. Folding the quote character on all three strings makes the span
+    // comparison quote-blind; a literal whose text still differs (an escape) stays a hole.
+    def fq(x: String): String = if (x == null) null else x.replace('\'', '"')
+    val (full, left, right) = (fq(full0), fq(left0), fq(right0))
     def skip(s: String, i: Int, cs: String): Int = {
       var j = i
       while (j < s.length && (cs.contains(s(j)) || s(j).isWhitespace)) j += 1
@@ -8775,6 +8848,19 @@ import scala.annotation.tailrec
         case Right(op) => ujson.Obj("k" -> "binop", "op" -> op,
                                     "a" -> expr(kids(0)), "b" -> expr(kids(1)))
         case Left(lbl) => hole(lbl)
+      }
+    // JS/TS `a ?? b`: the left value unless it is null/undefined (Core's one `Val.unit`).
+    // `expr` has no prelude slot, so the left operand is evaluated twice (test, then
+    // value) and must be re-evaluable; an impure one is translated by `exprV`, which
+    // threads a temp, and is a hole here.
+    else if (jsNullishCall(c).isDefined)
+      jsNullishCall(c).get match {
+        case Left(lbl) => hole(lbl)
+        case Right(_) =>
+          val List(a, b) = kids
+          if (pureNode(a))
+            ujson.Obj("k" -> "cond", "c" -> jsIsNullish(expr(a)), "t" -> expr(b), "e" -> expr(a))
+          else hole("op:js-nullish-impure-lhs")
       }
     else if (pointerNullTest(c).isDefined) {
       val (other, neg) = pointerNullTest(c).get
@@ -11530,6 +11616,33 @@ import scala.annotation.tailrec
     // two values, so the 0/1-vs-value dialect rule is untouched too. When `b` has NO
     // prelude nothing changes at all (`pa` was already safe to hoist: `a` is always
     // evaluated first).
+    // JS/TS `a ?? b`: `t := a; (if t is nullish { pb; r := b }); value: t is nullish ? r : t`.
+    // `a` is evaluated exactly once, `b` (and its prelude) only when `a` is null/undefined,
+    // and a left value of `0`, `""` or `false` is kept. Recovered from source text because
+    // jssrc2cpg names it `<operator>.logicalOr` (`jsLogicalOr`).
+    case c: Call if jsNullishCall(c).isDefined =>
+      jsNullishCall(c).get match {
+        case Left(lbl) => (Nil, hole(lbl))
+        case Right(_) =>
+          val List(a, b) = kidsOf(c)
+          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+          if (pa.isEmpty && pb.isEmpty && pureNode(a))
+            (Nil, ujson.Obj("k" -> "cond", "c" -> jsIsNullish(ae), "t" -> be, "e" -> ae))
+          else {
+            val t = freshExprVTemp()
+            val tn = ujson.Obj("k" -> "name", "v" -> t)
+            val assignT = ujson.Obj("k" -> "assign", "x" -> t, "e" -> ae)
+            if (pb.isEmpty)
+              (pa :+ assignT, ujson.Obj("k" -> "cond", "c" -> jsIsNullish(tn), "t" -> be, "e" -> tn))
+            else {
+              val r = freshExprVTemp()
+              val rn = ujson.Obj("k" -> "name", "v" -> r)
+              val runRight = seqOf(pb :+ ujson.Obj("k" -> "assign", "x" -> r, "e" -> be))
+              val guard = ujson.Obj("k" -> "ifte", "c" -> jsIsNullish(tn), "t" -> runRight, "e" -> skip)
+              (pa ++ List(assignT, guard), ujson.Obj("k" -> "cond", "c" -> jsIsNullish(tn), "t" -> rn, "e" -> tn))
+            }
+          }
+      }
     case c: Call if (c.methodFullName == "<operator>.logicalAnd" ||
                      c.methodFullName == "<operator>.logicalOr") && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)

@@ -3622,8 +3622,9 @@ Not done: jssrc2cpg is not installed here, so the exporter change is checked on 
 synthetic spans through Joern (and a C export is byte-identical before and after), not on
 a JS CPG; `ast-LangJS.json` was not re-exported. `.unit` is both `null` and `undefined`,
 so `===` between two of them is a hole. jssrc2cpg also maps `??` to `logicalOr`
-(`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed, and not recoverable the same way without a
-new Core operator.
+(`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed here, and not recoverable the same way without a
+new Core operator. *(Superseded: fixed in section 64, which also ran all of this on a real
+jssrc2cpg CPG for the first time.)*
 
 ## 62. Python method resolution along the C3 MRO, `super()`, and bare names by Python scoping
 
@@ -3916,3 +3917,75 @@ test against). Argument conversion at call sites. Nested/anonymous aggregate mem
 `activeStructText` does for `sizeof`. Untyped `.cLike` arithmetic survives in byte-cursor
 `$off` bookkeeping and pointer-index arithmetic, whose values are offsets. Java `(char)`
 casts still hole as C's `char` does, although Java's `char` is `u16`.
+
+## 64. JavaScript on a real jssrc2cpg CPG: `??` was a wrong answer, `null` was `undefined`
+
+*(Item R. The number is provisional; the merger renumbers.)*
+
+Section 61 changed the exporter to read `==`/`===`/`>>`/`>>>` from source text and said, in
+its last lines, that it had never run on a JS CPG: jssrc2cpg was not installed, 15 test
+strings had been pushed through Joern's base machinery, `ast-LangJS.json`/`ast-LangTS.json`
+had not been re-exported, `??` was unfixed, and `null === undefined` was a hole. This item
+fetched the frontend and ran it.
+
+**The frontend.** `io.joern:jssrc2cpg_3:4.0.606` from Maven Central (705,539 bytes), plus
+`astgen` 3.47.0 (the version `application.conf` inside the jar pins), which is a release
+asset of `joernio/astgen-monorepo` (tag `javascript-astgen/v3.47.0`, `astgen-linux`), not of
+the old `joernio/astgen` repository, whose releases stop earlier. `ASTGEN_BIN` points at it;
+`JoernParse --language jssrc` additionally needs a `js2cpg.sh` in the installation root.
+`provenance/ast-LangJS.json.prov.json` records the command and the astgen digest.
+
+**Measured on the real CPG** (fixture `tests/fixtures/jsnode/jsnode_cases.js`, 55 functions;
+Node v22.22.2 against Core on the exporter's real output; `Autoform/JsNode.lean`,
+`tests/test_jsnode_node.py`, 7 tests). With the exporter of `4dc1f19`: 15 of 55 differ from
+Node, 11 of them silent wrong answers and 4 holes. Seven of the wrong answers are `??`
+(`0 ?? 5` gave `5`; jssrc2cpg lowers `??` to `<operator>.logicalOr`). Three of the holes are
+a bug in section 61's token recovery that only a real CPG shows: jssrc2cpg re-quotes every
+string literal as `"..."`, so for `'a' === 'a'` the operand text is not found in the
+expression text and the token was `op:js-token-unrecovered`; p-queue had 4 such holes
+(`typeof x === 'number'`). The token recovery itself works: all six spellings are recovered
+from real spans. With the fixes: 55 of 55 agree with Node, 0 holes in the fixture.
+
+**Changes.**
+* `??` is told from `||` by the token between the operand spans (`jsLogicalOr`) and lowered
+  to `cond (a == null) b a` (a temp when `a` is impure, `b` and its prelude only when `a` is
+  nullish). Not a Core operator: that would add a third arm to `evalExpr`'s short-circuit
+  `if`, which `Refine`, `FuelMono` and `Overflow` each case-split on. A `logicalOr` whose text
+  has `??` and whose token cannot be read is a hole (`op:js-token-unrecovered:logicalOr`).
+* `x == null` was section 61's by-reading finding (rewritten to `x in (None, 0)`): measured,
+  the exporter already emitted `==` first; `0 == null`, `"" == null` and `false == null` are
+  `false` in 4 fixture cases.
+* `undefined`, `NaN` and `Infinity` were unbound names, which Core reads as `Val.unit` outside
+  Python. Now `unit`, and the IEEE values (`NaN`; `Infinity` is spelled `1e999`, because
+  `render_lean.py` strips a trailing `f` and `inf` lost it), unless a parameter or an
+  assignment in the CPG rebinds the name. jssrc2cpg gives every undeclared identifier a
+  synthetic `Local`, so testing for a `Local` does not detect shadowing.
+* `null` is `Val.jsnull`, new, and `Val.unit` is `undefined` under `.javascript`; `Lit.jsnull`
+  and `{"k": "jsnull"}` in the AST. `jsEqE`: loosely equal to each other, strictly equal
+  only to themselves. `null === undefined` is `false`, `null === null` and
+  `undefined === undefined` are `true`; the hole `js:===:null-vs-undefined` is gone. Ripple:
+  `Val.kind`/`identical`/`beq`/`truthy`, `Lit.toVal`, the literal arm of `evalExpr`, and one
+  case-split alternative in `FuelMono.lean`. Built, in addition to those: `Refine`,
+  `Overflow`, `Ledger`, `Harness.*`, `CallingConvention`, `PyScoping`, `PyMro`, `CBoolInt`,
+  `CIntWidth`, `JavaIntWidth`, `BoxedContainers`, `BuiltinBase`, `Contracts`, `HoleContracts`,
+  `SpecsGen.Basis`, `SpecsGen.Cachetools`, `SpecsGen.LinuxLib*`, `SpecsGen.V8BaseSample`, the
+  `Specs.*` modules (409 jobs, no error; not `SpecsGen.V8Base`).
+
+**Re-exports.** `ast-LangJS.json` is p-map `3f153f1` `index.js` (the one 285-line revision:
+`git show <commit>:index.js | wc -l` over the history); `ast-LangTS.json` is p-queue `9efde42`
+`source/*.ts` (a revision whose method set contains every non-lambda method name of the
+committed artifact; `9efde42` and `d9cf2be` give identical function lists and `9efde42` is the
+one dated the same day as the p-map commit; `89a10bb`, a day later, was not compared). The previous artifacts cannot be reproduced: they came from an unrecorded
+frontend that named `const f = () => ...` `f` and exported TypeScript overload signatures
+(TS 86 functions, now 82; JS 14, still 14). Both are recorded with `scripts/provenance.py record`,
+and `ast-Cachetools.json` and `ast-CAddr.json` were re-exported with the new exporter, found
+byte-identical (`cmp`), and re-recorded: the exporter digest is part of every record, so any
+exporter edit makes them stale until that is done.
+
+**Not done / found and left.** `a ??= b` is the hole `op:notNullAssert` and `a ||= b` an
+unmodelled call (`<operators>.assignmentOr`); `void 0` is `op:void`; a call to a sibling
+top-level function is the hole `call:f` (`Ctx.resolve` matches `.f`, jssrc2cpg names it
+`file.js::program:f`), which is why the fixture has no calls. Any other free JS global
+(`Math`, `Promise`, `Symbol`) is still read as `Val.unit` by the legacy unbound-name rule. The
+lowered `??` is exact for a pure or temp-able left operand; in plain `expr` position (a call
+argument, a condition) an impure left operand is the hole `op:js-nullish-impure-lhs`.
