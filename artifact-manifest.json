@@ -165,5 +165,19 @@
       "corpus_ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
       "source": "ast-V8BaseSample.json"
     }
+  },
+  "untracked_by_policy": {
+    "Ansible": {
+      "reason": "Gitignored by policy (docs/integrity.md): the AST is larger than its render, and neither the corpus source commit nor the exporter version that produced the pinned ast_sha256 was recorded, so a re-export cannot reproduce it and no copy exists outside the original workspace. No spec module is pinned to it. What this costs: the figures in docs/evidence-ansible.md and evidence-Ansible.summary.json were measured on this AST and cannot be re-derived from a clone. At 136.6 MB it also exceeds GitHub's 100 MB per-file limit.",
+      "reviewed": "2026-10-02, STRATEGY.md section 59 (item N)"
+    },
+    "LinuxCrypto": {
+      "reason": "Gitignored by policy (docs/integrity.md): the AST is larger than its render, and neither the corpus source commit nor the exporter version that produced the pinned ast_sha256 was recorded, so a re-export cannot reproduce it and no copy exists outside the original workspace. No spec module is pinned to it. What this costs: the figures in docs/evidence-LinuxCrypto.md and evidence-LinuxCrypto.json / core-oracle-LinuxCrypto.json were measured on this AST and cannot be re-derived from a clone.",
+      "reviewed": "2026-10-02, STRATEGY.md section 59 (item N)"
+    },
+    "LinuxLib": {
+      "reason": "Gitignored by policy (docs/integrity.md): the AST is larger than its render, and neither the corpus source commit nor the exporter version that produced the pinned ast_sha256 was recorded, so a re-export cannot reproduce it and no copy exists outside the original workspace. No spec module is pinned to it. What this costs: the figures in docs/evidence-LinuxLib.md and evidence-LinuxLib.json / core-oracle-LinuxLib.json were measured on this AST and cannot be re-derived from a clone. SpecsGen/LinuxLib is pinned to LinuxLibSample, a tracked subset, not to this.",
+      "reviewed": "2026-10-02, STRATEGY.md section 59 (item N)"
+    }
   }
 }
