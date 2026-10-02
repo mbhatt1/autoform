@@ -3474,6 +3474,89 @@ make the one-argument re-application hit `param:default-nonliteral`; they are no
 modules elaborated against the new AST: `synth_specs.py` would regenerate `C_tfFree`, which
 `C_not_tfFree` refutes, so it cannot regenerate `SpecsGen/Cachetools.lean` as-is.
 
+## 60. A C address model: provenance, not addresses
+
+`cstr:address-compare`, `op:addressOf:element:*`, `op:*crement:pointer` and the int-to-pointer
+casts were the largest SQLite hole family, and they had one cause: Core could only operate on
+a pointer the exporter had *proven* to be an interior pointer into a block Core itself
+allocated (`isIrefExpr`, `strCursorParams`). Every pointer loaded from a field or received as
+a parameter -- SQLite's page buffers, `pPage->aData`, every `u8 *data` -- was a static hole.
+
+The fix is to move the provenance check from export time to run time, where the blocks are.
+`Autoform/Lang/Core/Address.lean` (design and justification in its module doc and in
+`docs/core-language.md` §2.1) gives each array block an extent and an element size, and
+`Expr.ptrOp` answers comparison, `p ± n` and `p − q` from them -- CompCert's `Vptr b ofs`,
+with ISO C's undefined and unspecified cases (cross-object ordering, leaving the array,
+one-past-the-end compared with another object, a stride that is not the block's) as holes.
+Comparisons are stride-free and need no element size; arithmetic carries the static pointee
+size and checks it, which is what makes `&p[i]` safe on a pointer that may have come
+through `(u32*)bytes`. Pointer ↔ integer stays a hole, deliberately: a block has no
+number, and every SQLite use of `SQLITE_PTR_TO_INT` would hole under an abstract encoding
+anyway. `unop "cast:ptr"` is the run-time form of the existing pointer-to-pointer
+pass-through for operands whose type the frontend lost.
+
+Two semantic corrections came with it, both "a value where C has none": `derefIref` read an
+out-of-bounds element as `.unit` and `setDerefIref` silently grew the block; both are now
+`ub:ptr-*-out-of-bounds` holes. And `applyBinop`'s heap-free `iref` equality answered
+`false` for one-past-the-end against another object's start, which C leaves unspecified.
+
+Two restrictions keep it honest. A site whose operand is a `Val.str` on every run (a
+literal, an unboxed `char[]`, a byte cursor, a `strFrom` expression) keeps its static
+`cstr:*` label instead of becoming a guaranteed dynamic hole. And arithmetic on a pointer to
+a *struct* stays a hole: Core has no block of structs, so the step could only produce a
+pointer whose every `p->f` holes -- translating it measured +28 hole-free functions on the
+amalgamation (2015 vs 1987), all of them of that kind, and they were taken back out.
+
+### Measured
+
+All with `/opt/corpus/measure.sh` and a per-function hole-multiset diff against the
+baseline export (`/opt/corpus/addrmodel/holediff.py`): no function gained a hole or lost
+hole-freedom.
+
+| corpus | holeFree before | after | holes before | after |
+|---|---|---|---|---|
+| SQLite amalgamation (2433 fns), on base `46c65fc` | 1909 (78.5%) | 1987 (81.7%) | 2280 | 1818 |
+| SQLite amalgamation, merged onto integration head `6d7000e` | 1907 (78.4%) | 1985 (81.6%) | 2296 | 1834 |
+
+Amalgamation labels, before → after: `op:addressOf:element:scalar` 386 → 30,
+`cstr:address-compare` 41 → 21, `cstr:address-equality` 52 → 39, `cstr:pointer-arith`
+45 → 19, `op:postIncrement:pointer` 200 → 184, `op:cast:pointer:int-to-pointer` 16 → 8.
+
+**The full tree is not measured.** `/opt/corpus/measure.sh <exporter> <out> full` was run
+twice with this exporter and Joern was OOM-killed both times (exit 137; the box was shared
+with other agents' Lean builds, `MemAvailable` fell under the 13 GB the full export needs).
+The baseline to compare against is `/opt/corpus/final/full` (holeFree 5054 of 7772,
+`cstr:address-compare` 1478), whose exporter produces an amalgamation export identical to
+this work's base (per-function diff: 0 changes). Run it on an idle machine before quoting
+a full-tree figure.
+
+Conformance: `tests/c_address/addr.c` (14 functions; 5 hole-free before, 14 after) under
+`scripts/differential.py ast-CAddr.json tests/c_address CAddr 40`: 282/282 agree with `cc`,
+0 divergences, 38 INCONCLUSIVE -- every one the model refusing undefined or unspecified
+behaviour (`ub:ptr-arith-out-of-bounds` ×37, `ptr:eq-one-past-unspecified` ×1).
+`Autoform/Specs/AddressSpec.lean` pins the same functions to `cc`'s outputs in the kernel.
+
+### Not addressed
+
+* **Dynamic-hole risk.** A statically hole-free function now answers only when its
+  pointers are Core blocks at run time; page buffers from the (unmodelled) pager, and
+  `char*` arguments that are `Val.str`, hole. That is the trade every `isIrefExpr`
+  relaxation already made, but it moves more functions across the static line.
+* `cstr:address-compare` in `sqlite3__wasm_enum_json` (1,244 of the full tree's): `zPos` points
+  into a `static char aBuffer[]`, which is not boxed (mutable static locals need
+  persistent per-function storage). Boxing it would make every one of those comparisons a
+  same-block `ptrOp`.
+* `char*` under the string model has no address; comparing two of them is still refused.
+  Closing it means representing `char*` as byte blocks.
+* Struct arrays: `Mem *p; p++` needs blocks whose elements are structs and field access
+  through an interior pointer.
+* A C comparison in value position yields `Val.bool` where C yields `int`
+  (`return a == b;` diverges from `cc` in the harness) -- pre-existing, not specific to
+  pointers; the fixture writes `? 1 : 0`.
+* `p[i]` reads on a pointer of unknown provenance still translate to Python `Expr.index`,
+  which answers `.list` element `i.toNat` for a negative `i` -- pre-existing, reported here
+  because it sits next to this work.
+
 ## 61. CI was red on every fresh checkout, at three steps; and JS `==`, `===`, `>>>` were one operator each
 
 ### `check_render` exit 3, by policy rather than by accident

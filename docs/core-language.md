@@ -27,8 +27,8 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `list : List Val → Val` | A list VALUE. Immutable: a Python list *display* is not one of these but a `ref` to a heap object whose `Payload` is the list (`Expr.boxContainer`, see `docs/boxed-containers.md`). A `Val.list` still arises from C aggregate initializers, `dict.keys()`-style results and the oracle's encoder, and a write to one is the hole `setIndex:immutable-containers`. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
 | `dict : List (Val × Val) → Val` | An association list, *not* a hash map. Key order is observable in real languages and differs between them, so imposing one language's iteration order would be an invented answer. |
-| `ref : Ref → Val` | A reference to a heap object. Reference identity is what `is` compares. |
-| `iref : Ref → Sel → Val` | An *interior* pointer: a heap-boxed array or struct plus a position in it (`Sel.idx i` or `Sel.fld f`). Produced by `irefIndex`/`irefField`; read and written with `derefIref`/`setDerefIref`. Pointer arithmetic is defined only on `Sel.idx`; on a field it is the hole `iref:arith-on-field`. |
+| `ref : Ref → Val` | A reference to a heap object. Reference identity is what `is` compares. In C, a pointer to a whole object (§2.1). |
+| `iref : Ref → Sel → Val` | An *interior* pointer: heap block `r` plus a position in it — element `.idx i` of an array block or member `.fld f` of a struct block. In C, the block-plus-offset pointer of §2.1. |
 | `fn : String → Val` | A function, method or class used as a value (CPG `METHOD_REF` / `TYPE_REF`). |
 | `clos : String → List (String × Val) → Val` | A closure: a function name plus the bindings it captured. Capture is **by value**. |
 | `clsClos : String → List (String × Val) → Val` | A *class* value that captured an enclosing scope. Distinct from `clos` because a class is not a function: its methods, not it, read the captured bindings. |
@@ -126,6 +126,86 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
   This is a heuristic, written so that an *ambiguous* match resolves to a hole rather than
   to a guess. `Ctx.resolveMethod` prefers `Cls.meth` and falls back to any `.meth`.
 
+### 2.1 Pointers: the C address model
+
+Source of truth: `Autoform/Lang/Core/Address.lean`. A C pointer is a **block plus an
+offset**, after CompCert's `Vptr b ofs` and CH2O's object paths — provenance is part of
+the value, never an integer address:
+
+| C pointer | Core value |
+|---|---|
+| element `i` of array object `r`, including one past the end (`i = extent`) | `Val.iref r (.idx i)` |
+| member `f` of struct `r`, or a boxed scalar (`.fld "v"`) | `Val.iref r (.fld f)` |
+| the whole object `r` | `Val.ref r` |
+| null | `Val.unit` (spelled `NULL`, `(T*)0`) or `Val.int 0` (spelled `0`) |
+| a `char*` under the string model | `Val.str s` — the bytes up to the terminator, **no identity** |
+| a function | `Val.fn f` |
+
+A block carries two facts the operations consult:
+
+* **extent** (`Heap.extent`) — the number of contiguous decimal keys `"0"…"n-1"`. Every
+  array block Core allocates (`Expr.boxArray`, the exporter's `boxFieldsRange`) has
+  exactly those keys, and element writes are bounds-checked, so this is the length.
+* **element size** (`Heap.elemSize`) — an in-band `"$esz"` field (a key no C identifier
+  can spell) with the byte size the elements were allocated with. `boxArray` blocks are
+  bytes; the exporter tags `boxFieldsRange` blocks from the declared element type.
+  Untagged blocks have none.
+
+`Expr.ptrOp op esz a b` evaluates `a` then `b` and asks `applyPtrOp`, which reads the
+heap. It answers exactly where ISO C defines the answer, and is a hole everywhere else:
+
+| Operation | Answered | Hole |
+|---|---|---|
+| `==` / `!=` | null vs null; null vs any object pointer; same block (offsets compared); different blocks when neither pointer is one past the end (`false`) | one past the end vs another block: **unspecified** (C11 6.5.9p6) → `ptr:eq-one-past-unspecified`; an offset outside `[0, extent]` → `ub:ptr-out-of-bounds` |
+| `<` `<=` `>` `>=` | same block, both offsets in `[0, extent]` | different blocks → `ub:ptr-compare-cross-object`; null → `ub:ptr-order-null`; struct members → `ptr:member-order` (Core does not know member order) |
+| `+` / `-` (pointer ± integer) | same block, result in `[0, extent]`, static pointee size = block element size; a `Val.str` steps forward by bytes (ASCII only, never past the terminator) | leaving the array → `ub:ptr-arith-out-of-bounds`; stride mismatch → `ptr:stride-mismatch`; untagged block → `ptr:untyped-block`; null → `ub:ptr-arith-null`; a string stepped backwards / past its end → `ptr:str-before-start` / `ptr:str-past-terminator` |
+| `diff` (pointer − pointer) | same block, same stride, both in bounds: the element count | different blocks → `ub:ptr-diff-cross-object`; strings → `str:pointer-arithmetic-not-modelled` |
+
+Any comparison involving a `Val.str` is `str:pointer-{compare,equality}-not-modelled`
+(a string-model `char*` has no address); two distinct function names are
+`ptr:fn-identity` (Core cannot rule out two spellings of one function).
+
+**Member boxes.** The exporter boxes an array member of a boxed struct as its own block,
+so that member's address has two Core spellings (`&s.arr` is `iref s (.fld "arr")`,
+`s.arr` decays into the member's block), and a first member shares its address with the
+struct. Such blocks carry `"$member"` (`Heap.isMemberBox`), and any cross-block equality
+involving one is `ptr:member-box-alias` instead of `false`.
+
+**Arithmetic is limited to scalar and pointer pointees.** Core has no block whose elements
+are structs (a struct is its own object, `Val.ref`), so stepping a `Mem*` could only yield
+a pointer whose every `p->f` holes; such sites keep their static labels.
+
+Comparisons are **stride-free** — two offsets into one block order the same way whatever
+the pointee type — so they need no element size, and the exporter emits them for pointers
+of *any* provenance (`ptrRelOp` in `export_ast.sc`). Arithmetic carries the static pointee
+size `esz` and checks it against the block, because a pointer that reached an operation
+through a pointee-changing cast (`(u32*)bytes`) has a different stride, and stepping it by
+block elements would be a wrong answer.
+
+`derefIref`/`setDerefIref` read and write only elements inside the block: one past the
+end, or any other out-of-range offset, is `ub:ptr-deref-out-of-bounds` /
+`ub:ptr-store-out-of-bounds` (they used to read `.unit` and silently grow the block).
+
+**Pointer ↔ integer is a hole, by choice.** Both directions are implementation-defined
+(C11 6.3.2.3p5–6) and a block has no numeric address, so any integer Core produced for
+`(uintptr_t)p` would be invented. An abstract encoding (a provenance-carrying integer, as
+in the PNVI proposals) supports only round trips and equality; SQLite's
+`SQLITE_PTR_TO_INT` results are hashed, masked and subtracted, which would be holes under
+it anyway, at the price of a `Val` constructor every match in Core would have to learn.
+So `(intT)p` is `unop "cast:<w>"` on a non-integer — a hole — and `(T*)n` for an integer
+`n ≠ 0` is a hole. `unop "cast:ptr"` is the one cast operator: a cast to a pointer type
+whose operand's static type did not resolve; it is the identity on every pointer value
+(the exporter's pointer-to-pointer pass-through, decided at run time) and
+`op:cast:pointer:int-to-pointer` on a non-zero integer.
+
+**Dynamic-hole risk, stated.** Translating an operation on a pointer of unknown provenance
+makes the function statically hole-free while its run-time answer depends on what the
+pointer holds: an interior pointer into a Core block answers; a `Val.str`, a block of
+another element size, or a value from an unmodelled external call holes. The exporter
+keeps the static `cstr:*` label wherever an operand is a `Val.str` on *every* run (a
+string literal, an unboxed `char[]`, a byte cursor, a `strFrom` expression), so no site is
+traded for a guaranteed dynamic hole.
+
 ## 3. Expressions (`Expr`)
 
 | Constructor | Meaning |
@@ -147,12 +227,13 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
 | `isOp : Bool → Expr → Expr → Expr` | Identity. Reference identity for `.ref`, structural for immediates. The `Bool` means negated (`is not`). |
 | `inOp : Bool → Expr → Expr → Expr` | Membership over lists, tuples, dict keys, and substrings. The `Bool` means negated (`not in`). |
 | `starred` / `kwargE` / `dstarred` | `*e`, `k = e` and `**e` in an argument list (the calling convention, STRATEGY.md §35). Only meaningful directly inside a call's arguments; anywhere else they are the hole `op:starred-outside-call`. |
+| `ptrOp : String → Nat → Expr → Expr → Expr` | A C pointer comparison, pointer ± integer, or pointer difference, answered from the heap (§2.1). The `Nat` is the static pointee size for arithmetic. |
 | `hole : String → Expr` | An unmapped expression, tagged with the CPG node label that produced it. |
 | `boxNew : Expr → Expr` | Allocate a fresh single-field box (`"v"`) holding the value: an address-taken C local. |
 | `boxFields : List (Expr × Expr) → Expr` | Allocate a fresh multi-field box: a boxed C array (fields `"0"`, `"1"`, …) or struct (member names). |
-| `boxArray : Expr → Expr` | Allocate a box whose length is a *runtime* value, every field `.unit`: `malloc(n)`-shaped buffers. |
+| `boxArray : Expr → Expr` | Allocate a box whose length is a *runtime* value, every field `.unit`: `malloc(n)`-shaped byte buffers (element size `$esz` 1, §2.1). |
 | `irefIndex` / `irefField` | `&a[i]` / `&s.f` on a boxed array or struct: yields a `Val.iref`. |
-| `derefIref : Expr → Expr` | `*p` where `p` is a `Val.iref`. |
+| `derefIref : Expr → Expr` | `*p` where `p` is a `Val.iref`; an element outside the block is `ub:ptr-deref-out-of-bounds` (§2.1). |
 | `strByte : Expr → Expr → Expr` | C `*p` / `p[i]` on a `char*` byte cursor: the byte as an `int`; reading at the string's length gives `0` (the implicit terminator), further out is a hole. C-family exporter only. |
 | `strFrom : Expr → Expr → Expr` | The suffix of a string from a position: a byte cursor passed on whole, or `p + n` on an untracked `char*`. |
 
@@ -166,7 +247,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
 | `setField : Expr → String → Expr → Stmt` | `e.f = v`. Non-object receiver: `setField:<f>:non-object`. |
 | `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`, Python only (every other dialect: `setIndex:immutable-containers`). Evaluates `v`, `e`, `i` (CPython's order); a boxed list/dict is written with `Heap.setPayload` on the reference, so every alias sees it; a plain object runs its class's own `__setitem__`; a tuple/str/scalar is `TypeError`; an unboxed list/dict value stays the hole. |
 | `delIndex : Expr → Expr → Stmt` | `del e[i]`, Python only. Mirrors `setIndex`: `KeyError`/`IndexError`/`TypeError` as CPython, a class's own `__delitem__`, otherwise a hole. |
-| `setDerefIref : Expr → Expr → Stmt` | `*p = v` where `p` is a `Val.iref`. |
+| `setDerefIref : Expr → Expr → Stmt` | `*p = v` on an interior pointer; an element outside the block is `ub:ptr-store-out-of-bounds` (§2.1). |
 | `seq : Stmt → Stmt → Stmt` | Sequencing. Only a `normal` outcome continues. |
 | `ifte` / `loop` | Conditional and `while`. |
 | `breakBlock : Stmt → Stmt` | Absorbs a `break` but not a `continue`: a C `switch` lowers to an `ifte` chain inside one, so `break` ends the switch while `continue` reaches the enclosing loop. |
@@ -325,7 +406,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 |---|---|---|
 | ~~`op:starredUnpack`~~ | `*args` / `**kwargs` splicing. **Closed** (STRATEGY.md §35): `Expr.starred` / `Expr.kwargE` / `Expr.dstarred` and `Func.vararg` / `Func.kwarg` express it. The label no longer occurs. | Implemented. What remains is narrower and separately named: `op:starred-outside-call`, `call:<f>:keyword-to-builtin`. |
 | `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here and is now mapped to `/`, because the dialect already makes `/` floor under `.python` — check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
-| `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (`Val.float` exists, but the int↔float conversion is not wired into the exporter). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` needs the conversion wired (`FConfig.ofInt` exists); `char-signedness` needs a target-ABI parameter; `int-to-pointer` needs an address model. |
+| `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (`Val.float` exists, but the int↔float conversion is not wired into the exporter). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` needs the conversion wired (`FConfig.ofInt` exists); `char-signedness` needs a target-ABI parameter; `int-to-pointer` is a hole **by choice** (§2.1): what remains is an operand statically known to be an integer, or an integer constant (`(sqlite3_destructor_type)-1`, `(T*)8`). An operand with no type evidence is `unop "cast:ptr"`, decided at run time. |
 | `op:sizeOf:<kind>` | A `sizeof` that could not be folded to a constant. Folding uses the exporter's `dataModel` for pointer and `long`-family widths and standard C layout for aggregates (members in source order, each at the next multiple of its own alignment; an array has its element's alignment; an aggregate the maximum of its members'; 8-byte scalars are refused under ILP32, where their in-struct alignment is ABI-dependent). An aggregate is refused (`object`) when a member is a bit-field, when the struct is packed, when its tag has more than one distinct definition, when a `#if` in its body cannot be decided for the parsed configuration (only `#ifdef`/`#ifndef`/`defined()` of macros the corpus never defines and the frontend was not given are decided; see `cppDefines`), or when Joern's member list is not exactly the declarators of the source (it omits function-pointer members and lists every `#if` branch). `array-bound`: an array whose bound is neither a literal, an integer constant expression over literals, a resolvable `NAME±N` macro, nor (for `T x[] = {...}`) a countable initializer. `model-dependent`, `opaque-type`, `unknown-type`, `pointer` as for casts. | Not yet implemented beyond the shapes named. |
 | `op:shiftRight:unknown-signedness`, `op:shiftRight:64-bit-operand` | C `>>` is arithmetic or logical depending on the promoted left operand's signedness, which is taken from resolved types only (typedef chains, casts, literals, the usual arithmetic conversions; enums and bit-fields are refused). `unknown-signedness`: that type did not resolve. `64-bit-operand`: it did, and it is wider than the 32-bit arithmetic Core's `.cLike` dialect performs. | `64-bit-operand` needs width-typed arithmetic in Core. |
 | `stmt:va_arg` | A statement reading a variadic argument with `va_arg(ap, T)`. The frontend cannot parse it (the second argument is a type), and Core has no C variadic calling convention to read from. | Needs a variadic-argument model in Core. |
@@ -352,10 +433,10 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `control:FOR:elided-clause` | A `for` with fewer than four children whose clauses could not be identified. Omitted clauses are resolved when the children's CPG `order` (init 1, cond 2, step 3, body 4) *and* the blank clauses of the header text agree; an omitted condition is `true` (C11 6.8.5.3p2). | Residual only on disagreement. |
 | `op:assignment`, `op:<incr>:value` | An assignment / `++` / `--` used as a value where no prelude slot exists (plain `expr()` positions such as `&&`'s operand under a non-prelude path, `switch` scrutinees with impure targets, etc.). Loop conditions (`while`, `do`, `for`) now thread a prelude re-run before every test; `&&`/`||` evaluate their right operand's prelude only when the left does not decide (it previously ran unconditionally — a soundness bug). | Not yet implemented in the remaining positions. |
 | `stmt:empty-ast-children` | A block with no AST children whose source text is not empty — possibly a parse failure. A body consisting only of `NAME(...);` statements for function-like macros that left no trace anywhere in the CPG (expanded to nothing: `testcase`, `VdbeComment`, `PAGERTRACE`, ...) is `skip`; `va_arg` bodies and `#if`-guarded bodies stay holes. | Residual is genuine parse loss. |
-| `cstr:pointer-arith`, `cstr:address-compare`, `cstr:address-equality` | C string operations that are pointer operations, refused rather than given the Python answer. What still reaches these labels is the `char*` operation with no representation: two untracked `char*` compared or subtracted (address identity of two `Val.str`s), `p - n` on an untracked `char*`, and `p == q` against a `char[]` global (`p->zName == nth_valueName`). Translated instead, and so no longer here: byte-cursor `$off` arithmetic and same-root comparisons; `Val.iref` arithmetic/comparison when an operand is a tracked interior pointer or a decayed boxed array (`p + n`, `p += n`, `p - buf`, `p == buf`); `p + n`/`p += n`/`p++` on an untracked single-level `char*` as `strFrom p n`; and every null test on a pointer (`p == 0`, `p != NULL`, `!p`), as `p in (unit, 0)`, since a null pointer is `Val.unit` when spelled `NULL` and `Val.int 0` when spelled `0`. | **Permanent by design** for the remainder, until Core models addresses. |
-| `op:postIncrement:pointer`, `op:preIncrement:pointer`, `op:postDecrement:pointer`, `op:preDecrement:pointer` | `p++`/`p--` on a pointer that is neither a tracked interior pointer (`p = p ± 1` on a `Val.iref`) nor a tracked byte cursor (`$off ± 1`), and, for `++`, not an untracked single-level `char*` (`p = strFrom p 1`). The bulk is the struct-array walk `for(pTerm=pWC->a; ...; pTerm++)`: even with the step translated, every `pTerm->f` would be a dynamic hole, because Core cannot read a field through an interior pointer to an array element. | Needs a Core extension: field access through a `Val.iref` that names an array element, and an element size on `Sel.idx` so that a pointer cast between pointee sizes has a meaning. |
+| `cstr:pointer-arith`, `cstr:address-compare`, `cstr:address-equality` | C string operations that are pointer operations, refused rather than given the Python answer. Since the address model (§2.1) a pointer comparison, `p - q` and `p - n` of *any* provenance is `Expr.ptrOp`; what still reaches these labels is an operand that is a `Val.str` on every run — a string literal, an unboxed `char[]` (`p->zName == nth_valueName`), a byte cursor or a `strFrom` expression (`&zNum[i] < zEnd`) — where `ptrOp` could only hole, plus differences whose pointee sizes do not resolve or differ. Translated instead, and so no longer here: byte-cursor `$off` arithmetic and same-root comparisons; `Val.iref` arithmetic/comparison when an operand is a tracked interior pointer or a decayed boxed array (`p + n`, `p += n`, `p - buf`, `p == buf`); `p + n`/`p += n`/`p++` on an untracked single-level `char*` as `strFrom p n`; and every null test on a pointer (`p == 0`, `p != NULL`, `!p`), as `p in (unit, 0)`, since a null pointer is `Val.unit` when spelled `NULL` and `Val.int 0` when spelled `0`. | **Permanent by design** for the remainder: a string-model `char*` has no address. Closing it means representing `char*` as byte blocks. |
+| `op:postIncrement:pointer`, `op:preIncrement:pointer`, `op:postDecrement:pointer`, `op:preDecrement:pointer` | `p++`/`p--` on a pointer that is neither a tracked interior pointer (`p = p ± 1` on a `Val.iref`) nor a tracked byte cursor (`$off ± 1`), nor, for `++`, an untracked single-level `char*` (`p = strFrom p 1`), nor an unboxed pointer local/parameter or pure-receiver pointer field whose pointee size resolves (`p = ptrOp "±" sizeof(*p) p 1`, §2.1). What remains is a pointee of unresolved size (`void*`, opaque structs) and boxed (address-taken) pointers. The bulk is the struct-array walk `for(pTerm=pWC->a; ...; pTerm++)`: even with the step translated, every `pTerm->f` would be a dynamic hole, because Core cannot read a field through an interior pointer to an array element. | Needs a Core extension: field access through a `Val.iref` that names an array element, and an element size on `Sel.idx` so that a pointer cast between pointee sizes has a meaning. |
 | `stmt:<label>`, `stmt:UNKNOWN:<...>` | A CPG statement node with no mapping. The `UNKNOWN` bucket is where new front-end shapes appear. | Not yet implemented. |
-| `op:addressOf:<shape>:<kind>` | `&x` where `x` is an array element (`element`), struct field (`field`) or plain local (`local`) of static kind `scalar`/`pointer`/`unknown-type`/`opaque-type`, that no interior-pointer case covers. Translated instead: `&a[i]`/`&s.f`/`&p->f`/`&p->arr[i]` on a boxed array/struct or a known-struct pointer (`Expr.irefIndex`/`irefField`), `&z[i]` on a byte cursor and `&"lit"[k]` on a plain string literal (`Expr.strFrom`), and `&p[i]` with `p` a provable interior pointer (`p + i` on `Val.iref`). The residue is dominated by `&buf[i]` into a byte buffer of unknown provenance (page images, blobs). | **Blocked on an address model**: needs a Core pointer value for memory Core did not allocate (a whole-program points-to fact, or a byte-addressed heap). |
+| `op:addressOf:<shape>:<kind>` | `&x` where `x` is an array element (`element`), struct field (`field`) or plain local (`local`) of static kind `scalar`/`pointer`/`unknown-type`/`opaque-type`, that no interior-pointer case covers. Translated instead: `&a[i]`/`&s.f`/`&p->f`/`&p->arr[i]` on a boxed array/struct or a known-struct pointer (`Expr.irefIndex`/`irefField`), `&z[i]` on a byte cursor and `&"lit"[k]` on a plain string literal (`Expr.strFrom`), and `&p[i]` with `p` a provable interior pointer (`p + i` on `Val.iref`). The residue is dominated by `&buf[i]` into a byte buffer of unknown provenance (page images, blobs). | Mostly closed by the address model (§2.1): `&p[i]` on a POINTER `p` of any provenance whose pointee size resolves is `ptrOp "+" sizeof(*p) p i`. The residue is arrays that are not boxed (`u8 aBuf[32]` — its value is not a block), pointees of unresolved size, and the shapes below. |
 | `op:addressOf:element:int-to-pointer` | `&((T*)0)[k]` — SQLite's `SQLITE_INT_TO_PTR(k)`, an integer carried through a pointer-typed slot. | Blocked on a pointer↔integer model (same as `op:cast:pointer:int-to-pointer`). |
 | `op:addressOf:field:offsetof` | `&((T*)0)->f` — a hand-written `offsetof(T, f)`; its value is a struct-layout byte offset. | Blocked on a struct-layout model. |
 | `op:alloc:array-decl`, `op:arrayDecl:size` | A local array declaration that is not boxed (it escapes to an in-program callee whose parameter is not proven to receive only interior pointers, its size is not a resolvable constant, or it is at module scope), and an array declarator Joern emits as a one-child `arrayInitializer`. | Mostly blocked on the same address model: boxing an escaping array is only sound once the callee's use of the pointer is. |
@@ -391,7 +472,12 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |
 | `ub:<reason>` | The configured integer (or float) arithmetic says the source language does not define this operation. |
 | `binop://:float-floordiv`, `float:pow`, `float:format-mismatch`, `binop:<op>:non-numeric` | Float `//` and `**` (not modelled), a float of the wrong format for the dialect, and float arithmetic against a non-number. `Float.lean`'s `unmodelled` results also surface here under their own labels. |
-| `str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`, `str:pointer-equality-not-modelled` | A C string operation under `.cLike`. |
+| `str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`, `str:pointer-equality-not-modelled` | A C string operation under `.cLike`, or a `ptrOp` on a string-model `char*` (no address). |
+| `ub:ptr-out-of-bounds`, `ub:ptr-arith-out-of-bounds`, `ub:ptr-deref-out-of-bounds`, `ub:ptr-store-out-of-bounds`, `ub:ptr-compare-cross-object`, `ub:ptr-diff-cross-object`, `ub:ptr-order-null`, `ub:ptr-arith-null` | The address model (§2.1): a pointer operation C leaves undefined. |
+| `ptr:eq-one-past-unspecified` | One-past-the-end of one block compared for equality with another block: C leaves the result unspecified. |
+| `ptr:member-box-alias` | A cross-block comparison involving a separately boxed array member, whose address may coincide with a member of another block. |
+| `ptr:stride-mismatch`, `ptr:untyped-block`, `ptr:str-non-ascii`, `ptr:str-before-start`, `ptr:str-past-terminator`, `ptr:member-order`, `ptr:mixed-selector`, `ptr:whole-vs-member`, `ptr:fn-identity`, `ptr:fn-vs-object`, `ptr:non-pointer-operand`, `ptr:offset-non-int`, `ptr:diff-non-index`, `ptr:arith-non-pointer` | The address model cannot answer from what the values carry (§2.1). |
+| `op:cast:pointer:int-to-pointer`, `op:cast:pointer:non-pointer` | `unop "cast:ptr"` met a non-zero integer / a non-pointer value. |
 | `call:stray-control-flow` | A `brk`/`cont` escaped a function body — a transpiler bug if it appears. |
 | `initializers:outOfFuel` | Module initializers did not finish within the fuel budget. |
 
@@ -405,7 +491,8 @@ The distinction tells you whether a hole is work or a boundary.
   translated by converting exactly the variables some inner function declares `nonlocal`
   into heap cells, which needs no change to `Env` — STRATEGY.md §58.)
 * `cstr:*` and `str:pointer-*`. Core has one `Val.str` for Python strings and C `char*`.
-  Rather than model addresses, the operations that differ are refused.
+  Core now models addresses for blocks (§2.1), but a string-model `char*` is still a
+  value with no address, so its comparisons and backward steps are refused.
 * `op:starred-outside-call`. A starred form outside an argument list. Starred
   *assignment* (`a, *b, c = xs`) no longer reaches it: the exporter recognises
   `pysrc2cpg`'s lowering of it and emits `Stdlib.unpackEx` (STRATEGY.md §58). What is left
