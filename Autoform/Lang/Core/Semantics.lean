@@ -1,5 +1,6 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
+import Autoform.Lang.Core.TypedInt
 import Autoform.Lang.Core.Stdlib
 import Autoform.Lang.Core.Address
 import Autoform.Lang.Core.Boxed
@@ -458,7 +459,12 @@ def binopTail (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "!=" => .val (.bool (!Val.beq a b))
   | "&&" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
   | "||" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
-  | _    => .hole s!"binop:{op}"
+  -- A width-typed operator (`"*:i64"`, `"<:u32"`, `"+:j64"`; `TypedInt.lean`) is
+  -- claimed here: none of the literal arms above can match it. Untyped operators are
+  -- `none` there, and keep their hole.
+  | _    => match typedIntBinop op a b with
+            | some r => r
+            | none   => .hole s!"binop:{op}"
 
 /-- The tail of `applyBinop`: operand pairs no typed arm there claims. A `bool` meeting a
 number is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`); everything else is
@@ -492,7 +498,9 @@ def binopFallback (d : Dialect) (op : String) (a b : Val) : EResult :=
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
 Integer arithmetic goes through `NumConfig`, so width and overflow policy follow the
-source dialect: Python gets bignums, C-like gets 32-bit two's-complement. -/
+source dialect: Python gets bignums, C-like gets 32-bit two's-complement for an UNTYPED
+operator. A width-typed operator (`"*:i64"`, `TypedInt.lean`) matches none of the literal arms
+below and is answered by `binopTail`. -/
 def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
@@ -544,7 +552,7 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- strings here rather than sharing the logical ones.
   --
   -- The arithmetic is `NumConfig`'s, so the width and overflow policy are the dialect's:
-  -- under `.cLike` every integer is 32-bit two's-complement, so `1 << 31` is `INT_MIN`
+  -- under `.cLike` an UNTYPED operator is 32-bit two's-complement, so `1 << 31` is `INT_MIN`
   -- (the wrapping config the oracle measures) and `-1 & 255` is `255`.
   --
   -- `>>` and `>>>` are **two different operators** and the difference is only visible on
@@ -969,7 +977,10 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- non-zero integer. Pointer-to-INTEGER casts are the `cast:<w>` arms above, which
   -- have no case for a pointer value and so stay holes: Core blocks have no address.
   | "cast:ptr", v => ptrCast v
-  | _, _        => .hole s!"unop:{op}"
+  -- `-`/`~` at a typed width (`"-:u32"`, `"~:i64"`; `TypedInt.lean`).
+  | _, _        => match typedIntUnop op a with
+                   | some r => r
+                   | none   => .hole s!"unop:{op}"
 
 /-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
 than against `applyUnop`'s own definition. -/

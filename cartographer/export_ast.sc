@@ -49,7 +49,14 @@ import scala.annotation.tailrec
   // guards (`assign:aug-impure-target`). C-family CPGs only: in Python `a |= b`
   // mutates a set/list in place, which `a = a | b` does not, so other frontends keep
   // their current (unresolved-call) behaviour until that is modelled.
-  if (cpg.metaData.language.l.exists(l => l == "NEWC" || l == "C")) {
+  //
+  // Item O: Java too (javasrc2cpg 4.0.606 uses the same plural spellings, e.g. `x >>= 2`
+  // is `<operators>.assignmentArithmeticShiftRight`). Java has no operator overloading:
+  // these operators exist only on primitives (and `boolean` for `&= |= ^=`), where
+  // `x op= e` is `x = (T)(x op e)` (JLS 15.26.2) -- which `assignTo` now emits, the
+  // narrowing cast included (`jArithStore`), and the shift token read from the source
+  // (`jTypedAug`) rather than from the swapped operator names.
+  if (cpg.metaData.language.l.exists(l => l == "NEWC" || l == "C" || l == "JAVASRC")) {
     val diff = Cpg.newDiffGraphBuilder
     cpg.call.filter(_.methodFullName.startsWith("<operators>.")).l.foreach { c =>
       val n = "<operator>." + c.methodFullName.stripPrefix("<operators>.")
@@ -1499,6 +1506,8 @@ import scala.annotation.tailrec
 
   /** `fullName` of the method `emit` is translating. */
   var currentMethodFull = ""
+  // Item O: the declared return type of the method being emitted (`return e` converts).
+  var currentReturnType = ""
 
   /** `003-box-address-taken-locals`: `pointerLocalName -> boxedLocalName`, for a
     * pointer-typed local that is PROVABLY, syntactically, an alias of one specific
@@ -7457,36 +7466,32 @@ import scala.annotation.tailrec
     if (!cppFile) Some(">>")     // Java `>>`/`>>>`, Python: the token is unambiguous; JS
                                  // never reaches here (`jsAmbiguousBinop` runs first)
     else {
-      val b = bareType(staticTypeOf(lhs))
-      if (signedTypeNames.contains(b)) Some(">>")
-      else if (unsignedTypeNames.contains(b)) Some(">>>")
-      // `casts-sizeof`: the name tables above only know a type by its spelling. What
-      // decides C's `>>` is the type of the *promoted left operand* (C11 6.5.7p3), and
-      // that is computable from resolved types whenever `cIntExprType` can compute it
-      // -- through typedef chains (`Bitmask` -> `u64`), casts, literals and the usual
-      // arithmetic conversions of an arithmetic sub-expression (`(c - 0x10000) >> 10`,
-      // `(i + 1) >> 3`, whose own CPG node is typed `ANY`). Tried only AFTER the
-      // tables, so no site that translated before changes operator.
-      //
-      // Only a promoted type of at most 32 bits is translated. Core's `.cLike`
-      // arithmetic is 32-bit (`Dialect.toNumConfig`), so a shift of a 64-bit operand
-      // would be computed at the wrong width -- that site gets the separate
-      // `op:shiftRight:64-bit-operand` label from `shiftRightHoleLabel` instead:
-      // its signedness IS known, what is missing is 64-bit arithmetic in Core.
-      else cIntExprType(lhs).map(cPromote) match {
-        case Some((signed, bits)) if bits <= 32 => Some(if (signed) ">>" else ">>>")
-        case _                                  => None
+      // What decides C's `>>` is the type of the *promoted left operand* (C11 6.5.7p3):
+      // its signedness picks arithmetic or logical, its width the width. Item O: Core
+      // performs the shift AT that type (`">>:u64"`, `TypedInt.lean`), so the operator
+      // names it, and a 64-bit operand -- `op:shiftRight:64-bit-operand` before, when
+      // Core's `.cLike` arithmetic was 32-bit only -- now translates. `cIntExprType`
+      // resolves the type through typedef chains (`Bitmask` -> `u64`), casts, literals
+      // and the usual arithmetic conversions of a sub-expression (`(c - 0x10000) >> 10`,
+      // whose own CPG node is typed `ANY`). The spelling tables (`signedTypeNames` /
+      // `unsignedTypeNames`) are the fallback, and only for a name whose WIDTH
+      // `resolveIntType` also knows: a signedness without a width would be the 32-bit
+      // guess this replaces.
+      cIntExprType(lhs).map(cPromote).flatMap(cIntTag) match {
+        case Some(tag) => Some(">>:" + tag)
+        case None =>
+          val b = bareType(staticTypeOf(lhs))
+          if (signedTypeNames.contains(b) || unsignedTypeNames.contains(b))
+            resolveIntType(staticTypeOf(lhs))
+              .map(t => (t.head == 'i', t.drop(1).toInt)).map(cPromote).flatMap(cIntTag)
+              .map(">>:" + _)
+          else None
       }
     }
 
   /** The hole label for a `>>`/`>>=` that `shiftRightOp` could not translate: the
-    * signedness was not recovered, or it was and the promoted operand is wider than
-    * the 32-bit arithmetic Core's `.cLike` dialect performs. */
-  def shiftRightHoleLabel(lhs: AstNode): String =
-    cIntExprType(lhs).map(cPromote) match {
-      case Some((_, bits)) if bits > 32 => "op:shiftRight:64-bit-operand"
-      case _                            => "op:shiftRight:unknown-signedness"
-    }
+    * promoted left operand's type -- hence its signedness and width -- is unrecovered. */
+  def shiftRightHoleLabel(lhs: AstNode): String = "op:shiftRight:unknown-signedness"
 
   /** `casts-sizeof`: C integer-expression typing, from RESOLVED types only.
     *
@@ -7619,19 +7624,478 @@ import scala.annotation.tailrec
           else if (boolish.contains(mfn)) Some((true, 32))
           else if (mfn == "<operator>.conditional" && ks.size == 3)
             for (a <- rec(ks(1)); b <- rec(ks(2))) yield cUsualArith(a, b)
-          else if (fieldOps.contains(mfn))
-            asField(c) match {
-              case Some((_, f)) if !bitfieldMemberNames.contains(f) => cLeafIntType(staticTypeOf(c))
-              case _ => None
-            }
+          // Item O: a member's type through the typedef chain of its owner, with
+          // bit-fields typed by their promotion (`cFieldIntType`).
+          else if (fieldOps.contains(mfn)) cFieldIntType(c)
           else if (indexOps.contains(mfn) || mfn == "<operator>.indirection")
-            cLeafIntType(staticTypeOf(c))
-          // An ordinary call: its declared return type, as Joern recorded it.
-          else if (!mfn.startsWith("<operator>")) cLeafIntType(c.typeFullName)
+            cLeafIntType(cExprTypeName(c))
+          // Item O: `sizeof` is `size_t` (C11 6.5.3.4p5), whose width is the data model's.
+          else if (mfn == "<operator>.sizeOf") cLeafIntType("size_t")
+          // Item O: `p - q` on two pointers is `ptrdiff_t` (C11 6.5.6p9).
+          else if (mfn == "<operator>.subtraction" && ks.size == 2 &&
+                   ks.forall(k => { val t = cExprTypeName(k); bareType(t) != "ANY" && isPointerType(t) }))
+            cLeafIntType("ptrdiff_t")
+          // Item O: an assignment or `++`/`--` used as a value has the type of its target
+          // (C11 6.5.16p3, 6.5.2.4p2) -- unless the target is a bit-field, whose stored
+          // value is truncated in a way Core does not model.
+          else if ((mfn == "<operator>.assignment" || augOps.contains(mfn) ||
+                    mfn == "<operator>.assignmentArithmeticShiftRight") && ks.size == 2 && !cIsBitfield(ks(0)))
+            rec(ks(0))
+          else if (incrOps.contains(mfn) && ks.size == 1 && !cIsBitfield(ks(0))) rec(ks(0))
+          // An ordinary call: its declared return type, as Joern recorded it; for an
+          // unresolved call to one of a few ISO C library functions, the return type
+          // the standard fixes (`cLibcReturnTypes`).
+          else if (!mfn.startsWith("<operator>"))
+            cLeafIntType(c.typeFullName).orElse(
+              if (bareType(c.typeFullName) == "ANY" && !cDefinedMethodNames.contains(mfn))
+                cLibcReturnTypes.get(mfn).flatMap(cLeafIntType)
+              else None)
           else None
         case _ => None
       }
     }
+
+  /** Item O: every declaration of every member, keyed by (owner, member) as
+    * `memberTypes` is, but keeping ALL declarations (a struct declared twice with
+    * different member types must not answer with whichever came last) and each
+    * member's own text (bit-field widths live there). */
+  lazy val cMembers: Map[(String, String), List[(String, String)]] =
+    cpg.typeDecl.l.flatMap { td =>
+      td.member.l.map(mm => (stripDuplicateSuffix(bareType(td.fullName)), mm.name) -> (mm.typeFullName, mm.code))
+    }.groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).distinct }
+
+  /** The declared owner of member `f`, following the typedef chain from `owner0`
+    * (`Mem` -> `sqlite3_value`, `DbPage` -> `PgHdr`), or `None`. */
+  def cMemberOwner(owner0: String, f: String): Option[String] = {
+    @tailrec def go(t: String, seen: Set[String]): Option[String] =
+      if (cMembers.contains((t, f))) Some(t)
+      else if (seen.contains(t) || seen.size > 16 || t.isEmpty || t == "ANY") None
+      else typeAliases.get(t) match {
+        case Some(n) if bareType(n) != "ANY" => go(bareType(n), seen + t)
+        case _ => aliasCandidates.get(t).map(_.toList) match {
+          case Some(List(n)) if n != "ANY" => go(bareType(n), seen + t)
+          case _ => None
+        }
+      }
+    go(owner0, Set.empty)
+  }
+
+  /** Item O: the C type of an lvalue-shaped expression as a type NAME, through member
+    * chains whose owners are typedef'd (`p->pPager->pWal`), `a[i]` and `*p` -- the
+    * same derivations `staticTypeOf` makes, but with the owner looked up through
+    * `cMemberOwner` and every declaration of the member required to agree.
+    * Everything else is `staticTypeOf`. */
+  def cExprTypeName(n: AstNode, depth: Int = 0): String =
+    if (depth > 16) staticTypeOf(n)
+    else n match {
+      case c: Call if fieldOps.contains(c.methodFullName) =>
+        asField(c).flatMap { case (r, f) =>
+          val owner0 = bareType(cExprTypeName(r, depth + 1)).reverse.dropWhile(_ == '*').reverse
+          cMemberOwner(owner0, f).map(o => cMembers((o, f)).map(_._1).distinct)
+        } match {
+          case Some(List(t)) => t
+          case _             => staticTypeOf(n)
+        }
+      case c: Call if indexOps.contains(c.methodFullName) || c.methodFullName == "<operator>.indirection" =>
+        val direct = staticTypeOf(n)
+        if (bareType(direct) != "ANY" && direct.nonEmpty) direct
+        else {
+          val recv = if (indexOps.contains(c.methodFullName)) asIndex(c).map(_._1) else kidsOf(c).headOption
+          recv.map(r => bareType(cExprTypeName(r, depth + 1))) match {
+            case Some(t) if t.endsWith("*") => t.dropRight(1)
+            case Some(t) if indexOps.contains(c.methodFullName) =>
+              """^(.+)\[[^\[\]]*\]$""".r.findFirstMatchIn(t).map(_.group(1)).getOrElse(direct)
+            case _ => direct
+          }
+        }
+      case _ => staticTypeOf(n)
+    }
+
+  /** The owner type name of member access `c`'s receiver, pointer levels stripped. */
+  def cFieldOwner(r: AstNode): String =
+    bareType(cExprTypeName(r)).reverse.dropWhile(_ == '*').reverse
+
+  def cBitfieldWidth(code: String): Option[Int] =
+    """:\s*(\d+)\s*$""".r.findFirstMatchIn(code).map(_.group(1).toInt)
+
+  /** Is `n` a member access whose member is (or, with the owner unresolved, may be) a
+    * bit-field? */
+  def cIsBitfield(n: AstNode): Boolean = n match {
+    case c: Call if fieldOps.contains(c.methodFullName) =>
+      asField(c) match {
+        case Some((r, f)) =>
+          val owner0 = cFieldOwner(r)
+          cMemberOwner(owner0, f) match {
+            case Some(o) => cMembers((o, f)).exists(d => cBitfieldWidth(d._2).isDefined)
+            case None    => bitfieldMemberNames.contains(f)
+          }
+        case None => true
+      }
+    case _ => false
+  }
+
+  /** The C type of a member READ, before promotion -- except a bit-field, which is
+    * given its promoted type: narrower than `int` it promotes to `int` (C11 6.3.1.1p2),
+    * exactly `int`-wide it keeps its declared `int`/`unsigned int`; wider bit-fields are
+    * implementation-defined and refused. Every declaration of the member must agree. */
+  def cFieldIntType(c: Call): Option[(Boolean, Int)] = asField(c).flatMap { case (r, f) =>
+    val owner0 = cFieldOwner(r)
+    cMemberOwner(owner0, f) match {
+      case Some(owner) =>
+        val tys = cMembers((owner, f)).map { case (ty, code) =>
+          cBitfieldWidth(code) match {
+            case None => cLeafIntType(ty)
+            case Some(w) =>
+              cLeafIntType(ty).flatMap { case (s, b) =>
+                if (b > 32) None else if (w < 32) Some((true, 32)) else if (w == 32) Some((s, 32)) else None
+              }
+          }
+        }
+        if (tys.nonEmpty && tys.forall(_.isDefined) && tys.distinct.size == 1) tys.head else None
+      // Unchanged fallback: the node's own type, any bit-field of that NAME refused.
+      case None =>
+        if (!bitfieldMemberNames.contains(f)) cLeafIntType(staticTypeOf(c)) else None
+    }
+  }
+
+  /** Item O: return types the ISO C standard fixes for a few library functions
+    * (C11 7.24.4, 7.24.6.3, 7.24.5.6/7). Consulted only for a call Joern left `ANY`
+    * to a function the program does not define (`cDefinedMethodNames`). */
+  lazy val cLibcReturnTypes: Map[String, String] = Map(
+    "strcmp" -> "int", "strncmp" -> "int", "memcmp" -> "int", "strcoll" -> "int",
+    "strlen" -> "size_t", "strspn" -> "size_t", "strcspn" -> "size_t")
+
+  lazy val cDefinedMethodNames: Set[String] = cpg.method.isExternal(false).fullName.toSet
+
+  // ---- item O: width-typed integer arithmetic -----------------------------------
+  //
+  // Core's untyped `.cLike` integer operators compute at 32 bits (`Dialect.toNumConfig
+  // .cLike = c32Wrapv`), right for `int` and silently wrong for `long`, `i64`, `u64`,
+  // `size_t` and every `unsigned` comparison/division/shift. A `Val.int` carries no
+  // type, so the width has to be named here, where the static type is known: an
+  // integer operator on a C/C++ file is emitted as `"<op>:<tag>"` (`"*:i64"`,
+  // `">>:u32"`, `"<:u64"`; Core's `TypedInt.lean`), the tag being the type the
+  // operation is performed at (C11 6.3.1.8 usual arithmetic conversions; the promoted
+  // left operand for shifts and unary `-`/`~`), resolved by `cIntExprType` with the
+  // stated `dataModel`. When that type does not resolve and the operands are not
+  // provably floating or pointer-valued, the operator is the hole
+  // `op:int:unresolved-type` -- NOT the untyped 32-bit operator, which would be a
+  // guess at the width.
+  //
+  // Stores convert too: `x += e`, `x++` and `x = e` into an integer object of type `T`
+  // wrap the value to `T` (`cast:<T>`) whenever the value's own type is not known to
+  // fit, so `u8 c = 255; c++` is 0 and `unsigned u = -1` holds 4294967295 -- the
+  // invariant every typed operator relies on (each operand holds the mathematical
+  // value of its own C object). `return e` converts to the declared return type the
+  // same way. Plain `char` and `_Bool` targets are not converted by a cast (`char`'s
+  // signedness is implementation-defined; `_Bool` converts by `!= 0`, not by wrapping):
+  // an arithmetic store into one is the hole `op:int:store-char-or-bool`, a plain
+  // assignment is left as it was.
+
+  /** The Core type tag of a promoted C integer type, or `None` (a width Core does not
+    * model, e.g. `__int128`). Arithmetic is never performed below `int`. */
+  def cIntTag(t: (Boolean, Int)): Option[String] = t match {
+    case (true, 32)  => Some("i32")
+    case (true, 64)  => Some("i64")
+    case (false, 32) => Some("u32")
+    case (false, 64) => Some("u64")
+    case _           => None
+  }
+
+  lazy val cFloatTypeNames = Set("float", "double", "longdouble", "_Float32", "_Float64",
+    "_Float128", "__float128")
+
+  /** `n` is PROVABLY not an integer: floating, a pointer/array, or a string literal.
+    * An untyped operator is then the right one (Core's float or pointer arms decide). */
+  def cNonIntExpr(n: AstNode, depth: Int = 0): Boolean =
+    if (depth > 24) false
+    else {
+      val ty = cExprTypeName(n)
+      val b  = bareType(ty)
+      if (cFloatTypeNames.contains(b) || (b.nonEmpty && b != "ANY" && isPointerType(ty))) true
+      else n match {
+        case l: Literal =>
+          val code = l.code.trim
+          code.startsWith("\"") || code.startsWith("L\"") ||
+            (!code.startsWith("0x") && !code.startsWith("0X") &&
+             code.matches("""^-?[0-9]*\.?[0-9]*([eE][-+]?[0-9]+)?[fFlL]?$""") &&
+             (code.contains(".") || code.contains("e") || code.contains("E")))
+        case c: Call =>
+          val ks = kidsOf(c)
+          c.methodFullName match {
+            case "<operator>.cast" if ks.size == 2 =>
+              val tty = staticTypeOf(ks(0))
+              cFloatTypeNames.contains(bareType(tty)) || castTargetIsPointer(ks(0), tty)
+            // `p - q` on two pointers is an integer (`ptrdiff_t`), not a pointer.
+            case "<operator>.subtraction" if ks.size == 2 &&
+                   ks.forall(k => { val t = cExprTypeName(k); bareType(t) != "ANY" && isPointerType(t) }) => false
+            case "<operator>.addition" | "<operator>.subtraction" | "<operator>.multiplication" |
+                 "<operator>.division" =>
+              ks.exists(k => cNonIntExpr(k, depth + 1))
+            case "<operator>.minus" | "<operator>.plus" => ks.exists(k => cNonIntExpr(k, depth + 1))
+            case "<operator>.conditional" if ks.size == 3 =>
+              cNonIntExpr(ks(1), depth + 1) || cNonIntExpr(ks(2), depth + 1)
+            case "<operator>.addressOf" => true
+            // An assignment or `++`/`--` used as a value has its target's type.
+            case m if (m == "<operator>.assignment" || augOps.contains(m) || incrOps.contains(m)) &&
+                      ks.nonEmpty => cNonIntExpr(ks(0), depth + 1)
+            case _ => false
+          }
+        case _ => false
+      }
+    }
+
+  /** The operator a C binary operator is emitted as: `Right(op)` (typed, or untyped when
+    * an operand is provably floating/pointer, or outside C/C++), `Left(holeLabel)`. */
+  def cTypedBinop(c: Call, base: String): Either[String, String] =
+    if (javaFile) jTypedBinop(c, base)
+    else if (!cppFile || base == "&&" || base == "||") Right(base)
+    else {
+      val ks = kidsOf(c)
+      val t: Option[(Boolean, Int)] =
+        if (ks.size != 2) None
+        else base match {
+          case "<<" | ">>" | ">>>" => cIntExprType(ks(0)).map(cPromote)
+          case _ => for (a <- cIntExprType(ks(0)); b <- cIntExprType(ks(1))) yield cUsualArith(a, b)
+        }
+      typedOrHole(base, t, ks)
+    }
+
+  /** As `cTypedBinop`, for an operator whose operands are given separately (the
+    * augmented-assignment target and value). */
+  def cTypedAug(lhs: AstNode, rhs: AstNode, base: String): Either[String, String] =
+    if (javaFile) jTypedAug(lhs, rhs, base)
+    else if (!cppFile || base.contains(":")) Right(base)
+    else {
+      val t = base match {
+        case "<<" | ">>" | ">>>" => cIntExprType(lhs).map(cPromote)
+        case _ => for (a <- cIntExprType(lhs); b <- cIntExprType(rhs)) yield cUsualArith(a, b)
+      }
+      typedOrHole(base, t, List(lhs, rhs))
+    }
+
+  def typedOrHole(base: String, t: Option[(Boolean, Int)], ks: List[AstNode]): Either[String, String] =
+    t match {
+      case Some(tt) => cIntTag(tt).map(tag => base + ":" + tag).toRight("op:int:unsupported-width")
+      case None if ks.exists(k => cNonIntExpr(k)) => Right(base)
+      case None => Left("op:int:unresolved-type")
+    }
+
+  /** Unary `-`/`~` at the promoted operand type; `!` is not arithmetic. */
+  def cTypedUnop(c: Call, base: String): Either[String, String] =
+    if (javaFile && base != "!")
+      kidsOf(c) match {
+        case k :: Nil => jTyped(base, jExprType(k))
+        case _        => Left("op:int:unresolved-type")
+      }
+    else if (!cppFile || base == "!") Right(base)
+    else kidsOf(c) match {
+      case k :: Nil => typedOrHole(base, cIntExprType(k).map(cPromote), List(k))
+      case ks       => typedOrHole(base, None, ks)
+    }
+
+  def typedBinopObj(op: Either[String, String], a: ujson.Obj, b: ujson.Obj): ujson.Obj = op match {
+    case Right(o)    => ujson.Obj("k" -> "binop", "op" -> o, "a" -> a, "b" -> b)
+    case Left(label) => hole(label)
+  }
+
+  def typedUnopObj(op: Either[String, String], a: ujson.Obj): ujson.Obj = op match {
+    case Right(o)    => ujson.Obj("k" -> "unop", "op" -> o, "a" -> a)
+    case Left(label) => hole(label)
+  }
+
+  /** The type an operator tag names, back as (signed, bits). */
+  def tagType(op: String): Option[(Boolean, Int)] = op.split(":").toList match {
+    case List(_, t) if t.length == 3 && (t(0) == 'i' || t(0) == 'u') && t.drop(1).forall(_.isDigit) =>
+      Some((t(0) == 'i', t.drop(1).toInt))
+    case _ => None
+  }
+
+  /** Does every value of integer type `s` survive conversion to `t` unchanged? */
+  def cFits(s: (Boolean, Int), t: (Boolean, Int)): Boolean =
+    if (s._1 == t._1) s._2 <= t._2
+    else if (!s._1 && t._1) s._2 < t._2
+    else false
+
+  /** The C integer type of a store target: `Some(Right(t))` for a type Core converts to
+    * with a `cast:`, `Some(Left(()))` for `char`/`_Bool`, `None` when it is not a
+    * resolved integer type. */
+  def cStoreType(lhs: AstNode): Option[Either[Unit, (Boolean, Int)]] =
+    if (!cppFile || cIsBitfield(lhs)) None     // a bit-field store truncates: not modelled
+    else {
+      val b = bareType(cExprTypeName(lhs))
+      if (b == "char" || b == "_Bool" || b == "bool") Some(Left(()))
+      else cIntExprType(lhs).map(Right(_))
+    }
+
+  def castTag(t: (Boolean, Int)): String = (if (t._1) "i" else "u") + t._2
+
+  def castObj(t: (Boolean, Int), v: ujson.Obj): ujson.Obj =
+    ujson.Obj("k" -> "unop", "op" -> ("cast:" + castTag(t)), "a" -> v)
+
+  def isHoleObj(v: ujson.Obj): Boolean = v.value.get("k").exists(_.str == "hole")
+
+  /** `v`, an arithmetic result computed by typed operator `op`, as stored into `lhs`.
+    * Untyped `op` (floating/pointer arithmetic) is stored as it was. */
+  def cArithStore(lhs: AstNode, op: String, v: ujson.Obj): ujson.Obj =
+    if (javaFile && !isHoleObj(v)) jArithStore(lhs, op, v)
+    else if (!cppFile || isHoleObj(v)) v
+    else tagType(op) match {
+      case None => v
+      case Some(opType) =>
+        cStoreType(lhs) match {
+          case Some(Left(_))  => hole("op:int:store-char-or-bool")
+          case Some(Right(t)) => if (cFits(opType, t)) v else castObj(t, v)
+          case None           => hole("op:int:unresolved-type")
+        }
+    }
+
+  /** `v`, the value of `rhs`, converted as by assignment to an object of type `t`:
+    * a `cast:` exactly when `rhs`'s type is not known to fit. Floating/pointer values
+    * are left alone (no integer conversion applies, or it is not this one). */
+  def cConvertTo(t: Option[Either[Unit, (Boolean, Int)]], rhs: AstNode, v: ujson.Obj): ujson.Obj =
+    if (!cppFile || isHoleObj(v)) v
+    else t match {
+      case Some(Right(tt)) =>
+        cIntExprType(rhs) match {
+          case Some(s) if cFits(s, tt)  => v
+          case Some(_)                  => castObj(tt, v)
+          case None if cNonIntExpr(rhs) => v
+          case None                     => castObj(tt, v)
+        }
+      case _ => v
+    }
+
+  // ---- item O, Java: `int` and `long` ------------------------------------------
+  //
+  // Java's integer arithmetic is at `int` (32) or `long` (64) by binary numeric
+  // promotion (JLS 5.6.2): `long` if either operand is, else `int` (`byte`, `short`,
+  // `char` and the boxed types unbox and widen first). Core performs it with Java's
+  // rules (`"*:j64"`, `TypedInt.lean`: wraps, shift counts masked, `MIN / -1 = MIN`).
+  // The type is computed from the OPERANDS, not taken from the operator node:
+  // javasrc2cpg 4.0.606 types `Integer * Long` as `java.lang.Integer` (it is `long`).
+  //
+  // javasrc2cpg 4.0.606 also SWAPS the two right shifts: `x >>> 28` is a call to
+  // `<operator>.arithmeticShiftRight` and `x >> 1` to `<operator>.logicalShiftRight`
+  // (checked on a fixture). Both were translated by name, so each was the other --
+  // `-16 >> 1` computed `>>>`. The operator is now read from the source token
+  // (`javaShiftToken`), and a shift whose token cannot be read is a hole.
+
+  def javaFile: Boolean = currentFile.toLowerCase.endsWith(".java")
+
+  /** A Java type's category after unboxing and unary numeric promotion. */
+  def jPrim(t: String): Option[String] = t match {
+    case "int" | "short" | "byte" | "char" | "java.lang.Integer" | "java.lang.Short" |
+         "java.lang.Byte" | "java.lang.Character" => Some("int")
+    case "long" | "java.lang.Long" => Some("long")
+    case "float" | "double" | "java.lang.Float" | "java.lang.Double" => Some("float")
+    case "boolean" | "java.lang.Boolean" => Some("boolean")
+    case "java.lang.String" => Some("string")
+    case _ => None
+  }
+
+  /** Binary numeric promotion over `jPrim` categories (`+` with a String concatenates). */
+  def jBinaryPromote(a: String, b: String): Option[String] =
+    if (a == "string" || b == "string") Some("string")
+    else if (a == "float" || b == "float") Some("float")
+    else if (a == "boolean" || b == "boolean") (if (a == b) Some("boolean") else None)
+    else if (a == "long" || b == "long") Some("long")
+    else Some("int")
+
+  lazy val jArithOps = Set("<operator>.addition", "<operator>.subtraction",
+    "<operator>.multiplication", "<operator>.division", "<operator>.modulo",
+    "<operator>.and", "<operator>.or", "<operator>.xor")
+  lazy val jBoolOps = Set("<operator>.lessThan", "<operator>.lessEqualsThan",
+    "<operator>.greaterThan", "<operator>.greaterEqualsThan", "<operator>.equals",
+    "<operator>.notEquals", "<operator>.logicalNot", "<operator>.logicalAnd",
+    "<operator>.logicalOr", "<operator>.instanceOf")
+
+  /** The promoted category of a Java expression, or `None` when unresolved. */
+  def jExprType(n: AstNode, depth: Int = 0): Option[String] =
+    if (depth > 24) None
+    else n match {
+      case c: Call =>
+        val ks = kidsOf(c)
+        val mfn = c.methodFullName
+        if (jArithOps.contains(mfn) && ks.size == 2)
+          for (a <- jExprType(ks(0), depth + 1); b <- jExprType(ks(1), depth + 1);
+               r <- jBinaryPromote(a, b)) yield r
+        else if ((mfn == "<operator>.shiftLeft" || mfn == "<operator>.arithmeticShiftRight" ||
+                  mfn == "<operator>.logicalShiftRight") && ks.size == 2)
+          jExprType(ks(0), depth + 1)
+        else if ((mfn == "<operator>.minus" || mfn == "<operator>.plus" ||
+                  mfn == "<operator>.not") && ks.size == 1)
+          jExprType(ks(0), depth + 1)
+        else if (jBoolOps.contains(mfn)) Some("boolean")
+        else jPrim(c.typeFullName)
+      case other => jPrim(nodeType(other))
+    }
+
+  /** `>>` or `>>>`, read from the source text between the left operand and the right. */
+  def javaShiftToken(c: Call): Option[String] =
+    kidsOf(c).headOption.collect { case e: Expression => e.code }.flatMap { lc =>
+      val i = c.code.indexOf(lc)
+      if (lc.isEmpty || i < 0 || !c.code.substring(0, i).forall(ch => ch == '(' || ch.isWhitespace)) None
+      else {
+        val rest = c.code.substring(i + lc.length).dropWhile(ch => ch == ')' || ch.isWhitespace)
+        if (rest.startsWith(">>>")) Some(">>>") else if (rest.startsWith(">>")) Some(">>") else None
+      }
+    }
+
+  def jTyped(base: String, t: Option[String]): Either[String, String] = t match {
+    case Some("int")  => Right(base + ":j32")
+    case Some("long") => Right(base + ":j64")
+    case Some(_)      => Right(base)          // floating, boolean, String: not integer arithmetic
+    case None         => Left("op:int:unresolved-type")
+  }
+
+  def jTypedBinop(c: Call, base0: String): Either[String, String] = {
+    val ks = kidsOf(c)
+    val base =
+      if (base0 == ">>" || base0 == ">>>") javaShiftToken(c).getOrElse("?") else base0
+    if (base == "?") Left("op:shiftRight:unknown-token")
+    else if (ks.size != 2) Right(base)
+    else base match {
+      // Comparison needs no conversion in Java: every integer type is signed (or `char`,
+      // whose values `int` holds), so comparing the values is comparing the converted ones.
+      case "&&" | "||" | "<" | "<=" | ">" | ">=" | "==" | "!=" => Right(base)
+      case "<<" | ">>" | ">>>" => jTyped(base, jExprType(ks(0)))
+      case _ => jTyped(base, for (a <- jExprType(ks(0)); b <- jExprType(ks(1));
+                                  r <- jBinaryPromote(a, b)) yield r)
+    }
+  }
+
+  def jTypedAug(lhs: AstNode, rhs: AstNode, base0: String): Either[String, String] = {
+    val b0 = base0.takeWhile(_ != ':')
+    val base =
+      if (b0 == ">>" || b0 == ">>>")
+        (lhs match {
+          case e: Expression => e.astParent match { case p: Call => javaShiftToken(p); case _ => None }
+          case _ => None
+        }).getOrElse("?")
+      else b0
+    if (base == "?") Left("op:shiftRight:unknown-token")
+    else base match {
+      case "<<" | ">>" | ">>>" => jTyped(base, jExprType(lhs))
+      case _ => jTyped(base, for (a <- jExprType(lhs); b <- jExprType(rhs);
+                                  r <- jBinaryPromote(a, b)) yield r)
+    }
+  }
+
+  /** A compound assignment or increment narrows back to the target's type (JLS 15.26.2:
+    * `b += 1` is `b = (byte)(b + 1)`). */
+  def jArithStore(lhs: AstNode, op: String, v: ujson.Obj): ujson.Obj = {
+    val tag = op.split(":").lift(1)
+    if (!tag.exists(t => t == "j32" || t == "j64")) v
+    else staticTypeOf(lhs) match {
+      case "byte" | "java.lang.Byte"      => castObj((true, 8), v)
+      case "short" | "java.lang.Short"    => castObj((true, 16), v)
+      case "char" | "java.lang.Character" => castObj((false, 16), v)
+      case "int" | "java.lang.Integer"    => if (tag.contains("j32")) v else castObj((true, 32), v)
+      case "long" | "java.lang.Long"      => v
+      case _                              => hole("op:int:unresolved-type")
+    }
+  }
 
   /** One element of a brace initializer, classified.
     *
@@ -8485,8 +8949,12 @@ import scala.annotation.tailrec
     else if (cLikeFile && kids.size == 2 && kids.exists(isCString) &&
         cStringUnsafe.contains(mfn) && !isNullCheck)
       hole(cStringUnsafe(mfn))
+    // Item O: typed at the operation's C type (`cTypedBinop`), or a hole.
     else if (binops.contains(mfn) && kids.size == 2)
-      ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+      typedBinopObj(cTypedBinop(c, binops(mfn)), expr(kids(0)), expr(kids(1)))
+    // Item O: Java reads `>>`/`>>>` from the source token (see `javaShiftToken`).
+    else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2 && javaFile)
+      typedBinopObj(jTypedBinop(c, ">>"), expr(kids(0)), expr(kids(1)))
     else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2)
       shiftRightOp(kids(0)) match {
         case Some(op) => ujson.Obj("k" -> "binop", "op" -> op,
@@ -8497,7 +8965,7 @@ import scala.annotation.tailrec
     else if (isPointerNot(c))
       nullTestExpr(expr(kids(0)), neg = false)
     else if (unops.contains(mfn) && kids.size == 1)
-      ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
+      typedUnopObj(cTypedUnop(c, unops(mfn)), expr(kids(0)))
     // `011-control-flow-holes`: unary `+e` (`<operator>.plus`, one child) is `e`.
     // C11 6.5.3.3p1/p2: the operand must have ARITHMETIC type (never a pointer), and
     // the result is "the value of its (promoted) operand" -- integer promotion is
@@ -10228,9 +10696,18 @@ import scala.annotation.tailrec
     // produces the FINAL statement, and this needs to reach the function's own
     // trailing `seqOf(prelude :+ core)`.
     var indexPrelude = List.empty[ujson.Obj]
+    // Item O: the arithmetic of `x op= e` is performed at the usual-arithmetic type of
+    // `x` and `e` and the result converted back to `x`'s type (C11 6.5.16.2p3);
+    // `x = e` converts `e` to `x`'s type (6.5.16.1p2). See `cTypedAug`/`cArithStore`/
+    // `cConvertTo`.
     def combine(cur: => ujson.Obj): ujson.Obj = aug match {
-      case None     => rhsE
-      case Some(op) => ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> rhsE)
+      case None     => cConvertTo(cStoreType(lhs), rhs, rhsE)
+      case Some(op) =>
+        cTypedAug(lhs, rhs, op) match {
+          case Left(label) => hole(label)
+          case Right(top)  =>
+            cArithStore(lhs, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> rhsE))
+        }
     }
     // `010-reach-90pct-hole-free`: is `r` a nested `<operator>.assignment` Call
     // (a C chained assignment's inner half) whose OWN LHS name is a
@@ -10609,7 +11086,7 @@ import scala.annotation.tailrec
         val (pa, ae) = exprV(a)
         val (pb, be) = exprV(b)
         indexPrelude = pa ++ pb
-        ujson.Obj("k" -> "setIndex", "r" -> ae, "i" -> be, "v" -> rhsE)
+        ujson.Obj("k" -> "setIndex", "r" -> ae, "i" -> be, "v" -> cConvertTo(cStoreType(lhs), rhs, rhsE))
       case c: Call if c.methodFullName.startsWith("<operator>") =>
         holeS("assign:lhs:" + c.methodFullName.stripPrefix("<operator>."))
       case other => holeS("assign:lhs:" + other.label)
@@ -10637,6 +11114,22 @@ import scala.annotation.tailrec
     val one = ujson.Obj("k" -> "int", "v" -> ujson.Num(1.0))
     def bump(cur: ujson.Obj): ujson.Obj =
       ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> one)
+    // Item O: `x++` on an integer object is `x = (T)(x + 1)`, the `+` at the usual
+    // arithmetic type of `x` and `int` -- so `u8 c = 255; c++` stores 0 and `i64 n`
+    // counts past 2^31. Used for every NON-pointer target below; the pointer cases
+    // keep `bump`, whose `+` is Core's element-indexed pointer arithmetic.
+    def ibump(cur: ujson.Obj): ujson.Obj =
+      if (javaFile) jTyped(op, jExprType(tgt).flatMap(t => jBinaryPromote(t, "int"))) match {
+        case Left(label) => hole(label)
+        case Right(top)  =>
+          cArithStore(tgt, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> one))
+      }
+      else if (!cppFile) bump(cur)
+      else typedOrHole(op, cIntExprType(tgt).map(a => cUsualArith(a, (true, 32))), List(tgt)) match {
+        case Left(label) => hole(label)
+        case Right(top)  =>
+          cArithStore(tgt, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> one))
+      }
     // `006-reduce-remaining-holes`, Story 5: `p++`/`p--`, `p` PROVABLY holding an
     // interior pointer VALUE for its whole lifetime (`ptrIrefNames`) -- checked
     // BEFORE the general pointer-target guard just below, which exists precisely
@@ -10699,21 +11192,21 @@ import scala.annotation.tailrec
       // not the value, so the bump has to go through the box's field.
       case i: Identifier if boxedLocals.contains(localName(i.name)) =>
         val nm = localName(i.name)
-        ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> bump(boxField(nm)))
+        ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> ibump(boxField(nm)))
       case i: Identifier =>
         val k = if (isGlobalWrite(i.name)) "setGlobal" else "assign"
         ujson.Obj("k" -> k, "x" -> localName(i.name),
-                  "e" -> bump(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
+                  "e" -> ibump(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
         if (!pureNode(r)) holeS("op:" + opName + ":impure-receiver")
         else ujson.Obj("k" -> "setField", "r" -> expr(r), "f" -> f,
-                       "v" -> bump(ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)))
+                       "v" -> ibump(ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)))
       case ia if asIndex(ia).isDefined =>
         val (a, b) = asIndex(ia).get
         if (!(pureNode(a) && pureNode(b))) holeS("op:" + opName + ":impure-target")
         else ujson.Obj("k" -> "setIndex", "r" -> expr(a), "i" -> expr(b),
-                       "v" -> bump(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
+                       "v" -> ibump(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
       // `(*p)++` / `++*p` / `(*p)--` / `--*p` in statement position, for exactly the
       // pointers `assignTo`'s own `*p = v` write cases already trust: this is
       // `*p = *p ± 1` with `p` read twice, so it is admitted under the SAME two
@@ -10737,12 +11230,12 @@ import scala.annotation.tailrec
       case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
                       isIrefExpr(kidsOf(c).head) =>
         val pRef = expr(kidsOf(c).head)
-        ujson.Obj("k" -> "setDerefIref", "p" -> pRef, "v" -> bump(ujson.Obj("k" -> "derefIref", "p" -> pRef)))
+        ujson.Obj("k" -> "setDerefIref", "p" -> pRef, "v" -> ibump(ujson.Obj("k" -> "derefIref", "p" -> pRef)))
       case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
                       rawLocalOrParamName(kidsOf(c).head).map(localName)
                         .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n)) =>
         val nm = rawLocalOrParamName(kidsOf(c).head).map(localName).get
-        aliasOrOutParamWrite(nm, bump(aliasOrOutParamRead(nm)))
+        aliasOrOutParamWrite(nm, ibump(aliasOrOutParamRead(nm)))
       // `++*p` on any other pointer — the location model Core lacks.
       case _ => holeS("op:" + opName + ":unsupported-target")
     }
@@ -11092,7 +11585,7 @@ import scala.annotation.tailrec
       }
     case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
-      shiftRightOp(a) match {
+      (if (javaFile) jTypedBinop(c, ">>").toOption else shiftRightOp(a)) match {
         case Some(op) =>
           val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
           (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
@@ -11114,15 +11607,23 @@ import scala.annotation.tailrec
     case c: Call if binops.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(c.methodFullName)) =>
       val List(a, b) = kidsOf(c)
-      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
-      (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> binops(c.methodFullName), "a" -> ae, "b" -> be))
+      cTypedBinop(c, binops(c.methodFullName)) match {
+        case Left(label) => (Nil, hole(label))
+        case Right(op) =>
+          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+          (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+      }
     // Pointer-arith family: `!p` on a pointer is `p == 0` (see `callExpr`).
     case c: Call if isPointerNot(c) =>
       val (pa, ae) = exprV(kidsOf(c).head)
       (pa, nullTestExpr(ae, neg = false))
     case c: Call if unops.contains(c.methodFullName) && kidsOf(c).size == 1 =>
-      val (pa, ae) = exprV(kidsOf(c).head)
-      (pa, ujson.Obj("k" -> "unop", "op" -> unops(c.methodFullName), "a" -> ae))
+      cTypedUnop(c, unops(c.methodFullName)) match {
+        case Left(label) => (Nil, hole(label))
+        case Right(op) =>
+          val (pa, ae) = exprV(kidsOf(c).head)
+          (pa, ujson.Obj("k" -> "unop", "op" -> op, "a" -> ae))
+      }
     // `006-reduce-remaining-holes`, Story 5: `a[i]`, `a` a recognized boxed array
     // -- mirrors `callExpr`'s own matching case exactly (this file's `exprV`
     // never routes an `indexOps` call through `callExpr`, so without this the
@@ -11468,7 +11969,15 @@ import scala.annotation.tailrec
       kidsOf(r).headOption match {
         case Some(e) =>
           val (prelude, ev) = valueOf(e)
-          seqOf(prelude :+ ujson.Obj("k" -> "ret", "e" -> ev))
+          // Item O: `return e` converts `e` to the declared return type (C11 6.8.6.4p3).
+          val retTy: Option[Either[Unit, (Boolean, Int)]] =
+            if (!cppFile) None
+            else {
+              val b = bareType(currentReturnType)
+              if (b == "char" || b == "_Bool" || b == "bool") Some(Left(()))
+              else cLeafIntType(currentReturnType).map(Right(_))
+            }
+          seqOf(prelude :+ ujson.Obj("k" -> "ret", "e" -> cConvertTo(retTy, e, ev)))
         case None => ujson.Obj("k" -> "ret", "e" -> ujson.Obj("k" -> "unit"))
       }
     case c: Call if c.methodFullName == "<operator>.assignment" =>
@@ -12345,6 +12854,7 @@ import scala.annotation.tailrec
   def emit(m: Method, isModule: Boolean): ujson.Obj = {
     moduleScope  = isModule
     currentMethodFull = m.fullName
+    currentReturnType = m.methodReturn.typeFullName
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
     cppFile      = cppExts.exists(e => m.filename.toLowerCase.endsWith(e))

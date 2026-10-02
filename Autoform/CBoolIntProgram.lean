@@ -49,9 +49,9 @@ def f_lt_flag : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.assign "t" (.binop "<" (.name "a") (.name "b")))
+              (.assign "t" (.binop "<:i32" (.name "a") (.name "b")))
               (.seq
-                (.ifte (.binop "==" (.name "t") (.lit (.int 1))) (.ret (.lit (.int 7))) .skip)
+                (.ifte (.binop "==:i32" (.name "t") (.lit (.int 1))) (.ret (.lit (.int 7))) .skip)
                 (.ret (.lit (.int 3)))))) }
 
 /-- `is_fatal`  (from `cboolint_cases.c`) -/
@@ -63,16 +63,19 @@ def f_is_fatal : Func :=
               "&&"
               (.binop
                 "&&"
-                (.binop "!=" (.name "rc") (.lit (.int 0)))
-                (.binop "!=" (.name "rc") (.lit (.int 5))))
-              (.binop "!=" (.name "rc") (.lit (.int 6))))) }
+                (.binop "!=:i32" (.name "rc") (.lit (.int 0)))
+                (.binop "!=:i32" (.name "rc") (.lit (.int 5))))
+              (.binop "!=:i32" (.name "rc") (.lit (.int 6))))) }
 
 /-- `both_ways`  (from `cboolint_cases.c`) -/
 def f_both_ways : Func :=
   { name := "both_ways"
   , params := ["a", "b"]
   , body := (.ret
-            (.binop "+" (.binop "<" (.name "a") (.name "b")) (.binop "<" (.name "b") (.name "a")))) }
+            (.binop
+              "+:i32"
+              (.binop "<:i32" (.name "a") (.name "b"))
+              (.binop "<:i32" (.name "b") (.name "a")))) }
 
 /-- `case_lt_flag_true`  (from `cboolint_cases.c`) -/
 def f_case_lt_flag_true : Func :=
@@ -98,7 +101,7 @@ def f_case_cmp_eq_one : Func :=
                 .skip
                 (.seq
                   (.assign "b" (.lit (.int 12)))
-                  (.ret (.binop "==" (.binop "<" (.name "a") (.name "b")) (.lit (.int 1)))))))) }
+                  (.ret (.binop "==:i32" (.binop "<:i32" (.name "a") (.name "b")) (.lit (.int 1)))))))) }
 
 /-- `case_cmp_plus_cmp`  (from `cboolint_cases.c`) -/
 def f_case_cmp_plus_cmp : Func :=
@@ -106,7 +109,7 @@ def f_case_cmp_plus_cmp : Func :=
   , params := [""]
   , body := (.ret
             (.binop
-              "+"
+              "+:i32"
               (.call "both_ways" [(.lit (.int 3)), (.lit (.int 12))])
               (.call "both_ways" [(.lit (.int 5)), (.lit (.int 5))]))) }
 
@@ -120,8 +123,8 @@ def f_case_logical_times : Func :=
               (.assign "x" (.call "is_fatal" [(.lit (.int 4))]))
               (.ret
                 (.binop
-                  "+"
-                  (.binop "*" (.name "x") (.lit (.int 10)))
+                  "+:i32"
+                  (.binop "*:i32" (.name "x") (.lit (.int 10)))
                   (.call "is_fatal" [(.lit (.int 5))]))))) }
 
 /-- `case_not_plus`  (from `cboolint_cases.c`) -/
@@ -132,7 +135,7 @@ def f_case_not_plus : Func :=
             .skip
             (.seq
               (.assign "a" (.lit (.int 0)))
-              (.ret (.binop "+" (.unop "!" (.name "a")) (.lit (.int 1)))))) }
+              (.ret (.binop "+:i32" (.unop "!" (.name "a")) (.lit (.int 1)))))) }
 
 /-- `case_neg_cmp`  (from `cboolint_cases.c`) -/
 def f_case_neg_cmp : Func :=
@@ -146,7 +149,7 @@ def f_case_neg_cmp : Func :=
                 .skip
                 (.seq
                   (.assign "b" (.lit (.int 2)))
-                  (.ret (.unop "-" (.binop "<" (.name "a") (.name "b")))))))) }
+                  (.ret (.unop "-:i32" (.binop "<:i32" (.name "a") (.name "b")))))))) }
 
 /-- `case_bnot_cmp`  (from `cboolint_cases.c`) -/
 def f_case_bnot_cmp : Func :=
@@ -160,7 +163,7 @@ def f_case_bnot_cmp : Func :=
                 .skip
                 (.seq
                   (.assign "b" (.lit (.int 2)))
-                  (.ret (.unop "~" (.binop ">" (.name "a") (.name "b")))))))) }
+                  (.ret (.unop "~:i32" (.binop ">:i32" (.name "a") (.name "b")))))))) }
 
 /-- `case_bitand_cmps`  (from `cboolint_cases.c`) -/
 def f_case_bitand_cmps : Func :=
@@ -176,11 +179,11 @@ def f_case_bitand_cmps : Func :=
                   (.assign "b" (.lit (.int 2)))
                   (.ret
                     (.binop
-                      "+"
+                      "+:i32"
                       (.binop
-                        "&"
-                        (.binop "<" (.name "a") (.name "b"))
-                        (.binop ">" (.name "b") (.lit (.int 0))))
+                        "&:i32"
+                        (.binop "<:i32" (.name "a") (.name "b"))
+                        (.binop ">:i32" (.name "b") (.lit (.int 0))))
                       (.lit (.int 2)))))))) }
 
 /-- `case_xor_cmps`  (from `cboolint_cases.c`) -/
@@ -197,11 +200,11 @@ def f_case_xor_cmps : Func :=
                   (.assign "b" (.lit (.int 2)))
                   (.ret
                     (.binop
-                      "+"
+                      "+:i32"
                       (.binop
-                        "^"
-                        (.binop "<" (.name "a") (.name "b"))
-                        (.binop ">" (.name "b") (.lit (.int 0))))
+                        "^:i32"
+                        (.binop "<:i32" (.name "a") (.name "b"))
+                        (.binop ">:i32" (.name "b") (.lit (.int 0))))
                       (.lit (.int 4)))))))) }
 
 /-- `case_shift_cmp`  (from `cboolint_cases.c`) -/
@@ -216,7 +219,7 @@ def f_case_shift_cmp : Func :=
                 .skip
                 (.seq
                   (.assign "b" (.lit (.int 2)))
-                  (.ret (.binop "<<" (.binop "<" (.name "a") (.name "b")) (.lit (.int 3)))))))) }
+                  (.ret (.binop "<<:i32" (.binop "<:i32" (.name "a") (.name "b")) (.lit (.int 3)))))))) }
 
 /-- `case_cmp_vs_cmp`  (from `cboolint_cases.c`) -/
 def f_case_cmp_vs_cmp : Func :=
@@ -232,9 +235,9 @@ def f_case_cmp_vs_cmp : Func :=
                   (.assign "b" (.lit (.int 2)))
                   (.ret
                     (.binop
-                      ">"
-                      (.binop "<" (.name "a") (.name "b"))
-                      (.binop "<" (.name "b") (.name "a")))))))) }
+                      ">:i32"
+                      (.binop "<:i32" (.name "a") (.name "b"))
+                      (.binop "<:i32" (.name "b") (.name "a")))))))) }
 
 /-- `case_sum_flags`  (from `cboolint_cases.c`) -/
 def f_case_sum_flags : Func :=
@@ -250,15 +253,18 @@ def f_case_sum_flags : Func :=
                   (.assign "i" (.lit (.int 0)))
                   (.seq
                     (.loop
-                      (.binop "<" (.name "i") (.lit (.int 10)))
+                      (.binop "<:i32" (.name "i") (.lit (.int 10)))
                       (.seq
                         (.assign
                           "n"
                           (.binop
-                            "+"
+                            "+:i32"
                             (.name "n")
-                            (.binop "==" (.binop "%" (.name "i") (.lit (.int 3))) (.lit (.int 0)))))
-                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))
+                            (.binop
+                              "==:i32"
+                              (.binop "%:i32" (.name "i") (.lit (.int 3)))
+                              (.lit (.int 0)))))
+                        (.assign "i" (.binop "+:i32" (.name "i") (.lit (.int 1))))))
                     (.ret (.name "n"))))))) }
 
 /-- `case_cmp_plus_double`  (from `cboolint_cases.c`) -/
@@ -279,7 +285,7 @@ def f_case_cmp_plus_double : Func :=
                         ">"
                         (.binop
                           "+"
-                          (.binop "<" (.name "a") (.name "b"))
+                          (.binop "<:i32" (.name "a") (.name "b"))
                           (.lit (.float (Fl.ofBits 4602678819172646912))))
                         (.lit (.float (Fl.ofBits 4607182418800017408))))
                       (.ret (.lit (.int 1)))
@@ -296,7 +302,7 @@ def f_case_direct_return : Func :=
               (.assign "a" (.lit (.int 1)))
               (.seq
                 .skip
-                (.seq (.assign "b" (.lit (.int 2))) (.ret (.binop "<" (.name "a") (.name "b"))))))) }
+                (.seq (.assign "b" (.lit (.int 2))) (.ret (.binop "<:i32" (.name "a") (.name "b"))))))) }
 
 /-- `cboolint_cases.c:<global>`  (from `cboolint_cases.c`) -/
 def f_cboolint_cases_c__global_ : Func :=
