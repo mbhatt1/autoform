@@ -123,6 +123,8 @@ def expr_shape(n):
     if k == "str":    return ".lit", [("atom", f"(.str {lean_str(f('v'))})")]
     if k == "bool":   return ".lit", [("atom", f"(.bool {lean_bool(f('v'))})")]
     if k == "unit":   return ".lit", [("atom", ".unit")]
+    # JS/TS `null` (`Val.jsnull`); `unit` is `undefined` there. Emitted only for JS/TS.
+    if k == "jsnull": return ".lit", [("atom", ".jsnull")]
     if k == "float":  return ".lit", [("atom", f"(.float (Fl.ofBits {lean_float_bits(f('v'))}))")]
     if k == "name":   return ".name", [("atom", lean_str(f('v')))]
     if k == "binop":  return ".binop", [("atom", lean_str(f('op'))), ("e", f('a')), ("e", f('b'))]

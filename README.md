@@ -11,8 +11,9 @@ JavaScript, Python, Kotlin and binaries normalize to one node vocabulary, so one
 and one exporter cover all of them. There is no per-language transpiler. How far that
 holds is measured per language in `docs/languages.md`: Python is checked against CPython,
 and C against `cc` only on integer-argument functions (the harness crashed on `sds`'s
-`char *` API); Java, Go, JS and TS translate but have no runtime oracle, real Kotlin
-fails in the Joern frontend, and binaries were not tested.
+`char *` API); Java, Go, JS and TS translate but have no runtime oracle beyond
+integer-width fixtures (§63, §66), real Kotlin cannot be exported (Joern's dataflow overlay
+crashes on it), and binaries were not tested.
 
 ## Use
 
@@ -149,6 +150,11 @@ mostly members of nested/anonymous structs). Full tree with both: **5,295 of 8,1
 hole-free; there is no full-tree run isolating each change. Fixtures pin both against the
 real compilers: 282/282 address cases agree with `cc` (38 refused as undefined
 behaviour), 23/23 C width cases with `cc -fwrapv`, 22/22 Java cases with `java`.
+Go and Kotlin integer arithmetic got the same treatment (STRATEGY.md §66): operators carry
+their operand type (Go `*:g64`, `-:w08`; Kotlin `*:k64`, `-:q32`) with each language's own
+overflow, shift and division rules, and the fixtures pin them against the real runtimes: 55
+of 56 Go cases agree with `go` (the 56th is a documented hole) and 61 of 61 Kotlin cases
+with the Kotlin compiler; with the previous exporter the same CPGs gave 15 and 20 agreeing.
 
 ## The oracle
 
@@ -349,11 +355,14 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   `.javascript`), unary `-`, truthiness and `==` (NaN ≠ NaN, `-0.0 == 0.0`). Still holes:
   float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), casts to a floating
   type in C (`op:cast:float`), and `float()`/`str()`/`repr()` conversions (the Python
-  stdlib model has no float builtins). Two known gaps that are *not* holes: Python's `/`
-  on two ints still floors, because the exporter maps `//` onto `/`
-  (`Semantics.lean`, "Floating point"); and float `%` uses Python's floored remainder under
+  stdlib model has no float builtins). One known gap that is *not* a hole: float `%` uses Python's floored remainder under
   `.cLike` as well as `.python`, so Java's `-5.5 % 2.0` (`-1.5`) is mis-modelled
-  (`.javascript` uses the truncated remainder and matches Node). The differential harness
+  (`.javascript` uses the truncated remainder and matches Node). Python `/` on two ints is
+  true division (a correctly rounded float when both operands are at most 2^53 in magnitude,
+  the hole `binop:/:int-true-division-beyond-2^53` beyond that, `ZeroDivisionError` for a zero
+  divisor), `//` is its own operator, and `bool` is an `int` under `.python` (`True == 1`,
+  `True + True == 2`; `bool & bool` stays `bool`): `Autoform/PyArith.lean`,
+  `tests/test_pyarith_cpython.py`, STRATEGY.md section 64. The differential harness
   now encodes float arguments recorded from the test suite (`docs/conformance.md`).
 - **Contract *inference* at holes.** The mechanism for reasoning about partially translated
   functions under named assumptions exists (`Autoform/Contracts.lean` for expression holes,

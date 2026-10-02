@@ -3622,8 +3622,9 @@ Not done: jssrc2cpg is not installed here, so the exporter change is checked on 
 synthetic spans through Joern (and a C export is byte-identical before and after), not on
 a JS CPG; `ast-LangJS.json` was not re-exported. `.unit` is both `null` and `undefined`,
 so `===` between two of them is a hole. jssrc2cpg also maps `??` to `logicalOr`
-(`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed, and not recoverable the same way without a
-new Core operator.
+(`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed here, and not recoverable the same way without a
+new Core operator. *(Superseded: fixed in section 65, which also ran all of this on a real
+jssrc2cpg CPG for the first time.)*
 
 ## 62. Python method resolution along the C3 MRO, `super()`, and bare names by Python scoping
 
@@ -3909,10 +3910,252 @@ compared with `cc -O0 -fwrapv` / `javac`+`java` by pytest. With the integration-
 exporter: C 4 agree, 16 silent wrong answers, 2 holes, 1 `outOfFuel`; Java 7 agree, 11
 wrong, 4 holes. Now 23/23 and 22/22.
 
-**Not done.** Kotlin and Go (`.kt`, `.go`) keep untyped 32-bit operators; Go's `int`
+**Not done.** ~~Kotlin and Go (`.kt`, `.go`) keep untyped 32-bit operators; Go's `int`
 is 64-bit, so Go arithmetic is still §29 item 5's wrong answer (no Go frontend here to
-test against). Argument conversion at call sites. Nested/anonymous aggregate members
+test against).~~ (Done in §66.) Argument conversion at call sites. Nested/anonymous aggregate members
 (the bulk of the remaining unresolved types) need the struct text parsed, as
 `activeStructText` does for `sizeof`. Untyped `.cLike` arithmetic survives in byte-cursor
 `$off` bookkeeping and pointer-index arithmetic, whose values are offsets. Java `(char)`
 casts still hole as C's `char` does, although Java's `char` is `u16`.
+
+## 64. Python `/` floored, and `True == 1` was `False`
+
+Two silent wrong answers in Python's numeric semantics, both reproduced against CPython
+3.11 on the base commit (4dc1f19) and then fixed at the root.
+
+**True division.** `applyBinop .python "/" (.int 7) (.int 2)` was `int 3` (CPython: `3.5`),
+and `6 / 3` was `int 2` (CPython: the float `2.0`). The cause was recorded in `Semantics.lean`
+("Floating point") and never fixed: the exporter spelled both `<operator>.division` and
+`<operator>.floorDiv` as `"/"`, and Core's `.python` `"/"` floored. Now `floorDiv` is exported
+as `"//"` (floor division; `Int.fdiv`; its float form stays the hole
+`binop://:float-floordiv`), and `"/"` on two ints under `.python` is `pyIntTrueDiv`:
+
+* zero divisor: `ZeroDivisionError`;
+* both operands `|n| <= 2^53` (exact binary64s): ONE IEEE division in binary64, which is
+  CPython's correctly rounded `long_true_divide` exactly (`-0.0` for `0 / -3` included);
+* otherwise the named hole `binop:/:int-true-division-beyond-2^53`. Converting each operand
+  and dividing rounds twice; CPython rounds once; a double-rounded answer can be an ulp off,
+  and a hole beats a wrong translation (CONTRIBUTING rule 1).
+
+C/Java/JS/Go/Kotlin keep `<operator>.division` = `"/"` with their own dialects' semantics;
+`"//"` under a non-Python dialect is now a hole (`binop://:non-python`) rather than the
+truncating division it silently was.
+
+**`bool` is an `int`.** `True == 1` was `False`, `True + 1` the hole `binop:+`, `-True` a hole,
+and `{1: 'a'}[True]` a `KeyError`. Round-2 item K had extended `Dialect.promotesBool` to `.cLike`;
+it is now `true` for `.python` too (JavaScript has its own coercion table, `jsEqE`, and is
+untouched). The integer rule a promoted Python `bool` follows is `pyIntBinop` (unbounded, `/` is
+true division, `//` floors), proved equal to `applyBinop .python` on the same integers
+(`PyArith.pyIntBinop_eq`). `bool & bool`, `|`, `^` stay `bool`. `Val.beq` identifies a `bool` with
+the `int`/`float` of the same value, which is what makes dict-key lookup, `in`, and container
+equality (`(True, 2) == (1, 2)`) right without touching them; `eqPy` inherits it.
+
+**Checked against the runtime.** `tests/fixtures/pyarith/pyarith_cases.py` (45 cases: `7/2`,
+`-7/2`, `6/3`, `1/0`, `0/-3`, `7//2`, `-7//2`, `2**53` boundary and beyond, the bool cases) is
+exported (pysrc2cpg 4.0.606), rendered to `Autoform/PyArithProgram.lean`, pinned with
+`#guard_msgs` in `Autoform/PyArith.lean`, and compared with CPython by
+`tests/test_pyarith_cpython.py`. Before the change 35 of the 45 pins disagreed with CPython (a
+Lean build of the same file against the base `Semantics.lean`/`Syntax.lean`/exporter); after,
+45/45 agree, three of them as the documented hole. The ten that agreed before are `//`, `%`,
+`1/0` and the float cases: regression guards.
+
+**Re-exported / repaired.** The only tracked Python ASTs containing a floor division was
+`ast-Stress.json` (`ops.py` `fdiv`); `ast-Cachetools.json` has none and re-exports byte-identical
+(provenance re-recorded at the new exporter digest, as is `ast-CAddr.json`, also byte-identical).
+`ast-Stress.json`'s source is not in the repository: `fdiv` was patched `"/"` -> `"//"` by hand
+after reconstructing `ops.py` from the AST and checking a real pysrc2cpg export of it agrees
+(`provenance/unattributed.json` says so). `Refine.fdiv_refines` still proves `Int.fdiv`, now from
+`"//"` (`applyBinop_py_floordiv`); `applyBinop_py_div` is restated as true division (it was a
+theorem about `Int.fdiv`, which is false of `/`), with `applyBinop_py_div_big` for the hole.
+
+`Overflow.applyBinop_agrees` (and `exact_sound`, `no_ub_of_condsHold`, `terminates_of_condsHold`)
+modelled `/` as integer quotient and held for `.python` only while Core floored; they now carry
+`hdiv : op = "/" -> d = .cLike` / `slashFree e` (Python's integer division is `//`, outside the
+analysed fragment), so under `.python` they cover `+ - * %` and comparisons, not `/`. Everything
+else that mentions `"/"` under Python (`Contracts`, `HoleContracts`, `FuelMono`, `SpecsGen/*`,
+`Specs/*`, the PyScoping/PyMro/BoxedContainers fixtures) was checked: none depended on it, and all build.
+
+**Not done.** `int ** int`, `abs`/`sum`/`min`/`max` on `bool`, `bool` as a list index, and the
+shortest-repr of the float a `/` returns (`float()`/`str()` are not modelled) remain as before.
+A `/` on operands beyond 2^53 is a hole until CPython's exact big-integer rounding is modelled.
+
+## 65. JavaScript on a real jssrc2cpg CPG: `??` was a wrong answer, `null` was `undefined`
+
+*(Item R. The number is provisional; the merger renumbers.)*
+
+Section 61 changed the exporter to read `==`/`===`/`>>`/`>>>` from source text and said, in
+its last lines, that it had never run on a JS CPG: jssrc2cpg was not installed, 15 test
+strings had been pushed through Joern's base machinery, `ast-LangJS.json`/`ast-LangTS.json`
+had not been re-exported, `??` was unfixed, and `null === undefined` was a hole. This item
+fetched the frontend and ran it.
+
+**The frontend.** `io.joern:jssrc2cpg_3:4.0.606` from Maven Central (705,539 bytes), plus
+`astgen` 3.47.0 (the version `application.conf` inside the jar pins), which is a release
+asset of `joernio/astgen-monorepo` (tag `javascript-astgen/v3.47.0`, `astgen-linux`), not of
+the old `joernio/astgen` repository, whose releases stop earlier. `ASTGEN_BIN` points at it;
+`JoernParse --language jssrc` additionally needs a `js2cpg.sh` in the installation root.
+`provenance/ast-LangJS.json.prov.json` records the command and the astgen digest.
+
+**Measured on the real CPG** (fixture `tests/fixtures/jsnode/jsnode_cases.js`, 55 functions;
+Node v22.22.2 against Core on the exporter's real output; `Autoform/JsNode.lean`,
+`tests/test_jsnode_node.py`, 7 tests). With the exporter of `4dc1f19`: 15 of 55 differ from
+Node, 11 of them silent wrong answers and 4 holes. Seven of the wrong answers are `??`
+(`0 ?? 5` gave `5`; jssrc2cpg lowers `??` to `<operator>.logicalOr`). Three of the holes are
+a bug in section 61's token recovery that only a real CPG shows: jssrc2cpg re-quotes every
+string literal as `"..."`, so for `'a' === 'a'` the operand text is not found in the
+expression text and the token was `op:js-token-unrecovered`; p-queue had 4 such holes
+(`typeof x === 'number'`). The token recovery itself works: all six spellings are recovered
+from real spans. With the fixes: 55 of 55 agree with Node, 0 holes in the fixture.
+
+**Changes.**
+* `??` is told from `||` by the token between the operand spans (`jsLogicalOr`) and lowered
+  to `cond (a == null) b a` (a temp when `a` is impure, `b` and its prelude only when `a` is
+  nullish). Not a Core operator: that would add a third arm to `evalExpr`'s short-circuit
+  `if`, which `Refine`, `FuelMono` and `Overflow` each case-split on. A `logicalOr` whose text
+  has `??` and whose token cannot be read is a hole (`op:js-token-unrecovered:logicalOr`).
+* `x == null` was section 61's by-reading finding (rewritten to `x in (None, 0)`): measured,
+  the exporter already emitted `==` first; `0 == null`, `"" == null` and `false == null` are
+  `false` in 4 fixture cases.
+* `undefined`, `NaN` and `Infinity` were unbound names, which Core reads as `Val.unit` outside
+  Python. Now `unit`, and the IEEE values (`NaN`; `Infinity` is spelled `1e999`, because
+  `render_lean.py` strips a trailing `f` and `inf` lost it), unless a parameter or an
+  assignment in the CPG rebinds the name. jssrc2cpg gives every undeclared identifier a
+  synthetic `Local`, so testing for a `Local` does not detect shadowing.
+* `null` is `Val.jsnull`, new, and `Val.unit` is `undefined` under `.javascript`; `Lit.jsnull`
+  and `{"k": "jsnull"}` in the AST. `jsEqE`: loosely equal to each other, strictly equal
+  only to themselves. `null === undefined` is `false`, `null === null` and
+  `undefined === undefined` are `true`; the hole `js:===:null-vs-undefined` is gone. Ripple:
+  `Val.kind`/`identical`/`beq`/`truthy`, `Lit.toVal`, the literal arm of `evalExpr`, and one
+  case-split alternative in `FuelMono.lean`. Built, in addition to those: `Refine`,
+  `Overflow`, `Ledger`, `Harness.*`, `CallingConvention`, `PyScoping`, `PyMro`, `CBoolInt`,
+  `CIntWidth`, `JavaIntWidth`, `BoxedContainers`, `BuiltinBase`, `Contracts`, `HoleContracts`,
+  `SpecsGen.Basis`, `SpecsGen.Cachetools`, `SpecsGen.LinuxLib*`, `SpecsGen.V8BaseSample`, the
+  `Specs.*` modules (409 jobs, no error; not `SpecsGen.V8Base`).
+
+**Re-exports.** `ast-LangJS.json` is p-map `3f153f1` `index.js` (the one 285-line revision:
+`git show <commit>:index.js | wc -l` over the history); `ast-LangTS.json` is p-queue `9efde42`
+`source/*.ts` (a revision whose method set contains every non-lambda method name of the
+committed artifact; `9efde42` and `d9cf2be` give identical function lists and `9efde42` is the
+one dated the same day as the p-map commit; `89a10bb`, a day later, was not compared). The previous artifacts cannot be reproduced: they came from an unrecorded
+frontend that named `const f = () => ...` `f` and exported TypeScript overload signatures
+(TS 86 functions, now 82; JS 14, still 14). Both are recorded with `scripts/provenance.py record`,
+and `ast-Cachetools.json` and `ast-CAddr.json` were re-exported with the new exporter, found
+byte-identical (`cmp`), and re-recorded: the exporter digest is part of every record, so any
+exporter edit makes them stale until that is done.
+
+**Not done / found and left.** `a ??= b` is the hole `op:notNullAssert` and `a ||= b` an
+unmodelled call (`<operators>.assignmentOr`); `void 0` is `op:void`; a call to a sibling
+top-level function is the hole `call:f` (`Ctx.resolve` matches `.f`, jssrc2cpg names it
+`file.js::program:f`), which is why the fixture has no calls. Any other free JS global
+(`Math`, `Promise`, `Symbol`) is still read as `Val.unit` by the legacy unbound-name rule. The
+lowered `??` is exact for a pure or temp-able left operand; in plain `expr` position (a call
+argument, a condition) an impure left operand is the hole `op:js-nullish-impure-lhs`.
+
+## 66. Go and Kotlin integer arithmetic at their own widths
+
+§63's "Not done": Go and Kotlin (`.go`, `.kt`) kept the untyped `.cLike` operators, i.e.
+32-bit signed wrapping, whatever the type. Go `int` is 64 bits on amd64/arm64 (the stated
+data model) and Kotlin `Long` is 64, so `100000 * 100000` was 1410065408 where both give
+10000000000, and every `uint8`/`uint64`/`int8` operation was a silent wrong answer or a
+shift-count hole. Reproduced first, on the head: gosrc2cpg and kotlin2cpg 4.0.606 (below)
+exported `m := 100000; return m * m` / `val m = 100000L; return m * m` as a bare `"*"`,
+which Core evaluated to 1410065408.
+
+**Frontends and oracles.** `io.joern:gosrc2cpg_3:4.0.606` and `kotlin2cpg_3:4.0.606` were
+assembled from Maven Central like `javasrc2cpg` (§63). gosrc2cpg shells out to `goastgen`
+(v0.1.0, the GitHub release asset `goastgen-linux`; it must be on PATH and the working
+directory needs `./bin/astgen/goastgen-linux`, otherwise it exits 2 without a message).
+`go` 1.24.7 is installed: the Go fixture is checked against the real toolchain. `kotlinc` is
+not, but kotlin2cpg's own runtime dependencies include `kotlin-compiler-embeddable` 2.3.21,
+which compiles the Kotlin fixture (`org.jetbrains.kotlin.cli.jvm.K2JVMCompiler`, then
+`java`): both fixtures are oracle-checked, nothing is pinned from memory of the specs.
+
+**Design** (§63's, extended; `Lang/Core/TypedInt.lean`). The exporter names the type in the
+operator. Go: `g08 g16 g32 g64` signed, `w08 w16 w32 w64` unsigned, because Go has no
+integer promotion (the spec's "Arithmetic operators": both operands have the same type, an
+untyped constant converts to the other's), so an operation is performed AT its operands'
+type; `int`/`uint`/`uintptr` are as wide as a pointer under the stated `dataModel` (an
+unknown model leaves them unresolved). Kotlin: `k32 k64` / `q32 q64`; `Byte`/`Short`
+(`UByte`/`UShort`) promote to `Int` (`UInt`), `Int` meeting `Long` is `Long`, and signed
+meeting unsigned has no operator, so it is a hole. Semantics, each checked against the
+runtime and not reused from C or Java where they differ:
+
+| | C | Java / Kotlin | Go |
+|---|---|---|---|
+| signed overflow | policy (wrap) | wraps | wraps |
+| `MIN / -1`, `MIN % -1` | UB hole | `MIN`, `0` | `MIN`, `0` (spec: "equal to x") |
+| `/`, `%` by zero | UB hole | `ArithmeticException` | panic (an exception here) |
+| shift count `>=` width | UB hole | masked | `0`, or `-1` for `>>` of a negative |
+| negative shift count | UB hole | masked | panic |
+
+New: `IntLang.go`/`.kotlin`, the twelve tag spellings above, `goShift` (Go's shift is not a
+`NumConfig` policy), `&^` (AND NOT). **`NumConfig.go64` was wrong** and is corrected:
+it had `onSignedOverflow := .trap`, i.e. `MinInt / -1` panicked, and the table in
+`Numeric.lean` said so; the specification and `go run` say it is `MinInt`. (It was dead code
+until now; its `#eval` comment is updated.) 39 new `#guard`s in `TypedInt.lean`; no existing
+statement changed. Built unmodified: `Refine`, `Overflow`, `FuelMono`, `CallingConvention`,
+`PyScoping`, `PyMro`, `CBoolInt`, `CIntWidth`, `JavaIntWidth`, `BoxedContainers`,
+`SpecsGen.Basis`, `V8Spec`, `CppCastSpec`, `CachetoolsSpec`, `DoWhileSpec`, `AddressSpec`,
+`Ledger`, `Harness.Conformance`.
+
+**Exporter.** `goTypedBinop`/`goTypedAug`/`goTypedUnop`, `ktTypedBinop`/... behind the same
+`cTypedBinop` dispatch as Java; increments and compound assignments typed too (Kotlin
+`Byte++` narrows back with `cast:i8`, as `Byte.inc()` wraps). Type sources: a Go
+`Identifier`'s `typeFullName`; `byte`/`rune` arrive already as `uint8`/`int32`; a
+package-level named type (`type Level uint8`, `type Flags = uint32`) through its TYPE_DECL's
+declaration text; operators computed structurally from their operands (Joern's own type for
+`a += 2` on an `int16` is `int`, and for `a > b` on `UInt`s is `int`). Go constant
+expressions are evaluated EXACTLY and emitted as the literal (`1<<64 - 1` is
+18446744073709551615; the constant is arbitrary precision, no width computes it), rune
+literals, `0o17` and `1_000` parse. Integer conversions `T(x)` (Go, an external call named
+after the type) and Kotlin's `toInt()`/`toLong()`/`toByte()`/`toUInt()`/... and `inv()`
+are `cast:*` (value-preserving or modular, the same rule as C's). Anything that does not
+resolve stays `op:int:unresolved-type`: a struct field reached through a pointer (Joern's
+type for `s.n` is the garbage string `*main.S.n.<FieldAccess>.<unknown>`), a map element,
+a call result Joern left `ANY`, a named type from another package, a Kotlin `Char`.
+`1 << n` with an untyped constant left operand takes its type from the context (`var x
+int64 = 1 << n`), which the exporter cannot see: `op:int:untyped-constant-shift`.
+
+**Three frontend quirks worked around, each found by the oracle or by reading the CPG.**
+(1) gosrc2cpg types the later uses of a `for i := 0; ...; i++` variable `ANY` with no
+`REF`; the method's locals of that name decide when they all agree, and a local whose
+declared type is `ANY` because its initializer is a conversion (`s := uint8(n)`) takes the
+type every other assignment agrees on. (2) gosrc2cpg types an *untyped named constant*
+`int` (`const m = 1<<64 - 1` is "int"), so an operand spelled `int` meeting another integer
+type adopts it: a valid Go program cannot mix a genuine `int` with `uint64`. A floating or
+string operand decides the result only when no integer is involved. (3) `x &^= y` is a
+call Joern names `<operator>.unknown`, indistinguishable by name from the binary `x &^ y`;
+the first version translated it as that binary expression with its value discarded, so
+`x` kept its value and **nothing marked the function a hole** (`0xFFFF &^= 0x0F0F` stayed
+65535, Go: 61680). The oracle caught it; it is now an assignment operator. Kotlin and Go
+files now get the plural-spelling normalization that C and Java already had (`x %= 7` was an
+unresolved call to a function named `<operators>.assignmentModulo`).
+
+**Measured against the runtimes.** `tests/fixtures/gointwidth` (56 cases, `go` 1.24.7) and
+`tests/fixtures/kotlinintwidth` (61 cases, Kotlin 2.3.21): exported, rendered, pinned with
+`#guard_msgs`, compared by pytest. With the base-head exporter (the same CPGs): Go 15
+agree, 20 wrong, 21 holes; Kotlin 20 agree, 20 wrong, 21 holes. Now: Go 55 agree and one
+hole, the `1 << n` case above, which Go computes as 1099511627776 and Core refuses;
+Kotlin 61 of 61. Go's divide-by-zero and negative-shift panics are pinned as exceptions
+(the old Core raised Python's `ZeroDivisionError` for the first and holed the second).
+`ast-LangGo.json` (kelseyhightower/envconfig `7834011`, 82 functions) and
+`ast-LangKt.json` (the toy, now with a recorded source) were re-exported with provenance;
+`ast-CAddr.json` and `ast-Cachetools.json` re-exported with the new exporter and compared
+byte-identical, so only their recorded `exporter_sha256` moved. A Go stdlib sample (`math/bits`,
+`hash/fnv`, `hash/adler32`, go1.24.7; 121 functions) is the only multi-package check:
+base exporter 267 untyped arithmetic operators and 61 functions with a hole; now 244
+typed integer operators, the 4 string `+` untyped, 10 `op:int:unresolved-type`, 58
+functions with a hole (conversions, `^x` and `&^` now translate). That is a measurement, not
+a fixture: no oracle was run on it.
+
+**Not done.** (a) Real Kotlin end to end: kotlin2cpg parses `kotlinx-datetime`'s
+`core/common/src`, but Joern's default `ReachingDefPass` overlay crashes on it before the
+exporter runs (`key not found: MethodRef`; identical at the base exporter), so the Kotlin
+change is exercised on fixtures only. (b) Go package-level constants are field accesses
+Core cannot read (`field:mask:non-object`, a different gap); named *untyped* constants
+inside a constant sub-expression are computed at `int` before the enclosing operation's
+type is known, which is exact for `+ - * & | ^ <<` (the result is reduced at the enclosing
+width) and not for `/ % >>` of values beyond `int64`. (c) Named integer types from other
+packages (`time.Duration`), Kotlin `typealias`es and `Char` arithmetic are holes. (d)
+Floating-point arithmetic is untouched; the dialect is still `.cLike` for both. (e) Go `int`
+under `ilp32` would be `g32` by construction and was not exercised.

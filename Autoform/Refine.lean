@@ -1073,7 +1073,7 @@ def f_ops_py__module__fdiv : Func :=
   , params := ["a", "b"]
   , body := (.seq
             (.ifte (.binop "==" (.name "b") (.lit (.int 0))) (.ret (.lit (.int 0))) .skip)
-            (.ret (.binop "/" (.name "a") (.name "b")))) }
+            (.ret (.binop "//" (.name "a") (.name "b")))) }
 
 /-- `ops.py:<module>.fmod`  (from `ops.py`) -/
 def f_ops_py__module__fmod : Func :=
@@ -1326,10 +1326,13 @@ theorem fmod_refines :
 
 When this file was first written, `ops.py`'s `//` was untranslated and `f_ops_py__module__fdiv`
 carried `Expr.hole "op:floorDiv"`, which made it the hole negative result. The transpiler
-has since been regenerated and now emits `Expr.binop "/"`, which under the `.python`
-dialect is floor division. So the same function has moved from "provably refines nothing"
-to "provably refines `Int.fdiv`" — which is exactly the transition the ledger exists to
-record. -/
+has since been regenerated and now emits `Expr.binop "//"`, floor division. (Between those
+two states it emitted `"/"`, which Core's `.python` dialect answered by flooring; that was
+the right number for `//` and the WRONG one for a real `/`, whose CPython answer is a
+float -- `7 / 2 == 3.5` -- so the exporter now keeps the two operators apart, and `"/"` is
+true division: `applyBinop_py_div`.) So the same function has moved from "provably refines
+nothing" to "provably refines `Int.fdiv`" — which is exactly the transition the ledger
+exists to record. -/
 
 theorem fdiv_refines :
     Refines₂ (α := Int) (β := Int) (γ := Int)
@@ -1345,7 +1348,7 @@ theorem fdiv_refines :
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
   · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
-          applyBinop_py_div a b hb, hb]
+          applyBinop_py_floordiv a b hb, hb]
 
 /-! ### The hole negative result: untranslated constructs are not refinable
 

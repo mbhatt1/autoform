@@ -1,0 +1,20 @@
+{
+ "_": [
+  "How tests/fixtures/pyarith/ast.json was produced. `tests/test_pyarith_cpython.py`",
+  "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py: an exporter change invalidates this fixture",
+  "automatically; re-running the command and diffing ast.json is how to find out."
+ ],
+ "source": "tests/fixtures/pyarith/pyarith_cases.py",
+ "source_sha256": "af060d2150b2aa229d0734742f5f098db126af8fa4c4b8d0201d592816cc13cd",
+ "ast_sha256": "329982ccac6592362566579dd25aeebd54a9d1292a77f325c1aa9b38a2132e9c",
+ "joern_version": "4.0.606",
+ "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "command": [
+  "joern-parse tests/fixtures/pyarith --language pythonsrc --output pyarith.cpg",
+  "joern --script cartographer/export_ast.sc --param cpgPath=pyarith.cpg --param out=tests/fixtures/pyarith/ast.json",
+  "python3 cartographer/render_lean.py tests/fixtures/pyarith/ast.json Autoform/PyArithProgram.lean PyArith"
+ ]
+}

@@ -119,13 +119,29 @@ end
 /-- Allocate a fresh boxed container for a `Val.list`/`Val.dict`; any other value is
 returned as it is. Used for the results of builtins that construct a NEW container
 (`list(x)`, `sorted(x)`, `dict(x)`, `xs.copy()`), each of which is a fresh object in
-CPython. -/
+CPython.
+
+A `Val.tuple` is the result shape of `<unpackEx>` (starred assignment, `a, *b, c = xs`),
+whose starred slot is a NEW list in CPython (`b` is bound to a fresh list even when `xs` is
+a tuple or a string). The tuple itself is an immutable value and stays one; each `list`/
+`dict` value directly inside it is boxed. No other fresh-builtin returns a tuple, so this
+case is reached only from there. -/
 def boxFresh (h : Heap) (v : Val) : Heap × Val :=
   match v with
   | .list vs  => let (h', r) := h.alloc { cls := "list", fields := [], payload := .list vs }
                  (h', .ref r)
   | .dict kvs => let (h', r) := h.alloc { cls := "dict", fields := [], payload := .dict kvs }
                  (h', .ref r)
+  | .tuple es =>
+      let step : Heap × List Val → Val → Heap × List Val := fun (acc : Heap × List Val) e =>
+        match e with
+        | .list vs  => let (h', r) := acc.1.alloc { cls := "list", fields := [], payload := .list vs }
+                       (h', acc.2 ++ [.ref r])
+        | .dict kvs => let (h', r) := acc.1.alloc { cls := "dict", fields := [], payload := .dict kvs }
+                       (h', acc.2 ++ [.ref r])
+        | _         => (acc.1, acc.2 ++ [e])
+      let (h', es') := es.foldl step (h, [])
+      (h', .tuple es')
   | _ => (h, v)
 
 end Heap
@@ -250,10 +266,12 @@ def valInH (d : Dialect) (h : Heap) (x c : Val) : EResult :=
 argument object itself, so handing them the boxed container's contents is exact.
 `dict` is handled separately (only a dict argument is seen through). -/
 def viewedBuiltins : List String :=
-  ["len", "list", "tuple", "sorted", "sum", "min", "max", "bool", "isinstance", "callable"]
+  ["len", "list", "tuple", "sorted", "sum", "min", "max", "bool", "isinstance", "callable",
+   "<unpackEx>"]
 
-/-- Builtins whose result is a FRESH mutable container in CPython. -/
-def freshBuiltins : List String := ["list", "dict", "sorted"]
+/-- Builtins whose result is a FRESH mutable container in CPython. `<unpackEx>` returns a
+tuple whose starred slot is such a container (see `Heap.boxFresh`). -/
+def freshBuiltins : List String := ["list", "dict", "sorted", "<unpackEx>"]
 
 /-- The arguments a builtin call hands to `Stdlib.builtin`, seen through the heap where
 that is exact (`viewedBuiltins`). Every other builtin receives the reference itself, which

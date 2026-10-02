@@ -60,7 +60,9 @@ error that made the semantics dialect-parameterized in the first place.
 * `range()`, `enumerate()`, `zip()`, `map()`, `filter()`, `reversed()` — lazy views.
   Same objection as `iter`, plus `range(3) == [0,1,2]` is `False` in Python.
 * `str()` / `repr()` on strings and containers — see `Exceptions are strings` below.
-* `float`, `bytes`, `complex` — no corresponding `Val`.
+* `bytes`, `complex` — no corresponding `Val`. (`float` has one, `Val.float`, and Python
+  float arithmetic and comparison are evaluated in `Semantics.lean`; what this stdlib model
+  lacks is the `float()`/`str()`/`repr()` conversions, so those are still `call:<name>` holes.)
 * `getattr`/`hasattr` on an *absent* attribute — Python consults the class, the MRO and
   `__getattr__`; Core's heap only has instance fields, so absence is unknown, not `False`.
 

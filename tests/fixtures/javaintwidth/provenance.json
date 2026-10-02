@@ -2,7 +2,7 @@
  "_": [
   "How tests/fixtures/javaintwidth/ast.json was produced. `tests/test_javaintwidth_java.py`",
   "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
-  "exporter_sha256 is informational.",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py.",
   "/opt/joern ships only c2cpg. javasrc2cpg 4.0.606 was assembled from Maven Central",
   "(io.joern:javasrc2cpg_3:4.0.606, runtime scope, org.gradle:gradle-tooling-api excluded:",
   "it is not on Central) and run with the jars /opt/joern-mvn/lib lacks appended to that",
@@ -17,7 +17,7 @@
  "joern_version": "4.0.606",
  "frontend": "javasrc2cpg 4.0.606 (io.joern.javasrc2cpg.Main), default options",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "c024b0ea6d062f7990871baa128f00324b265d31a3c3c458c52809edc51f62c7",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
  "command": [
   "java -cp '/opt/joern-mvn/lib/*:<the jars above>/*' io.joern.javasrc2cpg.Main <a directory holding only JavaIntWidth.java> --output cpg.bin",
   "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/javaintwidth/ast.json",

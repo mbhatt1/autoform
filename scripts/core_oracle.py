@@ -146,7 +146,7 @@ def mtime_advisory(module):
 
 CORE_PROBE = """import Autoform.Ledger
 import Autoform.Generated.{mod}
-open Autoform.Core Autoform.Generated
+open Autoform.Core Autoform.Generated.{mod}
 
 #eval show IO Unit from do
   for n in program.coreNames do IO.println ("@@core@@" ++ n)
@@ -333,7 +333,7 @@ def testsuite_cases(ast_path, funcs, src_root, wanted, per_fn, tests_override, s
 # ------------------------------------------------------------------------ lean driver
 
 HEADER = """import Autoform.Generated.{mod}
-open Autoform.Core Autoform.Generated
+open Autoform.Core Autoform.Generated.{mod}
 
 private def gp : Heap × Ref := initGlobals program {fuel} {inits}
 private def h0 : Heap := gp.1

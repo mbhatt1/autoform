@@ -1,0 +1,30 @@
+{
+ "_": [
+  "How tests/fixtures/kotlinintwidth/ast.json was produced. `tests/test_kotlinintwidth_kotlin.py`",
+  "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py.",
+  "/opt/joern ships only c2cpg. kotlin2cpg 4.0.606 was assembled from Maven Central",
+  "(io.joern:kotlin2cpg_3:4.0.606, runtime scope, org.gradle:gradle-tooling-api excluded) and run",
+  "with the jars /opt/joern-mvn/lib lacks on that classpath.",
+  "Only cases.kt is parsed; Main.kt is the oracle driver and is not exported.",
+  "Oracle: the Kotlin compiler 2.3.21 (org.jetbrains.kotlin:kotlin-compiler-embeddable, a runtime",
+  "dependency of kotlin2cpg_3:4.0.606), run as org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib",
+  "with kotlin-stdlib 2.3.21, then `java -cp <out>:kotlin-stdlib MainKt`.",
+  "The AST's <global> module initializer holds stmt:METHOD holes (a pre-existing Kotlin gap); every",
+  "case_* function is hole-free."
+ ],
+ "source": "tests/fixtures/kotlinintwidth/cases.kt",
+ "source_sha256": "3d2916986f2c56969a773e443e7b0c3b4b3c46041a6088e9e7a09c0e4a0dd2ba",
+ "driver": "tests/fixtures/kotlinintwidth/Main.kt",
+ "driver_sha256": "c6375be2dd75ae7d52b25932728d63b142d44747cff2e8ed31de04606c2fddaa",
+ "ast_sha256": "ddf9b0621ddd989ba9709577f48a10850eaeb6bbef7c768bfae21a5730fa1eec",
+ "joern_version": "4.0.606",
+ "frontend": "kotlin2cpg 4.0.606 (io.joern.kotlin2cpg.Main), default options",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "command": [
+  "java -cp '/opt/joern-mvn/lib/*:<the kotlin2cpg_3 runtime jars>/*' io.joern.kotlin2cpg.Main <a directory holding only cases.kt> --output cpg.bin",
+  "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/kotlinintwidth/ast.json",
+  "python3 cartographer/render_lean.py tests/fixtures/kotlinintwidth/ast.json Autoform/KotlinIntWidthProgram.lean KotlinIntWidth"
+ ]
+}

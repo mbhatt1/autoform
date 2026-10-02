@@ -40,17 +40,24 @@ cannot accidentally quantify over them. The cases, and who does what:
 |---|---|---|---|---|
 | signed overflow | **UB** | wraps | wraps | n/a (bignum) |
 | unsigned overflow | wraps | n/a | wraps | n/a |
-| `INT_MIN / -1` | **UB** | yields `INT_MIN` | **panics** | n/a |
-| `INT_MIN % -1` | **UB** | yields `0` | panics | n/a |
-| shift count ≥ width | **UB** | count taken mod width | **panics**¹ | n/a |
+| `INT_MIN / -1` | **UB** | yields `INT_MIN` | yields `INT_MIN`² | n/a |
+| `INT_MIN % -1` | **UB** | yields `0` | yields `0`² | n/a |
+| shift count ≥ width | **UB** | count taken mod width | `0` / `-1`¹ | n/a |
 | negative shift count | **UB** | (mod width, so no) | panics | `ValueError` |
 | `>>` of a negative | arithmetic | `>>` arithmetic, `>>>` logical | arithmetic | arithmetic |
 | `/` rounding | toward zero | toward zero | toward zero | toward −∞ |
 
-¹ Go shifts by an over-large *count* yield 0 rather than panicking; Go panics only on a
-negative count. `Policy.wrap` here means "reduce the count mod width" (the x86/Java
-behaviour), so Go is modelled with `.undefined` unless the caller knows better. This
-imprecision is recorded rather than hidden.
+¹ Go shifts by an over-large *count* yield 0 (or -1 for `>>` of a negative signed value)
+rather than panicking; Go panics only on a negative count (checked with the `go` toolchain,
+STRATEGY §66). `Policy.wrap` here means "reduce the count mod width" (the x86/Java
+behaviour), which is NOT Go's, so no `NumConfig` field expresses Go's shift: the typed Go
+operators (`TypedInt.lean`, `goShift`) do it directly and use `NumConfig` only for the
+in-range arithmetic.
+
+² Earlier revisions of this table said Go panics here. The Go specification
+(https://go.dev/ref/spec#Arithmetic_operators): "if the dividend x is the most negative
+value for the int type of x, the quotient q = x / -1 is equal to x (and r = 0) due to
+two's-complement integer overflow"; `go run` agrees. Only division by zero panics.
 
 Note the deliberate asymmetry: `NumConfig.c32` uses `Policy.undefined` for signed
 overflow, because that is what the *standard* says, and a program relying on it is a
@@ -241,10 +248,13 @@ def java32 : NumConfig :=
 /-- Java `long`. -/
 def java64 : NumConfig := { java32 with type := .signed .w64 }
 
-/-- Go `int` (64-bit on mainstream platforms): overflow wraps, division by zero and
-`MinInt / -1` panic. -/
+/-- Go `int` (64-bit on mainstream platforms): signed overflow WRAPS (a defined result,
+never a panic), `MinInt / -1` is `MinInt` and `MinInt % -1` is `0`; only division by
+zero panics. (This was `onSignedOverflow := .trap`, which made `MinInt / -1` a panic —
+the Go specification and `go run` say it is `MinInt`.) The shift policy is not Go's and
+is not used: Go shifts are `goShift` in `TypedInt.lean`. -/
 def go64 : NumConfig :=
-  { type := .signed .w64, onSignedOverflow := .trap, onShiftCount := .undefined,
+  { type := .signed .w64, onSignedOverflow := .wrap, onShiftCount := .undefined,
     negRightShift := .arithmetic, divRound := .trunc }
 
 end NumConfig
@@ -646,7 +656,7 @@ example : NumConfig.c32Wrapv.mul 100000 100000 = .ok 1410065408 := by decide
 -- INT_MIN / -1.
 #eval NumConfig.c32.div (-2147483648) (-1)        -- ub "signed integer overflow"
 #eval NumConfig.java32.div (-2147483648) (-1)     -- ok (-2147483648)
-#eval NumConfig.go64.div (-9223372036854775808) (-1)  -- trap
+#eval NumConfig.go64.div (-9223372036854775808) (-1)  -- ok MinInt (Go spec; was `trap`)
 #eval NumConfig.c32.div 1 0                       -- divZero
 #eval NumConfig.c32.mod (-2147483648) (-1)        -- ub
 #eval NumConfig.java32.mod (-2147483648) (-1)     -- ok 0

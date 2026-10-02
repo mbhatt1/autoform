@@ -1,0 +1,14 @@
+{
+ "artifact": "ast-LangGo.json",
+ "artifact_bytes": 591127,
+ "artifact_sha256": "48964b0a20f3f8b9db01e96f763808427e466a87c6b80dc6c1a5b806f76a7a9e",
+ "command": "git clone https://github.com/kelseyhightower/envconfig && git -C envconfig checkout 7834011875d613aec60c606b52c2b0fe8949fe91; gosrc2cpg envconfig --output <cpg>; joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-LangGo.json. Joern 4.0.606 from Maven Central: io.joern:gosrc2cpg_3:4.0.606 (runtime scope) run as io.joern.gosrc2cpg.Main on the /opt/joern-mvn/lib classpath, with goastgen v0.1.0 (github.com/joernio/goastgen release asset goastgen-linux) on PATH and at ./bin/astgen/goastgen-linux of the working directory; the export ran as io.joern.joerncli.console.ReplBridge --script (joern --script from /opt/joern/joern-cli with the exporter's absolute path), CPG schema 1.7.70. The previously committed artifact (83 functions) was exported from an unrecorded revision of this package; this one has 82. Item S (STRATEGY.md section 64): Go integer operators now carry width tags. Re-verified at the merged exporter (sha 0f6b40b9eb37, items Q+R+S): a fresh export of the same source with the same frontend is byte-identical to the committed artifact (cmp), so only exporter_sha256 moved.",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/tmp/claude-0/-home-user-autoform/50aed7c6-e1a7-5570-8335-131f3caffbc5/scratchpad/S/envconfig",
+ "source_revision": "git:7834011875d613aec60c606b52c2b0fe8949fe91"
+}

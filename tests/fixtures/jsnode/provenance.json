@@ -1,0 +1,20 @@
+{
+ "_": [
+  "How tests/fixtures/jsnode/ast.json was produced. `tests/test_jsnode_node.py` checks",
+  "source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py: an exporter change invalidates this fixture",
+  "automatically; re-running the command and diffing ast.json is how to find out."
+ ],
+ "source": "tests/fixtures/jsnode/jsnode_cases.js",
+ "source_sha256": "2fbfabe9f3837c2898395bdd47d85151c0f81baf1a3a33b21b7daff7b1b963c1",
+ "ast_sha256": "2f04a47a67b2267759fa044c9c8359208fe0d5f36a468f2727bfb872caa8756d",
+ "joern_version": "4.0.606",
+ "frontend": "io.joern:jssrc2cpg_3:4.0.606 (Maven Central) with the astgen 3.47.0 binary (github.com/joernio/astgen-monorepo, release javascript-astgen/v3.47.0, asset astgen-linux, sha256 88b83632f6e8149d51b8d47503bda802c04501c099da98ce8ee3597fe1835f17) named by ASTGEN_BIN, run through io.joern.joerncli.JoernParse --language jssrc (a root directory whose js2cpg.sh strips -J flags and runs io.joern.jssrc2cpg.Main)",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "command": [
+  "joern-parse <a directory holding only jsnode_cases.js> --language jssrc --output jsnode.cpg",
+  "joern --script cartographer/export_ast.sc --param cpgPath=jsnode.cpg --param out=tests/fixtures/jsnode/ast.json",
+  "python3 cartographer/render_lean.py tests/fixtures/jsnode/ast.json Autoform/JsNodeProgram.lean JsNode"
+ ]
+}

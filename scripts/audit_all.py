@@ -35,6 +35,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -338,6 +339,44 @@ def _leanchecker_exe() -> str | None:
     return None
 
 
+# How long the kernel replay may run before the audit gives up on it. The replay of every
+# constant reachable from `Autoform` is single-threaded and, since the V8Base specs (73
+# parts of `rfl`-by-computation laws) joined the import graph, takes hours rather than the
+# ~1.5 minutes it took when this script was written: a local run was still going after 62
+# minutes. Timed in pieces on the final tree (one `leanchecker --fresh <module>` each, which
+# includes ~75 s of `lake env` start-up): `Autoform.Lang.Core.Semantics` 396 s,
+# `V8Base.Base` 291 s, `Part1` 283 s, `Part33` 574 s, `Part60` 774 s -- so about 5 minutes
+# fixed plus 5-13 minutes for each heavy part. Summed over the 73 parts that is roughly
+# 2.5-3 hours: an extrapolation from those five runs, NOT a measured end-to-end time (two
+# full runs were lost, one to this script's own timeout and one to a container restart).
+# CI runs the replay as its own job (`kernel-replay`) for that reason.
+# Override with $AUTOFORM_LEANCHECKER_TIMEOUT (seconds).
+LEANCHECKER_TIMEOUT_S = int(os.environ.get("AUTOFORM_LEANCHECKER_TIMEOUT", 4 * 3600))
+
+
+def run_in_group(cmd, *, timeout, **kw) -> "subprocess.CompletedProcess[str]":
+    """`subprocess.run(..., capture_output=True, text=True, timeout=...)`, except that on a
+    timeout the WHOLE process group is killed.
+
+    `subprocess.run` kills only the direct child. Here that child is `lake env`, which runs
+    `leanchecker` as ITS child, so a timeout used to leave a 4-6 GB `leanchecker` running
+    unsupervised and unreported (observed: still alive, parented to init, an hour after the
+    audit had printed "leanchecker timed out"). A leaked replay competes with whatever runs
+    next for memory, which on a CI runner is how a later step gets OOM-killed."""
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            start_new_session=True, **kw)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.communicate()
+        raise
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
 def lean4checker(fresh: bool = True) -> dict:
     """Externally re-verify the .olean files, or report the gap honestly.
 
@@ -347,7 +386,8 @@ def lean4checker(fresh: bool = True) -> dict:
     `--fresh` replays every constant -- imported ones included -- into an empty
     environment.  That is the mode we rely on: it is the one demonstrated to reject a
     tampered `.olean` anywhere in the transitive import graph, at the cost of being
-    single-threaded (~1.5 min for `Autoform`).  Without `--fresh` the checker can
+    single-threaded (about 1.5 minutes for `Autoform` when this was written; hours now that
+    the V8Base specs are in the graph -- see `LEANCHECKER_TIMEOUT_S`).  Without `--fresh` the checker can
     silently check almost nothing when the named module is a bare re-export list, which
     is exactly the shape `Autoform.lean` has; see STRATEGY.md 19 on silent oracles.
     """
@@ -369,16 +409,16 @@ def lean4checker(fresh: bool = True) -> dict:
 
     cmd = ["lake", "env", exe] + (["--fresh"] if fresh else []) + ["Autoform"]
     try:
-        proc = subprocess.run(
-            cmd, cwd=str(REPO), env=elan_env(),
-            capture_output=True, text=True, timeout=3600,
-        )
+        proc = run_in_group(cmd, cwd=str(REPO), env=elan_env(),
+                            timeout=LEANCHECKER_TIMEOUT_S)
     except FileNotFoundError as e:
         return {"status": "ERROR", "available": True, "exe": exe,
                 "command": " ".join(cmd), "detail": f"could not run: {e}"}
     except subprocess.TimeoutExpired:
         return {"status": "ERROR", "available": True, "exe": exe,
-                "command": " ".join(cmd), "detail": "leanchecker timed out"}
+                "command": " ".join(cmd),
+                "detail": f"leanchecker timed out after {LEANCHECKER_TIMEOUT_S} s "
+                          "(set $AUTOFORM_LEANCHECKER_TIMEOUT to allow longer)"}
 
     return {
         "status": "VERIFIED" if proc.returncode == 0 else "FAILED",
@@ -409,22 +449,39 @@ def main() -> int:
                     help="source sweep only (no lake invocation)")
     ap.add_argument("--strict", action="store_true",
                     help="also fail on demonstration sorries and on a missing leanchecker")
+    ap.add_argument("--skip-kernel", action="store_true",
+                    help="do not run the kernel replay in this invocation: it is reported as "
+                         "DELEGATED (it is its own CI job, because it takes hours) and does "
+                         "not fail the audit, even under --strict. NOT a pass: the verdict "
+                         "line says the replay was not run")
+    ap.add_argument("--kernel-only", action="store_true",
+                    help="run only the kernel replay (no axiom sweep); the source sweep, "
+                         "which is instant, still runs")
     ap.add_argument("--no-fresh", action="store_true",
                     help="run leanchecker without --fresh (faster, weaker: it may check "
                          "almost nothing for a re-export-only root module)")
     args = ap.parse_args()
+    if args.skip_kernel and args.kernel_only:
+        ap.error("--skip-kernel and --kernel-only are opposites")
 
     report: dict = {"repo": str(REPO)}
     report["source_sweep"] = source_sweep()
     report["axiom_sweep"] = (
         {"status": "SKIPPED", "leaks": [], "declarations": 0,
          "declared_axioms": [], "nonstandard_axioms": [], "axiom_histogram": {}}
-        if args.skip_lean else axiom_sweep()
+        if (args.skip_lean or args.kernel_only) else axiom_sweep()
     )
-    report["lean4checker"] = (
-        {"status": "SKIPPED", "available": False} if args.skip_lean
-        else lean4checker(fresh=not args.no_fresh)
-    )
+    if args.skip_lean:
+        report["lean4checker"] = {"status": "SKIPPED", "available": False}
+    elif args.skip_kernel:
+        report["lean4checker"] = {
+            "status": "DELEGATED", "available": False,
+            "detail": "NOT RUN in this invocation (--skip-kernel). The kernel replay of every "
+                      "constant reachable from `Autoform` takes hours, so CI runs it as its own "
+                      "job (`kernel-replay`, `audit_all.py --kernel-only --strict`). Nothing "
+                      "below speaks for it."}
+    else:
+        report["lean4checker"] = lean4checker(fresh=not args.no_fresh)
 
     ax = report["axiom_sweep"]
     src = report["source_sweep"]
@@ -462,7 +519,9 @@ def main() -> int:
     p("=" * 74)
     p("")
     p(f"[1] AXIOM SWEEP  ({ax['status']})")
-    if ax["status"] == "ERROR":
+    if ax["status"] == "SKIPPED":
+        p("    skipped in this invocation")
+    elif ax["status"] == "ERROR":
         p("    could not run:")
         for line in str(ax.get("error", ""))[-1500:].splitlines():
             p("      " + line)
@@ -504,7 +563,7 @@ def main() -> int:
             p(f"      {f['file']}:{f['line']} [{f['kind']}] {f['text'][:90]}")
     p("")
     p(f"[3] KERNEL RECHECK / leanchecker  ({l4c['status']})")
-    if l4c["status"] in ("UNVERIFIED", "ERROR"):
+    if l4c["status"] in ("UNVERIFIED", "ERROR", "DELEGATED"):
         p("    " + str(l4c.get("detail")))
     elif l4c["status"] == "SKIPPED":
         p("    skipped (--skip-lean)")
@@ -521,7 +580,10 @@ def main() -> int:
         for f in failures:
             p("  - " + f)
     else:
-        p("VERDICT: PASS (no trusted-code leak)")
+        if l4c["status"] == "DELEGATED":
+            p("VERDICT: PASS (no trusted-code leak); the kernel replay was NOT run here")
+        else:
+            p("VERDICT: PASS (no trusted-code leak)")
         if l4c["status"] == "UNVERIFIED":
             p("  caveat: kernel re-check UNVERIFIED (leanchecker absent)")
     p(f"wrote {args.output}")

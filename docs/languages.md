@@ -15,8 +15,8 @@ pipeline; where a document and an artifact disagree, the artifact wins.
 | C | `antirez/sds` (`sds.c`, `sds.h`, `sdsalloc.h`) | 3 | real C, string library, heavy pointer use |
 | Java | `google/gson` `com/google/gson/internal/**` | 14 | real utility library, generics, inner classes |
 | Go | `kelseyhightower/envconfig` (all `.go`) | 7 | small real package incl. tests |
-| TypeScript | `sindresorhus/p-queue` `source/*.ts` | 5 | real async library |
-| JavaScript | `sindresorhus/p-map` `index.js` | 1 | real library, 285 lines |
+| TypeScript | `sindresorhus/p-queue` `source/*.ts` @ `9efde42` | 5 | real async library (re-exported 2026-10-02 from this revision, `provenance/ast-LangTS.json.prov.json`) |
+| JavaScript | `sindresorhus/p-map` `index.js` @ `3f153f1` | 1 | real library, 285 lines (re-exported 2026-10-02 from this revision, `provenance/ast-LangJS.json.prov.json`) |
 | JavaScript (scale) | `lodash/lodash.js` | 1 | 17k lines, 693 functions |
 | Kotlin | `Kotlin/kotlinx-datetime` `core/common/src` | 20 | real Kotlin, 7.4k lines |
 | Kotlin (toy) | hand-written `gcd`/`addAll` | 1 | control experiment |
@@ -33,13 +33,33 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 | Python | yes | yes | yes | `.python` ✅ | 209 | 80% | 99 (47%) | 0.8% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | **none** |
-| Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | **none** |
-| TypeScript | yes | yes | yes | `.cLike` ⚠️ | 86 | 44 (51%) | 18 (21%) | 4% | **none** |
-| JavaScript | yes | yes | yes | `.cLike` ⚠️ | 14 | 5 (35%) | 1 (7%) | 5% | **none** |
+| Go | yes | yes | yes | `.cLike` ⚠️ | 82 | 20 (24%) | not re-measured | 4.1% | **none** (integer arithmetic: a `go`-checked fixture, §66) |
+| TypeScript | yes | yes | yes | `.javascript` ✅ | 82 | 46 (56%) | not re-measured | 3.1% | **Node, 55 cases** (`tests/test_jsnode_node.py`; not this corpus) |
+| JavaScript | yes | yes | yes | `.javascript` ✅ | 14 | 6 (43%) | not re-measured | 2.9% | **Node, 55 cases** (as above) |
 | JavaScript (lodash) | yes | **no** | n/a | `.cLike` ⚠️ | 693 | 419 (60%) | — | 1.8% | **none** |
 | Kotlin (real repo) | **no** | n/a | n/a | n/a | — | — | — | — | **none** |
-| Kotlin (toy) | yes | yes | yes | `.cLike` ⚠️ | 3 | 2 (66%) | 2 (66%) | 4% | **none** |
+| Kotlin (toy) | yes | yes | yes | `.cLike` ⚠️ | 3 | 2 (67%) | not re-measured | 3.4% | **none** (integer arithmetic: a Kotlin-compiler-checked fixture, §66) |
 | `.tsx` / `.jsx` | yes | yes | yes | **`.python` ❌ WRONG** | — | — | — | — | none |
+
+> **Dated correction (2026-10-02, item R, STRATEGY.md section 65).** The TypeScript and
+> JavaScript rows were re-measured: both artifacts were re-exported with a real
+> `jssrc2cpg` 4.0.606 (the old ones came from an unrecorded frontend: 86 and 14 functions,
+> TS overload signatures exported as functions, `const f = () => ...` named `f`). Functions,
+> hole-free and holes/nodes come from `python3 scripts/lang_matrix.py ast-LangJS.json
+> ast-LangTS.json` (JS 14 functions, 6 hole-free, 31 holes over 1,061 nodes; TS 82, 46,
+> 82 over 2,625); "Lean compiles" from `scripts/check_render.py --typecheck LangJS LangTS`.
+> "Verifiable core" was not re-measured (it needs the ledger run). The dialect column is
+> `.javascript` because `render_lean.py` has said so since `46c65fc`; the old `.cLike ⚠️`
+> was stale.
+
+**Go and Kotlin rows re-exported (item S, STRATEGY.md §66).** `ast-LangGo.json` and
+`ast-LangKt.json` were re-exported with provenance (`provenance/ast-LangGo.json.prov.json`,
+`ast-LangKt.json.prov.json`): Go from `kelseyhightower/envconfig` at `7834011` (82
+functions; the earlier artifact, 83 functions, came from an unrecorded revision), the Kotlin
+toy from `tests/fixtures/langkt/T.kt`. Their Functions / Hole-free / Holes-per-node cells
+are `scripts/lang_matrix.py ast-LangGo.json ast-LangKt.json` on the new files; the
+*Verifiable core* cells were not re-measured (they need the ledger, which was not re-run),
+and the Go hole-cause row below is that tool's count for the new file.
 
 Percentages are from the ledger the pipeline printed (`ledger-Lang*.json`);
 `scripts/lang_matrix.py` recomputes them from the exported AST independently and agrees
@@ -69,7 +89,12 @@ maps to the single `.cLike` constructor, which is 32-bit truncating C. See below
   run stops after `==> [1/6] parsing` printing **no error at all**. A CPG file is still
   written; running `export_ast.sc` on it crashes with the same exception. A hand-written
   two-function Kotlin file goes end to end, so this is the frontend on real Kotlin, not
-  the corpus.
+  the corpus. (Item S, 2026-10-02: kotlin2cpg 4.0.606 itself *does* parse
+  `kotlinx-datetime` `core/common/src` — 66 files, `c73ca37` — and writes a CPG; the crash is
+  in Joern's `ReachingDefPass`, one of the default overlays `joern --script` applies
+  before `export_ast.sc` runs, so the exporter is not involved: the unmodified exporter and
+  the item-S exporter fail identically on it. Real Kotlin therefore still cannot be
+  exported end to end, and the Kotlin width fix is exercised on fixtures only.)
 * **JavaScript at scale — does not render.** lodash exports 693 functions (25 MB of AST)
   and then `render_lean.py` dies:
   `RecursionError: maximum recursion depth exceeded while decoding a JSON object`.
@@ -100,7 +125,7 @@ translation. They are not the same set across languages, which is direct evidenc
 |---|---|
 | C | `op:indirection` 28, `op:cast` 18, `control:SWITCH` 14, `assign:lhs:indirectIndexAccess` 12, `op:indirectIndexAccess` 12, `assign:lhs:indirection` 12, `cstr:address-equality` 11, `op:postIncrement` 11, `op:postDecrement` 8, `control:FOR` 7, `control:GOTO` 5, `op:sizeOf` 5 |
 | Java | `op:alloc` 166, `control:THROW` 125, `op:cast` 123, `op:instanceOf` 90, `op:arrayInitializer` 43, `control:FOR` 30, `expr:BLOCK-impure` 20, `control:SWITCH` 15, `op:postIncrement` 15, `op:sizeOf` 13, `control:TRY-multiCatch` 4 |
-| Go | `op:addressOf` 44, `stmt:IMPORT` 39, `lit:unquoted` 17, `stmt:TYPE_DECL` 13, `op:indirection` 12, `assign:arity` 7 (multi-return `a, b := f()`), `control:FOR` 6 |
+| Go | `stmt:empty-ast-children` 134, `stmt:IMPORT` 39, `assign:arity` 16 (multi-return `a, b := f()`), `lit:unquoted` 15, `op:indirection:opaque-type` 12, `expr:empty-block` 4 |
 | TypeScript | `op:assignment` 26, `op:notNullAssert` 11, `control:THROW` 10, `stmt:TYPE_DECL` 9, `op:alloc` 7, `op:await` 7, `op:instanceOf` 5, `op:spread` 2 |
 | JavaScript (lodash) | `op:assignment` 111, `op:instanceOf` 100, `op:preIncrement` 91, `expr:BLOCK-impure` 44, `op:postIncrement` 44, `op:alloc` 27, `op:and` 23, `control:THROW` 16, `op:iterator` 6 |
 | Kotlin (toy) | `stmt:METHOD` 2 |
@@ -140,9 +165,12 @@ original measurement, not re-run.
 | 3 | JS `-5.5 % 2.0` | `-1.5` (JS `%` truncates) | `-1.5` | **fixed** under `.javascript` (truncated `fmod`); `.cLike` float `%` still uses Python's floored `pyMod` |
 | 4 | JS `1 == "1"` | `true` | `hole "js:==:cross-type-coercion"` | **hole** (was `bool false`): JS `==` is now loose equality, exact on same-type operands, a hole across types except `null`/`undefined` |
 | 4 | JS `1 === "1"` | `false` | `bool false` | **fixed** — `===`/`!==` are Core operators of their own, recovered by the exporter from source text (jssrc2cpg erases them) |
-| 4 | JS `null == 0` | `false` | `bool false` | **fixed** (was `true` by reading the exporter, not measured on a JS CPG: `pointerNullTest` keys on `cLikeFile`, which includes `.js`/`.ts`, and rewrote `x == null` to `x in (None, 0)`) |
+| 4 | JS `null == 0` | `false` | `bool false` | **fixed** (was `true` by reading the exporter, not measured on a JS CPG: `pointerNullTest` keys on `cLikeFile`, which includes `.js`/`.ts`, and rewrote `x == null` to `x in (None, 0)`). **Measured on a real JS CPG in item R:** the old exporter already emitted `==` for `x == null`, so `0 == null`, `"" == null`, `false == null` were `false` (`tests/fixtures/jsnode`, 4 cases) |
+| 4 | JS `null === undefined` | `false` | `bool false` | **fixed** in item R: `null` is `Val.jsnull`, `undefined` is `Val.unit` (was the hole `js:===:null-vs-undefined`) |
+| 4 | JS `0 ?? 5`, `"" ?? "d"`, `false ?? 5` | `0`, `""`, `false` | same | **fixed** in item R (was `5`, `"d"`, `5`: jssrc2cpg lowers `??` to `<operator>.logicalOr`, so it exported as `\|\|`; silent wrong answer). Lowered by the exporter to `a == null ? b : a` |
+| 4 | JS `x === 'a'` (single-quoted literal) | — | `bool` | **fixed** in item R: the old token recovery returned `op:js-token-unrecovered` for every comparison with a single-quoted string, found only by running on a real CPG |
 | 7 | JS `1 << 32`, `-1 >>> 0`, `~2147483648` | `1`, `4294967295`, `2147483647` | same | **fixed** (`jsBitwise`/`jsBitNot`: ToInt32/ToUint32; operands beyond 2^53 are a hole). Was `4294967296`, a `ub` hole, `-2147483649` |
-| 5 | Java `long` / Go `int` | 64-bit | 32-bit `.cLike` | **still wrong** — `.java`/`.go` still map to `.cLike` |
+| 5 | Java `long` / Go `int` / Kotlin `Long` | 64-bit | typed operators (`*:j64`, `*:g64`, `*:k64`) | **fixed** — Java in §63, Go and Kotlin in §66: the exporter names the operand type in the operator; the dialect is still `.cLike` |
 | 6 | JS `"a" + "b"` | `"ab"` | `str "ab"` | **fixed** (`Dialect.stringsAreValues`) |
 
 ### 1. `and` / `or` return an operand, not a boolean (Python, JS, TS) — NEW, and it hits the flagship corpus
@@ -224,19 +252,73 @@ span it cannot parse is the hole `op:js-token-unrecovered:<op>`. In Core (`jsEqE
 |---|---|---|
 | `1 === "1"` / `1 !== "1"` | `false` / `true` | `false` / `true` ✅ |
 | `1 == "1"`, `0 == false`, `[1] == 1` | `true` | hole `js:==:cross-type-coercion` |
-| `null == undefined`, `null == 0` | `true`, `false` | `true`, `false` ✅ (`.unit` is both) |
-| `null === undefined` | `false` | hole `js:===:null-vs-undefined` (Core has one `.unit`) |
+| `null == undefined`, `null == 0` | `true`, `false` | `true`, `false` ✅ (`null` is `Val.jsnull`, `undefined` is `Val.unit`; item R) |
+| `null === undefined`, `null === null` | `false`, `true` | `false`, `true` ✅ (was the hole `js:===:null-vs-undefined`; item R) |
 | `NaN === NaN`, `-0 === 0`, `1 === 1.0` | `false`, `true`, `true` | same ✅ |
 | `o == o`, `[1] == [1]` (heap objects) | `true`, `false` | same ✅ (identity, not Python's `__eq__`) |
 
 Every row is an `example … := rfl` or `#eval` in `Semantics.lean`; the Node column is
-from `node -e` (v22). **Not verified end to end:** jssrc2cpg is not installed on the
-machine this was done on, so the exporter change is checked on synthetic source spans
-(not a JS CPG), and the tracked `ast-LangJS.json` was not re-exported — its 21 `"=="`
-nodes are therefore read as LOOSE equality, which is exact on same-type operands and a
-hole otherwise, never a wrong answer.
+from `node -e` (v22). **Verified end to end in item R (2026-10-02), see "4b" below.** The paragraph that stood
+here said jssrc2cpg was not installed, that the exporter change had only been run on 15
+synthetic spans, and that `ast-LangJS.json` was not re-exported. All three are no longer
+true: jssrc2cpg 4.0.606 was fetched, a real JS CPG was exported, and both JS/TS artifacts
+were regenerated.
+
+### 4b. Running the JS exporter on a real jssrc2cpg CPG (item R)
+
+**Obtaining the frontend.** `io.joern:jssrc2cpg_3:4.0.606` is on Maven Central (a 700 KB
+jar; the other jars it needs are already in the Joern distribution). It shells out to
+`astgen`, whose pinned version is in the jar (`application.conf`: `astgen_version:
+"3.47.0"`). `joernio/astgen` has moved to `joernio/astgen-monorepo`; the binary is the
+release asset `astgen-linux` of tag `javascript-astgen/v3.47.0`, selected with
+`ASTGEN_BIN`. `JoernParse --language jssrc` also wants a `js2cpg.sh` in the installation
+root; a two-line wrapper that strips the `-J` flags and runs `io.joern.jssrc2cpg.Main`
+does it. `provenance/ast-LangJS.json.prov.json` records the exact command and the
+astgen digest.
+
+**What the real runs found** (a purpose-written fixture, `tests/fixtures/jsnode/
+jsnode_cases.js`, 55 functions each run under Node `v22.22.2` and under Core on the
+exporter's real output; `Autoform/JsNode.lean`, `tests/test_jsnode_node.py`):
+
+| finding | measured |
+|---|---|
+| the token recovery works on real CPGs | `===`, `!==`, `==`, `!=`, `>>`, `>>>` all recovered from the real call spans; p-map has 21 `===` and no `==`, p-queue 34 `===` and 9 `!==` (counts of the re-exported ASTs). The committed `ast-LangJS.json` had 21 `"=="` for those 21 `===`: read as loose equality, which was exact on same-type operands, so no wrong answer, but the strictness was lost |
+| it did **not** work for single-quoted strings | jssrc2cpg re-quotes every string literal as `"..."`, so the operand text no longer occurs in the expression text and `typeof x === 'string'` was `op:js-token-unrecovered:equals`. p-queue had 4 such holes (`typeof options.intervalCap === 'number'` ...), the fixture 3. Fixed: the span comparison folds the quote character |
+| `??` is erased | `0 ?? 5` is exported as `0 \|\| 5`. On the fixture, the 4dc1f19 exporter against Node: 15 of 55 cases differ, 11 silent wrong answers (7 are `??`) and 4 holes. The other 4 "wrong" ones only differ because Core now answers `===` on two `unit`s; under the old Core they were holes |
+| `undefined`, `NaN`, `Infinity` are unbound names | the exporter emitted `name "undefined"`, and Core reads any unbound name as `Val.unit` outside Python (`Ctx.unboundName`), so `NaN` was `undefined`/`null`. jssrc2cpg gives every undeclared identifier a synthetic `Local`, so "has a `Local`" says nothing about shadowing. Now `undefined` is `unit`, `NaN`/`Infinity` are the IEEE values, unless some parameter or assignment in the CPG rebinds the name |
+| `a ??= b` | exported as the hole `op:notNullAssert` (jssrc2cpg maps it to the TS non-null operator); `a \|\|= b` as an unmodelled call. Both are holes, not wrong answers; unchanged |
+| sibling calls | `f(x)` where `f` is another top-level function is the hole `call:f`: `Ctx.resolve` matches the suffix `.f`, and jssrc2cpg names functions `file.js::program:f`. Not changed here; it is why the fixture's cases are zero-argument and inline |
+
+**`??`.** Not a new Core operator (that would put a third arm into `evalExpr`'s short-circuit
+`if`, which `Refine.lean`, `FuelMono.lean` and `Overflow.lean` each case-split on): the
+exporter recovers the token (`jsLogicalOr`) and lowers `a ?? b` to `cond (a == null) b a`.
+`==` against the null literal is true exactly for `null` and `undefined` and false for
+`0`, `""`, `false` and objects, which is the definition of `??`. `a` is evaluated once
+(a temp when it is impure), `b` only when `a` is nullish. A `logicalOr` whose text contains
+`??` and whose token cannot be recovered is the hole `op:js-token-unrecovered:logicalOr`
+(p-queue has one: `options.id ?? (this.#idAssigner++).toString()`).
+
+**`null` versus `undefined`.** Done: `Val.jsnull` and `Lit.jsnull`. Under `.javascript`,
+`.unit` is `undefined` (what a missing return, a missing property and an unassigned
+variable already evaluated to) and the source literal `null` is `.jsnull`. `jsEqE`: both are
+loosely equal to each other and strictly equal only to themselves. The ripple was small:
+`Val.kind`, `Val.identical`, `Val.beq`, `Val.truthy`, `Lit.toVal`, `evalExpr`'s literal
+arm and one case split in `FuelMono.lean` (`| jsnull => exact hy`); `Refine`, `Overflow`
+and every importer built unchanged. No theorem statement changed.
 
 ### 5. Java `long` and Go `int` are 64-bit; Core models them as 32-bit
+
+> **Fixed for integer arithmetic** — Java by STRATEGY.md §63, Go and Kotlin by §66. The
+> exporter names the type each integer operation is performed at inside the operator
+> (`"*:j64"`, Go `"*:g64"` / `"-:w08"`, Kotlin `"*:k64"` / `"-:q32"`); `TypedInt.lean` gives
+> each language its own overflow, shift and division rules (Go: a shift count at or above
+> the width gives 0/-1, division by zero panics; Kotlin: masked counts,
+> `ArithmeticException`); a type that does not resolve is the hole
+> `op:int:unresolved-type`. Measured against the real runtimes on 56 Go cases (`go`
+> 1.24.7) and 61 Kotlin cases (Kotlin compiler 2.3.21): before, Go 15 agree / 20 wrong /
+> 21 holes and Kotlin 20 / 20 / 21; after, Go 55 agree + 1 hole (`1 << n` with an untyped
+> constant, whose type comes from a context the exporter cannot see) and Kotlin 61/61. The
+> section below is the original measurement, kept as recorded.
 
 `.java`/`.go` → `.cLike` → `c32Wrapv`. `Numeric.lean` *already defines* `java32`,
 `java64` and `go64` configs — but `Dialect` has only two constructors (`python`,

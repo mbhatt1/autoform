@@ -42,36 +42,8 @@
    "reproduction_attempted": false,
    "reproduced": false
   },
-  "ast-LangGo.json": {
-   "artifact_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangJS.json": {
-   "artifact_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
   "ast-LangJava.json": {
    "artifact_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangKt.json": {
-   "artifact_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangTS.json": {
-   "artifact_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
    "source_hint": null,
    "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
    "reproduction_attempted": false,
@@ -92,9 +64,9 @@
    "reproduced": false
   },
   "ast-Stress.json": {
-   "artifact_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
+   "artifact_sha256": "fa088b83e8835042a3b61681eb18f95fdee2a48a8fc857514e1a7cc60f970799",
    "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/stress",
-   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 8 entries to the committed 6; the extra two are the module initializers `ops.py:<module>` and `<module-objects>:<module>`.",
+   "reason": "HAND-PATCHED, then verified, not re-exported: item Q changed `<operator>.floorDiv` from \"/\" to \"//\" in cartographer/export_ast.sc, and the one `\"/\"` in this artifact (ops.py `fdiv`, which is `a // b`) was edited to `\"//\"` by hand because the original ops.py is not in the repository (the source_hint scratch directory is gone). The edit was checked against a real export: ops.py was reconstructed from this AST, exported with the new exporter by pysrc2cpg 4.0.606, and the `fdiv` entry is byte-identical to the patched one (and `fmod`, `poly`, `absval`, `gcdish` match modulo the integer-literal quoting that predates this artifact). Before the patch: scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 8 entries to the committed 6; the extra two are the module initializers `ops.py:<module>` and `<module-objects>:<module>`. Attribution still requires a tracked ops.py and a re-export, which would also add the two module initializers and change the function count the README quotes.",
    "reproduction_attempted": true,
    "reproduced": false
   },

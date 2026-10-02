@@ -166,6 +166,13 @@ inductive Val where
   `Val.beq` below routes floats through `Fl.eqv` for exactly this reason. -/
   | float : Fl → Val
   | unit  : Val
+  /-- JavaScript's `null`, as distinct from `undefined`. Under `Dialect.javascript` the
+  existing `.unit` is `undefined` -- it is what a missing return value, a missing property
+  and an unassigned variable already evaluate to -- and the JS source literal `null`
+  evaluates to this. The two are loosely equal (`null == undefined`) and strictly different
+  (`null === undefined` is `false`), which is the one thing a single `.unit` could not say
+  (`jsEqE`, `Semantics.lean`). No other dialect produces it. Falsy, like `.unit`. -/
+  | jsnull : Val
   | list  : List Val → Val
   | tuple : List Val → Val
   /-- Association list, not a hash map: key order is observable and we do not want to
@@ -387,6 +394,8 @@ inductive Lit where
   bits are the only spelling that round-trips through the differential harness. -/
   | float : Fl → Lit
   | unit  : Lit
+  /-- JavaScript's `null` literal (`Val.jsnull`); `Lit.unit` is `undefined` there. -/
+  | jsnull : Lit
   deriving Repr, Inhabited, DecidableEq
 
 /-- Expressions. `call` is by name: the CPG gives us resolved callee names. -/
@@ -895,6 +904,7 @@ def Val.kind : Val → Nat
   | .bool _      => 2
   | .float _     => 3
   | .unit        => 4
+  | .jsnull      => 14
   | .list _      => 5
   | .tuple _     => 6
   | .dict _      => 7
@@ -920,6 +930,7 @@ keeps finding. -/
 def Val.identical : Val → Val → Option Bool
   | .ref a, .ref b => some (a == b)
   | .unit,  .unit  => some true
+  | .jsnull, .jsnull => some true
   -- A NAMED function denotes one function object, so `f is g` is decidable on names.
   -- `Cache.__init__` needs exactly this: `self.getsizeof is not Cache.getsizeof` is how
   -- cachetools detects an overridden sizer, and `none` there would turn a working
@@ -978,7 +989,15 @@ def Val.beq : Val → Val → Bool
   -- which is why it goes through `Fl.cmpIntv` rather than converting either side.
   | .int a,   .float b => Fl.cmpIntv a b == some .eq
   | .float a, .int b   => Fl.cmpIntv b a == some .eq
+  -- `bool` is an `int` subclass in Python: `True == 1`, `True == 1.0`, `{1: 'a'}[True]`
+  -- (equal hashes too), `True in [1]`. C promotes `_Bool` to `int` and Java/Go/Kotlin never
+  -- compare the two, so the identification is right wherever it can be reached.
+  | .bool a,  .int b   => (if a then 1 else 0) == b
+  | .int a,   .bool b  => a == (if b then 1 else 0)
+  | .bool a,  .float b => Fl.cmpIntv (if a then 1 else 0) b == some .eq
+  | .float a, .bool b  => Fl.cmpIntv (if b then 1 else 0) a == some .eq
   | .unit,    .unit    => true
+  | .jsnull,  .jsnull  => true
   | .ref a,   .ref b   => a == b
   | .fn a,    .fn b    => a == b
   | .clos a _, .clos b _ => a == b
@@ -1174,6 +1193,7 @@ def Val.truthy : Val → Bool
   -- `bool(0.0) == bool(-0.0) == False`; `bool(nan)` is `True`.
   | .float f  => Fl.truthy f
   | .unit     => false
+  | .jsnull   => false
   | .list vs  => !vs.isEmpty
   | .tuple vs => !vs.isEmpty
   | .dict kvs => !kvs.isEmpty

@@ -1,0 +1,2806 @@
+[
+ {
+  "name": "main.case_int_mul",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:g64",
+      "a": {
+       "k": "name",
+       "v": "m"
+      },
+      "b": {
+       "k": "name",
+       "v": "m"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int_add_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "9223372036854775807"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:g64",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int32_mul_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:g32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int64_mul",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:g64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int8_add_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "127"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "binop",
+       "op": "+:g08",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int8_incr",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "127"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "binop",
+       "op": "+:g08",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "int",
+        "v": 1
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int16_compound",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "32767"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "binop",
+       "op": "+:g16",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint8_sub_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "binop",
+       "op": "-:w08",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_byte_add_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "int",
+      "v": "200"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+:w08",
+      "a": {
+       "k": "name",
+       "v": "b"
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_rune_add_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "r",
+     "e": {
+      "k": "int",
+      "v": "2147483647"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+:g32",
+      "a": {
+       "k": "name",
+       "v": "r"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint32_mul_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "65536"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:w32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint64_mul_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "9223372036854775808"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:w64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint64_sub_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "-:w64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint_sub_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "-:w64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uintptr_sub_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "p",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "-:w64",
+      "a": {
+       "k": "name",
+       "v": "p"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint16_neg",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "-:w16",
+      "a": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int_neg_min",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "y",
+     "e": {
+      "k": "int",
+      "v": "-9223372036854775808"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "-:g64",
+      "a": {
+       "k": "name",
+       "v": "y"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint8_complement",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "5"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "~:w08",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int64_complement",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "~:g64",
+      "a": {
+       "k": "name",
+       "v": "z"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_and_not",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "255"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "y",
+       "e": {
+        "k": "int",
+        "v": "15"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "&^:w08",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "y"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_min_div",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "int",
+      "v": "-9223372036854775808"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "int",
+        "v": "-1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:g64",
+        "a": {
+         "k": "name",
+         "v": "m"
+        },
+        "b": {
+         "k": "name",
+         "v": "d"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_min_rem",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "int",
+      "v": "-9223372036854775808"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "int",
+        "v": "-1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%:g64",
+        "a": {
+         "k": "name",
+         "v": "m"
+        },
+        "b": {
+         "k": "name",
+         "v": "d"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int8_min_div",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "int",
+      "v": "-128"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "int",
+        "v": "-1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:g08",
+        "a": {
+         "k": "name",
+         "v": "m"
+        },
+        "b": {
+         "k": "name",
+         "v": "d"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_div_trunc",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "-7"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:g64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_rem_sign",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "-7"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "3"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%:g64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint32_div",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:w32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shl_over_width",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "33"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<:g32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shl_in_width",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "31"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<:g32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shl_int64",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "63"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<:g64",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shr_over_width_neg",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "-8"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "40"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">>:g32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shr_over_width_pos",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "8"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "40"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">>:g32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shr_arith",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "-16"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">>:g32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shr_uint",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "28"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">>:w32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shl_count_type",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "7"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<:w08",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shl_signed_count",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "62"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<:g64",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_shl_drops_bits",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "255"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "4"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<:w08",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_uint32_gt",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int8_lt",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "-1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_int_accumulate",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "assign",
+        "x": "i",
+        "e": {
+         "k": "int",
+         "v": "0"
+        }
+       }
+      },
+      "b": {
+       "k": "loop",
+       "c": {
+        "k": "binop",
+        "op": "<",
+        "a": {
+         "k": "name",
+         "v": "i"
+        },
+        "b": {
+         "k": "int",
+         "v": "3"
+        }
+       },
+       "body": {
+        "k": "seq",
+        "a": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "s",
+          "e": {
+           "k": "binop",
+           "op": "+:g64",
+           "a": {
+            "k": "name",
+            "v": "s"
+           },
+           "b": {
+            "k": "int",
+            "v": "2000000000"
+           }
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "s",
+          "e": {
+           "k": "binop",
+           "op": "*:g64",
+           "a": {
+            "k": "name",
+            "v": "s"
+           },
+           "b": {
+            "k": "int",
+            "v": "3"
+           }
+          }
+         }
+        },
+        "b": {
+         "k": "assign",
+         "x": "i",
+         "e": {
+          "k": "binop",
+          "op": "+:g64",
+          "a": {
+           "k": "name",
+           "v": "i"
+          },
+          "b": {
+           "k": "int",
+           "v": 1
+          }
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "s"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_conv_int32_trunc",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4294967297"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_conv_uint8_trunc",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "300"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:u8",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_conv_sign_extend",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "-1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:u64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_conv_int64_widen",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "-5"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_untyped_const_shift",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "n",
+     "e": {
+      "k": "int",
+      "v": "40"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "hole",
+      "label": "op:int:untyped-constant-shift"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_named_type_wraps",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "l",
+     "e": {
+      "k": "int",
+      "v": "200"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+:w08",
+      "a": {
+       "k": "name",
+       "v": "l"
+      },
+      "b": {
+       "k": "int",
+       "v": "100"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_untyped_const_operand",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "mask",
+     "e": {
+      "k": "int",
+      "v": "18446744073709551615"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "x",
+       "e": {
+        "k": "int",
+        "v": "5"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "^:w64",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "mask"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_local_from_conversion",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "n",
+     "e": {
+      "k": "int",
+      "v": "300"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "s",
+       "e": {
+        "k": "unop",
+        "op": "cast:u8",
+        "a": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "s",
+        "e": {
+         "k": "binop",
+         "op": "+:w08",
+         "a": {
+          "k": "name",
+          "v": "s"
+         },
+         "b": {
+          "k": "int",
+          "v": "250"
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_const_expr_exact",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "int",
+    "v": "1099511627783"
+   }
+  }
+ },
+ {
+  "name": "main.case_const_conversion",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:u64",
+    "a": {
+     "k": "int",
+     "v": "18446744073709551615"
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_compound_ops",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "100"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:w08",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "200"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "x",
+       "e": {
+        "k": "binop",
+        "op": "*:w08",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "int",
+         "v": "3"
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "x",
+        "e": {
+         "k": "binop",
+         "op": "-:w08",
+         "a": {
+          "k": "name",
+          "v": "x"
+         },
+         "b": {
+          "k": "int",
+          "v": "7"
+         }
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "x",
+         "e": {
+          "k": "binop",
+          "op": "/:w08",
+          "a": {
+           "k": "name",
+           "v": "x"
+          },
+          "b": {
+           "k": "int",
+           "v": "2"
+          }
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "x",
+          "e": {
+           "k": "binop",
+           "op": "%:w08",
+           "a": {
+            "k": "name",
+            "v": "x"
+           },
+           "b": {
+            "k": "int",
+            "v": "50"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "x",
+           "e": {
+            "k": "binop",
+            "op": "|:w08",
+            "a": {
+             "k": "name",
+             "v": "x"
+            },
+            "b": {
+             "k": "int",
+             "v": "129"
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "x",
+            "e": {
+             "k": "binop",
+             "op": "&:w08",
+             "a": {
+              "k": "name",
+              "v": "x"
+             },
+             "b": {
+              "k": "int",
+              "v": "247"
+             }
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "x",
+             "e": {
+              "k": "binop",
+              "op": "^:w08",
+              "a": {
+               "k": "name",
+               "v": "x"
+              },
+              "b": {
+               "k": "int",
+               "v": "85"
+              }
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "x",
+              "e": {
+               "k": "binop",
+               "op": "<<:w08",
+               "a": {
+                "k": "name",
+                "v": "x"
+               },
+               "b": {
+                "k": "int",
+                "v": "3"
+               }
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "x",
+               "e": {
+                "k": "binop",
+                "op": ">>:w08",
+                "a": {
+                 "k": "name",
+                 "v": "x"
+                },
+                "b": {
+                 "k": "int",
+                 "v": "1"
+                }
+               }
+              },
+              "b": {
+               "k": "ret",
+               "e": {
+                "k": "name",
+                "v": "x"
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_compound_and_not",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "65535"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "&^:w16",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "3855"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_compound_shl_count",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "35"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "x",
+        "e": {
+         "k": "binop",
+         "op": "<<:g32",
+         "a": {
+          "k": "name",
+          "v": "x"
+         },
+         "b": {
+          "k": "name",
+          "v": "n"
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "x"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_compound_int64",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4611686018427387904"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:g64",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "name",
+        "v": "x"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "x",
+       "e": {
+        "k": "binop",
+        "op": "*:g64",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "int",
+         "v": "2"
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "x"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_div_zero",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:g64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_neg_shift",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "n",
+       "e": {
+        "k": "int",
+        "v": "-1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "<<:g64",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "name",
+         "v": "n"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "main.case_rem_zero",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%:w08",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cases.go:main.cases.go",
+  "file": "cases.go",
+  "params": [],
+  "body": {
+   "k": "skip"
+  }
+ }
+]

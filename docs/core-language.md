@@ -23,7 +23,8 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `str : String → Val` | A string *or* a C `char*`. One constructor: see §7, where the operators are dialect-split instead. |
 | `bool : Bool → Val` | A boolean. |
 | `float : Fl → Val` | An IEEE-754 float as a bit pattern plus its format (`Autoform/Lang/Core/Float.lean`). The format comes from the dialect (`Dialect.toFConfig`: `.python` → `FConfig.python`, `.cLike`/`.javascript` → `FConfig.cDouble`). `Val.beq` routes floats through `Fl.eqv`, never bit equality: NaN ≠ NaN and `-0.0 == 0.0`. |
-| `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
+| `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. Under `Dialect.javascript` it is `undefined`. |
+| `jsnull : Val` | JavaScript's `null` (the source literal), distinct from `undefined` so that `null === undefined` is `false` and `null == undefined` is `true`. Only the JS/TS exporter produces it; falsy, like `unit`. |
 | `list : List Val → Val` | A list VALUE. Immutable: a Python list *display* is not one of these but a `ref` to a heap object whose `Payload` is the list (`Expr.boxContainer`, see `docs/boxed-containers.md`). A `Val.list` still arises from C aggregate initializers, `dict.keys()`-style results and the oracle's encoder, and a write to one is the hole `setIndex:immutable-containers`. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
 | `dict : List (Val × Val) → Val` | An association list, *not* a hash map. Key order is observable in real languages and differs between them, so imposing one language's iteration order would be an invented answer. |
@@ -89,8 +90,11 @@ the six comparisons (exact `int`/`float` comparison under `.python`, promote-the
 under `.cLike`/`.javascript`; NaN is unordered), unary `-`, truthiness and equality. Still
 holes: float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), C casts to a
 floating type (`op:cast:float`), and `float()`/`str()`/`repr()` (the stdlib model has no
-float builtins). Known wrong answers rather than holes: Python `/` on two ints floors,
-because the exporter maps `//` onto `/` (see "Floating point" in `Semantics.lean`); and float
+float builtins). Python `/` on two ints is true division (`pyIntTrueDiv`: a float, one IEEE division when
+both operands are at most 2^53 in magnitude, the hole `binop:/:int-true-division-beyond-2^53`
+beyond, `ZeroDivisionError` on a zero divisor) and `//` is its own operator, exported from
+`<operator>.floorDiv`; `bool` is an `int` under `.python` (`Dialect.promotesBool`, `Val.beq`).
+A known wrong answer rather than a hole: float
 `%` is Python's floored remainder under `.cLike` as well as `.python`, which is wrong for
 Java (`-5.5 % 2.0` is `-1.5`); `.javascript` uses the truncated remainder. The differential harness refuses float
 arguments, so none of this is oracle-checked yet.
@@ -237,7 +241,7 @@ traded for a guaranteed dynamic hole.
 
 | Constructor | Meaning |
 |---|---|
-| `lit : Lit → Expr` | An `int` / `str` / `bool` / `float` / `unit` literal. |
+| `lit : Lit → Expr` | An `int` / `str` / `bool` / `float` / `unit` literal; `Lit.jsnull` is JS/TS `null`. |
 | `name : String → Expr` | Variable read. Resolution order: local `Env`, then the globals frame, then the function table (yielding `Val.fn`), then `unit`. The function-table fallback is what makes higher-order code translatable instead of holed. |
 | `binop : String → Expr → Expr → Expr` | Binary operator by name. `&&`/`\|\|` short-circuit (§5); everything else evaluates left then right. |
 | `unop : String → Expr → Expr` | Unary operator by name (`-`, `!`). |
@@ -366,12 +370,16 @@ The dialect currently controls:
   `c32` surfacing undefined behaviour, or `c32Wrapv` matching what `cc` actually does — is
   a recorded choice, not a default: see §8 and `Numeric.lean`.) That 32-bit config is
   only the meaning of an *untyped* `.cLike` operator. The exporter names the type of every
-  C/C++ and Java integer operation in the operator itself — `"*:i64"`, `"<:u32"`,
-  `">>:u64"`, `"+:j64"` (`TypedInt.lean`): operands are converted to that type (the usual
-  arithmetic conversions; the left operand only, for shifts) and the operation is
-  performed at it, C tags under the configured C overflow policy and Java tags under
-  `NumConfig.java32`/`java64`. An operation whose C type does not resolve is the hole
-  `op:int:unresolved-type`, not the untyped operator (STRATEGY.md §63).
+  C/C++, Java, Go and Kotlin integer operation in the operator itself — `"*:i64"`,
+  `"<:u32"`, `">>:u64"`, `"+:j64"`, Go `"*:g64"` / `"-:w08"` (signed / unsigned, at the
+  operand's own width: Go has no integer promotion), Kotlin `"*:k64"` / `"-:q32"`
+  (`TypedInt.lean`): operands are converted to that type (the usual arithmetic
+  conversions; the left operand only, for shifts) and the operation is performed at it,
+  C tags under the configured C overflow policy, Java and Kotlin tags under
+  `NumConfig.java32`/`java64` (wrap, masked shift counts, `ArithmeticException`), Go tags
+  under `NumConfig.go64` (wrap, a shift count at or above the width gives 0 / -1, a
+  negative one or a zero divisor panics). An operation whose type does not resolve is the
+  hole `op:int:unresolved-type`, not the untyped operator (STRATEGY.md §63, §66).
 * `Dialect.toFConfig` — the float format and rules (`FConfig.python` or
   `FConfig.cDouble`; §1).
 * `Dialect.comparesIntFloatExactly` — whether `int`/`float` comparison is exact (Python)
@@ -445,7 +453,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | Label family | Meaning | Status |
 |---|---|---|
 | ~~`op:starredUnpack`~~ | `*args` / `**kwargs` splicing. **Closed** (STRATEGY.md §35): `Expr.starred` / `Expr.kwargE` / `Expr.dstarred` and `Func.vararg` / `Func.kwarg` express it. The label no longer occurs. | Implemented. What remains is narrower and separately named: `op:starred-outside-call`, `call:<f>:keyword-to-builtin`. |
-| `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here and is now mapped to `/`, because the dialect already makes `/` floor under `.python` — check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
+| `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here, was then mapped to `/` — which made a real Python `/` floor — and is now mapped to its own `//` operator; check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
 | `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (`Val.float` exists, but the int↔float conversion is not wired into the exporter). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` needs the conversion wired (`FConfig.ofInt` exists); `char-signedness` needs a target-ABI parameter; `int-to-pointer` is a hole **by choice** (§2.1): what remains is an operand statically known to be an integer, or an integer constant (`(sqlite3_destructor_type)-1`, `(T*)8`). An operand with no type evidence is `unop "cast:ptr"`, decided at run time. |
 | `op:sizeOf:<kind>` | A `sizeof` that could not be folded to a constant. Folding uses the exporter's `dataModel` for pointer and `long`-family widths and standard C layout for aggregates (members in source order, each at the next multiple of its own alignment; an array has its element's alignment; an aggregate the maximum of its members'; 8-byte scalars are refused under ILP32, where their in-struct alignment is ABI-dependent). An aggregate is refused (`object`) when a member is a bit-field, when the struct is packed, when its tag has more than one distinct definition, when a `#if` in its body cannot be decided for the parsed configuration (only `#ifdef`/`#ifndef`/`defined()` of macros the corpus never defines and the frontend was not given are decided; see `cppDefines`), or when Joern's member list is not exactly the declarators of the source (it omits function-pointer members and lists every `#if` branch). `array-bound`: an array whose bound is neither a literal, an integer constant expression over literals, a resolvable `NAME±N` macro, nor (for `T x[] = {...}`) a countable initializer. `model-dependent`, `opaque-type`, `unknown-type`, `pointer` as for casts. | Not yet implemented beyond the shapes named. |
 | `op:shiftRight:unknown-signedness`, `op:shiftRight:unknown-token` | C `>>` is arithmetic or logical depending on the promoted left operand's signedness, and Core performs it at that operand's width (`">>:u64"`); the type is taken from resolved types only (typedef chains, casts, literals, the usual arithmetic conversions; enums refused). `unknown-signedness`: that type did not resolve. `unknown-token`: a Java shift whose `>>`/`>>>` token could not be read from the source (javasrc2cpg 4.0.606 swaps the two operator names, so the name is not used). `op:shiftRight:64-bit-operand` no longer occurs: 64-bit shifts translate. | Type work. |

@@ -15,9 +15,11 @@ file builds the contracts half.
 `Refine.Outcome` deliberately has no `hole` constructor — so `refines_not_hole` says a
 refined function provably never reaches an untranslated construct. That is the right
 default and it is not being weakened here. Its cost is that **one** hole anywhere in a
-function puts the entire function outside anything we can state: on `cachetools`, 165 of
-238 functions are hole-free and 74 are call-closed, so roughly 70% of the code is
-currently unspeakable.
+function puts the entire function outside anything we can state. When this was written,
+on `cachetools` 165 of 238 functions were hole-free and 74 call-closed, so roughly 70% of
+the code was unspeakable; those are historical figures. The current ones are in
+`ledger-Cachetools.json` (regenerate it with `scripts/ledger.lean.tmpl`; `scripts/check_docs.py`
+checks the docs against it, but nothing checks this docstring).
 
 ## The mechanism
 

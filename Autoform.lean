@@ -11,10 +11,14 @@ import Autoform.Overflow
 import Autoform.FuelMono
 import Autoform.CallingConvention
 import Autoform.PyScoping
+import Autoform.PyArith
 import Autoform.PyMro
 import Autoform.CBoolInt
 import Autoform.CIntWidth
 import Autoform.JavaIntWidth
+import Autoform.JsNode
+import Autoform.GoIntWidth
+import Autoform.KotlinIntWidth
 import Autoform.BoxedContainers
 
 -- The synthesised specification modules. These were NOT in the build until this merge,
@@ -66,15 +70,19 @@ import Autoform.Specs.DoWhileSpec
 import Autoform.Specs.AddressSpec
 
 -- ---------------------------------------------------------------------------
--- The one module still outside this graph, and why.
+-- What is still outside this graph.
 --
--- `Autoform/SpecsGen/V8Base.lean` (229 synthesised laws over the 1,920-function V8 base
--- corpus) is NOT here, and the reason is no longer the namespace collision this change
--- removed -- `Autoform.Specs.V8Spec`, which imports the same `Generated.V8Base`, is in
--- the graph two lines above. The reason is elaboration cost: a single `lean` process on
--- that file ran past 57 minutes of CPU and 16 GB of RSS without finishing (see
--- `scripts/check_specs.py`, which exists for exactly this module and has always recorded
--- it as not proving). Importing it would make every `lake build` in the repository
--- unbounded, so it stays gated behind `scripts/check_specs.py V8Base` until its laws are
--- regenerated in a form that elaborates. Its CI inventory floor is a floor on TEXT and
--- says so; do not read it as a proof count.
+-- `Autoform/SpecsGen/V8Base.lean` is IN the graph (`import Autoform.SpecsGen.V8Base`
+-- above): it is now only the 73 `V8Base.Part<N>` imports, with the shared context and the
+-- domains in `V8Base.Base`. An earlier version of this comment said the opposite -- that
+-- the single 229-law module was gated behind `scripts/check_specs.py V8Base` because one
+-- `lean` process on it ran past 57 minutes of CPU and 16 GB of RSS without finishing.
+-- That was true of the unsplit module and stopped being true when it was split.
+--
+-- No module imports, and so nothing in `lake build` or `leanchecker --fresh` covers:
+--   * `Autoform/Generated/SC.lean` (see docs/integrity.md);
+--   * `Autoform/SpecsGen/V8Exp.lean` and `V8Exp2.lean`, synthesised experiment files in
+--     the same namespace as the V8Base parts. They are not built by anything, so no check
+--     vouches for them either way.
+-- The CI inventory floor on SpecsGen/V8Base counts theorem TEXT in the part files and says
+-- so; do not read it as a proof count.
