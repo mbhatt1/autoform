@@ -1,0 +1,19 @@
+{
+ "_": [
+  "How tests/fixtures/cboolint/ast.json was produced. `tests/test_cboolint_cc.py`",
+  "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
+  "exporter_sha256 is informational."
+ ],
+ "source": "tests/fixtures/cboolint/cboolint_cases.c",
+ "source_sha256": "23dc69a733e10dd389da0c785119a050c6c7421610c171132bd5bb81734b723e",
+ "ast_sha256": "467cffbf2bb1580aa6a26001c222a57e65d3bc75e31efb92121610c22aa3cc46",
+ "joern_version": "4.0.606",
+ "frontend": "c2cpg (Joern 4.0.606, /opt/joern/joern-cli/c2cpg.sh), no defines",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "1227f616a23c7b893d67199df8d6388711129777f0d6423c2dd07d538984d329",
+ "command": [
+  "c2cpg.sh <a directory holding only cboolint_cases.c> --output cpg.bin",
+  "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/cboolint/ast.json",
+  "python3 cartographer/render_lean.py tests/fixtures/cboolint/ast.json Autoform/CBoolIntProgram.lean CBoolInt"
+ ]
+}

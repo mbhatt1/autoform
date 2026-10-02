@@ -317,54 +317,112 @@ which `a = a | b` does not.
 ### Conformance sample
 
 `scripts/sqlite_sample.py` keeps only what the C leg of `differential.py` can run with
-nothing invented. That leg passes and returns `c_int`, and the AST carries no C types,
-so a candidate must be hole-free, call-closed through other candidates, have integer
-parameter and return types, and contain no preprocessor line in its body, no free names,
-and no objects. Its file must be compiled by the default amalgamation of the same
-checkout. The C side is SQLite's own code: `csrc/sample.c` renames each function by
-macro, `#include`s the amalgamation unchanged, and exports an `int f(int…)` wrapper. The
-wrapper aborts (a skipped native call, never a comparison) on any argument the real
-parameter type cannot hold and any result `int` cannot hold. Selection is by sha256 of
-the name, so it is deterministic.
+nothing invented. The AST carries no C types, so a candidate must be hole-free,
+call-closed through other candidates, have integer parameter and return types, and contain
+no preprocessor line in its body, no free names, and no objects. Its file must be compiled
+by the default amalgamation of the same checkout. The C side is SQLite's own code:
+`csrc/sample.c` renames each function by macro, `#include`s the amalgamation unchanged,
+and exports a wrapper under the original name with the function's own signature.
+`csrc/ctypes.json` records each parameter's and the result's width and signedness, read
+from a program compiled against the same amalgamation (`probe_types`), so `LogEst` is
+16-bit signed and `sqlite3_int64` 64-bit because the compiler says so. Selection is by
+sha256 of the name, so it is deterministic.
 
 Of 5,724 hole-free functions, 3,269 are in files the default amalgamation does not
 compile (`autosetup/jimsh0.c`, `tool/`, `ext/fts5`, `ext/jni`, `src/test*.c`, ...),
-1,143 return a non-integer type, 1,117 have a non-integer parameter (pointer, struct, float, ...), 122
-have a definition the signature reader could not match, and the remaining filters remove
-64 more (no parameters, several definitions, preprocessor lines, non-candidate callees, ...). **9 qualify**, so the sample is the whole population, short of the 50-100 the
-item asked for. The binding constraint is the oracle's `int`-only C calling convention,
-not the selection.
+1,135 return a non-integer type (849 `void`), 1,125 have a non-integer parameter
+(pointer, struct, float, ...), 133 have a definition the signature reader could not
+match, and the remaining filters remove 53 more (no parameters, preprocessor lines,
+non-candidate callees, ...). **9 qualify**, the same 9 as before the typed leg:
+admitting `_Bool`, `Bitmask`, `<stdint.h>` names and `SQLITE_OPT_INLINE u64` moved 8
+functions from "return type" to "parameter" (every one also takes a pointer), and no
+function in the population was refused for an integer *width* alone. The binding
+constraint is pointers, not integer types.
 
-| Function | Cases | Agree | Diverge | Inconclusive |
+**Typed C leg.** `differential.py` reads `ctypes.json` when it is present: values are
+passed and read at their real C width and signedness (`char`/`short`/`int`/`long`/`long
+long`, `unsigned`, `_Bool`) through ctypes, and each argument is drawn over its whole type
+(a boundary of the type with probability 0.35: min, max, their neighbours, the
+power-of-two edges), so a `sqlite3_int64` parameter now receives values a 32-bit model
+cannot hold. The basis is `c-typed-v1`; it is not comparable with the int-only basis.
+`tests/test_cboolint_cc.py` checks that every typed argument is representable in its
+type and that both boundaries are drawn.
+
+Commands, 2026-10-02, Core at this branch (`Dialect.promotesBool`):
+
+```sh
+python3 scripts/sqlite_sample.py /opt/corpus/D/full/ast.json /opt/corpus/D/amal \
+    /opt/corpus/D/amal/sqlite3.c <out>
+python3 cartographer/render_lean.py <out>/ast-SqliteSample.json \
+    Autoform/Generated/SqliteSample.lean SqliteSample
+lake build Autoform.Generated.SqliteSample
+(cd <out> && python3 <repo>/scripts/differential.py ast-SqliteSample.json csrc SqliteSample 20)
+# int-only basis: the same command on a copy of round 1's /opt/corpus/D/sample (no ctypes.json)
+```
+
+| Basis | Functions compared | Agree | Diverge | Inconclusive |
 |---|--:|--:|--:|--:|
-| `pwr10to2`, `pwr2to10`, `sqlite3AbsInt32`, `sqlite3LogEstAdd`, `sqlite3MemRoundup`, `vdbeSorterTreeDepth`, `walNextHash` | 140 | 140 | 0 | 0 |
-| `isFatalError` | 20 | 0 | 20 | 0 |
-| `validJulianDay` | 20 | 0 | 10 | 10 |
-| **total** (9/9 functions compared) | 180 | **140/170** | 30 | 10 |
+| int-only (`varargs-attempted-v2`), before the fix | 9/9 | 140/170 | 30 | 10 |
+| int-only, after | 9/9 | **170/170** | 0 | 10 |
+| typed (`c-typed-v1`), after | 9/9 | **168/168** | 0 | 12 |
 
-No native call aborted. The random arguments are `randint(-20, 20)`; `--wasm` (boundary
-values) was not usable because the wasm toolchain here is freestanding and the
-amalgamation needs libc.
+**The 30 round-1 divergences** (`isFatalError` 20, `validJulianDay` 10) had one root
+cause: C's relational, equality, `!`, `&&`, `||` results are `int` 0/1 (C11 6.5.8-6.5.14,
+6.5.3.3), and Core's were `Val.bool`, which `==` against an `int` compared false
+(`Val.beq`) and arithmetic holed. In the sample they all surfaced at the RETURN (`return
+rc!=0 && rc!=5 && rc!=6` gave `bool true`, `cc` 1); the same root cause is a silent wrong
+answer one step inside a function: `int t = (a < b); if (t == 1) return 7; return 3;`
+returned 3 where `cc` returns 7.
 
-**All 30 divergences have one root cause.** Under `Dialect.cLike` a relational, equality,
-`&&`/`||` or `!` result is `Val.bool`, while C's is `int` 0/1 (C11 6.5.8-6.5.14,
-6.5.3.3). `return rc!=0 && rc!=5 && rc!=6` returns `bool true` where `cc` returns 1. At a
-function boundary this looks like a printing difference, but it is not one. Core's `==` on
-`bool` and `int` is `Val.beq`, which is false, and arithmetic on a `bool` holes
-(`applyBinop .cLike "+" (.bool true) (.int 1)` is `hole "binop:+"`). On a three-function
-fixture, `int t = (a < b); if (t == 1) return 7; return 3;` returned 3 in Lean and 7
-under `cc` for (3, 12): a silent wrong answer. `(a<b) == 1` likewise compares false.
-`(a<b) + (b<a)` holes. The fix belongs in Core rather than the exporter. Under `.cLike`,
-either produce `.int 0/1` from these operators or promote `.bool` to `0/1` in
-arithmetic and equality. C++ (`.cc` files share `.cLike`) needs the promotion form,
-since its `<` really is `bool`. It touches `Semantics.lean` and the C proofs that `simp`
-through `applyBinop`, so it is left for that change and not made here.
+The fix is in Core, not the exporter, and it is a promotion rather than a change of
+result type, because `.cLike` also serves Java, Go, Kotlin and C++. There `a < b` is a
+`boolean`/`bool`: Java's `boolean` must stay a `bool` (Java's `&` on two of them is a
+`boolean`), C++ integral-promotes `bool` to `int` 0/1 in arithmetic and comparison
+([conv.prom]/6), and in Java/Go/Kotlin mixing a boolean with a number is a compile error,
+so no well-typed program of theirs reaches the promoted cases. So comparisons still yield
+`Val.bool`, and under `.cLike` (`Dialect.promotesBool`) a `bool` meeting an integer or a
+float in `applyBinop` (`binopFallback`), or under unary `-`/`~`, is promoted to 0/1 --
+the C++ rule, which for C is its own arithmetic. `(a<b) == 1` is now true, `(a<b) +
+(b<a)` is 1, `(a<b) & (b>0)` stays a `bool` (Java) that a later integer context reads as
+1 (C). `cIntBinop_eq` proves the promoted arms compute exactly what the integer arms
+compute. No proof needed changing: the integer arms are untouched, and `simp` lemmas for
+the split-out fallback (`binopFallback_int_int`, `binopTail_eq`, ...) keep
+`Specs/V8Spec.lean`'s `simp [applyBinop, ...]` working as it was.
 
-**The 10 inconclusive cases** are `validJulianDay(iJD)` on `iJD >= 0`:
-`INT_464269060799999` is `((i64)0x1a640 << 32) | 0x1072fdff`. The exporter keeps the
-`cast:i64`, but Core's `cLike` integers are 32-bit, so `<< 32` is
-`ub:shift count out of range`, a hole and not a wrong answer. 64-bit arithmetic is
-unmodelled.
+The one integer context Core does not see is the return conversion to the function's
+declared type: `int f(void) { return a < b; }` returns `Val.bool`. The harness applies
+that conversion (`c_return_conversion`: `bool` compares as exactly 0/1, nothing looser),
+and so does `tests/test_cboolint_cc.py`. Of the 30, all 30 agree through it; the Core
+promotion is what fixes the in-function form, which the sample happens not to contain and
+the fixture does. Emitting a `cast:<T>` on `return` from the exporter would move the
+conversion into the translation; it needs the declared return type at each `Return`
+and a re-export, and is not done.
+
+`tests/fixtures/cboolint/cboolint_cases.c` (15 cases, including the fixture above,
+`(a<b)+(b<a)`, `-(a<b)`, `~(a>b)`, `(a<b)<<3`, a loop counting `i % 3 == 0`, and `(a<b) +
+0.5 > 1.0`) is exported by Joern, rendered to `Autoform/CBoolIntProgram.lean`, pinned in
+`Autoform/CBoolInt.lean` with `#guard_msgs`, and compared with `cc` by
+`tests/test_cboolint_cc.py`: 15/15 agree, none holes.
+
+**Float `%`.** `.cLike` `%` on a double used CPython's floored `pyMod`. The only
+`.cLike` languages that accept a floating `%` are Java and Kotlin (C, C++ and Go reject
+it at compile time), and both truncate: `-5.5 % 2.0` is `-1.5` (JLS 15.17.3; `javac`/
+`java` on this box print `-1.5`, and `1.5` for `5.5 % -2`). `.cLike` now uses `fmod`, pinned
+by `#guard`s in `Semantics.lean` (with Python's `0.5` pinned alongside).
+
+**The inconclusive cases.** 11 (typed) / 10 (int-only) are `validJulianDay(iJD)` on
+`iJD >= 0`: `INT_464269060799999` is `((i64)0x1a640 << 32) | 0x1072fdff`, and Core's
+`.cLike` integers are 32-bit, so `<< 32` is `ub:shift count out of range`, a hole. The
+typed leg adds one: `vdbeSorterTreeDepth(nPMA)` keeps an `i64 nDiv` and multiplies it by
+16 until it exceeds `nPMA`. At 32 bits `16^8 = 2^32` wraps to 0, the loop never ends, and
+Core answers `outOfFuel` (checked directly: `runFunc` gives 6 for `nPMA = 2^28`, which
+`cc` agrees with, and `outOfFuel` for `2^28 + 1` and `INT_MAX`, where `cc` gives 7). Not
+a wrong answer here, but the same gap: **64-bit C arithmetic is computed at 32 bits**
+(`Dialect.toNumConfig .cLike = c32Wrapv` for every C integer type), and a function whose
+`i64`/`u64`/`unsigned` arithmetic leaves the `int` range without hitting a hole or a
+loop would be a wrong answer. The int-only leg could not reach it (`randint(-20, 20)`);
+the typed leg reaches it, and on this sample it lands on a hole and `outOfFuel` only.
+Per-type widths in Core (the exporter already resolves them for `>>`) are the fix.
 
 ## What was *not* measured
 
@@ -378,7 +436,8 @@ unmodelled.
   the `autoform.sh` stages were run.
 * **Conformance percentages at scale.** The 100% figures in `README.md` remain
   `cachetools`-only for Python. The one large-corpus run, SQLite (above), compared 9
-  functions and found a real semantic divergence.
+  functions, found a real semantic divergence (C comparison results as `int`), and after
+  its fix agrees on every conclusive case.
 
 ## Caveats on these runs
 

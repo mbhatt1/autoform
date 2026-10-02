@@ -11,6 +11,7 @@ import Autoform.Overflow
 import Autoform.FuelMono
 import Autoform.CallingConvention
 import Autoform.PyScoping
+import Autoform.CBoolInt
 import Autoform.BoxedContainers
 
 -- The synthesised specification modules. These were NOT in the build until this merge,

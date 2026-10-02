@@ -118,13 +118,22 @@ selects the functions the C leg of `scripts/differential.py` can run without inv
 anything: hole-free, call-closed through candidates only, every parameter and the return
 an integer type, no preprocessor line in the body, no free names, compiled by the default
 amalgamation of the same checkout. **9 of 5,724** qualify (most take a pointer or
-return `void`). Against `cc`, 20 random cases each: **140/170 agree, 30 diverge,
-10 inconclusive**. All 30 divergences are one root cause: Core comparisons return
-`Val.bool` where C returns `int` 0/1 (`isFatalError`, `validJulianDay`). This is a real
-wrong answer, not a printing difference: in a fixture, `int t = (a<b); if (t == 1) return
-7; return 3;` returns 3 in Lean and 7 under `cc`, because Core's `==` on `bool`/`int` is
-false. The 10 inconclusive are `validJulianDay`'s `(i64)0x1a640 << 32`, which Core's
-32-bit `cLike` int holes as `ub:shift count out of range`. See `docs/scale.md`.
+return `void`). Round 1 measured **140/170 agree, 30 diverge, 10 inconclusive** against
+`cc`, and all 30 divergences were one root cause: C's comparison and logical results are
+`int` 0/1, Core's were `Val.bool`, and Core's `==` on `bool`/`int` was false, so
+`int t = (a<b); if (t == 1) return 7; return 3;` returned 3 where `cc` returns 7. Core
+now promotes a `bool` to 0/1 wherever it meets a number under `.cLike`
+(`Dialect.promotesBool`; the C++ rule, unreachable from well-typed Java/Go/Kotlin, which
+share the dialect), and the harness reads a `bool` result as 0/1 (the C return
+conversion). Same sample, same 20 random cases each: **170/170 agree, 0 diverge, 10
+inconclusive**. The C leg is now typed (`csrc/ctypes.json`: real widths, signedness and
+`_Bool`, arguments over each type's full range): **168/168 agree, 12 inconclusive**. The
+inconclusive cases are holes or `outOfFuel` where `cc` has an answer, and both trace to one
+remaining gap: Core computes C `i64`/`u64` arithmetic at 32 bits
+(`validJulianDay`'s `<< 32` holes; `vdbeSorterTreeDepth`'s `i64` loop wraps and runs out
+of fuel). A 15-case fixture, `tests/test_cboolint_cc.py`, pins the fix against `cc`.
+`.cLike` float `%` is now Java's truncated remainder (`-5.5 % 2.0` is `-1.5`), not
+Python's floored one. See `docs/scale.md`.
 
 ## The oracle
 
