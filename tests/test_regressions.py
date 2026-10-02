@@ -236,8 +236,22 @@ OLD_MAIN_DRIVER = textwrap.dedent("""
     spec = importlib.util.spec_from_file_location("rl", sys.argv[1])
     rl = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(rl)
-    # Reconstruct the pre-fix entry point: call _run_main directly on the main
-    # thread at Python's default recursion limit, which is what autoform.sh did.
+    # The fix has two independent halves, and the reconstruction has to undo both.
+    #
+    # (1) The spine walk. `render()` now hands a `.seq` chain to `_render_seq_chain`,
+    #     which walks it with a loop. Before that, `render()` fell through to its
+    #     generic structural case for `.seq` like any other node: one `render` ->
+    #     `render_child` -> `render` round trip per statement. Restore exactly that
+    #     fall-through (it is the tail of `render()`, verbatim).
+    def old_structural_seq(node, col):
+        head, children = rl.SHAPE["s"](node)
+        inner = min(col + rl.INDENT, rl.MAX_INDENT)
+        pad = " " * inner
+        parts = [rl.render_child(c, inner) for c in children]
+        return "(" + head + "\\n" + "\\n".join(pad + p for p in parts) + ")"
+    rl._render_seq_chain = old_structural_seq
+    # (2) The entry point: call _run_main directly on the main thread at Python's
+    #     default recursion limit, which is what autoform.sh did.
     sys.setrecursionlimit(1000)
     sys.argv = ["render_lean.py"] + sys.argv[2:]
     try:
@@ -266,6 +280,56 @@ class TestRenderRecursionDepth:
                            capture_output=True, text=True, timeout=600)
         assert r.returncode == 9, (r.returncode, r.stdout, r.stderr)
         assert "RECURSION_ERROR" in r.stdout
+
+    def test_spine_walk_alone_survives_the_old_entry_point(self, tmp_path, deep_ast):
+        """The iterative spine walk is a fix on its own, not just the big stack.
+
+        Same driver as above -- main thread, 1000-frame limit -- but without undoing
+        the spine walk. If someone deletes `_render_seq_chain`, this fails while the
+        thread-based tests below still pass, so neither half can quietly go."""
+        drv = str(tmp_path / "old_entry_only.py")
+        with open(drv, "w") as fh:
+            fh.write(OLD_MAIN_DRIVER.replace(
+                "rl._render_seq_chain = old_structural_seq\n", ""))
+        r = subprocess.run([sys.executable, drv, RENDER, deep_ast,
+                            str(tmp_path / "Old.lean"), "Deep"],
+                           capture_output=True, text=True, timeout=600)
+        assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+        assert "RECURSION_ERROR" not in r.stdout
+
+    def test_spine_walk_is_byte_identical_to_full_recursion(self, render_lean):
+        """`_render_seq_chain` claims to reproduce `render()`'s old output exactly.
+
+        Compared at a depth the old recursion can still reach, and at several starting
+        columns so both the flat-fits and the must-wrap decisions are exercised."""
+        rl = render_lean
+
+        def old_render(node, kind, col):
+            try:
+                one = rl.flat_capped(node, kind, rl.WIDTH - col)
+                if one is not None:
+                    return one
+            except rl._RawNewline:
+                one = rl.flat(node, kind)
+                if col + len(one) <= rl.WIDTH or "\n" in one:
+                    return one
+            head, children = rl.SHAPE[kind](node)
+            if not children:
+                return head
+            inner = min(col + rl.INDENT, rl.MAX_INDENT)
+            pad = " " * inner
+            parts = []
+            for tag, val in children:
+                if tag in ("e", "s"):
+                    parts.append(old_render(val, tag, inner))
+                else:
+                    parts.append(rl.render_child((tag, val), inner))
+            return "(" + head + "\n" + "\n".join(pad + p for p in parts) + ")"
+
+        for n in (1, 2, 3, 7, 60):
+            body = seq_chain(n)
+            for col in (0, 4, 40, rl.WIDTH - 5):
+                assert rl.render(body, "s", col) == old_render(body, "s", col), (n, col)
 
     def test_fixed_renders_the_same_input(self, tmp_path, deep_ast):
         out = str(tmp_path / "Deep.lean")
