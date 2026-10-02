@@ -1,5 +1,6 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
+import Autoform.Lang.Core.TypedInt
 import Autoform.Lang.Core.Stdlib
 import Autoform.Lang.Core.Boxed
 
@@ -347,7 +348,12 @@ def binopTail (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "!=" => .val (.bool (!Val.beq a b))
   | "&&" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
   | "||" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
-  | _    => .hole s!"binop:{op}"
+  -- A width-typed operator (`"*:i64"`, `"<:u32"`, `"+:j64"`; `TypedInt.lean`) is
+  -- claimed here: none of the literal arms above can match it. Untyped operators are
+  -- `none` there, and keep their hole.
+  | _    => match typedIntBinop op a b with
+            | some r => r
+            | none   => .hole s!"binop:{op}"
 
 /-- The tail of `applyBinop`: operand pairs no typed arm there claims. A `bool` meeting a
 number is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`); everything else is
@@ -750,7 +756,10 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   | "cast:u32", .bool b => .val (.int (if b then 1 else 0))
   | "cast:i64", .bool b => .val (.int (if b then 1 else 0))
   | "cast:u64", .bool b => .val (.int (if b then 1 else 0))
-  | _, _        => .hole s!"unop:{op}"
+  -- `-`/`~` at a typed width (`"-:u32"`, `"~:i64"`; `TypedInt.lean`).
+  | _, _        => match typedIntUnop op a with
+                   | some r => r
+                   | none   => .hole s!"unop:{op}"
 
 /-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
 than against `applyUnop`'s own definition. -/
