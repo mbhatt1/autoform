@@ -230,6 +230,11 @@ def expr_shape(n):
     if k == "listE":  return ".listE", [("es", f('items'))]
     if k == "tupleE": return ".tupleE", [("es", f('items'))]
     if k == "dictE":  return ".dictE", [("ps", f('pairs'))]
+    # `docs/boxed-containers.md` step 3: a Python list/dict DISPLAY is a fresh heap
+    # object. The exporter wraps the `listE`/`dictE` it would have emitted; see
+    # `Expr.boxContainer` (`Syntax.lean`) for why this is a wrapper and not a change to
+    # `listE`/`dictE`, which C aggregate initializers also use.
+    if k == "boxContainer": return ".boxContainer", [("e", f('e'))]
     if k == "cond":   return ".cond", [("e", f('c')), ("e", f('t')), ("e", f('e'))]
     if k == "isOp":   return ".isOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
     if k == "inOp":   return ".inOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
@@ -264,6 +269,8 @@ def stmt_shape(n):
     # --- objects, iteration, exceptions ---
     if k == "setField": return ".setField", [("e", f('r')), ("atom", lean_str(f('f'))), ("e", f('v'))]
     if k == "setIndex": return ".setIndex", [("e", f('r')), ("e", f('i')), ("e", f('v'))]
+    # `del e[i]` (Python only; every other language keeps `op:delete-index`).
+    if k == "delIndex": return ".delIndex", [("e", f('r')), ("e", f('i'))]
     if k == "setDerefIref": return ".setDerefIref", [("e", f('p')), ("e", f('v'))]
     if k == "forIn":    return ".forIn", [("atom", lean_str(f('x'))), ("e", f('e')), ("s", f('body'))]
     if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]
@@ -572,6 +579,16 @@ def render_func(f, nm) -> list:
         variadic.append(f"  , vararg := some {lean_str(f['vararg'])}")
     if f.get("kwarg") is not None:
         variadic.append(f"  , kwarg := some {lean_str(f['kwarg'])}")
+    # Keyword-only / positional-only parameters and default values: emitted only when the
+    # AST records them, for the same byte-identity reason. `defaults` is an ordered list of
+    # `[param, expr]` pairs (a JSON object would make the order a property of the parser).
+    if f.get("kwonly"):
+        variadic.append("  , kwonly := [" + ", ".join(lean_str(p) for p in f["kwonly"]) + "]")
+    if f.get("posonly"):
+        variadic.append("  , posonly := [" + ", ".join(lean_str(p) for p in f["posonly"]) + "]")
+    if f.get("defaults"):
+        pairs = ", ".join(f"({lean_str(p)}, {render(e, 'e', 14)})" for p, e in f["defaults"])
+        variadic.append(f"  , defaults := [{pairs}]")
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",
         f"def {nm} : Func :=",

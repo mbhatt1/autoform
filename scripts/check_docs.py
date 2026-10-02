@@ -43,7 +43,13 @@ CHECKS = [
      "ledger-Cachetools.json", "holeFree", int),
     ("docs/contracts.md", r"On `cachetools`, \d+ of (\d+) functions are",
      "ledger-Cachetools.json", "functions", int),
-    ("docs/languages.md", r"the ledger's population \((\d+) for", 
+    # The conditional figures (docs/contracts.md) are a separate number from the core,
+    # and drift the same way: bind them to the ledger fields they quote.
+    ("docs/contracts.md", r"(\d+) of \d+ functions are conditionally\s+verifiable",
+     "ledger-Cachetools.json", "conditionallyVerifiable", int),
+    ("docs/contracts.md", r"resting on (\d+) named hole assumptions",
+     "ledger-Cachetools.json", "conditionalAssumptions", int),
+    ("docs/languages.md", r"the ledger's population \((\d+) for",
      "ledger-Cachetools.json", "functions", int),
 ]
 

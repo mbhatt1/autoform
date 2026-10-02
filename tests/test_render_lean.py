@@ -14,7 +14,7 @@ import sys
 
 import pytest
 
-from conftest import CARTO, fn, run_script, seq_chain, write_ast
+from conftest import CARTO, ROOT, fn, run_script, seq_chain, write_ast
 
 RENDER = os.path.join(CARTO, "render_lean.py")
 
@@ -132,22 +132,45 @@ class TestRendererRefuses:
         with pytest.raises(ValueError, match="not an object"):
             render_lean.expr("a")
 
-    def test_unknown_extension_is_refused_not_defaulted(self, tmp_path):
+    @pytest.mark.parametrize("ext", [".rs", ".rb", ".cs", ".swift", ".php"])
+    def test_unknown_extension_is_refused_not_defaulted(self, tmp_path, render_lean, ext):
         """Defaulting to Python's floored division for a `.tsx` file gave `-7 % 3 = 2`
-        where TypeScript gives -1. An unknown extension is an error."""
+        where TypeScript gives -1. An unknown extension is an error.
+
+        `.tsx` itself is now known (it maps to `.javascript`, whose `%` truncates), so
+        this uses extensions that are genuinely absent from `DIALECT` -- each of these
+        languages has its own integer semantics (Rust's `%` truncates and panics on
+        overflow, Ruby's floors), none of which any existing dialect is guaranteed to
+        match."""
+        assert ext not in render_lean.DIALECT
         ast = str(tmp_path / "ast-X.json")
-        write_ast(ast, [fn(file="a.tsx")])
+        write_ast(ast, [fn(file="a" + ext)])
         rc, log = run_script(RENDER, ast, str(tmp_path / "X.lean"), "X")
         assert rc != 0
         assert "cannot infer dialect" in log
-        assert ".tsx" in log
+        assert ext in log
 
     @pytest.mark.parametrize("ext,dialect", [
         (".py", ".python"), (".c", ".cLike"), (".cpp", ".cLike"),
-        (".java", ".cLike"), (".ts", ".cLike"), (".go", ".cLike"),
+        (".java", ".cLike"), (".go", ".cLike"),
+        # JS/TS have their own dialect: value-returning `&&`/`||`, unbounded `+`/`*`,
+        # truncating `%`, and IEEE `/` (`Semantics.lean`: `jsIntDiv`/`jsIntMod`).
+        (".js", ".javascript"), (".ts", ".javascript"), (".tsx", ".javascript"),
+        (".jsx", ".javascript"), (".mjs", ".javascript"), (".cjs", ".javascript"),
     ])
     def test_dialect_inference(self, render_lean, ext, dialect):
         assert render_lean.infer_dialect([fn(file="a" + ext)]) == dialect
+
+    def test_every_dialect_the_renderer_emits_exists_in_lean(self, render_lean):
+        """`DIALECT`'s values are pasted into the generated module as
+        `Core.Dialect` constructors. One that Lean does not define fails only at
+        `lake build` time, far from the cause; catch it here."""
+        src = open(os.path.join(ROOT, "Autoform", "Lang", "Core", "Syntax.lean")).read()
+        m = re.search(r"^inductive Dialect where\n((?:\s*\|\s*\w+\n)+)", src, re.M)
+        assert m, "could not find `inductive Dialect` in Syntax.lean"
+        ctors = {"." + c for c in re.findall(r"\|\s*(\w+)", m.group(1))}
+        assert set(render_lean.DIALECT.values()) <= ctors, (
+            set(render_lean.DIALECT.values()) - ctors)
 
     def test_dialect_is_a_majority_vote_not_a_first_hit(self, render_lean):
         funcs = [fn(file="a.c")] * 3 + [fn(file="b.py")]

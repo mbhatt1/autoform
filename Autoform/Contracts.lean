@@ -134,6 +134,7 @@ def substE (σ : Impl) : Expr → Expr
   | .strByte a b   => .strByte (substE σ a) (substE σ b)
   | .strFrom a b   => .strFrom (substE σ a) (substE σ b)
   | .ptrOp o z a b => .ptrOp o z (substE σ a) (substE σ b)
+  | .boxContainer a => .boxContainer (substE σ a)
   | .lit l         => .lit l
   | .name x        => .name x
   | .fnref f       => .fnref f
@@ -161,6 +162,7 @@ def substS (σ : Impl) : Stmt → Stmt
   | .assign x e      => .assign x (substE σ e)
   | .setField r f v  => .setField (substE σ r) f (substE σ v)
   | .setIndex r i v  => .setIndex (substE σ r) (substE σ i) (substE σ v)
+  | .delIndex r i    => .delIndex (substE σ r) (substE σ i)
   | .setDerefIref p v => .setDerefIref (substE σ p) (substE σ v)
   | .seq a b         => .seq (substS σ a) (substS σ b)
   | .ifte c a b      => .ifte (substE σ c) (substS σ a) (substS σ b)
@@ -225,6 +227,7 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .strByte a b   => by rw [substE, substE_nil a, substE_nil b]
   | .strFrom a b   => by rw [substE, substE_nil a, substE_nil b]
   | .ptrOp o z a b => by rw [substE, substE_nil a, substE_nil b]
+  | .boxContainer a => by rw [substE, substE_nil a]
 
 theorem substEL_nil : ∀ es : List Expr, substEL [] es = es
   | []      => rfl
@@ -241,6 +244,7 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .assign x e      => by rw [substS, substE_nil e]
   | .setField r f v  => by rw [substS, substE_nil r, substE_nil v]
   | .setIndex r i v  => by rw [substS, substE_nil r, substE_nil i, substE_nil v]
+  | .delIndex r i    => by rw [substS, substE_nil r, substE_nil i]
   | .setDerefIref p v => by rw [substS, substE_nil p, substE_nil v]
   | .seq a b         => by rw [substS, substS_nil a, substS_nil b]
   | .ifte c a b      => by rw [substS, substE_nil c, substS_nil a, substS_nil b]
@@ -798,7 +802,7 @@ theorem methodkey_refinesUnder_value :
   simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
-    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
+    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf, Val.closParts?]
 
 set_option maxHeartbeats 2000000 in
 /-- **A different contract proves a different theorem.**
@@ -914,11 +918,14 @@ theorem methodkey_refines :
   intro args _
   apply forall_ge_of_forall_add
   intro k
+  -- `Expr.call` now looks for a closure-valued local first (STRATEGY.md §58); with the
+  -- argument list symbolic, the environment `["self"].zip args` is only concrete per case.
+  rcases args with _ | ⟨a, args⟩ <;>
   simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
-    Val.iterable, strKeyed, Heap.get, Heap.alloc]
+    Val.iterable, strKeyed, Heap.get, Heap.alloc, Val.closParts?]
 
 /-- The unconditional theorem needs no satisfiability obligation — there is nothing to
 satisfy. Recorded as a declaration so the contrast with `methodkey_value_result` is

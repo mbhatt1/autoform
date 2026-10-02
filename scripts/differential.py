@@ -66,6 +66,8 @@ if os.environ.get("PYTHONHASHSEED") != "0" and not os.environ.get("AUTOFORM_NO_R
 
 FUEL = 5000
 MAX_TOTAL_CASES = 600      # keep the generated Lean file compile-bounded
+OVERSAMPLE = 40            # record up to this many times n-cases per function, then
+                           # keep n spread across call shapes (`diversify`)
 MAX_DEPTH = 8              # value-encoding depth limit
 MAX_ELEMS = 512            # value-encoding breadth limit (a resource
                            # bound, not a fidelity one: containers are
@@ -108,8 +110,34 @@ def classify(f):
     m = PY_NAME.fullmatch(f["name"])
     if not m: return None
     qual = m.group("qual")
-    if "<" in qual: return None          # <lambda>N, <redefined>N: no stable call site
+    # `<lambda>N` has no stable call site (the index is the exporter's per-file counter,
+    # and nothing in a traced frame says which lambda it is). `<redefined>N` DOES have
+    # one: it is the N-th of several same-named `def`s in one scope, in source order, and
+    # `build_lineno_index` reproduces that numbering from the source. Only a trailing
+    # `<redefined>N` segment is admitted; anything nested inside one stays out.
+    if "<" in REDEFINED.sub("", qual): return None
     return m.group("file"), qual, ("." in qual)
+
+
+REDEFINED = re.compile(r'<redefined>\d+$')
+
+
+def unmapped_reason(name):
+    """Why an AST entry can never be matched to a traced frame, or None if it can.
+
+    Counted in the coverage report rather than left as an unexplained "no case built":
+    a function the harness structurally cannot reach is a different gap from one the
+    test suite simply never called."""
+    if name.endswith(":<module>"):
+        return "module initializer: the module body, never called as a function"
+    m = PY_NAME.fullmatch(name)
+    if not m:
+        return "name not of the form <file>:<module>.<qualname>"
+    if "<lambda>" in m.group("qual"):
+        return "lambda: no stable call site to match a traced frame against"
+    if classify({"name": name}) is None:
+        return "qualified name has no source-level counterpart"
+    return None
 
 
 # ------------------------------------------------------------------ value encoding
@@ -120,6 +148,63 @@ def classify(f):
 
 class Unencodable(Exception):
     pass
+
+
+# Classes whose single base is a builtin type, by short class name, exactly as Core's
+# `Program.builtinBases` holds them (filled by `main` from the AST's `classBases`, with
+# the same drop-on-conflict rule as `render_lean.py`). Core turns an instance of such a
+# class into `Val.bobj cls payload`; the encoder must do the same with a CPython instance,
+# or the oracle compares a value that has lost its class against one that kept it.
+BUILTIN_BASES = {}
+
+# Mirror of `Core.builtinBaseRefusedDunders` (Semantics.lean). Core refuses to build a
+# `bobj` for a class overriding any of these, because every one names an operation Core
+# performs on the payload directly; an instance of such a class handed to Core *as* a
+# `bobj` would have the override silently bypassed, so the encoder refuses it too.
+BUILTIN_BASE_REFUSED_DUNDERS = (
+    "__init__", "__eq__", "__new__", "__ne__", "__getitem__", "__len__", "__iter__",
+    "__contains__", "__bool__", "__getattribute__")
+
+_BUILTIN_BASE_TYPES = {"tuple": tuple, "list": list, "dict": dict, "str": str}
+
+
+def builtin_bases_of(funcs):
+    """`{short class name: base}` from the AST's `classBases`, dropping any name that two
+    entries give different bases -- the rule `render_lean.py` applies, so the harness
+    and the rendered `Program.builtinBases` agree by construction."""
+    bases, conflicts = {}, set()
+    for f in funcs:
+        for cls, base in sorted((f.get("classBases") or {}).items()):
+            if cls in bases and bases[cls] != base:
+                conflicts.add(cls)
+            bases[cls] = base
+    for c in conflicts:
+        bases.pop(c, None)
+    return {c: b for c, b in bases.items() if b in _BUILTIN_BASE_TYPES}
+
+
+def builtin_base_of(v):
+    """`(short class name, builtin type)` when `v` is an instance of a class Core models
+    as `Val.bobj`, else None. Raises `Unencodable` for an instance Core *would* model as a
+    `bobj` but only by bypassing one of its overrides."""
+    t = type(v)
+    if t in (bool, int, str, list, tuple, dict) or t.__name__ not in BUILTIN_BASES:
+        return None
+    base = _BUILTIN_BASE_TYPES[BUILTIN_BASES[t.__name__]]
+    if t.__bases__ != (base,):
+        # Same short name, different shape (another module's class, a transitive or a
+        # multiple base). Core keys `builtinBases` by short name and cannot tell them
+        # apart, so neither encoding is known to be the one Core would use.
+        raise Unencodable("builtin-base-mismatch:%s" % t.__name__)
+    for d in BUILTIN_BASE_REFUSED_DUNDERS:
+        if d in t.__dict__:
+            raise Unencodable("builtin-base-override:%s.%s" % (t.__name__, d))
+    return t.__name__, base
+
+
+# Top-level package names of the corpus (set by `trace_tests` from the AST's files).
+# None means "treat every class as the corpus's own".
+CORPUS_PACKAGES = None
 
 
 class Encoder:
@@ -143,20 +228,46 @@ class Encoder:
         self.byid = {}          # id(obj) -> ref index
         self.objs = {}          # ref index -> the live object (keeps ids alive)
         self.pin = set()        # ids present before the result was encoded
+        self.captured = {}      # ref index -> [(name, Val)]: `Obj.captured`
 
     def enc(self, v, depth=0, in_key=False):
         if depth > MAX_DEPTH: raise Unencodable("depth")
         if v is None: return ("unit",)
+        bb = builtin_base_of(v)
+        if bb is not None:
+            # `class _HashedTuple(tuple)`: CPython's instance IS a tuple *and* a
+            # `_HashedTuple`. Encode both halves -- the class Core keeps in `Val.bobj` and
+            # the payload as the base type sees it. Instance attributes (the memoised
+            # `_HashedTuple__hashvalue`) are not carried: a `bobj` has none, and Core
+            # answers every attribute read on one with the hole `field:<f>:non-object`,
+            # so the omission can produce a hole and never an answer.
+            # The payload is read through the BASE type's own methods, so no override on
+            # the subclass (`__str__`, `keys`, ...) can change what is encoded.
+            name, base = bb
+            raw = {tuple: lambda x: tuple(tuple.__iter__(x)), list: list.copy,
+                   dict: dict.copy, str: str.__str__}[base](v)
+            return ("bobj", name, self.enc(raw, depth + 1, in_key))
         if isinstance(v, bool): return ("bool", v)
         if isinstance(v, int): return ("int", v)
         if isinstance(v, str): return ("str", v)
+        if type(v) is float:
+            # Core has had `Val.float` (an IEEE-754 bit pattern, `Core/Float.lean`) since
+            # before this encoder learned it; `Fl.ofBits`'s docstring names this harness
+            # as the producer. Refusing floats as "value model" kept every TTLCache method
+            # whose timer reads `time.monotonic()` out of the oracle for a gap that no
+            # longer existed. Encoded by bit pattern, so the comparison is exact.
+            # As a dict KEY a float is refused: CPython merges `1` and `1.0` into one
+            # key by `__hash__`/`__eq__`, and that is not what this comparison checks.
+            if in_key: raise Unencodable("float-as-dict-key")
+            return ("float", float_bits(v))
         if isinstance(v, (list, tuple)):
-            # Subclasses (`_HashedTuple`, `OrderedDict`) encode structurally: that is
-            # faithful for every operation Core can perform on data it was *handed*
-            # (index, len, membership, iteration order). Where Core instead *allocates*
-            # such a value itself it produces a `Val.ref`, and that shape disagreement
-            # is ruled INCONCLUSIVE at comparison time rather than refused here — see
-            # `compare_outcome`.
+            # Subclasses Core does NOT model as `Val.bobj` (stdlib classes such as
+            # `OrderedDict`, and corpus classes the exporter recorded no base for) encode
+            # structurally: that is faithful for every operation Core can perform on data
+            # it was *handed* (index, len, membership, iteration order). Where Core
+            # instead *allocates* such a value itself it produces a `Val.ref`, and that
+            # shape disagreement is ruled INCONCLUSIVE at comparison time rather than
+            # refused here. Recorded classes (`_HashedTuple`) took the `bobj` branch above.
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             k = "tuple" if isinstance(v, tuple) else "list"
             return (k, [self.enc(x, depth + 1, in_key) for x in v])
@@ -170,12 +281,42 @@ class Encoder:
             # case is refused rather than compared.
             return ("dict", [(self.enc(k, depth + 1, True),
                               self.enc(x, depth + 1, in_key)) for k, x in v.items()])
+        # (the module test comes first: `getattr` on an arbitrary object runs its
+        # `__getattr__`, which a traced corpus is free to make raise or mutate state)
+        if type(v).__module__ in ("types", "typing") and \
+                isinstance(getattr(v, "__origin__", None), type):
+            # `Cls[int, int]`: a parameterised alias of a class. Instantiating through
+            # one stores it as `__orig_class__` on the instance, and `vars()` on the
+            # alias forwards to the CLASS's namespace, so it used to be snapshotted as
+            # an object whose fields were the class's methods and properties -- and
+            # refused, taking every `TLRUCache[int, int, int](...)` receiver with it. It
+            # is a type reference, encoded as one (Core models those by name).
+            n = getattr(v.__origin__, "__qualname__", None)
+            if n: return ("fn", n)
+            raise Unencodable("callable:%s" % type(v).__name__)
         if isinstance(v, type) or inspect.isroutine(v) or isinstance(v, (
                 staticmethod, classmethod, property, functools.partial)):
             # `METHOD_REF`/`TYPE_REF` values: Core models them by name only.
             n = getattr(v, "__qualname__", None) or getattr(v, "__name__", None)
             if n: return ("fn", n)
-            raise Unencodable("callable")
+            # `inspect.isroutine` is true of ANY object whose class defines `__get__`
+            # without `__set__` -- which includes an instance of a user-defined
+            # descriptor class (cachetools' `_DescriptorBase` subclasses). Such an
+            # instance has no name because it is not a function: it is an ordinary
+            # object with fields, and refusing it as "callable" kept every
+            # `_DescriptorBase.__init__` call out of the oracle. Only instances that
+            # would otherwise be refused are rerouted; nothing that encoded as a
+            # function before changes encoding.
+            if (not isinstance(v, (type, staticmethod, classmethod, property,
+                                   functools.partial))
+                    and not (inspect.isfunction(v) or inspect.ismethod(v)
+                             or inspect.isbuiltin(v))
+                    and hasattr(v, "__dict__")
+                    and type(v).__module__ != "builtins"):
+                if in_key:
+                    raise Unencodable("object-as-dict-key")
+                return ("ref", self.alloc(v, depth))
+            raise Unencodable("callable:%s" % type(v).__name__)
         # a callable *instance* is still an object with fields — encode it as one
         if isinstance(v, (float, complex, bytes, frozenset, set)):
             raise Unencodable(type(v).__name__)
@@ -187,8 +328,9 @@ class Encoder:
         """Snapshot a plain Python object into the heap. Cycles resolve to the same
         ref, which is exactly the identity semantics `Val.ref` has."""
         if id(obj) in self.byid: return self.byid[id(obj)]
-        if isinstance(obj, type) or inspect.isroutine(obj):
-            raise Unencodable("callable")
+        if isinstance(obj, type) or inspect.isfunction(obj) or inspect.ismethod(obj) \
+                or inspect.isbuiltin(obj):
+            raise Unencodable("callable:%s" % type(obj).__name__)
         fields = {}
         if hasattr(obj, "__dict__"):
             fields.update(vars(obj))
@@ -206,6 +348,18 @@ class Encoder:
         self.objs[idx] = obj
         out = [(str(k), self.enc(val, depth + 1)) for k, val in fields.items()]
         self.heap[idx] = (type(obj).__name__, out)
+        # An instance of a class defined INSIDE a function: Core gives the object the
+        # bindings its class captured (`Obj.captured`), and dispatches its methods as
+        # closures over them. Without this the methods ran with their free variables
+        # unbound -- and Core resolves an unbound name to any same-suffix function or to
+        # `unit`, so the replay manufactured answers CPython never computed.
+        # Only for classes the corpus defines: a test-suite class's methods are not in
+        # the translated program, so there is nothing for its captures to be read by.
+        mod = getattr(type(obj), "__module__", "") or ""
+        ours = CORPUS_PACKAGES is None or mod.split(".")[0] in CORPUS_PACKAGES
+        cap = class_captures(type(obj)) if ours else []
+        if cap:
+            self.captured[idx] = [(n, self.enc(v, depth + 1)) for n, v in cap]
         return idx
 
     def freeze(self):
@@ -224,14 +378,22 @@ class Encoder:
         return r
 
 
+def float_bits(x):
+    """The IEEE-754 binary64 bit pattern of a Python float."""
+    import struct
+    return struct.unpack("<Q", struct.pack("<d", x))[0]
+
+
 def lean_val(v):
     t = v[0]
     if t == "unit": return "Val.unit"
+    if t == "float": return "Val.float (Fl.ofBits %d)" % v[1]
     if t == "bool": return "Val.bool " + ("true" if v[1] else "false")
     if t == "int":  return "Val.int (%d)" % v[1]
     if t == "str":  return "Val.str " + json.dumps(v[1])
     if t == "ref":  return "Val.ref (base + %d)" % v[1]
     if t == "fn":   return "Val.fn " + json.dumps(v[1])
+    if t == "bobj": return "Val.bobj %s (%s)" % (json.dumps(v[1]), lean_val(v[2]))
     if t in ("list", "tuple"):
         return "Val.%s [%s]" % (t, ", ".join(lean_val(x) for x in v[1]))
     if t == "dict":
@@ -240,14 +402,55 @@ def lean_val(v):
     raise Unencodable(t)
 
 
-def lean_heap(heap):
+def lean_heap(heap, captured=None):
     # named fields, not `⟨…⟩`: `Obj` has grown a field before (`captured`) and
     # anonymous-constructor literals fail the whole run when it happens again
+    captured = captured or {}
+
+    def binds(kvs):
+        return ", ".join("(%s, %s)" % (json.dumps(k), lean_val(val)) for k, val in kvs)
+
+    def cap(i):
+        # JSON round-trips turn int keys into strings; accept either
+        c = captured.get(i, captured.get(str(i)))
+        return ", captured := [%s]" % binds(c) if c else ""
     return "[%s]" % ", ".join(
-        "{ cls := %s, fields := [%s] }"
-        % (json.dumps(cls), ", ".join("(%s, %s)" % (json.dumps(k), lean_val(val))
-                                      for k, val in fields))
-        for cls, fields in heap)
+        "{ cls := %s, fields := [%s]%s }" % (json.dumps(cls), binds(fields), cap(i))
+        for i, (cls, fields) in enumerate(heap))
+
+
+def closure_cells(fn):
+    """[(name, value)] a function closes over, without `__class__`.
+
+    `__class__` is the cell `super()` reads; Core has no such binding and holes on
+    `super` itself, so it is not part of what a replay must supply."""
+    code = getattr(fn, "__code__", None)
+    cells = getattr(fn, "__closure__", None) or ()
+    if code is None or not cells:
+        return []
+    out = []
+    for n, c in zip(code.co_freevars, cells):
+        if n == "__class__": continue
+        try:
+            out.append((n, c.cell_contents))
+        except ValueError:
+            raise Unencodable("closure-cell-empty")
+    return out
+
+
+def class_captures(cls):
+    """The bindings a class defined inside a function captured: the union of its
+    methods' closure cells, over its MRO. Empty for a module-level class."""
+    seen = {}
+    for c in cls.__mro__:
+        if c is object: continue
+        for v in vars(c).values():
+            if isinstance(v, (staticmethod, classmethod)): v = v.__func__
+            if isinstance(v, property): v = v.fget
+            if inspect.isfunction(v):
+                for n, x in closure_cells(v):
+                    seen.setdefault(n, x)
+    return list(seen.items())
 
 
 # ------------------------------------------------------------------- repr parsing
@@ -255,7 +458,9 @@ def lean_heap(heap):
 # We cannot edit the Lean sources, so we parse Lean's derived `Repr` output. It is
 # emitted on one line (`Format.pretty` at a huge width) and fully parenthesised.
 
-TOKEN = re.compile(r'\s*("(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z0-9_.!?]*|-?\d+|[()\[\],])')
+# `{`, `}` and `:=` are for structure instances, which `Val.float`'s `Fl` payload
+# prints as (`{ fmt := { prec := 53, ... }, bits := 4611686018427387904 }`).
+TOKEN = re.compile(r'\s*("(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z0-9_.!?]*|-?\d+|:=|[()\[\],{}])')
 
 
 def tokenize(s):
@@ -293,6 +498,14 @@ class P:
                     self.next(); items.append(self.atom())
             self.expect("]")
             return ("seq", items)
+        if tok == "{":
+            self.next(); rec = {}
+            while self.peek() != "}":
+                k = self.next(); self.expect(":=")
+                rec[k] = self.atom()
+                if self.peek() == ",": self.next()
+            self.expect("}")
+            return ("record", rec)
         if re.fullmatch(r'-?\d+', tok):
             self.next(); return ("int", int(tok))
         if tok.startswith('"'):
@@ -328,6 +541,13 @@ class P:
         if qual == "Val.bool":  return ("bool", arg[1])
         if qual == "Val.ref":   return ("ref", arg[1])
         if qual == "Val.fn":    return ("fn", arg[1])
+        if qual == "Val.float":
+            fmt = arg[1].get("fmt", ("record", {}))[1]
+            # only binary64 is a Python float; any other format is reported, not read
+            if (fmt.get("prec"), fmt.get("emax"), fmt.get("expBits")) != \
+                    (("int", 53), ("int", 1023), ("int", 11)):
+                return ("float-format", repr(fmt))
+            return ("float", arg[1]["bits"][1])
         if qual == "Val.list":  return ("list", arg[1])
         if qual == "Val.tuple": return ("tuple", arg[1])
         if qual == "Val.dict":
@@ -350,21 +570,25 @@ def parse_result(line):
 
 # ---------------------------------------------------------------------- comparison
 
-def unwrap_bobj(v):
-    """A `Val.bobj cls payload` compares as its payload.
+def same_bobj(py, ln, base):
+    """Compare two sides of which at least one is a `bobj`: `None` when neither is.
 
-    `class _HashedTuple(tuple)` translates to `Val.bobj "_HashedTuple" (tuple …)`, and
-    Core's `Val.beq` compares such a value BY CONTENTS, ignoring the class — which is
-    CPython's answer for a builtin subclass that does not override `__eq__`
-    (`hashkey(0) == (0,)` is `True`). CPython hands the oracle a plain tuple, so comparing
-    the payload is the same relation the semantics implements, not a convenience.
+    `class _HashedTuple(tuple)` translates to `Val.bobj "_HashedTuple" (tuple ...)`, and
+    the encoder turns CPython's `_HashedTuple` instance into the same shape (see
+    `builtin_base_of`). So both halves are compared: the **class**, because `type(k)`,
+    `isinstance(k, _HashedTuple)` and the class's own methods (`__add__`) observe it, and
+    the **payload**, structurally.
 
-    Before this the harness had no `bobj` case at all: `hashkey` and `methodkey` came back
-    `representation:value-vs-object` and were counted INCONCLUSIVE — the oracle refusing to
-    look at a value Core had been fixed to produce correctly."""
-    while isinstance(v, tuple) and len(v) == 3 and v[0] == "bobj":
-        v = v[2]
-    return v
+    The harness used to strip the Lean side's class and compare the payload against a
+    CPython value encoded *without* its class. That agreed with Core's `Val.beq` (which
+    ignores the class, as `tuple.__eq__` does) but it also scored a Core answer that had
+    lost the class -- a plain `tuple` where CPython returns a `_HashedTuple` -- as
+    agreement, and the reverse. A class on one side only is now a divergence."""
+    if py[0] != "bobj" and ln[0] != "bobj":
+        return None
+    if py[0] != "bobj" or ln[0] != "bobj":
+        return False
+    return py[1] == ln[1] and same(py[2], ln[2], base)
 
 
 def same(py, ln, base):
@@ -373,7 +597,9 @@ def same(py, ln, base):
     Dicts compare order-insensitively: Core's `Val.dict` is an association list whose
     order is observable, but Python's insertion order is not part of the contract we
     are checking here, and pretending otherwise would manufacture divergences."""
-    ln = unwrap_bobj(ln)
+    sb = same_bobj(py, ln, base)
+    if sb is not None:
+        return sb
     if py[0] != ln[0]:
         # Core has no separate tuple/list distinction at some call sites; still, do not
         # paper over it — report as a mismatch.
@@ -381,6 +607,13 @@ def same(py, ln, base):
     t = py[0]
     if t in ("unit",): return True
     if t in ("int", "bool", "str"): return py[1] == ln[1]
+    if t == "float":
+        # Bit-exact, which is stricter than CPython's `==` in the one place that is
+        # observable: `0.0` and `-0.0` compare equal but print differently. Any NaN
+        # matches any NaN: the payload is not something a Python program can read
+        # without `struct`, and Core is entitled to canonicalise it.
+        nan = lambda b: (b >> 52) & 0x7FF == 0x7FF and b & ((1 << 52) - 1) != 0
+        return py[1] == ln[1] or (nan(py[1]) and nan(ln[1]))
     if t == "fn":
         # `Val.fn` names are spelled differently on the two sides: CPython reports a
         # `__qualname__` (`TTLCache._Link`), Joern a fully-qualified one
@@ -414,8 +647,16 @@ def same(py, ln, base):
 
 
 def shape_clash(py, ln):
-    """True when the two sides disagree about value-vs-object representation."""
-    ln = unwrap_bobj(ln)
+    """True when the two sides disagree about value-vs-object representation.
+
+    A `bobj` on both sides recurses into the payloads. A `bobj` on ONE side is not a
+    representation clash: the class is in `BUILTIN_BASES`, so Core and the oracle both
+    model it as a builtin-based value, and an opaque `ref` (or a bare container) on the
+    other side is a real disagreement for `same` to report."""
+    if py[0] == "bobj" and ln[0] == "bobj":
+        return shape_clash(py[2], ln[2])
+    if py[0] == "bobj" or ln[0] == "bobj":
+        return False
     containers = ("list", "tuple", "dict")
     if py[0] == "ref" and ln[0] in containers: return True
     if ln[0] == "ref" and py[0] in containers: return True
@@ -428,10 +669,14 @@ def shape_clash(py, ln):
 def show(v):
     t = v[0]
     if t == "unit": return "unit"
+    if t == "float":
+        import struct
+        return "float %r" % struct.unpack("<d", struct.pack("<Q", v[1]))[0]
     if t in ("int", "bool", "str", "fn", "ref"): return "%s %r" % (t, v[1])
     if t in ("list", "tuple"): return "%s[%s]" % (t, ", ".join(show(x) for x in v[1]))
     if t == "dict": return "{%s}" % ", ".join("%s: %s" % (show(a), show(b))
                                               for a, b in v[1])
+    if t == "bobj": return "%s(%s)" % (v[1], show(v[2]))
     return str(v)
 
 
@@ -516,27 +761,108 @@ def build_lineno_index(src_root, wanted_files):
             tree = pyast.parse(open(path, encoding="utf-8").read(), path)
         except (SyntaxError, OSError, UnicodeDecodeError):
             continue
-        stack = []
+        defs = []              # [qual, lines, enclosing def entry] in source order
 
-        def walk(node, prefix, cls):
+        def walk(node, prefix, cls, parent):
             for ch in pyast.iter_child_nodes(node):
                 if isinstance(ch, (pyast.FunctionDef, pyast.AsyncFunctionDef)):
                     qual = prefix + mangle(ch.name, cls)
                     # decorators shift co_firstlineno to the first decorator line
                     lines = [ch.lineno] + [d.lineno for d in ch.decorator_list]
-                    for ln in lines:
-                        idx.setdefault((os.path.abspath(path), ln), (rel, qual))
+                    entry = [qual, lines, parent, ch.name]
+                    defs.append(entry)
                     # a nested def does not change the mangling class
-                    walk(ch, qual + ".", cls)
+                    walk(ch, qual + ".", cls, entry)
                 elif isinstance(ch, pyast.ClassDef):
-                    walk(ch, prefix + ch.name + ".", ch.name)
+                    walk(ch, prefix + ch.name + ".", ch.name, parent)
                 else:
-                    walk(ch, prefix, cls)
-        walk(tree, "", None)
+                    walk(ch, prefix, cls, parent)
+        walk(tree, "", None, None)
+        # Same-named `def`s in one scope (`if ...: def f` / `else: def f`). The exporter
+        # keeps the LAST under the plain name and numbers the earlier ones
+        # `f<redefined>0`, `f<redefined>1`, ... in source order -- checked against
+        # cachetools' `cached.decorator.make_info`, whose three bodies differ. Keying all
+        # of them on the plain name (what this index used to do) attributed calls to the
+        # first two bodies to the third body's translation: a wrong-function comparison.
+        by_qual = {}
+        for e in defs:
+            by_qual.setdefault(e[0], []).append(e)
+        renamed = {}
+        for qual, es in by_qual.items():
+            for i, e in enumerate(es[:-1]):
+                renamed[id(e)] = "%s<redefined>%d" % (qual, i)
+        for e in defs:
+            qual, lines, parent, raw = e
+            # A def nested inside a shadowed def: no tracked corpus pins down the
+            # exporter's name for it, so it is not indexed. An unmatched call is counted
+            # as unexercised; a mismatched one would compare the wrong function.
+            p = parent
+            while p is not None and id(p) not in renamed:
+                p = p[2]
+            if p is not None: continue
+            qual = renamed.get(id(e), qual)
+            for ln in lines:
+                # Keyed on the code object's NAME as well as its first line. Line alone
+                # matched the module's own code object (`<module>`, first line 1) to
+                # whatever `def` sits on line 1, and recorded a module import as a call
+                # to that function with no arguments.
+                idx.setdefault((os.path.abspath(path), ln, raw), (rel, qual))
     return idx
 
 
 VARARGS, VARKW = 0x04, 0x08
+# CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR
+GENERATOR_FLAGS = 0x20 | 0x80 | 0x200
+
+_NORMAL_EXIT = ("RETURN_VALUE", "RETURN_CONST")
+
+
+def exit_kind(frame):
+    """How a traced frame is leaving, at its `return` trace event.
+
+    `settrace` delivers `return` both for a real `return` and for a frame unwinding
+    because an exception escaped it, with `arg is None` in the second case -- and also
+    in the first, whenever the function returns `None`. The instruction the frame is
+    stopped at tells them apart: a normal exit is at a return opcode, an unwinding one
+    at the instruction that raised (or `RERAISE`). Checked on CPython 3.10-3.13.
+    Anything else is reported, not guessed."""
+    import dis
+    try:
+        op = dis.opname[frame.f_code.co_code[frame.f_lasti]]
+    except (IndexError, TypeError, AttributeError):
+        return "unknown-instruction"
+    return "return" if op in _NORMAL_EXIT else "raise"
+
+
+def receiver_param(order, ast_params):
+    """The frame parameter that Core binds as the receiver, or None.
+
+    A leading `self` is a receiver only when the AST bound it as one, i.e. it is
+    absent from the AST's parameter list. The exporter keeps `self` as an ordinary
+    first parameter on NESTED functions that merely name it so (STRATEGY.md 49:
+    `_locked.wrapper(self, *args, **kwargs)`, `keys.methodkey(self, ...)`), and
+    stripping it there refused every call as a parameter mismatch."""
+    names = [n for n, _ in order]
+    if not names or names[0] != "self":
+        return None
+    if ast_params is not None and names == list(ast_params):
+        return None
+    return "self"
+
+
+def class_key(cls):
+    """`module:qualname` of a class, with the `<locals>` segments dropped so it lines
+    up with the exporter's qualified names. Keying live instances on `__name__` alone
+    conflated the six distinct nested classes cachetools calls `Wrapper`, so a sibling
+    method was synthesized against an instance of a different class."""
+    q = getattr(cls, "__qualname__", cls.__name__).replace("<locals>.", "")
+    return "%s:%s" % (getattr(cls, "__module__", "?"), q)
+
+
+def module_of(rel):
+    """Dotted module name for a corpus-relative path (`a/b/__init__.py` -> `a.b`)."""
+    mod = rel[:-3].replace("/", ".").replace("\\", ".") if rel.endswith(".py") else rel
+    return mod[:-9] if mod.endswith(".__init__") else mod
 
 
 def frame_param_order(code):
@@ -618,17 +944,30 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
     the arguments cannot corrupt it."""
     records = []
     counts = {}
-    live_files = set(p for (p, _) in index)
+    # Per-function account of every traced call: how many the suite made, how many
+    # were recorded, and why each of the rest was refused. A refused call used to be
+    # visible only as a global counter (`skip_unencodable_args: 12002933`), so a
+    # function whose every call was refused showed up in the coverage report as "no
+    # case built" -- indistinguishable from one the suite never called.
+    ledger = stats.setdefault("trace_ledger", {})
+    global CORPUS_PACKAGES
+    CORPUS_PACKAGES = set(module_of(rel).split(".")[0] for rel, _ in index.values()) \
+        or None
+
+    def refuse(key, reason):
+        e = ledger.setdefault(key, {"calls": 0, "recorded": 0, "over_quota": 0,
+                                    "refused": {}})
+        e["refused"][reason] = e["refused"].get(reason, 0) + 1
 
     params_by_name = params_by_name if params_by_name is not None else {}
-    live = live if live is not None else {}        # class name -> live instances
+    live = live if live is not None else {}        # class key -> live instances
     pool = pool if pool is not None else {}        # parameter name -> live values
 
     def snapshot(frame, qual, key):
         code = frame.f_code
         order = frame_param_order(code)
         loc = frame.f_locals
-        self_name = order[0][0] if order and order[0][0] == "self" else None
+        self_name = receiver_param(order, params_by_name.get(key))
         enc = Encoder()
         try:
             slf, args = bind_args(order, loc, enc, params_by_name.get(key), self_name)
@@ -636,26 +975,55 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
             stats["skip_param_mismatch"] = stats.get("skip_param_mismatch", 0) + 1
             r = stats.setdefault("param_mismatch_detail", {})
             r[qual] = e.args[0]
+            refuse(key, "param-mismatch: %s" % e.args[0])
             return None
         except (Unencodable, KeyError) as e:
             stats["skip_unencodable_args"] += 1
             r = stats.setdefault("unencodable_reasons", {})
-            k = "%s: %s" % (qual, e.args[0] if e.args else type(e).__name__)
+            why = e.args[0] if e.args else type(e).__name__
+            k = "%s: %s" % (qual, why)
             r[k] = r.get(k, 0) + 1
+            refuse(key, "unencodable-arg: %s" % why)
             return None
         if self_name is not None:
-            if slf is None or slf[0] != "ref":
-                # e.g. a `tuple` subclass: the receiver is a value, not an object with
-                # fields, and Core has no such receiver.
+            if slf is None or slf[0] not in ("ref", "bobj"):
+                # e.g. a `tuple` subclass Core has no `builtinBases` entry for: the
+                # receiver is a value, not an object with fields, and Core has no such
+                # receiver. A recorded one (`_HashedTuple`) encodes as `bobj`, which is
+                # exactly the receiver `Expr.mcall` binds for a method on it.
                 stats["skip_self_not_object"] = \
                     stats.get("skip_self_not_object", 0) + 1
+                refuse(key, "self-not-object")
                 return None
             # keep the live receiver: it is the only way to exercise sibling methods
             # the suite never calls (see `constructed_cases`)
             inst = loc[self_name]
-            bucket = live.setdefault(type(inst).__name__, [])
+            bucket = live.setdefault(class_key(type(inst)), [])
             if len(bucket) < 4 and not any(o is inst for o in bucket):
                 bucket.append(inst)
+        # A CLOSURE reads free variables the call does not pass. Replaying it by name
+        # alone left them unbound, and Core answers an unbound name with any function
+        # whose name has that dotted suffix (or `unit`) -- `_locked.wrapper`'s `cache`
+        # became `_WrapperBase.cache` and the run reported six "divergences" the
+        # harness had manufactured. Supply them, or refuse the call.
+        free = [v for v in code.co_freevars if v != "__class__"]
+        cap = None
+        if free:
+            if self_name is not None:
+                # a method: Core reads the captures off the receiver (`Obj.captured`),
+                # which `Encoder.alloc` fills from the class's own closure cells
+                have = set(n for n, _ in enc.captured.get(slf[1], ()))
+                if not set(free) <= have:
+                    refuse(key, "closure: receiver's class captures do not cover %s"
+                           % sorted(set(free) - have))
+                    return None
+            else:
+                try:
+                    cap = [(v, enc.enc(loc[v])) for v in free]
+                except (Unencodable, KeyError) as e:
+                    why = e.args[0] if e.args else type(e).__name__
+                    refuse(key, "unencodable-capture: %s" % why)
+                    return None
         for (n, kind) in order:
             if n == self_name: continue
             b = pool.setdefault(n, [])
@@ -664,7 +1032,7 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
                     if not any(o is loc[n] for o in b): b.append(loc[n])
                 except KeyError:
                     pass
-        return enc, slf, args
+        return enc, slf, args, cap
 
     # frames have no user-writable slot, so carry per-call state keyed by frame id
     state_by_frame = {}
@@ -676,38 +1044,83 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
             st["exn"] = arg[0].__name__
         elif event == "return":
             rec = st["rec"]
-            if arg is None and st.get("exn"):
+            key = rec["name"]
+            how = exit_kind(frame)
+            if how == "raise" and st.get("exn"):
                 rec["outcome"] = ("exn", st["exn"])
-            else:
+            elif how == "return":
+                # NOT "an exception event was seen and the result is None": that read
+                # `try: d[k] except KeyError: pass` -- which returns None -- as raising
+                # KeyError, and every such call became a manufactured divergence.
                 try:
                     rec["outcome"] = ("val", st["enc"].enc_result(arg))
-                except Unencodable as e:
+                except Exception as e:                      # noqa: BLE001
+                    # (any exception, for the reason given in `tracer2`)
+                    if not isinstance(e, Unencodable):
+                        e = Unencodable("recorder-error: %s" % type(e).__name__)
                     stats["skip_unencodable_ret"] += 1
                     r = stats.setdefault("unencodable_reasons", {})
-                    k = "%s: result %s" % (rec["name"].split(".")[-1],
-                                           e.args[0] if e.args else "?")
+                    why = e.args[0] if e.args else "?"
+                    k = "%s: result %s" % (key.split(".")[-1], why)
                     r[k] = r.get(k, 0) + 1
+                    refuse(key, "unencodable-result: %s" % why)
                     rec = None
+            else:
+                refuse(key, "exit-undetermined: %s" % how)
+                rec = None
             state_by_frame.pop(id(frame), None)
-            if rec is not None: records.append(rec)
+            if rec is not None:
+                records.append(rec)
+                ledger[key]["recorded"] += 1
+            else:
+                # Give the quota slot back: a call whose RESULT could not be encoded
+                # used to consume one of the function's `limit_per_fn` slots, so a
+                # function whose first few calls returned something unencodable was
+                # never recorded at all, however many encodable calls followed.
+                counts[key] -= 1
         return local2
 
     def tracer2(frame, event, arg):
         if event != "call": return None
         code = frame.f_code
-        hit = index.get((os.path.abspath(code.co_filename), code.co_firstlineno))
+        hit = index.get((os.path.abspath(code.co_filename), code.co_firstlineno,
+                         code.co_name))
         if hit is None: return None
         rel, qual = hit
         key = "%s:<module>.%s" % (rel, qual)
-        if key not in wanted or counts.get(key, 0) >= limit_per_fn: return None
-        snap = snapshot(frame, qual, key)
+        if key not in wanted: return None
+        e = ledger.setdefault(key, {"calls": 0, "recorded": 0, "over_quota": 0,
+                                    "refused": {}})
+        if code.co_flags & GENERATOR_FLAGS:
+            # A generator's frame starts at the first `next()`, not at the call, and
+            # its `return` event fires at every `yield`: the "outcome" recorded was a
+            # yielded element, once per element. A call returns a generator object,
+            # which the harness cannot encode -- so the frame is refused, and counted.
+            # The count is of frame entries (first `next()` and every resumption), not
+            # of calls: settrace cannot tell the two apart without keeping frames alive.
+            refuse(key, "generator: a call returns a generator object "
+                        "(count is frame entries, not calls)")
+            return None
+        e["calls"] += 1
+        if counts.get(key, 0) >= limit_per_fn:
+            e["over_quota"] += 1
+            return None
+        try:
+            snap = snapshot(frame, qual, key)
+        except Exception as ex:                             # noqa: BLE001
+            # An exception escaping a trace function propagates INTO THE TRACED
+            # PROGRAM: a recorder fault fails the corpus's own test, the suite exits 1
+            # and the run quietly reports fewer cases. Count it against the function
+            # and let the suite carry on.
+            refuse(key, "recorder-error: %s" % type(ex).__name__)
+            return None
         if snap is None: return None
-        enc, slf, args = snap
+        enc, slf, args, cap = snap
         counts[key] = counts.get(key, 0) + 1
         enc.freeze()
         state_by_frame[id(frame)] = {
             "rec": {"name": key, "heap": enc.heap, "self": slf, "args": args,
-                    "outcome": None},
+                    "outcome": None, "cap": cap, "captured": enc.captured},
             "enc": enc, "exn": None}
         return local2
 
@@ -878,6 +1291,10 @@ def _direct_cases(fn, f, pool, ncases, out):
         enc = Encoder()
         try:
             eargs = [enc.enc(a) for a in argv]
+            # a factory-produced function is a CLOSURE: replaying it by name alone
+            # leaves its free variables unbound in Core (see `closure_cells`)
+            cap = [(n, enc.enc(v)) for n, v in closure_cells(fn)] \
+                if closure_cells(fn) else None
         except Unencodable:
             return made
         enc.freeze()
@@ -892,7 +1309,8 @@ def _direct_cases(fn, f, pool, ncases, out):
         except Exception as e:                              # noqa: BLE001
             outcome = ("exn", type(e).__name__)
         out.append({"name": f["name"], "heap": enc.heap, "self": None,
-                    "args": eargs, "outcome": outcome, "origin": "constructed"})
+                    "args": eargs, "outcome": outcome, "origin": "constructed",
+                    "cap": cap, "captured": enc.captured})
         made += 1
     return made
 
@@ -965,7 +1383,7 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
         if "." not in qual:
             why[qual] = "not a method"; continue
         clsname, attr = qual.rsplit(".", 1)
-        insts = list(live.get(clsname.split(".")[-1], ()))
+        insts = list(live.get("%s:%s" % (module_of(rel), clsname), ()))
         cls = find_class(rel, clsname)
         if not insts and cls is not None:
             tried = _ctor_attempts(cls, pool)
@@ -1045,10 +1463,15 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
             enc = Encoder()
             try:
                 slf = enc.enc(inst)
-                if slf[0] != "ref": raise Unencodable("self-not-object")
+                if slf[0] not in ("ref", "bobj"): raise Unencodable("self-not-object")
                 eargs = [enc.enc(a) for a in argv]
             except Unencodable as e:
                 why[qual] = "unencodable receiver/arguments: %s" % (e.args[0],)
+                break
+            free = set(raw.__code__.co_freevars) - {"__class__"}
+            if not free <= set(n for n, _ in enc.captured.get(slf[1], ())):
+                why[qual] = ("closure: receiver's class captures do not cover %s"
+                             % sorted(free))
                 break
             enc.freeze()
             try:
@@ -1062,10 +1485,79 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
             except Exception as e:                       # noqa: BLE001
                 outcome = ("exn", type(e).__name__)
             out.append({"name": f["name"], "heap": enc.heap, "self": slf,
-                        "args": eargs, "outcome": outcome, "origin": "constructed"})
+                        "args": eargs, "outcome": outcome, "origin": "constructed",
+                        "captured": enc.captured})
             made += 1
         if made: why.pop(qual, None)
     return out
+
+
+def case_shape(c):
+    """A coarse signature of a recorded call: receiver class, argument kinds, every
+    class in the heap snapshot, and whether it returned or raised."""
+    slf = c["heap"][c["self"][1]][0] if c.get("self") and c["self"][0] == "ref" \
+        and c["self"][1] < len(c["heap"]) else None
+    return (slf, tuple(a[0] for a in c["args"]),
+            tuple(sorted(set(h[0] for h in c["heap"]))),
+            (c.get("outcome") or ("?",))[0])
+
+
+def diversify(records, n):
+    """At most `n` recorded calls per function, spread across distinct call shapes.
+
+    The suite's FIRST `n` calls to a function are usually one test's calls, on one
+    receiver class, in one state. Taking those alone made the compared set depend on
+    test order: once floats became encodable, `TLRUCache.__getitem__`'s first five calls
+    all came from a `time.monotonic` timer (a builtin Core cannot call) and the
+    function dropped out of the compared set, taking its subclass-receiver divergence
+    with it. Oversample, then take one call per shape round-robin, in suite order.
+    Returns (kept, {function: calls recorded but not kept})."""
+    by_fn = {}
+    for r in records:
+        by_fn.setdefault(r["name"], []).append(r)
+    kept, dropped = [], {}
+    for name, rs in by_fn.items():
+        groups = {}
+        for r in rs:
+            groups.setdefault(case_shape(r), []).append(r)
+        pick, rnd, layers = [], 0, list(groups.values())
+        while len(pick) < n:
+            layer = [g[rnd] for g in layers if len(g) > rnd]
+            if not layer: break
+            pick += layer[:n - len(pick)]
+            rnd += 1
+        chosen = set(map(id, pick))
+        kept += [r for r in rs if id(r) in chosen]       # suite order preserved
+        if len(rs) > len(pick):
+            dropped[name] = len(rs) - len(pick)
+    return kept, dropped
+
+
+def cap_cases(cases, budget):
+    """Keep at most `budget` cases: (kept, {function: cases cut}).
+
+    Round-robin across functions, not a random sample of cases. The shuffle-and-cut
+    this replaces could drop EVERY case of a function -- removing it from the oracle's
+    reach with nothing in the report to say so -- while keeping a fifth case of
+    another. Now each function keeps its first case before any keeps a second, the
+    order within a function is preserved, and whatever is cut is counted."""
+    if len(cases) <= budget:
+        return list(cases), {}
+    by_fn = {}
+    for c in cases:
+        by_fn.setdefault(c["name"], []).append(c)
+    kept, rnd = [], 0
+    while len(kept) < budget:
+        layer = [cs[rnd] for cs in by_fn.values() if len(cs) > rnd]
+        if not layer: break
+        kept += layer[:budget - len(kept)]
+        rnd += 1
+    kept_ids = set(map(id, kept))
+    truncated = {}
+    for c in cases:
+        if id(c) not in kept_ids:
+            truncated[c["name"]] = truncated.get(c["name"], 0) + 1
+    return kept, truncated
 
 
 def run_suite(test_dir):
@@ -1085,12 +1577,90 @@ def run_suite(test_dir):
 
 # ----------------------------------------------------------------------- C runtime
 
-def c_runtime(src_root):
+def c_signatures(src_root):
+    """Per-function C integer signatures, from `<src_root>/ctypes.json` if present.
+
+    The AST carries no C types, so without this file every parameter and result is
+    passed and read as `int` (the original C leg). A corpus that knows its signatures
+    -- `scripts/sqlite_sample.py` writes the file, with every width and signedness
+    resolved by the COMPILER from the real typedefs, not from their spelling -- gets
+    exact ctypes types instead: `u8`, `i16`, `u32`, `i64`, `u64`, `_Bool`, ... are
+    passed at their real width, results are read at their real width and signedness
+    (`unsigned` above INT_MAX, a 64-bit result, a `_Bool`), and arguments are drawn
+    over the whole range of the type (see `c_typed_arg`).
+
+    Format: {"functions": {name: {"params": [T, ...], "ret": T}}} with
+    T = {"c": spelling, "bits": 8|16|32|64, "signed": bool, "bool": bool}."""
+    path = os.path.join(src_root, "ctypes.json")
+    if not os.path.exists(path):
+        return {}
+    return json.load(open(path)).get("functions", {})
+
+
+def c_ctype(t):
+    import ctypes
+    if t.get("bool"):
+        return ctypes.c_bool
+    return {(8, True): ctypes.c_int8, (8, False): ctypes.c_uint8,
+            (16, True): ctypes.c_int16, (16, False): ctypes.c_uint16,
+            (32, True): ctypes.c_int32, (32, False): ctypes.c_uint32,
+            (64, True): ctypes.c_int64, (64, False): ctypes.c_uint64}[
+                (t["bits"], bool(t["signed"]))]
+
+
+def c_type_range(t):
+    if t.get("bool"):
+        return 0, 1
+    b = t["bits"]
+    return (-(1 << (b - 1)), (1 << (b - 1)) - 1) if t["signed"] else (0, (1 << b) - 1)
+
+
+def c_typed_arg(t):
+    """An argument for a parameter of C type `t`, always representable in `t`.
+
+    Mostly the small range the int-only leg uses (clamped into the type), and with
+    probability 0.35 a boundary of THIS type -- its min/max and their neighbours, and
+    the power-of-two edges below it. `randint(-20, 20)` alone can never exercise
+    wraparound: a `u8` needs 255, a `u32` needs values above INT_MAX, an `i64` needs
+    values a 32-bit model cannot hold."""
+    lo, hi = c_type_range(t)
+    if t.get("bool"):
+        return random.randint(0, 1)
+    if random.random() < 0.35:
+        pool = {lo, lo + 1, hi, hi - 1, 0, 1, hi // 2, hi // 2 + 1}
+        if t["signed"]:
+            pool.add(-1)
+        for k in (7, 8, 15, 16, 31, 32, 63):
+            for v in ((1 << k) - 1, 1 << k, -(1 << k)):
+                pool.add(v)
+        return random.choice(sorted(v for v in pool if lo <= v <= hi))
+    v = random.randint(-20, 20) if t["signed"] else random.randint(0, 40)
+    return max(lo, min(hi, v))
+
+
+def c_return_conversion(lr):
+    """Read a Core `bool` result the way C reads the value it stands for.
+
+    Under `.cLike` Core produces `Val.bool` for `<`, `==`, `!`, `&&`, ... and promotes it
+    to 0/1 in every integer context (`Dialect.promotesBool` in Semantics.lean), because
+    Java's `boolean` and C++'s `bool` share that dialect. The one integer context Core
+    does not see is the RETURN conversion to the function's declared integer type, which
+    the C side always applies (every C leg function returns an integer type: `int` on
+    the untyped leg, an integer type from `ctypes.json` on the typed one). So a
+    `bool true` result is compared as `1` -- the same conversion `cc` performs, and
+    nothing looser: `bool true` against a C result of 5 is still a divergence."""
+    if lr[0] == "val" and lr[1][0] == "bool":
+        return ("val", ("int", 1 if lr[1][1] else 0))
+    return lr
+
+
+def c_runtime(src_root, sigs=None):
     """Compile the C sources to a shared library and expose them via ctypes.
 
     Same oracle, different runtime: the point of the Core language is that one semantics
     is checked against whichever real implementation produced the code."""
     import ctypes
+    sigs = sigs or {}
     srcs = glob.glob(os.path.join(src_root, "**", "*.c"), recursive=True)
     if not srcs: return None
     lib = os.path.join(WORK, "libautoform_diff_c" +
@@ -1104,8 +1674,13 @@ def c_runtime(src_root):
     def get(name, nargs):
         try: fn = getattr(dll, name)
         except AttributeError: return None
-        fn.restype = ctypes.c_int
-        fn.argtypes = [ctypes.c_int] * nargs
+        sig = sigs.get(name)
+        if sig is not None and len(sig["params"]) == nargs:
+            fn.restype = c_ctype(sig["ret"])
+            fn.argtypes = [c_ctype(t) for t in sig["params"]]
+        else:
+            fn.restype = ctypes.c_int
+            fn.argtypes = [ctypes.c_int] * nargs
         return fn
     return get
 
@@ -1623,6 +2198,8 @@ def main():
     ncases = int(argv[3]) if len(argv) > 3 else 5
     funcs = json.load(open(ast_path))
     module_tag = lean_mod
+    BUILTIN_BASES.clear()
+    BUILTIN_BASES.update(builtin_bases_of(funcs))
 
     # ---- which real runtime does this corpus need?
     lang, exts = detect_language(funcs)
@@ -1653,7 +2230,7 @@ def main():
               ".cLike, .javascript exist), so %s runs under an approximation "
               "(java64/go64 NumConfigs exist but are unwired)." % (lang, lang))
 
-    holefree = [f for f in funcs if not has_hole(f["body"])]
+    holefree = [f for f in funcs if not has_hole([f["body"], f.get("defaults")])]
     # NOTE ON MEASUREMENT BASIS. `skip_varargs` used to exist here and was removed
     # deliberately: a `*args`/`**kwargs` callee binds a tuple and a dict, which Core
     # models exactly, so those calls are now *attempted* (bound positionally against
@@ -1718,7 +2295,22 @@ def main():
     elif lang == "kotlin":
         backend_status = "UNSUPPORTED: no kotlinc"
     elif is_c:
-        cget = c_runtime(src_root)
+        csigs = c_signatures(src_root)
+        if csigs:
+            if wasm_mode:
+                raise SystemExit("--wasm is not supported with a typed C leg "
+                                 "(ctypes.json): the wasm caller passes i32 only")
+            BASIS = "c-typed-v1"
+            BASIS_NOTE = (
+                "Basis c-typed-v1: the C leg read per-function signatures from "
+                "ctypes.json. Arguments and results are passed at their real C width "
+                "and signedness (char/short/int/long/long long, unsigned, _Bool), and "
+                "arguments are drawn over the whole range of each parameter type "
+                "(boundary values with p=0.35), not only randint(-20, 20). A Core "
+                "`bool` result is compared as 0/1, the C return conversion "
+                "(`c_return_conversion`). Not comparable with the int-only basis.")
+            print("  typed C leg: %d signatures from ctypes.json" % len(csigs))
+        cget = c_runtime(src_root, csigs)
         cands = [f for f in holefree
                  if f["params"] and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', f["name"])]
         # Fix the argument vectors up front so the native and wasm runs see EXACTLY the
@@ -1742,10 +2334,16 @@ def main():
                 return random.choice(UB_POOL)
             return random.randint(-20, 20)
 
+        def c_args(f):
+            sig = csigs.get(f["name"])
+            if sig is not None and len(sig["params"]) == len(f["params"]):
+                return [c_typed_arg(t) for t in sig["params"]]
+            return [c_arg() for _ in f["params"]]
+
         plan = []
         for f in cands:
             for _ in range(ncases):
-                plan.append((f, [c_arg() for _ in f["params"]]))
+                plan.append((f, c_args(f)))
 
         # ---- native leg (the existing `cc` backend)
         native, native2 = {}, {}
@@ -1837,7 +2435,7 @@ def main():
             cases.append({"name": f["name"], "heap": [], "self": None,
                           "args": [("int", a) for a in args],
                           "outcome": ("val", ("int", nat)), "origin": "random",
-                          "objs": {}})
+                          "objs": {}, "c_int_return": True})
         if wasm_report is not None:
             wasm_report.update(calls_planned=len(plan), tally=wtally,
                                trap_detail=dict(sorted(trap_detail.items(),
@@ -1890,8 +2488,10 @@ def main():
         live, pool = {}, {}
         if test_dirs and index:
             print("test suite: %s" % ", ".join(test_dirs))
-            traced = trace_tests(src_root, test_dirs, index, wanted, ncases, stats,
-                                 params_by_name, live, pool)
+            traced = trace_tests(src_root, test_dirs, index, wanted,
+                                 ncases * OVERSAMPLE, stats, params_by_name, live, pool)
+            traced, not_kept = diversify(traced, ncases)
+            stats["recorded_not_kept"] = not_kept
         elif not test_dirs:
             print("test suite: none discovered under %s (pass --tests DIR)" % src_root)
         else:
@@ -1901,6 +2501,13 @@ def main():
             r["origin"] = "test-suite"
             cases.append(r)
         print("cases recorded from the test suite: %d" % len(traced))
+        for run in stats.get("test_runs", []):
+            if run.get("rc") not in (0, None) or run.get("error"):
+                # A failing suite records only the calls made before each failure.
+                print("  WARNING: the suite under %s did not pass under tracing (%s); "
+                      "cases come from a partial run" % (run["dir"],
+                                                         run.get("error") or
+                                                         "rc=%s" % run.get("rc")))
         if test_dirs and not traced:
             print("  (the suite produced no usable calls — if it failed to even "
                   "collect, try re-running this harness under the interpreter the "
@@ -1937,9 +2544,12 @@ def main():
         stats["skip_no_instance"] = sum(1 for f, _, _ in methods
                                         if f["name"] not in reached)
 
-    if len(cases) > MAX_TOTAL_CASES:
-        random.shuffle(cases)
-        cases = cases[:MAX_TOTAL_CASES]
+    kept, truncated = cap_cases(cases, MAX_TOTAL_CASES)
+    if truncated:
+        print("case budget %d: kept %d of %d cases, cut %d from %d functions (counted "
+              "in `truncated_cases`)" % (MAX_TOTAL_CASES, len(kept), len(cases),
+                                         len(cases) - len(kept), len(truncated)))
+    cases = kept
 
     result = {"module": module_tag, "source_root": os.path.abspath(src_root),
               "ast": os.path.abspath(ast_path), "runtime": runtime,
@@ -1981,6 +2591,12 @@ def main():
                               "further call. Bound coverage with `coverage`, never with "
                               "these.",
               "test_runs": stats["test_runs"], "divergence_detail": [],
+              "truncated_cases": truncated,
+              # recorded from the suite but not kept by `diversify` (n per function)
+              "recorded_not_kept": stats.get("recorded_not_kept", {}),
+              # per function: traced calls, recorded, over quota, and refusals by
+              # reason. Refusal counts are call-event counts (see `skipped_note`).
+              "trace_ledger": stats.get("trace_ledger", {}),
               "unencodable_reasons": stats.get("unencodable_reasons", {}),
               "no_instance_detail": stats.get("no_instance_detail", {}),
               "param_mismatch_detail": stats.get("param_mismatch_detail", {}),
@@ -2103,12 +2719,29 @@ def main():
               "  fn   : String",
               "  slf  : Option Val",
               "  args : List Val",
-              "  chk  : List (Nat × String)", "",
+              "  chk  : List (Nat × String)",
+              # a closure's captured bindings, when the callee is one (`closure_cells`)
+              "  cap  : Option (List (String × Val)) := none", "",
+              # Dispatch exactly as Core's own call sites do: a closure through
+              # `applyClosure` over its captures, a method on an object whose class
+              # captured bindings through `applyClosure` with `self` prepended (the
+              # `Expr.mcall` rule), everything else through `applyFunc`.
+              "private def dapply (h : Heap) (fn : Func) (c : DCase) : Heap × EResult :=",
+              "  match c.cap, c.slf with",
+              "  | some cp, _ => applyClosure dctx %d h fn cp c.args []" % FUEL,
+              "  | none, some (.ref a) =>",
+              "    match h.get a with",
+              "    | some o => if o.captured.isEmpty "
+              "then applyFunc dctx %d h fn c.slf c.args []" % FUEL,
+              "                else applyClosure dctx %d h fn ((\"self\", .ref a) :: "
+              "o.captured) c.args []" % FUEL,
+              "    | none   => applyFunc dctx %d h fn c.slf c.args []" % FUEL,
+              "  | none, _ => applyFunc dctx %d h fn c.slf c.args []" % FUEL, "",
               # A boxed function object (Core section 47) is REPORTED AS THE FUNCTION IT
               # CARRIES. `wrapper.cache_clear = f` makes `wrapper` a heap object, and Core
               # returns a `Val.ref` to it where CPython returns the function -- a shape
-              # clash, not a disagreement. This is the same move `unwrap_bobj` makes on the
-              # Python side, and it hides the same thing: object identity and the attributes
+              # clash, not a disagreement. (The harness used to make the same move on
+              # `Val.bobj`, dropping the class; it no longer does.) It hides the same thing: object identity and the attributes
               # written to it. Neither side's test compares those here; if one ever does,
               # this has to compare them rather than unbox.
               "private def unboxRes (h : Heap) (r : EResult) : EResult :=",
@@ -2135,7 +2768,7 @@ def main():
               # printed, so the harness saw a live Lean process and reported every case as
               # `lean-no-answer`. An arity change silently disabled the only oracle that
               # compares the semantics to a real runtime.
-              "    | some fn => let r := applyFunc dctx %d h fn c.slf c.args []" % FUEL,
+              "    | some fn => let r := dapply h fn c",
               "                 unboxRes r.1 r.2", ""]
     footer = ["]", "",
               '#eval IO.println ("@@meta@@" ++ toString base ++ " " ++ toString gref)',
@@ -2146,10 +2779,13 @@ def main():
         slf = "none" if c["self"] is None else "(some (%s))" % lean_val(c["self"])
         chk = ", ".join('(%d, %s)' % (k, json.dumps(cls))
                         for k, (cls, _) in enumerate(c["heap"]))
+        cap = ("" if c.get("cap") is None else
+               ", cap := some [%s]" % ", ".join(
+                   "(%s, %s)" % (json.dumps(k), lean_val(v)) for k, v in c["cap"]))
         return ("  { idx := %d, objs := %s, fn := %s, slf := %s, args := [%s], "
-                "chk := [%s] }"
-                % (i, lean_heap(c["heap"]), json.dumps(c["name"]), slf,
-                   ", ".join(lean_val(a) for a in c["args"]), chk))
+                "chk := [%s]%s }"
+                % (i, lean_heap(c["heap"], c.get("captured")), json.dumps(c["name"]),
+                   slf, ", ".join(lean_val(a) for a in c["args"]), chk, cap))
 
     meta = {"base": 0, "gref": 0}
     # per-process scratch file: two harness runs (or two agents) sharing /tmp would
@@ -2291,6 +2927,8 @@ def main():
             print("  unparsable %s: %s" % (c["name"], line[:80]))
             continue
         py = c["outcome"]
+        if c.get("c_int_return"):
+            lr = c_return_conversion(lr)
         argstr = "(%s)" % ", ".join(show(a) for a in c["args"])
         if lr[0] in ("hole", "outOfFuel"):
             # ignorance is never agreement
@@ -2354,7 +2992,7 @@ def main():
     status = {}
     for f in funcs:
         status[f["name"]] = ("not-translated-fully (holes): untestable until translated"
-                             if has_hole(f["body"]) else "hole-free, no case built")
+                             if has_hole([f["body"], f.get("defaults")]) else "hole-free, no case built")
     for c in cases:
         status[c["name"]] = "cases built, all inconclusive"
     for n in compared_fns:
@@ -2369,14 +3007,38 @@ def main():
     # in the oracle's own value model that no amount of semantics work removes.
     VALUE_MODEL = ("float", "set", "opaque", "complex", "bytes", "frozenset",
                    "container-subclass", "object-as-dict-key", "wide",
-                   "self-not-object", "representation")
+                   "self-not-object", "representation", "callable", "generator")
+    ledger = result["trace_ledger"]
+    for f in funcs:
+        n = f["name"]
+        if n in compared_fns or has_hole(f["body"]): continue
+        if not status[n].startswith("hole-free, no case built"): continue
+        # Say why no case reached the oracle, from the per-function trace ledger. The
+        # suite's own refusals come first: they are the reason REAL inputs were lost.
+        led = ledger.get(n)
+        um = unmapped_reason(n)
+        prior = status[n].split(": ", 1)[1] if ": " in status[n] else ""
+        if um:
+            why = um
+        elif n in truncated:
+            why = "all %d cases cut by the case budget" % truncated[n]
+        elif led and led["refused"]:
+            top = sorted(led["refused"].items(), key=lambda kv: -kv[1])
+            why = ("%d traced calls, none recorded: %s"
+                   % (led["calls"], "; ".join("%s x%d" % kv for kv in top[:3])))
+            if prior: why += " | then: " + prior
+        elif prior:
+            why = prior
+        else:
+            why = "never called by the test suite"
+        status[n] = "hole-free, no case built: " + why
     labels = {}
     for k, v in incon_detail.items():
         fn, lab = k.split(": ", 1)
         labels.setdefault(fn, set()).add(lab.split(":")[0])
     for f in funcs:
         n = f["name"]
-        if n in compared_fns or has_hole(f["body"]): continue
+        if n in compared_fns or has_hole([f["body"], f.get("defaults")]): continue
         labs = labels.get(n, set())
         if labs and labs <= {"representation", "exception-payload-unmodelled"}:
             status[n] = "blocked (value model): " + ", ".join(sorted(labs))
@@ -2385,9 +3047,12 @@ def main():
                         ", ".join(sorted(labs))
         else:
             why = status.get(n, "")
-            hit = [w for w in VALUE_MODEL if w in why]
-            status[n] = ("blocked (value model): " + hit[0] if hit
-                         else "blocked (unexercised): " + why.split(": ", 1)[-1])
+            # the label is the value-model gap named FIRST in the reason (the
+            # dominant refusal comes first), and the reason itself is kept
+            detail = why.split(": ", 1)[-1]
+            hit = sorted((detail.find(w), w) for w in VALUE_MODEL if w in detail)
+            status[n] = ("blocked (value model): %s -- %s" % (hit[0][1], detail) if hit
+                         else "blocked (unexercised): " + detail)
     counts = {}
     for v in status.values():
         k = v.split(":")[0]

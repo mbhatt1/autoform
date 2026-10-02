@@ -60,6 +60,8 @@ def eCalls : Expr → List (Bool × String)
   | .cond c a b   => eCalls c ++ eCalls a ++ eCalls b
   | .isOp _ a b   => eCalls a ++ eCalls b
   | .inOp _ a b   => eCalls a ++ eCalls b
+  -- A Python list/dict display: calls inside it are calls of the function.
+  | .boxContainer a => eCalls a
   | _             => []
 /-- Names called across a list of expressions. -/
 def eCallsL : List Expr → List (Bool × String)
@@ -87,6 +89,7 @@ def eRisk : Expr → Nat
   | .cond c a b   => eRisk c + eRisk a + eRisk b
   | .isOp _ a b   => eRisk a + eRisk b
   | .inOp _ a b   => 1 + eRisk a + eRisk b
+  | .boxContainer a => eRisk a
   | _             => 0
 /-- Risk across a list of expressions. -/
 def eRiskL : List Expr → Nat
@@ -104,6 +107,7 @@ def sCalls : Stmt → List (Bool × String)
   | .assign _ e     => eCalls e
   | .setField r _ v => eCalls r ++ eCalls v
   | .setIndex r i v => eCalls r ++ eCalls i ++ eCalls v
+  | .delIndex r i   => eCalls r ++ eCalls i
   | .seq a b        => sCalls a ++ sCalls b
   | .ifte c a b     => eCalls c ++ sCalls a ++ sCalls b
   | .loop c a       => eCalls c ++ sCalls a
@@ -119,6 +123,7 @@ def sRisk : Stmt → Nat
   | .assign _ e     => eRisk e
   | .setField r _ v => 1 + eRisk r + eRisk v
   | .setIndex _ _ _ => 1
+  | .delIndex _ _   => 1
   | .seq a b        => sRisk a + sRisk b
   | .ifte c a b     => eRisk c + sRisk a + sRisk b
   | .loop c a       => eRisk c + sRisk a
@@ -266,6 +271,78 @@ ledger's claim rests on. -/
 def Program.callClosureAgrees (p : Program) : Bool :=
   p.callClosed.map (·.name) == p.callClosedRef.map (·.name)
 
+/-! ## Conditionally verifiable functions, and one named assumption per hole
+
+`docs/contracts.md`. A function with holes is not verifiable *unconditionally*, but it can
+be reasoned about **relative to contracts on its holes** (`Autoform/Contracts.lean` for
+expression holes, `Autoform/HoleContracts.lean` for statement holes). The ledger reports
+such functions as a **separate** number, never folded into the verifiable core:
+
+* **conditionally verifiable** — at least one hole, and every call target resolves (the
+  same per-path resolution test as `callClosed`). An *upper bound*, exactly as hole-free
+  is for the core: it says a contract-relative statement is expressible, not that one has
+  been proved. Proved ones are counted separately, from `contracts-<Module>.json`.
+* **named hole assumptions** — every hole occurrence in the program gets an identifier
+  `H:<function>#<i>:<label>` and a kind (`stmt`/`expr`). Nothing is silently trusted: a
+  contract-relative result must name which of these it assumes, and `holeSites_labels`
+  proves the inventory is exactly `Stmt.holes` — no occurrence can be missing from it. -/
+
+namespace Analysis
+
+/-- Every hole in a statement with its position: `true` for a `Stmt.hole`, `false` for an
+`Expr.hole`. Mirrors `Stmt.holes` arm for arm (`holeSites_labels`). -/
+def sHoleSites : Stmt → List (Bool × String)
+  | .hole l          => [(true, l)]
+  | .expr e          => e.holes.map (false, ·)
+  | .assign _ e      => e.holes.map (false, ·)
+  | .setField r _ v  => (r.holes ++ v.holes).map (false, ·)
+  | .setIndex r i v  => (r.holes ++ i.holes ++ v.holes).map (false, ·)
+  | .delIndex r i    => (r.holes ++ i.holes).map (false, ·)
+  | .setDerefIref p v => (p.holes ++ v.holes).map (false, ·)
+  | .seq a b         => sHoleSites a ++ sHoleSites b
+  | .ifte c a b      => c.holes.map (false, ·) ++ sHoleSites a ++ sHoleSites b
+  | .loop c a        => c.holes.map (false, ·) ++ sHoleSites a
+  | .breakBlock a    => sHoleSites a
+  | .forIn _ e b     => e.holes.map (false, ·) ++ sHoleSites b
+  | .ret e           => e.holes.map (false, ·)
+  | .tryCatch b _ h  => sHoleSites b ++ sHoleSites h
+  | .tryFinally b f  => sHoleSites b ++ sHoleSites f
+  | .raise e         => e.holes.map (false, ·)
+  | .setGlobal _ e   => e.holes.map (false, ·)
+  | _                => []
+
+/-- The site inventory is complete and exact: its labels are `Stmt.holes`, in order. -/
+theorem holeSites_labels (s : Stmt) : (sHoleSites s).map (·.2) = s.holes := by
+  induction s <;> simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def, *]
+
+end Analysis
+
+/-- Hole occurrences of a function, tagged `true` for statement position. -/
+def Func.holeSites (f : Func) : List (Bool × String) := Analysis.sHoleSites f.body
+
+/-- Has holes, and is otherwise call-closed: every hole is a place a named contract can be
+assumed, and nothing else is missing. Disjoint from `callClosed` by construction. -/
+def Program.conditionallyVerifiable (p : Program) : List Func :=
+  let idx := ResolveIndex.build p.table
+  p.funcs.filter (fun f =>
+    !f.total && f.calls.all (fun c => idx.resolvable p.dialect c.1 c.2))
+
+/-- The name of the assumption for the `i`-th hole of `f`. -/
+def holeAssumptionId (fn : String) (i : Nat) (label : String) : String :=
+  s!"H:{fn}#{i}:{label}"
+
+/-- One named assumption per hole occurrence, in program order. -/
+def Program.holeAssumptionsJson (p : Program) : Lean.Json :=
+  let cv := (p.conditionallyVerifiable.map (·.name))
+  .arr <| (p.funcs.flatMap fun f =>
+    (f.holeSites.zipIdx).map fun ((isStmt, l), i) =>
+      Lean.Json.mkObj
+        [ ("id",       .str (holeAssumptionId f.name i l))
+        , ("function", .str f.name)
+        , ("label",    .str l)
+        , ("kind",     .str (if isStmt then "stmt" else "expr"))
+        , ("conditionallyVerifiable", .bool (cv.contains f.name)) ]).toArray
+
 /-- Per-program translation evidence. -/
 structure Coverage where
   funcs      : Nat
@@ -305,6 +382,8 @@ def Program.coverage (p : Program) : Coverage :=
 of functions with **no** holes — the only ones that can be verified unconditionally. -/
 def Program.ledger (p : Program) (name : String) : String :=
   let c := p.coverage
+  let cv := p.conditionallyVerifiable
+  let cvHoles : Nat := (cv.map (·.holes.length)).sum
   let pct (a b : Nat) : String :=
     if b == 0 then "n/a" else s!"{(a * 100) / b}%"
   let hdr := s!"
@@ -314,6 +393,7 @@ def Program.ledger (p : Program) (name : String) : String :=
 │ holes                : {c.holes}  ({pct c.holes c.nodes} of nodes)
 │ hole-free (upper bd) : {c.totalFuncs} / {c.funcs} functions  ({pct c.totalFuncs c.funcs})
 │ VERIFIABLE CORE      : {c.closedFuncs} / {c.funcs} functions  ({pct c.closedFuncs c.funcs}) — hole-free AND call-closed
+│ CONDITIONALLY verif. : {cv.length} / {c.funcs} functions  ({pct cv.length c.funcs}) — call-closed but holed; results only RELATIVE TO {cvHoles} named hole assumptions, NOT in the core
 │ dynamic-hole risk    : {c.riskNodes} constructs may hole at runtime (input-dependent)
 │ semantics            : Autoform.Core (fuel-indexed, total, no sorry)
 │ transpiler           : Joern CPG → Core, deterministic
@@ -337,6 +417,8 @@ dialect explicitly. The SACM pass caught exactly this class of defect in
 claim about that subject, and was correctly capped at WEAK. -/
 def Program.ledgerJson (p : Program) (name : String) : Lean.Json :=
   let c := p.coverage
+  let cv := p.conditionallyVerifiable
+  let cvHoles : Nat := (cv.map (·.holes.length)).sum
   Lean.Json.mkObj
     [ ("module",         .str name)
     , ("dialect",        .str p.dialect.name)
@@ -346,6 +428,11 @@ def Program.ledgerJson (p : Program) (name : String) : Lean.Json :=
     , ("holeFree",       .num c.totalFuncs)
     , ("verifiableCore", .num c.closedFuncs)
     , ("dynamicHoleRisk", .num c.riskNodes)
+    -- Reported apart from `verifiableCore`, never added to it: these functions are
+    -- analysable only relative to named contracts on their holes (docs/contracts.md).
+    , ("conditionallyVerifiable", .num cv.length)
+    , ("conditionalAssumptions",  .num cvHoles)
+    , ("holeAssumptions",         p.holeAssumptionsJson)
     , ("holesByLabel",   .arr (c.byLabel.map (fun (l, n) =>
         Lean.Json.mkObj [("label", .str l), ("count", .num n)])).toArray) ]
 
@@ -391,6 +478,22 @@ private def cx : Ctx := { dialect := .python, table := tbl }
 -- The tail decomposition itself.
 #guard dottedTails "m.py:<module>.A.clear" == ["py:<module>.A.clear", "A.clear", "clear"]
 #guard dottedTails "plain" == []
+
+-- Conditional verifiability: a holed function whose calls resolve is counted; a holed
+-- function with an unresolvable call is not; a hole-free one is in the core instead, and
+-- never in both lists.
+private def condProg : Program :=
+  { funcs :=
+    [ { name := "m.py:<module>.helper", params := [], body := .skip }
+    , { name := "m.py:<module>.holedOk", params := []
+      , body := .seq (.hole "op:delete-index") (.expr (.call "helper" [])) }
+    , { name := "m.py:<module>.holedBad", params := []
+      , body := .seq (.ret (.hole "expr:genExp")) (.expr (.call "nowhere" [])) } ] }
+#guard condProg.conditionallyVerifiable.map (·.name) == ["m.py:<module>.holedOk"]
+#guard condProg.callClosed.map (·.name) == ["m.py:<module>.helper"]
+#guard (condProg.funcs.flatMap Func.holeSites) == [(true, "op:delete-index"), (false, "expr:genExp")]
+#guard holeAssumptionId "m.py:<module>.holedOk" 0 "op:delete-index"
+  == "H:m.py:<module>.holedOk#0:op:delete-index"
 
 end IndexCheck
 

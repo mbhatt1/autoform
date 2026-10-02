@@ -209,15 +209,10 @@ jobs:
       - name: check_docs — documented figures match the artifacts
         run: python3 scripts/check_docs.py
 
-      # The Python tooling is ~8,000 lines that gate every downstream claim; until
-      # tests/ existed none of it was tested. Each of the five regression classes in
-      # tests/test_regressions.py reconstructs a *silent* failure that once shipped,
-      # so a green run here is evidence the checkers still fail when they should.
-      - name: pytest — the Python tooling
-        run: |
-          set -euo pipefail
-          python3 -m pip install --quiet pytest
-          python3 -m pytest tests/ -q
+      # pytest used to run HERE, as step ~15 of this job, so any earlier red step (a
+      # `lake build` OOM, check_render's exit 3 on an untracked AST) skipped it and the
+      # Python suite gated nothing. It needs neither Lean nor Joern, so it is now its
+      # own job, `python-tests`, below.
 
       # Cheap, deterministic guard on the one invariant this repo has an
       # explicit rule about: the fuel-monotonicity exclusion list. Widening
@@ -326,6 +321,35 @@ jobs:
           lake env lean Demo.lean 2>&1 | tee demo.out || true
           grep -q "TRUSTED-CODE LEAK" demo.out
           grep -q "VACUOUS" demo.out
+
+  # ------------------------------------------------------------------ #
+  # The Python tooling is ~8,000 lines that gate every downstream claim; until
+  # tests/ existed none of it was tested. Each regression class in
+  # tests/test_regressions.py reconstructs a *silent* failure that once shipped,
+  # so a green run here is evidence the checkers still fail when they should.
+  #
+  # Its own job, with no Lean and no Joern: every test runs the shipped scripts
+  # against tracked ASTs and synthetic fixtures only (checked: nothing in tests/
+  # invokes lake, lean or joern). That keeps it a real gate -- it reports even when
+  # the Lean job is red -- and gives a verdict in about two minutes.
+  # ------------------------------------------------------------------ #
+  python-tests:
+    name: pytest (Python tooling)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: pytest — the Python tooling
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/ -q
 
   # ------------------------------------------------------------------ #
   # OPTIONAL / MANUAL ONLY.

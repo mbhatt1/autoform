@@ -1,0 +1,3841 @@
+[
+ {
+  "name": "pyscoping_cases.py:<module>.dflt_lits",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "a",
+   "b",
+   "c",
+   "d",
+   "e",
+   "f",
+   "g",
+   "h"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "a"
+     },
+     {
+      "k": "name",
+      "v": "b"
+     },
+     {
+      "k": "name",
+      "v": "c"
+     },
+     {
+      "k": "name",
+      "v": "d"
+     },
+     {
+      "k": "name",
+      "v": "e"
+     },
+     {
+      "k": "name",
+      "v": "f"
+     },
+     {
+      "k": "name",
+      "v": "g"
+     },
+     {
+      "k": "name",
+      "v": "h"
+     }
+    ]
+   }
+  },
+  "defaults": [
+   [
+    "b",
+    {
+     "k": "int",
+     "v": "10"
+    }
+   ],
+   [
+    "c",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "d",
+    {
+     "k": "str",
+     "v": "s"
+    }
+   ],
+   [
+    "e",
+    {
+     "k": "bool",
+     "v": true
+    }
+   ],
+   [
+    "f",
+    {
+     "k": "tupleE",
+     "items": []
+    }
+   ],
+   [
+    "g",
+    {
+     "k": "int",
+     "v": "-3"
+    }
+   ],
+   [
+    "h",
+    {
+     "k": "float",
+     "v": "0.5"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_default_all",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.dflt_lits",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_default_some",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.dflt_lits",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "int",
+       "v": "2"
+      },
+      {
+       "k": "kwargE",
+       "n": "d",
+       "a": {
+        "k": "str",
+        "v": "t"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_default_by_keyword",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.dflt_lits",
+     "args": [
+      {
+       "k": "kwargE",
+       "n": "a",
+       "a": {
+        "k": "int",
+        "v": "5"
+       }
+      },
+      {
+       "k": "kwargE",
+       "n": "g",
+       "a": {
+        "k": "int",
+        "v": "7"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.dflt_mutable",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "x",
+   "acc"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "name",
+     "v": "acc"
+    },
+    "b": {
+     "k": "listE",
+     "items": [
+      {
+       "k": "name",
+       "v": "x"
+      }
+     ]
+    }
+   }
+  },
+  "defaults": [
+   [
+    "acc",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_mutable_default_supplied",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.dflt_mutable",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "listE",
+       "items": [
+        {
+         "k": "int",
+         "v": "0"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_mutable_default_needed",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.dflt_mutable",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.dflt_global",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "x",
+   "lim"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "x"
+     },
+     {
+      "k": "name",
+      "v": "lim"
+     }
+    ]
+   }
+  },
+  "defaults": [
+   [
+    "lim",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_global_default_supplied",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.dflt_global",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "int",
+       "v": "2"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_global_default_needed",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.dflt_global",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_lambda_default",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "adder_fn",
+    "e": {
+     "k": "fnref",
+     "v": "pyscoping_cases.py:<module>.case_lambda_default.<lambda>0"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ret",
+     "e": {
+      "k": "call",
+      "f": "pyscoping_cases.py:<module>.case_lambda_default.<lambda>0",
+      "args": [
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "skip"
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_lambda_default.<lambda>0",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "x",
+   "y"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "name",
+     "v": "x"
+    },
+    "b": {
+     "k": "name",
+     "v": "y"
+    }
+   }
+  },
+  "defaults": [
+   [
+    "y",
+    {
+     "k": "int",
+     "v": "2"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.Shelf.get",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "key",
+   "default",
+   "strict"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "key"
+     },
+     {
+      "k": "name",
+      "v": "default"
+     },
+     {
+      "k": "name",
+      "v": "strict"
+     }
+    ]
+   }
+  },
+  "kwonly": [
+   "strict"
+  ],
+  "defaults": [
+   [
+    "default",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "strict",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_method_default",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "shelf_obj",
+    "e": {
+     "k": "alloc",
+     "cls": "Shelf",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "shelf_obj"
+       },
+       "m": "get",
+       "args": [
+        {
+         "k": "int",
+         "v": "1"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_method_default_kwonly",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "shelf_obj",
+    "e": {
+     "k": "alloc",
+     "cls": "Shelf",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "shelf_obj"
+       },
+       "m": "get",
+       "args": [
+        {
+         "k": "int",
+         "v": "1"
+        },
+        {
+         "k": "int",
+         "v": "2"
+        },
+        {
+         "k": "kwargE",
+         "n": "strict",
+         "a": {
+          "k": "bool",
+          "v": true
+         }
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>._underscored",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "_k",
+   "_v"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "_k"
+     },
+     {
+      "k": "name",
+      "v": "_v"
+     }
+    ]
+   }
+  },
+  "defaults": [
+   [
+    "_v",
+    {
+     "k": "int",
+     "v": "1"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_underscored_default",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>._underscored",
+     "args": [
+      {
+       "k": "int",
+       "v": "0"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.kwo",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "a",
+   "b",
+   "c"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "a"
+     },
+     {
+      "k": "name",
+      "v": "b"
+     },
+     {
+      "k": "name",
+      "v": "c"
+     }
+    ]
+   }
+  },
+  "kwonly": [
+   "b",
+   "c"
+  ],
+  "defaults": [
+   [
+    "c",
+    {
+     "k": "int",
+     "v": "3"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_kwonly",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.kwo",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "kwargE",
+       "n": "b",
+       "a": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_kwonly_positional_rejected",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.kwo",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "int",
+       "v": "2"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.kw_after_star",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "args",
+   "key",
+   "kw"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "args"
+     },
+     {
+      "k": "name",
+      "v": "key"
+     },
+     {
+      "k": "name",
+      "v": "kw"
+     }
+    ]
+   }
+  },
+  "vararg": "args",
+  "kwarg": "kw",
+  "kwonly": [
+   "key"
+  ],
+  "defaults": [
+   [
+    "key",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_kw_after_varargs",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.kw_after_star",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "int",
+       "v": "2"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_kw_after_varargs_named",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.kw_after_star",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "kwargE",
+       "n": "key",
+       "a": {
+        "k": "int",
+        "v": "5"
+       }
+      },
+      {
+       "k": "kwargE",
+       "n": "z",
+       "a": {
+        "k": "int",
+        "v": "6"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.posonly",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "a",
+   "b",
+   "c"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "a"
+     },
+     {
+      "k": "name",
+      "v": "b"
+     },
+     {
+      "k": "name",
+      "v": "c"
+     }
+    ]
+   }
+  },
+  "posonly": [
+   "a",
+   "b"
+  ],
+  "defaults": [
+   [
+    "b",
+    {
+     "k": "int",
+     "v": "2"
+    }
+   ],
+   [
+    "c",
+    {
+     "k": "int",
+     "v": "3"
+    }
+   ]
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_posonly",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.posonly",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_posonly_keyword_rejected",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.posonly",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "kwargE",
+       "n": "b",
+       "a": {
+        "k": "int",
+        "v": "5"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.posonly_kw",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "a",
+   "kw"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "tupleE",
+    "items": [
+     {
+      "k": "name",
+      "v": "a"
+     },
+     {
+      "k": "name",
+      "v": "kw"
+     }
+    ]
+   }
+  },
+  "kwarg": "kw",
+  "posonly": [
+   "a"
+  ]
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_posonly_name_goes_to_kwargs",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.posonly_kw",
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      },
+      {
+       "k": "kwargE",
+       "n": "a",
+       "a": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.make_counter",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "n",
+    "e": {
+     "k": "boxNew",
+     "e": {
+      "k": "unit"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "n"
+     },
+     "f": "v",
+     "v": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "inc",
+      "e": {
+       "k": "closure",
+       "f": "pyscoping_cases.py:<module>.make_counter.inc"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "exprS",
+       "e": {
+        "k": "call",
+        "f": "inc",
+        "args": []
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "exprS",
+         "e": {
+          "k": "call",
+          "f": "inc",
+          "args": []
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "tupleE",
+           "items": [
+            {
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "n"
+             },
+             "f": "v"
+            },
+            {
+             "k": "call",
+             "f": "inc",
+             "args": []
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.make_counter.inc",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "n"
+      },
+      "f": "v",
+      "v": {
+       "k": "binop",
+       "op": "+",
+       "a": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "n"
+        },
+        "f": "v"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "n"
+       },
+       "f": "v"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_nonlocal_counter",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.make_counter",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.make_pair",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "start"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "start",
+    "e": {
+     "k": "boxNew",
+     "e": {
+      "k": "name",
+      "v": "start"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "bump_by",
+     "e": {
+      "k": "closure",
+      "f": "pyscoping_cases.py:<module>.make_pair.bump_by"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "peek_at",
+      "e": {
+       "k": "closure",
+       "f": "pyscoping_cases.py:<module>.make_pair.peek_at"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "name",
+          "v": "bump_by"
+         },
+         {
+          "k": "name",
+          "v": "peek_at"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "skip"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.make_pair.bump_by",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "k"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "start"
+      },
+      "f": "v",
+      "v": {
+       "k": "binop",
+       "op": "+",
+       "a": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "start"
+        },
+        "f": "v"
+       },
+       "b": {
+        "k": "name",
+        "v": "k"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "start"
+       },
+       "f": "v"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.make_pair.peek_at",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "start"
+     },
+     "f": "v"
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_nonlocal_shared_between_closures",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "fns",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.make_pair",
+     "args": [
+      {
+       "k": "int",
+       "v": "10"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "bumper",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "fns"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "peeker",
+        "e": {
+         "k": "index",
+         "a": {
+          "k": "name",
+          "v": "fns"
+         },
+         "b": {
+          "k": "int",
+          "v": "1"
+         }
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "exprS",
+          "e": {
+           "k": "call",
+           "f": "bumper",
+           "args": [
+            {
+             "k": "int",
+             "v": "5"
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "exprS",
+            "e": {
+             "k": "call",
+             "f": "bumper",
+             "args": [
+              {
+               "k": "int",
+               "v": "1"
+              }
+             ]
+            }
+           },
+           "b": {
+            "k": "ret",
+            "e": {
+             "k": "call",
+             "f": "peeker",
+             "args": []
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.nonlocal_chain",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "x",
+    "e": {
+     "k": "boxNew",
+     "e": {
+      "k": "unit"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "x"
+     },
+     "f": "v",
+     "v": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "mid",
+      "e": {
+       "k": "closure",
+       "f": "pyscoping_cases.py:<module>.nonlocal_chain.mid"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "r",
+       "e": {
+        "k": "call",
+        "f": "mid",
+        "args": []
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ret",
+         "e": {
+          "k": "tupleE",
+          "items": [
+           {
+            "k": "name",
+            "v": "r"
+           },
+           {
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "x"
+            },
+            "f": "v"
+           }
+          ]
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "skip"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.nonlocal_chain.mid",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "inner",
+    "e": {
+     "k": "closure",
+     "f": "pyscoping_cases.py:<module>.nonlocal_chain.mid.inner"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "exprS",
+     "e": {
+      "k": "call",
+      "f": "inner",
+      "args": []
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "f": "v"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "skip"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.nonlocal_chain.mid.inner",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "x"
+     },
+     "f": "v",
+     "v": {
+      "k": "binop",
+      "op": "*",
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "f": "v"
+      },
+      "b": {
+       "k": "int",
+       "v": "10"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_nonlocal_through_two_levels",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.nonlocal_chain",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.loop_total",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "total",
+    "e": {
+     "k": "boxNew",
+     "e": {
+      "k": "unit"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "total"
+     },
+     "f": "v",
+     "v": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "add_one",
+      "e": {
+       "k": "closure",
+       "f": "pyscoping_cases.py:<module>.loop_total.add_one"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "forIn",
+       "x": "v",
+       "e": {
+        "k": "name",
+        "v": "xs"
+       },
+       "body": {
+        "k": "exprS",
+        "e": {
+         "k": "call",
+         "f": "add_one",
+         "args": [
+          {
+           "k": "name",
+           "v": "v"
+          }
+         ]
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ret",
+         "e": {
+          "k": "field",
+          "a": {
+           "k": "name",
+           "v": "total"
+          },
+          "f": "v"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "skip"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.loop_total.add_one",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "v"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "total"
+     },
+     "f": "v",
+     "v": {
+      "k": "binop",
+      "op": "+",
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "total"
+       },
+       "f": "v"
+      },
+      "b": {
+       "k": "name",
+       "v": "v"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_nonlocal_in_a_loop",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.loop_total",
+     "args": [
+      {
+       "k": "listE",
+       "items": [
+        {
+         "k": "int",
+         "v": "1"
+        },
+        {
+         "k": "int",
+         "v": "2"
+        },
+        {
+         "k": "int",
+         "v": "3"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.star_tail",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "call",
+      "f": "<unpackEx>",
+      "args": [
+       {
+        "k": "name",
+        "v": "xs"
+       },
+       {
+        "k": "int",
+        "v": "1"
+       },
+       {
+        "k": "int",
+        "v": "0"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "a",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "tmp0"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     },
+     "b": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "tmp0"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "tupleE",
+       "items": [
+        {
+         "k": "name",
+         "v": "a"
+        },
+        {
+         "k": "name",
+         "v": "b"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "skip"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.star_mid",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "call",
+      "f": "<unpackEx>",
+      "args": [
+       {
+        "k": "name",
+        "v": "xs"
+       },
+       {
+        "k": "int",
+        "v": "1"
+       },
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "p",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "tmp0"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "q",
+       "e": {
+        "k": "index",
+        "a": {
+         "k": "name",
+         "v": "tmp0"
+        },
+        "b": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      },
+      "b": {
+       "k": "assign",
+       "x": "r",
+       "e": {
+        "k": "index",
+        "a": {
+         "k": "name",
+         "v": "tmp0"
+        },
+        "b": {
+         "k": "int",
+         "v": "-1"
+        }
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "tupleE",
+       "items": [
+        {
+         "k": "name",
+         "v": "p"
+        },
+        {
+         "k": "name",
+         "v": "q"
+        },
+        {
+         "k": "name",
+         "v": "r"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "skip"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.star_head",
+  "file": "pyscoping_cases.py",
+  "params": [
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "call",
+      "f": "<unpackEx>",
+      "args": [
+       {
+        "k": "name",
+        "v": "xs"
+       },
+       {
+        "k": "int",
+        "v": "0"
+       },
+       {
+        "k": "int",
+        "v": "1"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "c",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "tmp0"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     },
+     "b": {
+      "k": "assign",
+      "x": "d",
+      "e": {
+       "k": "index",
+       "a": {
+        "k": "name",
+        "v": "tmp0"
+       },
+       "b": {
+        "k": "int",
+        "v": "-1"
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "tupleE",
+       "items": [
+        {
+         "k": "name",
+         "v": "c"
+        },
+        {
+         "k": "name",
+         "v": "d"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "skip"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_star_tail_of_tuple_is_a_list",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.star_tail",
+     "args": [
+      {
+       "k": "tupleE",
+       "items": [
+        {
+         "k": "int",
+         "v": "1"
+        },
+        {
+         "k": "int",
+         "v": "2"
+        },
+        {
+         "k": "int",
+         "v": "3"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_star_tail_empty",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.star_tail",
+     "args": [
+      {
+       "k": "listE",
+       "items": [
+        {
+         "k": "int",
+         "v": "1"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_star_middle_of_str",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.star_mid",
+     "args": [
+      {
+       "k": "str",
+       "v": "abcd"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_star_too_short",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.star_mid",
+     "args": [
+      {
+       "k": "listE",
+       "items": [
+        {
+         "k": "int",
+         "v": "1"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_star_head_of_str",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.star_head",
+     "args": [
+      {
+       "k": "str",
+       "v": "xyz"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>.case_star_noniterable",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "pyscoping_cases.py:<module>.star_tail",
+     "args": [
+      {
+       "k": "int",
+       "v": "5"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "<module-objects>:<module>",
+  "file": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setGlobal",
+    "x": "<module>pyscoping_cases.py",
+    "e": {
+     "k": "alloc",
+     "cls": "<module>pyscoping_cases.py",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>pyscoping_cases.py"
+     },
+     "f": "_underscored",
+     "v": {
+      "k": "fnref",
+      "v": "pyscoping_cases.py:<module>._underscored"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "<module>pyscoping_cases.py"
+      },
+      "f": "case_default_all",
+      "v": {
+       "k": "fnref",
+       "v": "pyscoping_cases.py:<module>.case_default_all"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setField",
+       "r": {
+        "k": "name",
+        "v": "<module>pyscoping_cases.py"
+       },
+       "f": "case_default_by_keyword",
+       "v": {
+        "k": "fnref",
+        "v": "pyscoping_cases.py:<module>.case_default_by_keyword"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "<module>pyscoping_cases.py"
+        },
+        "f": "case_default_some",
+        "v": {
+         "k": "fnref",
+         "v": "pyscoping_cases.py:<module>.case_default_some"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "<module>pyscoping_cases.py"
+         },
+         "f": "case_global_default_needed",
+         "v": {
+          "k": "fnref",
+          "v": "pyscoping_cases.py:<module>.case_global_default_needed"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "<module>pyscoping_cases.py"
+          },
+          "f": "case_global_default_supplied",
+          "v": {
+           "k": "fnref",
+           "v": "pyscoping_cases.py:<module>.case_global_default_supplied"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "<module>pyscoping_cases.py"
+           },
+           "f": "case_kw_after_varargs",
+           "v": {
+            "k": "fnref",
+            "v": "pyscoping_cases.py:<module>.case_kw_after_varargs"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setField",
+            "r": {
+             "k": "name",
+             "v": "<module>pyscoping_cases.py"
+            },
+            "f": "case_kw_after_varargs_named",
+            "v": {
+             "k": "fnref",
+             "v": "pyscoping_cases.py:<module>.case_kw_after_varargs_named"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setField",
+             "r": {
+              "k": "name",
+              "v": "<module>pyscoping_cases.py"
+             },
+             "f": "case_kwonly",
+             "v": {
+              "k": "fnref",
+              "v": "pyscoping_cases.py:<module>.case_kwonly"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "<module>pyscoping_cases.py"
+              },
+              "f": "case_kwonly_positional_rejected",
+              "v": {
+               "k": "fnref",
+               "v": "pyscoping_cases.py:<module>.case_kwonly_positional_rejected"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setField",
+               "r": {
+                "k": "name",
+                "v": "<module>pyscoping_cases.py"
+               },
+               "f": "case_lambda_default",
+               "v": {
+                "k": "fnref",
+                "v": "pyscoping_cases.py:<module>.case_lambda_default"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "setField",
+                "r": {
+                 "k": "name",
+                 "v": "<module>pyscoping_cases.py"
+                },
+                "f": "case_method_default",
+                "v": {
+                 "k": "fnref",
+                 "v": "pyscoping_cases.py:<module>.case_method_default"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "setField",
+                 "r": {
+                  "k": "name",
+                  "v": "<module>pyscoping_cases.py"
+                 },
+                 "f": "case_method_default_kwonly",
+                 "v": {
+                  "k": "fnref",
+                  "v": "pyscoping_cases.py:<module>.case_method_default_kwonly"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setField",
+                  "r": {
+                   "k": "name",
+                   "v": "<module>pyscoping_cases.py"
+                  },
+                  "f": "case_mutable_default_needed",
+                  "v": {
+                   "k": "fnref",
+                   "v": "pyscoping_cases.py:<module>.case_mutable_default_needed"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "setField",
+                   "r": {
+                    "k": "name",
+                    "v": "<module>pyscoping_cases.py"
+                   },
+                   "f": "case_mutable_default_supplied",
+                   "v": {
+                    "k": "fnref",
+                    "v": "pyscoping_cases.py:<module>.case_mutable_default_supplied"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "setField",
+                    "r": {
+                     "k": "name",
+                     "v": "<module>pyscoping_cases.py"
+                    },
+                    "f": "case_nonlocal_counter",
+                    "v": {
+                     "k": "fnref",
+                     "v": "pyscoping_cases.py:<module>.case_nonlocal_counter"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "setField",
+                     "r": {
+                      "k": "name",
+                      "v": "<module>pyscoping_cases.py"
+                     },
+                     "f": "case_nonlocal_in_a_loop",
+                     "v": {
+                      "k": "fnref",
+                      "v": "pyscoping_cases.py:<module>.case_nonlocal_in_a_loop"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "setField",
+                      "r": {
+                       "k": "name",
+                       "v": "<module>pyscoping_cases.py"
+                      },
+                      "f": "case_nonlocal_shared_between_closures",
+                      "v": {
+                       "k": "fnref",
+                       "v": "pyscoping_cases.py:<module>.case_nonlocal_shared_between_closures"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "setField",
+                       "r": {
+                        "k": "name",
+                        "v": "<module>pyscoping_cases.py"
+                       },
+                       "f": "case_nonlocal_through_two_levels",
+                       "v": {
+                        "k": "fnref",
+                        "v": "pyscoping_cases.py:<module>.case_nonlocal_through_two_levels"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "setField",
+                        "r": {
+                         "k": "name",
+                         "v": "<module>pyscoping_cases.py"
+                        },
+                        "f": "case_posonly",
+                        "v": {
+                         "k": "fnref",
+                         "v": "pyscoping_cases.py:<module>.case_posonly"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "setField",
+                         "r": {
+                          "k": "name",
+                          "v": "<module>pyscoping_cases.py"
+                         },
+                         "f": "case_posonly_keyword_rejected",
+                         "v": {
+                          "k": "fnref",
+                          "v": "pyscoping_cases.py:<module>.case_posonly_keyword_rejected"
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "setField",
+                          "r": {
+                           "k": "name",
+                           "v": "<module>pyscoping_cases.py"
+                          },
+                          "f": "case_posonly_name_goes_to_kwargs",
+                          "v": {
+                           "k": "fnref",
+                           "v": "pyscoping_cases.py:<module>.case_posonly_name_goes_to_kwargs"
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "setField",
+                           "r": {
+                            "k": "name",
+                            "v": "<module>pyscoping_cases.py"
+                           },
+                           "f": "case_star_head_of_str",
+                           "v": {
+                            "k": "fnref",
+                            "v": "pyscoping_cases.py:<module>.case_star_head_of_str"
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "setField",
+                            "r": {
+                             "k": "name",
+                             "v": "<module>pyscoping_cases.py"
+                            },
+                            "f": "case_star_middle_of_str",
+                            "v": {
+                             "k": "fnref",
+                             "v": "pyscoping_cases.py:<module>.case_star_middle_of_str"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "setField",
+                             "r": {
+                              "k": "name",
+                              "v": "<module>pyscoping_cases.py"
+                             },
+                             "f": "case_star_noniterable",
+                             "v": {
+                              "k": "fnref",
+                              "v": "pyscoping_cases.py:<module>.case_star_noniterable"
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "setField",
+                              "r": {
+                               "k": "name",
+                               "v": "<module>pyscoping_cases.py"
+                              },
+                              "f": "case_star_tail_empty",
+                              "v": {
+                               "k": "fnref",
+                               "v": "pyscoping_cases.py:<module>.case_star_tail_empty"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "setField",
+                               "r": {
+                                "k": "name",
+                                "v": "<module>pyscoping_cases.py"
+                               },
+                               "f": "case_star_tail_of_tuple_is_a_list",
+                               "v": {
+                                "k": "fnref",
+                                "v": "pyscoping_cases.py:<module>.case_star_tail_of_tuple_is_a_list"
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "setField",
+                                "r": {
+                                 "k": "name",
+                                 "v": "<module>pyscoping_cases.py"
+                                },
+                                "f": "case_star_too_short",
+                                "v": {
+                                 "k": "fnref",
+                                 "v": "pyscoping_cases.py:<module>.case_star_too_short"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "setField",
+                                 "r": {
+                                  "k": "name",
+                                  "v": "<module>pyscoping_cases.py"
+                                 },
+                                 "f": "case_underscored_default",
+                                 "v": {
+                                  "k": "fnref",
+                                  "v": "pyscoping_cases.py:<module>.case_underscored_default"
+                                 }
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "setField",
+                                  "r": {
+                                   "k": "name",
+                                   "v": "<module>pyscoping_cases.py"
+                                  },
+                                  "f": "dflt_global",
+                                  "v": {
+                                   "k": "fnref",
+                                   "v": "pyscoping_cases.py:<module>.dflt_global"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "setField",
+                                   "r": {
+                                    "k": "name",
+                                    "v": "<module>pyscoping_cases.py"
+                                   },
+                                   "f": "dflt_lits",
+                                   "v": {
+                                    "k": "fnref",
+                                    "v": "pyscoping_cases.py:<module>.dflt_lits"
+                                   }
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "setField",
+                                    "r": {
+                                     "k": "name",
+                                     "v": "<module>pyscoping_cases.py"
+                                    },
+                                    "f": "dflt_mutable",
+                                    "v": {
+                                     "k": "fnref",
+                                     "v": "pyscoping_cases.py:<module>.dflt_mutable"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setField",
+                                     "r": {
+                                      "k": "name",
+                                      "v": "<module>pyscoping_cases.py"
+                                     },
+                                     "f": "kw_after_star",
+                                     "v": {
+                                      "k": "fnref",
+                                      "v": "pyscoping_cases.py:<module>.kw_after_star"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "setField",
+                                      "r": {
+                                       "k": "name",
+                                       "v": "<module>pyscoping_cases.py"
+                                      },
+                                      "f": "kwo",
+                                      "v": {
+                                       "k": "fnref",
+                                       "v": "pyscoping_cases.py:<module>.kwo"
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setField",
+                                       "r": {
+                                        "k": "name",
+                                        "v": "<module>pyscoping_cases.py"
+                                       },
+                                       "f": "loop_total",
+                                       "v": {
+                                        "k": "fnref",
+                                        "v": "pyscoping_cases.py:<module>.loop_total"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "setField",
+                                        "r": {
+                                         "k": "name",
+                                         "v": "<module>pyscoping_cases.py"
+                                        },
+                                        "f": "make_counter",
+                                        "v": {
+                                         "k": "fnref",
+                                         "v": "pyscoping_cases.py:<module>.make_counter"
+                                        }
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "setField",
+                                         "r": {
+                                          "k": "name",
+                                          "v": "<module>pyscoping_cases.py"
+                                         },
+                                         "f": "make_pair",
+                                         "v": {
+                                          "k": "fnref",
+                                          "v": "pyscoping_cases.py:<module>.make_pair"
+                                         }
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "setField",
+                                          "r": {
+                                           "k": "name",
+                                           "v": "<module>pyscoping_cases.py"
+                                          },
+                                          "f": "nonlocal_chain",
+                                          "v": {
+                                           "k": "fnref",
+                                           "v": "pyscoping_cases.py:<module>.nonlocal_chain"
+                                          }
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "setField",
+                                           "r": {
+                                            "k": "name",
+                                            "v": "<module>pyscoping_cases.py"
+                                           },
+                                           "f": "posonly",
+                                           "v": {
+                                            "k": "fnref",
+                                            "v": "pyscoping_cases.py:<module>.posonly"
+                                           }
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "setField",
+                                            "r": {
+                                             "k": "name",
+                                             "v": "<module>pyscoping_cases.py"
+                                            },
+                                            "f": "posonly_kw",
+                                            "v": {
+                                             "k": "fnref",
+                                             "v": "pyscoping_cases.py:<module>.posonly_kw"
+                                            }
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "setField",
+                                             "r": {
+                                              "k": "name",
+                                              "v": "<module>pyscoping_cases.py"
+                                             },
+                                             "f": "star_head",
+                                             "v": {
+                                              "k": "fnref",
+                                              "v": "pyscoping_cases.py:<module>.star_head"
+                                             }
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "setField",
+                                              "r": {
+                                               "k": "name",
+                                               "v": "<module>pyscoping_cases.py"
+                                              },
+                                              "f": "star_mid",
+                                              "v": {
+                                               "k": "fnref",
+                                               "v": "pyscoping_cases.py:<module>.star_mid"
+                                              }
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "setField",
+                                               "r": {
+                                                "k": "name",
+                                                "v": "<module>pyscoping_cases.py"
+                                               },
+                                               "f": "star_tail",
+                                               "v": {
+                                                "k": "fnref",
+                                                "v": "pyscoping_cases.py:<module>.star_tail"
+                                               }
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "setField",
+                                                "r": {
+                                                 "k": "name",
+                                                 "v": "<module>pyscoping_cases.py"
+                                                },
+                                                "f": "Shelf",
+                                                "v": {
+                                                 "k": "fnref",
+                                                 "v": "pyscoping_cases.py:<module>.Shelf<meta>"
+                                                }
+                                               },
+                                               "b": {
+                                                "k": "skip"
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyscoping_cases.py:<module>",
+  "file": "pyscoping_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "str",
+     "v": "Differential fixture for Python calling convention and scoping (STRATEGY.md §58).\n\nEvery `case_*` function takes no arguments. `tests/test_pyscoping_cpython.py` runs each one\nunder CPython and compares the result with the value Core computes for the SAME source\nafter the whole pipeline -- `pysrc2cpg` -> `cartographer/export_ast.sc` ->\n`cartographer/render_lean.py` -> `Autoform/PyScopingProgram.lean` -- pinned by\n`#guard_msgs` in `Autoform/PyScoping.lean`.\n\nNames are deliberately distinctive: `Expr.call` resolves a bare name against the whole\nfunction table by suffix before it looks at local variables, so a local called `f` could\nreach an unrelated function `...x.f`. That is a separate, recorded Core rule; this fixture\ndoes not try to test it.\n"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setGlobal",
+     "x": "dflt_lits",
+     "e": {
+      "k": "fnref",
+      "v": "pyscoping_cases.py:<module>.dflt_lits"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setGlobal",
+      "x": "case_default_all",
+      "e": {
+       "k": "fnref",
+       "v": "pyscoping_cases.py:<module>.case_default_all"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setGlobal",
+       "x": "case_default_some",
+       "e": {
+        "k": "fnref",
+        "v": "pyscoping_cases.py:<module>.case_default_some"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setGlobal",
+        "x": "case_default_by_keyword",
+        "e": {
+         "k": "fnref",
+         "v": "pyscoping_cases.py:<module>.case_default_by_keyword"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setGlobal",
+         "x": "dflt_mutable",
+         "e": {
+          "k": "fnref",
+          "v": "pyscoping_cases.py:<module>.dflt_mutable"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setGlobal",
+          "x": "case_mutable_default_supplied",
+          "e": {
+           "k": "fnref",
+           "v": "pyscoping_cases.py:<module>.case_mutable_default_supplied"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setGlobal",
+           "x": "case_mutable_default_needed",
+           "e": {
+            "k": "fnref",
+            "v": "pyscoping_cases.py:<module>.case_mutable_default_needed"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setGlobal",
+            "x": "GLOBAL_LIMIT",
+            "e": {
+             "k": "int",
+             "v": "4"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setGlobal",
+             "x": "dflt_global",
+             "e": {
+              "k": "fnref",
+              "v": "pyscoping_cases.py:<module>.dflt_global"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setGlobal",
+              "x": "case_global_default_supplied",
+              "e": {
+               "k": "fnref",
+               "v": "pyscoping_cases.py:<module>.case_global_default_supplied"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setGlobal",
+               "x": "case_global_default_needed",
+               "e": {
+                "k": "fnref",
+                "v": "pyscoping_cases.py:<module>.case_global_default_needed"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "setGlobal",
+                "x": "case_lambda_default",
+                "e": {
+                 "k": "fnref",
+                 "v": "pyscoping_cases.py:<module>.case_lambda_default"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setGlobal",
+                  "x": "Shelf",
+                  "e": {
+                   "k": "fnref",
+                   "v": "pyscoping_cases.py:<module>.Shelf<meta>"
+                  }
+                 },
+                 "b": {
+                  "k": "exprS",
+                  "e": {
+                   "k": "fnref",
+                   "v": "pyscoping_cases.py:<module>.Shelf<meta>"
+                  }
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setGlobal",
+                  "x": "case_method_default",
+                  "e": {
+                   "k": "fnref",
+                   "v": "pyscoping_cases.py:<module>.case_method_default"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "setGlobal",
+                   "x": "case_method_default_kwonly",
+                   "e": {
+                    "k": "fnref",
+                    "v": "pyscoping_cases.py:<module>.case_method_default_kwonly"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "setGlobal",
+                    "x": "_underscored",
+                    "e": {
+                     "k": "fnref",
+                     "v": "pyscoping_cases.py:<module>._underscored"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "setGlobal",
+                     "x": "case_underscored_default",
+                     "e": {
+                      "k": "fnref",
+                      "v": "pyscoping_cases.py:<module>.case_underscored_default"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "setGlobal",
+                      "x": "kwo",
+                      "e": {
+                       "k": "fnref",
+                       "v": "pyscoping_cases.py:<module>.kwo"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "setGlobal",
+                       "x": "case_kwonly",
+                       "e": {
+                        "k": "fnref",
+                        "v": "pyscoping_cases.py:<module>.case_kwonly"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "setGlobal",
+                        "x": "case_kwonly_positional_rejected",
+                        "e": {
+                         "k": "fnref",
+                         "v": "pyscoping_cases.py:<module>.case_kwonly_positional_rejected"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "setGlobal",
+                         "x": "kw_after_star",
+                         "e": {
+                          "k": "fnref",
+                          "v": "pyscoping_cases.py:<module>.kw_after_star"
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "setGlobal",
+                          "x": "case_kw_after_varargs",
+                          "e": {
+                           "k": "fnref",
+                           "v": "pyscoping_cases.py:<module>.case_kw_after_varargs"
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "setGlobal",
+                           "x": "case_kw_after_varargs_named",
+                           "e": {
+                            "k": "fnref",
+                            "v": "pyscoping_cases.py:<module>.case_kw_after_varargs_named"
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "setGlobal",
+                            "x": "posonly",
+                            "e": {
+                             "k": "fnref",
+                             "v": "pyscoping_cases.py:<module>.posonly"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "setGlobal",
+                             "x": "case_posonly",
+                             "e": {
+                              "k": "fnref",
+                              "v": "pyscoping_cases.py:<module>.case_posonly"
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "setGlobal",
+                              "x": "case_posonly_keyword_rejected",
+                              "e": {
+                               "k": "fnref",
+                               "v": "pyscoping_cases.py:<module>.case_posonly_keyword_rejected"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "setGlobal",
+                               "x": "posonly_kw",
+                               "e": {
+                                "k": "fnref",
+                                "v": "pyscoping_cases.py:<module>.posonly_kw"
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "setGlobal",
+                                "x": "case_posonly_name_goes_to_kwargs",
+                                "e": {
+                                 "k": "fnref",
+                                 "v": "pyscoping_cases.py:<module>.case_posonly_name_goes_to_kwargs"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "setGlobal",
+                                 "x": "make_counter",
+                                 "e": {
+                                  "k": "fnref",
+                                  "v": "pyscoping_cases.py:<module>.make_counter"
+                                 }
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "setGlobal",
+                                  "x": "case_nonlocal_counter",
+                                  "e": {
+                                   "k": "fnref",
+                                   "v": "pyscoping_cases.py:<module>.case_nonlocal_counter"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "setGlobal",
+                                   "x": "make_pair",
+                                   "e": {
+                                    "k": "fnref",
+                                    "v": "pyscoping_cases.py:<module>.make_pair"
+                                   }
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "setGlobal",
+                                    "x": "case_nonlocal_shared_between_closures",
+                                    "e": {
+                                     "k": "fnref",
+                                     "v": "pyscoping_cases.py:<module>.case_nonlocal_shared_between_closures"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setGlobal",
+                                     "x": "nonlocal_chain",
+                                     "e": {
+                                      "k": "fnref",
+                                      "v": "pyscoping_cases.py:<module>.nonlocal_chain"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "setGlobal",
+                                      "x": "case_nonlocal_through_two_levels",
+                                      "e": {
+                                       "k": "fnref",
+                                       "v": "pyscoping_cases.py:<module>.case_nonlocal_through_two_levels"
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setGlobal",
+                                       "x": "loop_total",
+                                       "e": {
+                                        "k": "fnref",
+                                        "v": "pyscoping_cases.py:<module>.loop_total"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "setGlobal",
+                                        "x": "case_nonlocal_in_a_loop",
+                                        "e": {
+                                         "k": "fnref",
+                                         "v": "pyscoping_cases.py:<module>.case_nonlocal_in_a_loop"
+                                        }
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "setGlobal",
+                                         "x": "star_tail",
+                                         "e": {
+                                          "k": "fnref",
+                                          "v": "pyscoping_cases.py:<module>.star_tail"
+                                         }
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "setGlobal",
+                                          "x": "star_mid",
+                                          "e": {
+                                           "k": "fnref",
+                                           "v": "pyscoping_cases.py:<module>.star_mid"
+                                          }
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "setGlobal",
+                                           "x": "star_head",
+                                           "e": {
+                                            "k": "fnref",
+                                            "v": "pyscoping_cases.py:<module>.star_head"
+                                           }
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "setGlobal",
+                                            "x": "case_star_tail_of_tuple_is_a_list",
+                                            "e": {
+                                             "k": "fnref",
+                                             "v": "pyscoping_cases.py:<module>.case_star_tail_of_tuple_is_a_list"
+                                            }
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "setGlobal",
+                                             "x": "case_star_tail_empty",
+                                             "e": {
+                                              "k": "fnref",
+                                              "v": "pyscoping_cases.py:<module>.case_star_tail_empty"
+                                             }
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "setGlobal",
+                                              "x": "case_star_middle_of_str",
+                                              "e": {
+                                               "k": "fnref",
+                                               "v": "pyscoping_cases.py:<module>.case_star_middle_of_str"
+                                              }
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "setGlobal",
+                                               "x": "case_star_too_short",
+                                               "e": {
+                                                "k": "fnref",
+                                                "v": "pyscoping_cases.py:<module>.case_star_too_short"
+                                               }
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "setGlobal",
+                                                "x": "case_star_head_of_str",
+                                                "e": {
+                                                 "k": "fnref",
+                                                 "v": "pyscoping_cases.py:<module>.case_star_head_of_str"
+                                                }
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "setGlobal",
+                                                 "x": "case_star_noniterable",
+                                                 "e": {
+                                                  "k": "fnref",
+                                                  "v": "pyscoping_cases.py:<module>.case_star_noniterable"
+                                                 }
+                                                },
+                                                "b": {
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "skip"
+                                                 },
+                                                 "b": {
+                                                  "k": "seq",
+                                                  "a": {
+                                                   "k": "skip"
+                                                  },
+                                                  "b": {
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "skip"
+                                                   },
+                                                   "b": {
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "skip"
+                                                    },
+                                                    "b": {
+                                                     "k": "seq",
+                                                     "a": {
+                                                      "k": "skip"
+                                                     },
+                                                     "b": {
+                                                      "k": "seq",
+                                                      "a": {
+                                                       "k": "skip"
+                                                      },
+                                                      "b": {
+                                                       "k": "seq",
+                                                       "a": {
+                                                        "k": "skip"
+                                                       },
+                                                       "b": {
+                                                        "k": "seq",
+                                                        "a": {
+                                                         "k": "skip"
+                                                        },
+                                                        "b": {
+                                                         "k": "seq",
+                                                         "a": {
+                                                          "k": "skip"
+                                                         },
+                                                         "b": {
+                                                          "k": "seq",
+                                                          "a": {
+                                                           "k": "skip"
+                                                          },
+                                                          "b": {
+                                                           "k": "seq",
+                                                           "a": {
+                                                            "k": "skip"
+                                                           },
+                                                           "b": {
+                                                            "k": "seq",
+                                                            "a": {
+                                                             "k": "skip"
+                                                            },
+                                                            "b": {
+                                                             "k": "seq",
+                                                             "a": {
+                                                              "k": "skip"
+                                                             },
+                                                             "b": {
+                                                              "k": "seq",
+                                                              "a": {
+                                                               "k": "skip"
+                                                              },
+                                                              "b": {
+                                                               "k": "seq",
+                                                               "a": {
+                                                                "k": "skip"
+                                                               },
+                                                               "b": {
+                                                                "k": "seq",
+                                                                "a": {
+                                                                 "k": "skip"
+                                                                },
+                                                                "b": {
+                                                                 "k": "seq",
+                                                                 "a": {
+                                                                  "k": "skip"
+                                                                 },
+                                                                 "b": {
+                                                                  "k": "seq",
+                                                                  "a": {
+                                                                   "k": "skip"
+                                                                  },
+                                                                  "b": {
+                                                                   "k": "seq",
+                                                                   "a": {
+                                                                    "k": "skip"
+                                                                   },
+                                                                   "b": {
+                                                                    "k": "seq",
+                                                                    "a": {
+                                                                     "k": "skip"
+                                                                    },
+                                                                    "b": {
+                                                                     "k": "seq",
+                                                                     "a": {
+                                                                      "k": "skip"
+                                                                     },
+                                                                     "b": {
+                                                                      "k": "seq",
+                                                                      "a": {
+                                                                       "k": "skip"
+                                                                      },
+                                                                      "b": {
+                                                                       "k": "seq",
+                                                                       "a": {
+                                                                        "k": "skip"
+                                                                       },
+                                                                       "b": {
+                                                                        "k": "seq",
+                                                                        "a": {
+                                                                         "k": "skip"
+                                                                        },
+                                                                        "b": {
+                                                                         "k": "seq",
+                                                                         "a": {
+                                                                          "k": "skip"
+                                                                         },
+                                                                         "b": {
+                                                                          "k": "seq",
+                                                                          "a": {
+                                                                           "k": "skip"
+                                                                          },
+                                                                          "b": {
+                                                                           "k": "seq",
+                                                                           "a": {
+                                                                            "k": "skip"
+                                                                           },
+                                                                           "b": {
+                                                                            "k": "seq",
+                                                                            "a": {
+                                                                             "k": "skip"
+                                                                            },
+                                                                            "b": {
+                                                                             "k": "seq",
+                                                                             "a": {
+                                                                              "k": "skip"
+                                                                             },
+                                                                             "b": {
+                                                                              "k": "seq",
+                                                                              "a": {
+                                                                               "k": "skip"
+                                                                              },
+                                                                              "b": {
+                                                                               "k": "seq",
+                                                                               "a": {
+                                                                                "k": "skip"
+                                                                               },
+                                                                               "b": {
+                                                                                "k": "seq",
+                                                                                "a": {
+                                                                                 "k": "skip"
+                                                                                },
+                                                                                "b": {
+                                                                                 "k": "seq",
+                                                                                 "a": {
+                                                                                  "k": "skip"
+                                                                                 },
+                                                                                 "b": {
+                                                                                  "k": "seq",
+                                                                                  "a": {
+                                                                                   "k": "skip"
+                                                                                  },
+                                                                                  "b": {
+                                                                                   "k": "seq",
+                                                                                   "a": {
+                                                                                    "k": "skip"
+                                                                                   },
+                                                                                   "b": {
+                                                                                    "k": "seq",
+                                                                                    "a": {
+                                                                                     "k": "skip"
+                                                                                    },
+                                                                                    "b": {
+                                                                                     "k": "seq",
+                                                                                     "a": {
+                                                                                      "k": "skip"
+                                                                                     },
+                                                                                     "b": {
+                                                                                      "k": "seq",
+                                                                                      "a": {
+                                                                                       "k": "skip"
+                                                                                      },
+                                                                                      "b": {
+                                                                                       "k": "seq",
+                                                                                       "a": {
+                                                                                        "k": "skip"
+                                                                                       },
+                                                                                       "b": {
+                                                                                        "k": "seq",
+                                                                                        "a": {
+                                                                                         "k": "skip"
+                                                                                        },
+                                                                                        "b": {
+                                                                                         "k": "seq",
+                                                                                         "a": {
+                                                                                          "k": "skip"
+                                                                                         },
+                                                                                         "b": {
+                                                                                          "k": "seq",
+                                                                                          "a": {
+                                                                                           "k": "skip"
+                                                                                          },
+                                                                                          "b": {
+                                                                                           "k": "seq",
+                                                                                           "a": {
+                                                                                            "k": "skip"
+                                                                                           },
+                                                                                           "b": {
+                                                                                            "k": "seq",
+                                                                                            "a": {
+                                                                                             "k": "skip"
+                                                                                            },
+                                                                                            "b": {
+                                                                                             "k": "seq",
+                                                                                             "a": {
+                                                                                              "k": "skip"
+                                                                                             },
+                                                                                             "b": {
+                                                                                              "k": "skip"
+                                                                                             }
+                                                                                            }
+                                                                                           }
+                                                                                          }
+                                                                                         }
+                                                                                        }
+                                                                                       }
+                                                                                      }
+                                                                                     }
+                                                                                    }
+                                                                                   }
+                                                                                  }
+                                                                                 }
+                                                                                }
+                                                                               }
+                                                                              }
+                                                                             }
+                                                                            }
+                                                                           }
+                                                                          }
+                                                                         }
+                                                                        }
+                                                                       }
+                                                                      }
+                                                                     }
+                                                                    }
+                                                                   }
+                                                                  }
+                                                                 }
+                                                                }
+                                                               }
+                                                              }
+                                                             }
+                                                            }
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       }
+                                                      }
+                                                     }
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

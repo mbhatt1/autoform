@@ -30,13 +30,6 @@
    "reproduction_attempted": true,
    "reproduced": false
   },
-  "ast-Cachetools.json": {
-   "artifact_sha256": "368bf5615c24ea1fecdff4bafe94694340f1ce06a396f0afd32fbb89625f28fd",
-   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/cachetools",
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
   "ast-LangC.json": {
    "artifact_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
    "source_hint": null,

@@ -22,8 +22,9 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `int : Int → Val` | An integer. Width and overflow are **not** properties of the value — they belong to `NumConfig`, selected by the dialect. A `Val.int` is always the mathematical integer that the configured arithmetic produced. |
 | `str : String → Val` | A string *or* a C `char*`. One constructor: see §7, where the operators are dialect-split instead. |
 | `bool : Bool → Val` | A boolean. |
+| `float : Fl → Val` | An IEEE-754 float as a bit pattern plus its format (`Autoform/Lang/Core/Float.lean`). The format comes from the dialect (`Dialect.toFConfig`: `.python` → `FConfig.python`, `.cLike`/`.javascript` → `FConfig.cDouble`). `Val.beq` routes floats through `Fl.eqv`, never bit equality: NaN ≠ NaN and `-0.0 == 0.0`. |
 | `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
-| `list : List Val → Val` | A list. **Immutable** — Core has no boxed containers, which is why `Stmt.setIndex` is a hole. |
+| `list : List Val → Val` | A list VALUE. Immutable: a Python list *display* is not one of these but a `ref` to a heap object whose `Payload` is the list (`Expr.boxContainer`, see `docs/boxed-containers.md`). A `Val.list` still arises from C aggregate initializers, `dict.keys()`-style results and the oracle's encoder, and a write to one is the hole `setIndex:immutable-containers`. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
 | `dict : List (Val × Val) → Val` | An association list, *not* a hash map. Key order is observable in real languages and differs between them, so imposing one language's iteration order would be an invented answer. |
 | `ref : Ref → Val` | A reference to a heap object. Reference identity is what `is` compares. In C, a pointer to a whole object (§2.1). |
@@ -42,6 +43,10 @@ Three derived functions:
 * `Val.unbuiltin` — strips one layer of builtin-base wrapping. Non-recursive, so the
   functions that use it stay plain matchers that reduce by `rfl`.
 
+The interpreter applies the first two to `Heap.view h v`, not to `v`: a reference to a
+boxed list/dict (a Python display) is seen as its current contents, one level deep, so
+`if []:` is false and `for x in xs` iterates the object's elements.
+
 `Val.beq` is hand-written structural equality (the nested `List`/`Prod` occurrences block
 `deriving DecidableEq`). Closures and class closures compare by *name only*, ignoring
 captured environments.
@@ -53,18 +58,52 @@ to build a `bobj` for a class that defines its own `__eq__` (or its own `__init_
 emitting `alloc:builtin-base:<cls>:own-__eq__` instead — `Val.beq` has no dunder dispatch,
 so honouring such a class would mean silently ignoring the override.
 
-There is **no float constructor**. `Autoform/Lang/Core/Float.lean` develops a full
-IEEE-754 model as an explicit bit pattern, but at the time of writing it is not wired into
-`Val`; floats therefore still surface as holes and as skipped differential cases.
+The same holds for every other operation Core performs on a `bobj`'s payload directly —
+indexing, `len`, iteration, `in` and truthiness — so a class overriding any dunder in
+`builtinBaseRefusedDunders` (`__init__`, `__eq__`, `__new__`, `__ne__`, `__getitem__`,
+`__len__`, `__iter__`, `__contains__`, `__bool__`, `__getattribute__`) is refused with
+`alloc:builtin-base:<cls>:own-<dunder>`. `len(x)` of a `bobj` is the payload's length
+(`builtinSeeThrough`, at the interpreter's builtin call site). Arithmetic dunders need no
+refusal: `applyBinop` has no `bobj` case, so `+` on one is already `binop:+`.
+
+**Assumption, not checked:** `__hash__` overrides are accepted (`_HashedTuple` has one).
+Core's `dict` lookup is by `Val.beq` alone, which agrees with CPython for every class
+keeping Python's documented invariant `a == b → hash(a) == hash(b)`; a class that breaks
+it would get the builtin's lookup rather than its own.
+
+**Mutable bases.** A `list`/`dict` base is modelled with value semantics, exactly like
+Core's own containers: a mutating method on one is `mcall:<m>:unboxed-container` and
+`x[k] = v` is `setIndex:immutable-containers`. Faithful mutable subclasses
+(`class Cache(dict)` with in-place updates) wait on the boxed-container work in
+`docs/boxed-containers.md`. `int`/`float` bases are not modelled at all (`BuiltinBase` has
+no constructor for them; the exporter records nothing, so instances stay opaque `ref`s):
+an `int` payload would need `Val.beq`, `applyBinop` and the numeric tower to see through
+the wrapper. `cachetools` (v7.1.7) has no such class: `_HashedTuple(tuple)` is its only
+class with a builtin base, and `Cache` derives from `collections.abc.MutableMapping`, not
+`dict`.
+
+**Floats are partially wired.** `Val.float` and `Lit.float` exist; the exporter emits
+float literals and `render_lean.py` encodes them as exact binary64 bit patterns. Evaluated:
+`+ - * / %` (an `int` operand is promoted; a failed promotion is Python's `OverflowError`),
+the six comparisons (exact `int`/`float` comparison under `.python`, promote-then-compare
+under `.cLike`/`.javascript`; NaN is unordered), unary `-`, truthiness and equality. Still
+holes: float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), C casts to a
+floating type (`op:cast:float`), and `float()`/`str()`/`repr()` (the stdlib model has no
+float builtins). Known wrong answers rather than holes: Python `/` on two ints floors,
+because the exporter maps `//` onto `/` (see "Floating point" in `Semantics.lean`); and float
+`%` is Python's floored remainder under `.cLike` as well as `.python`, which is wrong for
+Java (`-5.5 % 2.0` is `-1.5`); `.javascript` uses the truncated remainder. The differential harness refuses float
+arguments, so none of this is oracle-checked yet.
 
 ## 2. The memory model: `Heap`, `Obj`, `Env`, `Ctx`
 
 ```lean
 abbrev Ref  := Nat
 structure Obj where cls : String; fields : List (String × Val); captured : List (String × Val)
+                    payload : Payload; version : Nat   -- both inert: boxed-containers.md, step 1
 abbrev Heap := List Obj                 -- index into the list is the Ref; alloc appends
 abbrev Env  := List (String × Val)      -- local variables; `set` conses, shadowing
-structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
+structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; globals : Ref
 ```
 
 * **Objects are the only mutable things.** Everything else is a value. Field writes go
@@ -171,7 +210,7 @@ traded for a guaranteed dynamic hole.
 
 | Constructor | Meaning |
 |---|---|
-| `lit : Lit → Expr` | An `int` / `str` / `bool` / `unit` literal. |
+| `lit : Lit → Expr` | An `int` / `str` / `bool` / `float` / `unit` literal. |
 | `name : String → Expr` | Variable read. Resolution order: local `Env`, then the globals frame, then the function table (yielding `Val.fn`), then `unit`. The function-table fallback is what makes higher-order code translatable instead of holed. |
 | `binop : String → Expr → Expr → Expr` | Binary operator by name. `&&`/`\|\|` short-circuit (§5); everything else evaluates left then right. |
 | `unop : String → Expr → Expr` | Unary operator by name (`-`, `!`). |
@@ -187,11 +226,16 @@ traded for a guaranteed dynamic hole.
 | `cond : Expr → Expr → Expr → Expr` | Conditional expression; only the taken branch is evaluated. |
 | `isOp : Bool → Expr → Expr → Expr` | Identity. Reference identity for `.ref`, structural for immediates. The `Bool` means negated (`is not`). |
 | `inOp : Bool → Expr → Expr → Expr` | Membership over lists, tuples, dict keys, and substrings. The `Bool` means negated (`not in`). |
-| `boxNew` / `boxFields` / `boxArray` | Allocate a one-field box, a struct/array block from (key, value) pairs, or a runtime-sized byte block (`$esz` 1). |
-| `irefIndex` / `irefField` / `derefIref` | `&a[i]`, `&s.f` on a boxed block, and `*p` on an interior pointer (in-bounds elements only, §2.1). |
-| `strByte` / `strFrom` | Byte `i` of a string-model `char*`, and its suffix from `i`. |
+| `starred` / `kwargE` / `dstarred` | `*e`, `k = e` and `**e` in an argument list (the calling convention, STRATEGY.md §35). Only meaningful directly inside a call's arguments; anywhere else they are the hole `op:starred-outside-call`. |
 | `ptrOp : String → Nat → Expr → Expr → Expr` | A C pointer comparison, pointer ± integer, or pointer difference, answered from the heap (§2.1). The `Nat` is the static pointee size for arithmetic. |
 | `hole : String → Expr` | An unmapped expression, tagged with the CPG node label that produced it. |
+| `boxNew : Expr → Expr` | Allocate a fresh single-field box (`"v"`) holding the value: an address-taken C local. |
+| `boxFields : List (Expr × Expr) → Expr` | Allocate a fresh multi-field box: a boxed C array (fields `"0"`, `"1"`, …) or struct (member names). |
+| `boxArray : Expr → Expr` | Allocate a box whose length is a *runtime* value, every field `.unit`: `malloc(n)`-shaped byte buffers (element size `$esz` 1, §2.1). |
+| `irefIndex` / `irefField` | `&a[i]` / `&s.f` on a boxed array or struct: yields a `Val.iref`. |
+| `derefIref : Expr → Expr` | `*p` where `p` is a `Val.iref`; an element outside the block is `ub:ptr-deref-out-of-bounds` (§2.1). |
+| `strByte : Expr → Expr → Expr` | C `*p` / `p[i]` on a `char*` byte cursor: the byte as an `int`; reading at the string's length gives `0` (the implicit terminator), further out is a hole. C-family exporter only. |
+| `strFrom : Expr → Expr → Expr` | The suffix of a string from a position: a byte cursor passed on whole, or `p + n` on an untracked `char*`. |
 
 ## 4. Statements (`Stmt`)
 
@@ -201,10 +245,12 @@ traded for a guaranteed dynamic hole.
 | `expr : Expr → Stmt` | Evaluate for effect; discard the value (but not exceptions or holes). |
 | `assign : String → Expr → Stmt` | Local binding — unless a `declGlobal` marker for that name is in scope, in which case it writes the globals frame. |
 | `setField : Expr → String → Expr → Stmt` | `e.f = v`. Non-object receiver: `setField:<f>:non-object`. |
-| `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`. **Always** the hole `setIndex:immutable-containers` — see §8. |
+| `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`, Python only (every other dialect: `setIndex:immutable-containers`). Evaluates `v`, `e`, `i` (CPython's order); a boxed list/dict is written with `Heap.setPayload` on the reference, so every alias sees it; a plain object runs its class's own `__setitem__`; a tuple/str/scalar is `TypeError`; an unboxed list/dict value stays the hole. |
+| `delIndex : Expr → Expr → Stmt` | `del e[i]`, Python only. Mirrors `setIndex`: `KeyError`/`IndexError`/`TypeError` as CPython, a class's own `__delitem__`, otherwise a hole. |
 | `setDerefIref : Expr → Expr → Stmt` | `*p = v` on an interior pointer; an element outside the block is `ub:ptr-store-out-of-bounds` (§2.1). |
 | `seq : Stmt → Stmt → Stmt` | Sequencing. Only a `normal` outcome continues. |
 | `ifte` / `loop` | Conditional and `while`. |
+| `breakBlock : Stmt → Stmt` | Absorbs a `break` but not a `continue`: a C `switch` lowers to an `ifte` chain inside one, so `break` ends the switch while `continue` reaches the enclosing loop. |
 | `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. The CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
 | `ret` / `brk` / `cont` | Return, break, continue — each its own `Ctl` outcome. |
 | `tryCatch : Stmt → String → Stmt → Stmt` | `try/except as x`. Catches **exceptions only**: `ret`/`brk`/`cont` pass straight through, or every `try` containing a `return` would break. |
@@ -215,7 +261,8 @@ traded for a guaranteed dynamic hole.
 | `declGlobal : String → Stmt` | `global x` — records a marker in `Env` that subsequent `assign`s to `x` consult. |
 | `hole : String → Stmt` | An unmapped statement, tagged with the originating CPG node label. |
 
-`Func` is a name, parameter list and body; `Program` is a list of `Func` plus the
+`Func` is a name, parameter list and body, plus optional `vararg`/`kwarg` naming the
+`*args`/`**kwargs` parameters; `Program` is a list of `Func` plus the
 `Dialect` the transpiler recorded. `Func.holes`, `Func.size`, `Func.total`,
 `Program.verifiableCore` are the folds the ledger is computed from. `Func.total` inspects
 only the AST, which is why static hole-freedom is an upper bound rather than a guarantee
@@ -258,7 +305,7 @@ theorems therefore quantify `∀ fuel ≥ N` rather than picking one.
 ## 6. Dialects
 
 ```lean
-inductive Dialect | python | cLike
+inductive Dialect | python | cLike | javascript
 ```
 
 Every program carries the dialect the transpiler inferred (`render_lean.py` infers it from
@@ -286,14 +333,25 @@ The dialect currently controls:
 
 * `Dialect.idiv`/`imod` — floored vs truncated division and remainder.
 * `Dialect.toNumConfig` — the `NumConfig` from `Numeric.lean`: Python gets unbounded
-  integers, `.cLike` gets 32-bit two's complement. (Which C policy is selected —
+  integers, `.cLike` gets 32-bit two's complement, and `.javascript` gets Python's
+  unbounded config (exact up to `Number.MAX_SAFE_INTEGER`; integer `/` and `%` therefore
+  *floor*, which is wrong for JavaScript — see `docs/languages.md`). (Which C policy is selected —
   `c32` surfacing undefined behaviour, or `c32Wrapv` matching what `cc` actually does — is
   a recorded choice, not a default: see §8 and `Numeric.lean`.)
-* String operators: under `.python`, `+` concatenates and `<`/`>`/`==` compare contents;
-  under `.cLike`, a `char*` is an address, so all three are holes rather than the Python
-  answer applied to a C program.
-* `Stdlib` — Python only. Under `.cLike` every builtin and method returns `none`, because
-  answering a C program with Python's builtins is the original modulo bug again.
+* `Dialect.toFConfig` — the float format and rules (`FConfig.python` or
+  `FConfig.cDouble`; §1).
+* `Dialect.comparesIntFloatExactly` — whether `int`/`float` comparison is exact (Python)
+  or promotes the integer first (C, JavaScript).
+* `Dialect.boolOpsAreValues` — whether `and`/`or` yield an operand (Python, JavaScript)
+  or a boolean (C).
+* String operators (`Dialect.stringsAreValues`): under `.python` and `.javascript`, `+`
+  concatenates and `<`/`>`/`==` compare contents; under `.cLike`, a `char*` is an address,
+  so all three are holes rather than the Python answer applied to a C program.
+* `Dialect.fieldsOnDicts` — whether `e.f` on a `dict` value reads key `"f"` (C aggregate
+  initializers, JS object literals) or stays a hole (Python).
+* `Stdlib` — Python only. Under `.cLike` and `.javascript` every builtin and method
+  returns `none`, because answering another language with Python's builtins is the
+  original modulo bug again.
 
 ## 7. Numeric outcomes
 
@@ -348,23 +406,28 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 |---|---|---|
 | ~~`op:starredUnpack`~~ | `*args` / `**kwargs` splicing. **Closed** (STRATEGY.md §35): `Expr.starred` / `Expr.kwargE` / `Expr.dstarred` and `Func.vararg` / `Func.kwarg` express it. The label no longer occurs. | Implemented. What remains is narrower and separately named: `op:starred-outside-call`, `call:<f>:keyword-to-builtin`. |
 | `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here and is now mapped to `/`, because the dialect already makes `/` floor under `.python` — check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
-| `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (Core has no float value, as for `lit:float`). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` is blocked on `Float.lean`; `char-signedness` needs a target-ABI parameter; `int-to-pointer` is a hole **by choice** (§2.1): what remains is an operand statically known to be an integer, or an integer constant (`(sqlite3_destructor_type)-1`, `(T*)8`). An operand with no type evidence is `unop "cast:ptr"`, decided at run time. |
+| `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (`Val.float` exists, but the int↔float conversion is not wired into the exporter). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` needs the conversion wired (`FConfig.ofInt` exists); `char-signedness` needs a target-ABI parameter; `int-to-pointer` is a hole **by choice** (§2.1): what remains is an operand statically known to be an integer, or an integer constant (`(sqlite3_destructor_type)-1`, `(T*)8`). An operand with no type evidence is `unop "cast:ptr"`, decided at run time. |
 | `op:sizeOf:<kind>` | A `sizeof` that could not be folded to a constant. Folding uses the exporter's `dataModel` for pointer and `long`-family widths and standard C layout for aggregates (members in source order, each at the next multiple of its own alignment; an array has its element's alignment; an aggregate the maximum of its members'; 8-byte scalars are refused under ILP32, where their in-struct alignment is ABI-dependent). An aggregate is refused (`object`) when a member is a bit-field, when the struct is packed, when its tag has more than one distinct definition, when a `#if` in its body cannot be decided for the parsed configuration (only `#ifdef`/`#ifndef`/`defined()` of macros the corpus never defines and the frontend was not given are decided; see `cppDefines`), or when Joern's member list is not exactly the declarators of the source (it omits function-pointer members and lists every `#if` branch). `array-bound`: an array whose bound is neither a literal, an integer constant expression over literals, a resolvable `NAME±N` macro, nor (for `T x[] = {...}`) a countable initializer. `model-dependent`, `opaque-type`, `unknown-type`, `pointer` as for casts. | Not yet implemented beyond the shapes named. |
 | `op:shiftRight:unknown-signedness`, `op:shiftRight:64-bit-operand` | C `>>` is arithmetic or logical depending on the promoted left operand's signedness, which is taken from resolved types only (typedef chains, casts, literals, the usual arithmetic conversions; enums and bit-fields are refused). `unknown-signedness`: that type did not resolve. `64-bit-operand`: it did, and it is wider than the 32-bit arithmetic Core's `.cLike` dialect performs. | `64-bit-operand` needs width-typed arithmetic in Core. |
 | `stmt:va_arg` | A statement reading a variadic argument with `va_arg(ap, T)`. The frontend cannot parse it (the second argument is a type), and Core has no C variadic calling convention to read from. | Needs a variadic-argument model in Core. |
-| `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]`, slice deletion, attribute deletion. | Blocked on boxed containers (index/slice); the rest not yet implemented. |
+| `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]` outside Python (Python's is `Stmt.delIndex`), slice deletion, attribute deletion. | Slices need a slice value (`docs/boxed-containers.md` §9); the rest not yet implemented. |
 | `op:dictLiteral-nonempty`, `op:stringExpressionList`, `op:fieldAccess-shape` | CPG node shapes the exporter does not recognise. | Not yet implemented. |
 | `op:raise-bare` | A bare `raise` re-raising the in-flight exception; Core has no ambient current-exception. | Not yet implemented. |
 | `control:TRY-finally-escaping` | `try/finally` whose body can `return`/`break`. The non-escaping case *is* translated; when control escapes, `ret` would bypass the trailing finalizer. | Design-limited; needs a richer `Ctl` interaction than one `tryCatch` can express. |
 | `control:TRY-else-without-except`, `control:TRY-multiCatch`, `control:TRY-multiFinally`, `control:TRY-shape` | `try/except/else` (the `else` must run only when nothing was raised, *and* its own exceptions must not be caught), multiple `except` clauses (the CPG discards exception types), and unrecognised `try` shapes. | Partly permanent (the CPG loses the exception types), partly not yet implemented. |
 | `control:WHILE-iterator` | A desugared iterator loop the exporter could not reconstruct into `forIn`. | Not yet implemented. |
-| `scope:nonlocal-write` | A write to an enclosing function's binding. Capture is by value, so a closure cannot mutate its enclosing frame. | **Permanent by design** until `Env` becomes shared mutable cells — see below. |
+| `scope:nonlocal-write` | A `nonlocal x` whose `x` resolves to no enclosing function binding (a `SyntaxError` in CPython). Every resolvable `nonlocal` is translated by **cell conversion** (STRATEGY.md §58): the owner allocates `x` as a one-field heap cell (`Expr.boxNew`) and every read/write of `x`, in the owner and in every closure, goes through it. | Residual only: 0 in `ast-Cachetools.json` (8 before the item-L re-export, which is the first committed export to carry cell conversion). |
+| `scope:del-cell` | `del x` where `x` is such a cell. Core's `del` would drop this frame's reference to the cell rather than empty it for every closure. | Not yet implemented. |
+| `param:default-nonliteral` | A parameter default that is not a literal (`acc=[]`, `t=time.monotonic`, `f=Cache.__setitem__`). `pysrc2cpg` drops default expressions entirely; the exporter reads the default's *text* back from the source, and can translate only literals, for which evaluating once at `def` time and once per call cannot be told apart. Sits in `Func.defaults`, not the body: it is raised only by a call that omits the argument, and counted by `Func.holes`. | Needs `def` statements to execute in Core (a value captured when the function object is created) **and** a CPG node for the default expression, which Joern does not provide. |
+| `param:signature-unparsed` | The exporter could not read the function's parameter list back from the source into exactly the CPG's parameters, so its defaults / keyword-only / positional-only markers are unknown. Prefixed to the whole body. | Residual parser limits (0 in a fresh export of `cachetools` v7.1.7). |
 | `scope:class-closure` | A class defined inside a function whose methods read the enclosing scope, where `classClosure` does not apply. | Being closed; check the current AST. |
 | `assign:arity`, `assign:lhs:<shape>`, `assign:aug-impure-target`, `assign:aug-impure-receiver` | Multiple assignment targets, assignment to a shape Core has no statement for, and augmented assignment whose target or receiver would have to be evaluated twice. | Mostly not yet implemented; the "impure" ones are a correctness refusal, not a gap. |
 | `op:indirection:<kind>`, `assign:lhs:indirection`, `op:<incr>:unsupported-target` | `*p` read, `*p = v` / `*p op= v`, and `(*p)++` where `p` is not provably an interior pointer (`Val.iref`), an alias of one boxed local, or a closed out-parameter. `<kind>` is `addrKind` of `p`'s static type (`pointer`, `scalar`, `object`, `unknown-type`, `opaque-type`). What remains is mostly `p` a parameter of a function with an external or unclosable caller (the public C API), `p` a struct pointer dereferenced whole (`*pA = *pB` struct copy), and pointers loaded from fields/arrays. `&n` of a boxed scalar is `irefField n "v"`, so a scalar out-parameter and an `&s->f`/`&a[i]` out-parameter are the same runtime shape and a callee's `*p` is `derefIref`/`setDerefIref` for both. A cast that changes the pointee type of a scalar (`*(char*)&one`, `*(i64*)&u64Val`, `f((u32*)&intVal)`) is a reinterpretation of bits, so it is never seen through and the dereference stays one of these holes; pointer-to-pointer pointee changes (`(void**)&pData`) are allowed because Core pointer values carry no C type. | Needs a location model for pointers of unknown provenance, and a byte-level memory model for type punning; not yet implemented. |
 | `call:computed-callee`, `call:no-callee-name` | A call whose callee is an expression rather than a name the CPG resolved. | Not yet implemented. |
+| `call:through-cell` | A Python call `f(...)` where `f` is a local or captured name held in a `nonlocal` cell. A call through any other local or captured name is emitted *by that name* (`Expr.call "f"`), never by the function `pysrc2cpg` resolved by short name, unless that function is the one `def f` binding `f` in that very scope (docs/conformance.md, finding 2). A cell holds the function one field down, and `Expr.call` takes a name, not a value. | Not yet implemented (needs a call-a-value form in Core). |
+| `gen:generator`, `gen:yield` | A Python generator function, and each `yield` / `yield from` in it (statement or value position). `pysrc2cpg` lowers `yield` to a `RETURN` node; it was translated as `return`, i.e. "return the first element" (docs/conformance.md, finding 1). Calling a generator runs none of its body, so `gen:generator` is prefixed to the whole body; the body is kept after it for reading only. Eager materialisation into a list was rejected: wrong for an infinite generator, a consumer that stops early, and a body that reads mutable state between yields (`TTLCache.__iter__`). | Needs suspension (a generator value) in Core. |
 | `import:module-value`, `import:unresolved`, `import:absent:external`, `import:absent:prefix-in-cpg`, `import:absent:relative` | A module used as a value, or an import the CPG could not resolve. The `absent:` labels split the second case by *why*: the module is external to the CPG, a proper prefix of its path is in the CPG (so more resolver work could reach it), or it is a relative import whose target is missing. | Permanent for genuinely external modules; that is the boundary the assurance case declares. `absent:prefix-in-cpg` is the part that is not permanent. |
-| `lit:float`, `lit:unquoted` | A float literal (Core has no float value) and a literal the exporter could not decode. | `lit:float` is blocked on wiring `Float.lean` into `Val`. |
+| ~~`lit:float`~~, `lit:unquoted` | `lit:float` was a float literal before Core had a float value; the exporter now emits `{"k": "float"}` and the label no longer occurs. `lit:unquoted` is a literal the exporter could not decode. | `lit:float`: implemented. |
 | `expr:BLOCK`, `expr:BLOCK-impure`, `expr:BLOCK-prelude`, `expr:empty-block`, `expr:genExp`, `expr:<label>` | Statement-expressions and generator expressions. `genExp` needs laziness Core does not have. In C/C++ a BLOCK in a *prelude-aware* position (`exprV`: conditions, returns, assignment RHS, call arguments, operands) that is a pure comma expression (`(e1, e2)`, or a multi-child macro expansion such as `UNUSED_PARAMETER2`) is translated as `e1` run as a statement then `e2` as the value; a block containing a declaration (`SWAP(T,a,b)` expanding to `{T t=a; ...}`: block scope Core's flat environment cannot express) or a statement stays a hole. | Mixed. |
 | `control:GOTO` | A `goto` none of the lowerings in `methodBody` proves safe. Translated today: a forward jump to the single top-level label (`while(true){...;break}`); jumps to several top-level labels whose tail ends in a `return` **or falls off the end of the function** (the tail is spliced at the jump with an explicit `return` appended, which `applyFunc` makes identical to falling off the end); a backward jump to a single top-level restart label, from outside any loop/switch (`while(true){ tail; break }` with `goto` as `continue`); and a jump to a label inside the body of the jump's innermost enclosing loop or switch (directly, or through plain `{}` blocks): the rest of that body from the label is spliced at the jump, followed by `continue` (loop) or `break` (switch). Everything else — jumps into nested blocks, backward jumps from inside loops, mixtures of a restart label with other labels, label cycles — stays a hole. | Partly implemented; the remainder needs a general reducible-CFG structuring pass or a Core `Stmt.label`/`goto`. |
 | `control:FOR:elided-clause` | A `for` with fewer than four children whose clauses could not be identified. Omitted clauses are resolved when the children's CPG `order` (init 1, cond 2, step 3, body 4) *and* the blank clauses of the header text agree; an omitted condition is `true` (C11 6.8.5.3p2). | Residual only on disagreement. |
@@ -393,11 +456,22 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `mcall:<m>:unboxed-container` | A *mutating* container method. Honouring it would update a temporary, because the CPG has already desugared `self.d.pop(k)` into `t = self.d; t.pop(k)`. |
 | `mcall:dangling-ref` | The receiver's ref is not in the heap. |
 | `index:unsupported` | Subscript of something that is not a list, tuple or dict. |
+| `index:negative` | A negative list/tuple index outside `.python` (Python counts from the end: `xs[-1]` is the last element; no other dialect has a meaning Core models). |
+| `param:default-nonliteral` | A call that omits an argument whose default is this static hole (see above). |
+| `call:<unpackEx>` | Starred assignment (`a, *b = obj`) from an object whose iterability depends on its class's `__iter__`. |
 | `in:non-container`, `in:non-str-in-str` | Membership on a value that cannot be searched. |
 | `forIn:non-iterable` | Iterating a non-iterable. |
-| `setIndex:immutable-containers` | *Any* `e[i] = v`. Containers are values, so a write cannot be observed by anything else holding the container. |
+| `setIndex:immutable-containers`, `delIndex:immutable-containers` | `e[i] = v` / `del e[i]` on an UNBOXED list/dict value (or in a non-Python dialect). Core does not know who else holds a value, so a write through it cannot be honoured. |
+| `setIndex:<Cls>:no-own-__setitem__`, `delIndex:<Cls>:no-own-__delitem__`, `setIndex:<Cls>`, `delIndex:<Cls>` | Subscript write/delete on a plain object whose class does not itself define the dunder (an inherited one needs the MRO Core does not have), or whose dunder did not resolve. |
+| `setIndex:list:index-shape`, `delIndex:list:index-shape` | A boxed list subscripted by something that is neither an integer nor a value CPython rejects outright (a reference, which may define `__index__`). |
+| `forIn:container-mutated-during-iteration` | The loop wrote to the boxed container it iterates. Core iterates a snapshot, which is only right if nothing changed (CPython's list iterator would see the write; its dict iterator raises). |
+| `mcall:dict.<m>:live-view-not-modelled` | `keys()`/`values()`/`items()` on a boxed dict: a snapshot list would go stale at the next write. |
+| `mcall:<m>:boxed-element-equality`, `call:<f>:boxed-key` | A stdlib method/builtin that compares elements with the heap-free `Val.beq` (`count`, `index`, `remove`, `dict(pairs)`), handed a boxed container inside what it compares. |
+| `field:<f>:builtin-container`, `setField:<f>:builtin-container` | Attribute read (absent) / write on a boxed list or dict. CPython: `AttributeError`. |
+| `boxContainer:non-container`, `boxContainer:non-python`, `mcall:<m>:payload-shape`, `setIndex:dangling-ref`, `delIndex:dangling-ref` | Shapes the exporter never produces; a hole rather than a guess if one ever does. |
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |
-| `ub:<reason>` | The configured integer arithmetic says the source language does not define this operation. |
+| `ub:<reason>` | The configured integer (or float) arithmetic says the source language does not define this operation. |
+| `binop://:float-floordiv`, `float:pow`, `float:format-mismatch`, `binop:<op>:non-numeric` | Float `//` and `**` (not modelled), a float of the wrong format for the dialect, and float arithmetic against a non-number. `Float.lean`'s `unmodelled` results also surface here under their own labels. |
 | `str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`, `str:pointer-equality-not-modelled` | A C string operation under `.cLike`, or a `ptrOp` on a string-model `char*` (no address). |
 | `ub:ptr-out-of-bounds`, `ub:ptr-arith-out-of-bounds`, `ub:ptr-deref-out-of-bounds`, `ub:ptr-store-out-of-bounds`, `ub:ptr-compare-cross-object`, `ub:ptr-diff-cross-object`, `ub:ptr-order-null`, `ub:ptr-arith-null` | The address model (§2.1): a pointer operation C leaves undefined. |
 | `ptr:eq-one-past-unspecified` | One-past-the-end of one block compared for equality with another block: C leaves the result unspecified. |
@@ -413,17 +487,16 @@ The distinction tells you whether a hole is work or a boundary.
 
 **Boundaries** (closing them means changing the design):
 
-* `scope:nonlocal-write` and global *rebinding*. Making these work requires every scope to
-  be a heap frame and `Env` to be references — a large refactor of the interpreter and a
-  re-repair of the entire refinement layer. Implementing writes by copying values back
-  would appear to work on simple cases and be silently wrong on aliased ones. Reads across
-  scopes work and are correct; writes are a hole.
+* Global *rebinding* from a function. (`nonlocal` writes are no longer here: they are
+  translated by converting exactly the variables some inner function declares `nonlocal`
+  into heap cells, which needs no change to `Env` — STRATEGY.md §58.)
 * `cstr:*` and `str:pointer-*`. Core has one `Val.str` for Python strings and C `char*`.
   Core now models addresses for blocks (§2.1), but a string-model `char*` is still a
   value with no address, so its comparisons and backward steps are refused.
-* `op:starred-outside-call`. A starred form outside an argument list (`a, *b = xs`) is
-  a *destructuring* pattern, not a call, and Core has no pattern binding. The calling
-  convention (§35) covers the call side only.
+* `op:starred-outside-call`. A starred form outside an argument list. Starred
+  *assignment* (`a, *b, c = xs`) no longer reaches it: the exporter recognises
+  `pysrc2cpg`'s lowering of it and emits `Stdlib.unpackEx` (STRATEGY.md §58). What is left
+  is starred forms in other positions (`for a, *b in ...`, nested targets).
 * `import:*` for genuinely external modules — the effect boundary itself, which the SACM
   case declares as an assumption.
 * `ub:*`. The semantics refusing to commit where the source language does not define an
@@ -431,10 +504,13 @@ The distinction tells you whether a hole is work or a boundary.
 
 **Work** (a known design would close them):
 
-* `setIndex:immutable-containers`, `mcall:*:unboxed-container`, `op:delete-index/slice` —
-  all one feature: boxed mutable containers. See `docs/boxed-containers.md`.
-* `lit:float` and the float skips in the differential oracle — wiring `Float.lean` into
-  `Val`.
+* `setIndex:immutable-containers`, `mcall:*:unboxed-container` on what remains unboxed,
+  `op:delete-slice`, `forIn:container-mutated-during-iteration`,
+  `mcall:dict.*:live-view-not-modelled` — the rest of boxed mutable containers. Python
+  displays are boxed; what remains is listed in `docs/boxed-containers.md`.
+* The rest of floats: `op:cast:float`, `binop://:float-floordiv`, `float:pow` and the
+  float builtins. Literals and arithmetic are wired (§1), and the differential oracle now
+  encodes float arguments.
 * `control:TRY-*` beyond the translated shapes — a richer control-flow encoding.
 * `call:<name>` for stdlib callees — more of `Stdlib.lean`. This is the largest single
   lever on the verifiable core, because a function is only as analysable as its callees.

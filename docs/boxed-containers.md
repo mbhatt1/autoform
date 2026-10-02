@@ -1,7 +1,121 @@
 # Boxed containers for Core
 
-**Status: steps 1 and 2 landed; steps 3-5 unimplemented.** Read this before changing
-`Syntax.lean` or `Semantics.lean`.
+**Status: steps 1-4 landed for Python (the 2026-10 section directly below says how, where
+it departs from this design, and why); step 5 -- the oracle's encoder -- is not done.**
+Read this before changing `Syntax.lean` or `Semantics.lean`.
+
+## Steps 3-4 as landed (Python)
+
+### What changed
+
+* **A display is an object.** The exporter wraps every Python list display and `{}` in
+  `Expr.boxContainer` (`.py` files only). It evaluates the inner `listE`/`dictE` and
+  allocates an `Obj` of class `list`/`dict` whose `Payload` holds the contents. Joern
+  lowers a non-empty dict display and every comprehension to an empty display followed by
+  `d[k] = v` / `.append`, so all of them are boxed. Results of `list(x)`, `dict(x)`,
+  `sorted(x)` and `xs.copy()` are boxed too (fresh objects in CPython).
+* **`Stmt.setIndex`** (evaluates `v`, `e`, `i`: CPython's order) writes a boxed container
+  with `Heap.setPayload` on the reference. **`Stmt.delIndex`** is new and replaces the
+  exporter's `op:delete-index` for Python. Both run a plain object's OWN
+  `__setitem__`/`__delitem__`; a tuple/str/scalar is `TypeError`; an unboxed list/dict
+  value keeps the original hole. Non-Python dialects are untouched (the old hole,
+  unevaluated).
+* **Mutating methods** (`append`, `pop`, `insert`, `extend`, `clear`, `remove`,
+  `setdefault`, `update`, `popitem`) on a boxed receiver go through `Stdlib.method`
+  unchanged and the new receiver value is written back with `setPayload` -- to the
+  reference, never to the receiver expression, so `t = self.d; t.pop(k)` reaches `self.d`.
+* **Readers see through the heap one level** (`Heap.view`): `index`, `in`, truthiness in
+  `if`/`while`/`and`/`or`/`not`/`cond`, `for`, `*xs`, `**d`, `xs + ys`, builtin-base
+  construction, and the builtins in `Boxed.viewedBuiltins`.
+* **`==` is `Val.eqPy` on every container**, not only on references (`(xs,) == ([1],)`
+  compares a boxed list at depth 1), boxed-vs-unboxed compares contents, and dict equality
+  is now order-insensitive (it was positional, which CPython's is not). `in` on a list or
+  tuple uses `Val.eqPy` per element.
+* **Negative indices** count from the end under Python. Before this change `Int.toNat`
+  clamped them, so `(7, 8, 9)[-1]` read `7` -- a silent wrong answer on every Python corpus.
+  Outside Python a negative index is the hole `index:negative`.
+
+### Where this departs from the design above, and why
+
+1. **A wrapper constructor, not a change to `listE`/`dictE`** (§1). C aggregate
+   initializers and JS/Java literals also translate to `listE`/`dictE`, and C copies
+   structs by value; re-meaning the shared constructors would have changed every C corpus.
+   The exporter knows the source language; the semantics does not need to guess it.
+2. **Snapshot iteration is kept, but guarded** (§4 says it must not be retained). Iterating
+   a snapshot is exact as long as nothing writes to the object during the loop, and
+   `Obj.version` detects the write: a loop whose container's version moved ends in
+   `forIn:container-mutated-during-iteration` instead of an answer. This is sound and
+   conservative (a loop that writes and then returns before the next element would have
+   agreed with CPython and is still refused), and it avoids a new mutually recursive
+   iterator in `execFor` -- and with it a new arm of the fuel-monotonicity proof.
+3. **Dict views are refused** (§2 treated `keys()`/`values()`/`items()` as reads). A
+   snapshot list is right until the next write and silently stale after it; boxing is
+   exactly what makes "after it" reachable. `mcall:dict.<m>:live-view-not-modelled`.
+4. **`Val.beq` is NOT split; heap-free consumers are guarded instead** (§5's cost table).
+   `Stdlib` keeps comparing with `Val.beq`; a method or builtin that would compare a boxed
+   reference by address (`count`, `index`, `remove`, `dict(pairs)`) holes
+   (`mcall:<m>:boxed-element-equality`, `call:<f>:boxed-key`), and a dict key that is
+   unhashable (a list or dict, boxed or not, or a tuple holding one) is CPython's
+   `TypeError` before `Val.beq` ever sees it. Hashable keys contain no boxed reference, so
+   `Val.beq` on keys stays exact.
+5. **The fuel-monotonicity proof needed one new arm per statement**, and `Refine.lean`'s
+   truthiness lemmas now state `(h.view v).truthy`; no theorem lost its content. Three
+   generated cachetools accessor theorems and four hand-written `CachetoolsSpec` theorems
+   gained a precondition CPython imposes too (the receiver is a plain object; a membership
+   probe is hashable); the `Basis` accessor lemmas take it as an auto-param discharged for
+   every non-Python program, so no C/C++ theorem changed.
+
+Also found on the way and fixed separately (commit "export_ast: do not box Python
+class-typed locals as C structs"): the C boxed-aggregate prologue was running on Python
+methods, rebinding a class-typed local such as `LFUCache` (inside
+`LFUCache.__setitem__`) to a fresh `<local>` box. 43 of the 209 cachetools 7.1.7 methods
+carried such a prologue with the exporter at 46c65fc.
+
+### Evidence
+
+* `Autoform/BoxedContainers.lean`: 30 kernel-checked evaluations of hand-written Core
+  programs (aliasing, append/pop through aliases and temporaries, dict set/get/del,
+  insertion order, `==`/`is`/`in`, negative and out-of-range indices, unhashable keys,
+  truthiness, and each refusal).
+* `tests/test_boxed_containers.py`: 34 Python functions run through the REAL exporter
+  (pinned Joern 4.0.606 + pysrc2cpg) and renderer and compared with CPython 3.11: 31 agree,
+  the 3 unmodelled shapes are pinned as holes, 0 diverge.
+* cachetools 7.1.7 (GitHub tag `v7.1.7`, commit `01af8e5`), ledger
+  (`scripts/ledger.lean.tmpl`), exporter at 46c65fc vs this change:
+
+  | | before | after |
+  |---|--:|--:|
+  | holes | 26 | 20 |
+  | `op:delete-index` | 6 | 0 |
+  | hole-free | 184 / 209 | 190 / 209 |
+  | verifiable core | 105 / 209 | 107 / 209 |
+  | dynamic-hole risk | 890 | 896 |
+
+  The other hole causes are unchanged (`scope:nonlocal-write` 8, `call:computed-callee` 6,
+  `expr:genExp` 2, `op:delete-slice` 2, `op:stringExpressionList` 1,
+  `control:TRY-multiCatch` 1). `setIndex` was never a STATIC hole -- it held at run time --
+  so the ledger understates the change.
+* `scripts/differential.py` on the same tree (CPython 3.11, the suite's own tests), AST
+  without boxing vs with boxing, both under the new semantics: 246/248 agree in both,
+  the same 2 divergences in both (`TLRUCache.__getitem__` reaching a test-file subclass's
+  `__missing__`, which Core resolves to `Cache.__missing__`: not introduced here),
+  functions exercised 106 -> 111, INCONCLUSIVE 290 -> 315 (the 5 functions that became
+  hole-free when `del d[k]` was translated now run and stop at other, pre-existing holes).
+
+### What remains
+
+* **Step 5, the encoder.** `differential.py` and `core_oracle.py` still encode a receiver's
+  list/dict fields as VALUES, so `self._Cache__data[k] = v` on an encoded receiver is still
+  `setIndex:immutable-containers`, and `skip_self_not_object` is unchanged. §8 is the
+  plan; the receiver `base` arithmetic and the `base - 1` fault injection must be redone
+  with it. (`core_oracle.py` does not run at 46c65fc at all: its probe opens
+  `Autoform.Generated` rather than the per-corpus namespace.)
+* Live dict views; `list.sort`/`reverse`; slice reads, writes and deletes; `__setitem__`
+  inherited through a translated base class (needs an MRO); `list`/`dict` SUBCLASS
+  receivers (`Val.bobj`, still value semantics); `**kwargs` dicts and `*args` tuples are
+  unboxed values (mutating a `kwargs` dict holes).
+* `True == 1` is `False` in Core (`Val.beq` has no bool/int case), so `d[True]` misses a
+  key `1`. Pre-existing and not introduced here, but boxing makes dict writes reachable.
 
 Step 2 landed WITHOUT re-typing `applyBinop`, which this document proposed and which is the
 wrong trade: 155 call sites, and it destroys the reducible scalar path that `Refine.lean`'s
@@ -20,10 +134,12 @@ heap-inert.
 Step 2 splits into two halves that are NOT equally separable. `Val.identical` (the `is` half,
 section 5) is landed: it is total, heap-free, and touches one call site, and it made `is`
 strictly more honest at no cost to the oracle (35 compared / 169-174 agree, unchanged). The
-`Val.eqPy` half is not landed, and is the piece this document calls the largest mechanical
-cost of the design -- `Val.beq` is structurally recursive and reducible by `rfl`/`decide`,
-which `Refine.lean` depends on, so re-typing it to take a heap and fuel cannot be sliced into
-a piece that leaves the corpora verifying.
+`Val.eqPy` half was at first judged unsliceable -- `Val.beq` is structurally recursive and
+reducible by `rfl`/`decide`, which `Refine.lean` depends on, so re-typing it to take a heap
+and fuel could not be done without breaking the corpora. It landed anyway (step 2b,
+`de8db00`, 2026-08-22) by *not* re-typing `Val.beq`: `Val.eqPy` is a separate heap-aware
+relation, reached only through the `binopNeedsHeap` guard described at the top of this
+section.
 
 Step 1 (`Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`) is in the tree and is
 INERT: nothing constructs a payload other than `.none`. It cost zero proof changes and zero
@@ -37,9 +153,9 @@ The consequences are all currently visible in the ledger and the oracle:
 
 | symptom | where | size |
 |---|---|---|
-| `Stmt.setIndex` is an unconditional hole | `Semantics.lean:608` | `setIndex:immutable-containers` |
+| `Stmt.setIndex` is an unconditional hole | `execStmt`'s `.setIndex` case, `Semantics.lean` | `setIndex:immutable-containers` |
 | `del d[k]` / `del xs[a:b]` are holes | transpiler | `op:delete-index`, `op:delete-slice` |
-| `list.append` / `dict.pop` implemented but unwireable | `Stdlib.lean:376` | `MethodResult.mutating` |
+| `list.append` / `dict.pop` implemented but unwireable | `MethodResult`, `Stdlib.lean` | `MethodResult.mutating` |
 | `dict`/`tuple`-subclass receivers refused by the oracle | `differential.py` | `skip_self_not_object` 1,361 |
 | `==` cannot distinguish "equal" from "the same object" | `Val.beq` | see §5 |
 
@@ -382,7 +498,7 @@ Counts taken from this repository, not estimated:
 | `evalSimp` mechanical lemmas (`evalExpr_*`, `execStmt_*`, `evalList_*`, `applyFunc_*`) | ~40 | **unaffected** |
 
 The "~74 theorems" figure overstates the cost, because of a design decision already taken:
-`PureE` (`Refine.lean:487`) is `lit | name | fnref | unop | binop | cond` — it
+`PureE` (`Refine.lean`) is `lit | name | fnref | unop | binop | cond` — it
 never admitted `listE`, `dictE` or `index`. So `evalExpr_pure_fuel_indep`,
 `evalExpr_pure_fuel_mono` and `evalExpr_pure_heap_inert` — the three load-bearing
 structural theorems, and the expensive ones — are about a fragment that does not allocate,

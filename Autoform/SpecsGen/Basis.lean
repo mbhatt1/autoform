@@ -302,22 +302,34 @@ quantified over *arbitrary* `args` and was true only because surplus arguments w
 silently dropped; it is now false for `args ≠ []`, and stating the domain is the honest
 repair. Nothing in the generated corpora loses a theorem: a projection method is called
 with no arguments.
+
+A fifth, `hbox`, came with boxed Python containers (`docs/boxed-containers.md`): reading an
+absent attribute off a boxed `list`/`dict` is `.hole "field:…:builtin-container"` under
+Python (CPython raises `AttributeError`), not `.unit`. It is an AUTO-PARAM discharged by
+`Or.inl rfl` for every non-Python program, so no C/C++ call site changes; a Python call site
+must say the receiver is not a boxed container.
 -/
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
-    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    (hbox : ctx.dialect.isPython = false ∨
+        ∀ o, h.get r = some o → o.payload.toVal = none := by exact Or.inl rfl) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
+  simp only [hb, bindParams_noParams _ _ hp hv hkw, Func.guardedBody_noParams _ _ hp, hp, kwargsRejected_nil, hpos,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
-        simp [hgr, hf, hc, hm]
+    · have hb : ctx.dialect.isPython = false ∨ o.payload.toVal = none := by
+        rcases hbox with hb | hb
+        · exact Or.inl hb
+        · exact Or.inr (hb o hgr)
+      rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
+        rcases hb with hb | hb <;> simp [hgr, hf, hc, hm, hb]
     · simp [hgr, hf]
 
 /-- The same theorem for the shape a *documented* accessor actually has.
@@ -332,17 +344,23 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (hb : fn.body = .seq (.expr (.lit (.str doc))) (.ret (.field (.name "self") fld)))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
-    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    (hbox : ctx.dialect.isPython = false ∨
+        ∀ o, h.get r = some o → o.payload.toVal = none := by exact Or.inl rfl) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
+  simp only [hb, bindParams_noParams _ _ hp hv hkw, Func.guardedBody_noParams _ _ hp, hp, kwargsRejected_nil, hpos,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
-        simp [hgr, hf, hc, hm]
+    · have hb : ctx.dialect.isPython = false ∨ o.payload.toVal = none := by
+        rcases hbox with hb | hb
+        · exact Or.inl hb
+        · exact Or.inr (hb o hgr)
+      rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
+        rcases hb with hb | hb <;> simp [hgr, hf, hc, hm, hb]
     · simp [hgr, hf]
 
 /-! ## 3b. Fuel independence

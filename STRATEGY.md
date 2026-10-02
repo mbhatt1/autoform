@@ -642,6 +642,13 @@ in that module is recorded as having killed it, so per-theorem attribution is co
 aggregate claim (these mutants are now caught) is sound; the per-theorem breakdown is not
 yet trustworthy and should be refined by isolating theorems into separate modules.
 
+*Superseded (2026-10):* re-run with per-theorem attribution on Lean 4.30.0-rc1 over all 48
+mutants of `Autoform/Lang/Imp/*`, with 0 coarse attributions (`mutation-Imp.json`). At the
+theorems above, 18/27 valid `Semantics.lean` mutants and 0/9 store mutants were killed. The
+8/8 figure was not a property of the theorems. The characterization lemmas, evalExpr/store
+laws, `evalStmt_complete` and `evalStmt_hole_complete` raise it to 24/27 and 7/9. The 5
+survivors are equivalent mutants; README "Findings" has the breakdown.
+
 ### Tier 3: audit, portfolio, assurance case
 
 * `scripts/audit_all.py` sweeps all **952** declarations: axiom basis is `propext` (225),
@@ -3207,7 +3214,268 @@ The worktrees are mine, created during this session's work. The contamination wa
 self-inflicted and the fix belongs in the gate regardless -- a checkout of the repository
 inside the repository is a thing that will happen again.
 
-## 57. A C address model: provenance, not addresses
+## 57. Builtin bases, finished: the oracle compared a value that had lost its class
+
+The item as briefed ("`_HashedTuple` instances are opaque `Val.ref`; surfaces as
+`representation:value-vs-object` INCONCLUSIVE") described the tree before §35/§45. On
+`origin/main` 46c65fc the Lean side already had `Val.bobj`, the exporter already emitted
+`classBases`, and the measured `representation:value-vs-object` count was **0**. What was
+left were three faults of the kind §45 names -- the semantics was mostly right and the
+apparatus around it was not -- plus one silent-wrong shape in the semantics itself.
+
+**Measurement.** `scripts/differential.py ast-Cachetools.json <cachetools>/src Cachetools 5
+--tests <cachetools>/tests`, cachetools cloned at **v7.1.7** (01af8e5). `provenance/` does
+not name a revision (`ast-Cachetools.json` is "not reproduced"); v7.1.7 was identified by
+matching the AST's 192 distinct qualified function names (lambdas excluded) against every tag (v7.1.7..v7.2.0 and HEAD
+all match by name) and then by body: the AST's `Cache.__init__` has no `maxsize < 0`
+check (added in v7.1.8) and `_cached._wrapper` has no `warnings.warn` (v7.2.0).
+
+                                   before (46c65fc)   after
+    compared functions                  48 / 209       51 / 209
+    agree / total                     246 / 248      256 / 258
+    divergences                              2              2   (TLRUCache.__getitem__, pre-existing, unrelated)
+    INCONCLUSIVE                           290            295
+      representation:value-vs-object         0              0
+      field:_HashedTuple__hashvalue:non-object  --         5   (new: __hash__ now attempted)
+    skip_self_not_object                 1,358              0
+    _HashedTuple.__add__/__radd__/__getstate__   skipped    compared, agree
+    _HashedTuple.__hash__                skipped           hole (field write on a value)
+
+INCONCLUSIVE rose by 5 because `__hash__` went from *not attempted* to *attempted and
+holed*; that is the honest direction (§45). The full per-label table is
+`conformance.json`'s `inconclusive_detail` from each run.
+
+### What was wrong
+
+1. **The oracle dropped the class on both sides.** CPython's `_HashedTuple((0,))` was
+   encoded as a bare tuple, and Core's `Val.bobj "_HashedTuple" (...)` was unwrapped to
+   its payload before comparison. Every `hashkey` "agreement" was therefore a comparison
+   of contents only: a Core answer that returned a *plain* `(0,)` -- observably different
+   via `type()`, `isinstance(k, _HashedTuple)` and `k + t` -- would have scored as
+   agreement, and so would the reverse. The encoder now reads `classBases` from the AST
+   (same drop-on-conflict rule as `render_lean.py`) and emits `("bobj", cls, payload)`;
+   `same` requires both class and payload; a class on one side only is a divergence, not
+   a shape clash. The payload is read through the *base* type's methods so a subclass's
+   `__str__`/`keys` cannot change what is encoded.
+2. **`_HashedTuple` receivers were never tried.** `skip_self_not_object` refused any
+   receiver that was not a heap `ref` -- 1,358 calls, all of them `_HashedTuple` methods.
+   A `bobj` receiver is exactly what `Expr.mcall` binds, so it is now passed.
+3. **`tuple.__add__` held in a default argument** (`def __add__(self, other,
+   add=tuple.__add__)`) was `call:tuple.__add__`. `unboundBuiltinMethod` answers it on two
+   tuples (either possibly a `bobj`) with a plain tuple, as CPython does, and nothing else:
+   a non-tuple `other` gets `NotImplemented` in CPython, which Core has no value for.
+   Note the harness passes `add` explicitly (CPython's frame holds it as a local); Core
+   still does not fill in omitted defaults, so a Core-internal `k.__add__(t)` holes as
+   `call:add` -- pinned in `Autoform/BuiltinBase.lean` §4.2.
+4. **Silent wrong, in Core.** `allocBuiltin` refused a class overriding `__init__` or
+   `__eq__`, but indexing, `len`, iteration, `in` and truthiness of a `bobj` all go to the
+   payload directly. `class A(tuple)` with its own `__getitem__` would have indexed as a
+   plain tuple. The refusal list is now `builtinBaseRefusedDunders` (`__init__`, `__eq__`,
+   `__new__`, `__ne__`, `__getitem__`, `__len__`, `__iter__`, `__contains__`, `__bool__`,
+   `__getattribute__`); the harness mirrors it (a pytest pins the two lists equal) and
+   refuses to *encode* such an instance as a `bobj`. `__hash__` is accepted on a stated
+   assumption (hash consistent with `__eq__`), recorded in `docs/core-language.md`.
+
+`len` of a `bobj` -- §35's one named gap -- is answered at the interpreter's builtin call
+site (`builtinSeeThrough`), not in `Stdlib.builtinCore`, so `builtin_heap_unchanged` is
+untouched; it is faithful only because `__len__` overrides are refused.
+
+### What remains
+
+* `_HashedTuple.__hash__`: `self.__hashvalue = ...` is a field write on a value. A `bobj`
+  has no attributes by design (§35). Modelling this needs either attributes on `bobj` or
+  `hash()`; neither is done.
+* `typedkey`: `key += tuple(...)` is `binop:+` on a `bobj`; `applyBinop` has no dunder
+  dispatch for any class. `typedmethodkey`: `expr:genExp`.
+* `int`/`float` bases: not modelled (`BuiltinBase` has no constructor; the exporter records
+  nothing, so instances stay opaque `ref`s). cachetools has no such class.
+* Mutable bases (`list`/`dict` subclasses) keep value semantics, so mutation holes
+  (`mcall:<m>:unboxed-container`, `setIndex:immutable-containers`) until the boxed-container
+  work in `docs/boxed-containers.md` lands. cachetools' `Cache` is a `MutableMapping`, not a
+  `dict` subclass, so this corpus does not reach it.
+* Default argument values are not filled in by Core (see 3).
+
+Tests: `Autoform/BuiltinBase.lean` §4.1/§4.2 (`len`, every refusal with its own label,
+`__hash__`/`__add__`/`__radd__`/`__getstate__` accepted, `_HashedTuple.__add__`/`__radd__`
+end to end keep the class), `tests/test_builtin_base_oracle.py` (26 tests: encoding,
+refusals, class-aware comparison, and reconstructions of the old class-dropping
+behaviour).
+
+## 58. Python calling convention and scoping: `nonlocal`, defaults, keyword-only, starred assignment
+
+Four gaps §22 and §36 recorded as open. Three were not holes at all but silent
+mistranslations, which is why the hole count below goes *up*.
+
+### What Joern gives, checked rather than assumed
+
+A probe file through `pysrc2cpg` 4.0.606 (the pinned version, fetched from Maven Central
+because this box's Joern is a C-only assembly) shows:
+
+* **Default expressions are dropped.** `def f(b=1)` and `def f(b)` produce the same CPG:
+  the parameter node has a name and an `OFFSET`, no children, and the `def` site evaluates
+  nothing. So defaults were never translated *and never holed* -- an omitted argument read
+  `unit`, which is right for `=None` by accident and wrong for `=128`.
+* **`*` and `/` markers are dropped.** `def f(a, *, b)` is three plain parameters, so
+  `def f(*args, key=None)` called as `f(1, 2)` bound `key = 2` (CPython: `args == (1, 2)`).
+* **`a, *b, c = xs`** is lowered to `tmp = xs; a = tmp[0]; b = tmp[1:-1:1]; c = tmp[-1]`.
+  The slice made it `op:slice`.
+* **`nonlocal x`** is an `UNKNOWN` node carrying its text (`scope:nonlocal-write`, 8 on
+  `cachetools`).
+
+### What was done
+
+* **Signatures from source** (`pySig` in `export_ast.sc`), the same move §36 made for
+  `**kwargs`: the parameter list is re-read at the parameters' offsets and must parse into
+  exactly the CPG's parameters, or the function gets `param:signature-unparsed`. It yields
+  `Func.kwonly`, `Func.posonly` and `Func.defaults`. Only the default's *text* exists, so
+  only literals are translated (`None`, booleans, numbers, escape-free strings, `()`) --
+  for those, CPython's evaluate-once-at-`def` rule and evaluate-per-call cannot be told
+  apart. Every other default is `param:default-nonliteral`, stored in `Func.defaults` (so
+  `Func.holes` and the ledger count it) and raised by `Func.guardedBody` only on a call that
+  omits the argument. Evaluating `acc=[]` per call would silently invert the aliasing
+  CPython has; evaluating `Cache.__setitem__` per call is right only until someone rebinds
+  `Cache`.
+* **`bindParams`** binds positional arguments to `posParams` (now excluding keyword-only
+  parameters), keywords to `kwParams` (excluding positional-only ones; such a keyword goes
+  to `**kwargs` or is a `TypeError`), and puts literal defaults *under* the call's own
+  bindings, so a supplied argument always shadows its default.
+* **`nonlocal` by cell conversion, entirely in the exporter.** §22 said this needed every
+  scope to become a heap frame. It does not: only the variables some inner function
+  declares `nonlocal` need to be shared, and Core already had one-field heap cells
+  (`Expr.boxNew`, from `003-box-address-taken-locals`). The owner (`bindingScopeOf`, the
+  LEGB walk over enclosing `def`s, skipping class bodies, stopping at `global`) allocates
+  the cell in its prologue; every read is `x.v` and every write `x.v = e`, in the owner and
+  in every function that reaches `x`; closures capture the cell's reference by value. No
+  change to `Env`, and none to the refinement layer.
+* **One Core change to make it reachable**: `Expr.call f` applies a `Val.clos` bound to `f`
+  in the environment *before* consulting the function table. The exporter calls a
+  capturing nested function by its variable name; before, it called `...outer.inc` by full
+  name, which reached the right `Func` through `applyFunc` with **no captured environment**.
+* **Starred assignment**: the exporter recognises Joern's lowering and emits
+  `tmp = <unpackEx>(xs, nb, na)` (`Stdlib.unpackEx`: any iterable, starred name always a
+  list, `ValueError` when too short, no answer for an object whose iterability depends on
+  `__iter__`).
+
+### Two silent bugs found on the way
+
+* **`xs[-1]` returned the first element.** `Expr.index` used `Int.toNat`, which clamps -1
+  to 0. Found because `p, *q, r = "abcd"` (Joern's lowering reads `r = tmp[-1]`) gave
+  `r == 'a'`. Python now wraps (`Stdlib.seqIndex`); other dialects hole `index:negative`.
+* **C struct boxing fired on Python.** `x = Cls()` in a Python function whose class has
+  methods made `x` -- and `Cls` -- boxed "structs" and holed the assignment
+  `op:arrayDecl:boxed-initializer`. Now gated off for `.py`.
+
+### Evidence
+
+`Autoform/PyScoping.lean`: kernel-checked theorems for each rule on hand-written programs
+(`literal_default_is_bound`, `nonliteral_default_holes_only_when_needed`,
+`kwonly_after_varargs`, `posonly_name_goes_to_kwargs`, `negative_index_counts_from_the_end`,
+`unpackEx_*`, `nonlocal_write_is_seen_by_the_owner`), then end-to-end: the 28 `case_*`
+functions of `tests/fixtures/pyscoping/pyscoping_cases.py`, exported, rendered
+(`Autoform/PyScopingProgram.lean`), run with `runMain` and pinned with `#guard_msgs`.
+`tests/test_pyscoping_cpython.py` runs the same 28 under CPython 3.11 and checks every pin:
+26 equal CPython's value; 2 (`dflt_mutable(1)` with `acc=[]`, `dflt_global(1)` with
+`lim=GLOBAL_LIMIT`) are the hole `param:default-nonliteral`, each listed with its reason.
+A pin that is a *different value* fails the test unconditionally.
+
+### `cachetools` (v7.1.7), before and after
+
+The committed `ast-Cachetools.json` is unattributed (`provenance/unattributed.json`), so
+the comparison is between two exports of the same CPG (`src/` of tag v7.1.7, which is the
+`__version__` the committed AST carries), with `export_ast.sc` at 46c65fc and with this
+change. The 46c65fc export has exactly the committed AST's hole table (byte content differs
+in 53 functions; hole labels and counts are identical).
+
+| label | before | after |
+|---|--:|--:|
+| `scope:nonlocal-write` | 8 | **0** |
+| `param:default-nonliteral` | -- | **30** |
+| `param:signature-unparsed` | -- | 0 |
+| everything else | 18 | 18 |
+| **total holes** | **26** | **48** |
+| hole-free functions (of 209) | 184 | 167 |
+
+Counted by walking every function's `body` *and* `defaults` for `hole`/`holeS` nodes (the
+walk `sacm.py` and `label_function_counts.py` now do). The two exports: `joern-parse
+cachetools/src --language pythonsrc`, then `joern --script <exporter> --param cpgPath=...
+--param out=...`, once with `export_ast.sc` as of 46c65fc and once with this one.
+
+8 functions became hole-free (the `wrapper`/`cache_clear` pairs of the four `_*_info`
+factories in `_cached.py`); 25 stopped being hole-free. All 25 are functions with a
+non-literal default -- 30 of the corpus' 77 recorded defaults: `cache_setitem=
+Cache.__setitem__` and its siblings, `default=__marker`, `key=keys.hashkey`,
+`timer=time.monotonic`, `choice=random.choice`, `hash=tuple.__hash__`. Every one of them
+used to read `unit` when its argument was omitted. That was not coverage; it was the
+§31 category, now counted. (`cachetools` has no keyword-only or positional-only
+parameters and no starred assignment, so those two changes are measured only on the
+fixture.) The first run of the new exporter also reported 7 `param:signature-unparsed`:
+`Character.isUnicodeIdentifierStart('_')` is false in Java, so every parameter spelled
+`_key` failed the reader. Fixed, and `case_underscored_default` added to the fixture.
+
+`ast-Cachetools.json` and `Autoform/Generated/Cachetools.lean` are **not** regenerated in
+this change: the 25 newly-holed functions would move the theorems in
+`SpecsGen/Cachetools.lean`, and re-attributing that artifact is a separate decision.
+
+### What remains
+
+* **Non-literal defaults** need Core to execute `def` statements (a function value that
+  carries the values computed when it was created) and a CPG node for the expression,
+  which `pysrc2cpg` does not emit.
+* **A missing required argument** (`f()` into `def f(a)`) still reads `unit` instead of
+  raising `TypeError`: a function rendered before signatures were recorded cannot be told
+  from one with no defaults.
+* **The unbound-method arity rule** in `Expr.call` (`vs.length == params.length + 1`) does
+  not know about defaults, so `m = C.get; m(obj, k)` against `def get(self, key,
+  default=None)` still binds `key := obj`, as before.
+* **Late-binding reads**: variables that no inner function declares `nonlocal` keep
+  by-value capture, so `g = lambda: x; x = 2; g()` reads the value at closure creation.
+  Converting every captured-and-reassigned variable to a cell is the same mechanism and
+  is not done here.
+* `del x` on a cell (`scope:del-cell`), `global` rebinding from a function, starred
+  targets outside an assignment statement, and plain unpacking's missing length check
+  (`a, b = [1, 2, 3]` binds without the `ValueError`).
+
+## 59. Generators are holes; a call through a local name is called by that name
+
+*(Item L. The number is provisional; the merger renumbers.)*
+
+Two wrong translations from the round-1 differential (docs/conformance.md findings 1, 2),
+both in `cartographer/export_ast.sc`, both of the kind CONTRIBUTING rule 1 is about: the
+function looked translated and computed something else.
+
+**`yield` was `return`.** pysrc2cpg has no YIELD node; it emits a RETURN whose code is
+the yield text. A generator function now starts with `gen:generator` and each yield is
+`gen:yield`. Modelling generators faithfully needs a suspended-computation value in Core;
+eager materialisation was rejected (wrong for infinite generators, early-stopping
+consumers, and `TTLCache.__iter__`, which reads mutable state between yields).
+
+**A call through a local name was bound by short name.** pysrc2cpg resolves `cache(self)`
+to whatever function is called `cache`, here a property of an unrelated class. The
+exporter now applies Python's scope rule to a bare callee (`pyBindingScope`: the caller's
+own bindings, then enclosing `def`/`lambda` scopes, skipping class bodies and `<module>`,
+stopping at `global`) and, if a function scope binds the name, emits the call by that
+name unless Joern's target is provably the one function that scope binds it to. The
+pyscoping fixture re-exports byte-identically; that check is what made the "provably"
+include `x = lambda …` and not only nested `def`s.
+
+**Measured.** Re-export of cachetools `01af8e5` (first committed export with provenance).
+L alone: 10 functions change, hole-free 170 → 168, holes 42 → 46, divergences unchanged
+(12 under H+G and under H+G+L). The 11 closure divergences survive because Core's
+`Expr.call` resolves a name against the function table before a non-closure local, and
+`cache` is a unique suffix. The exporter cannot fix that without inventing a value-call
+form; the bare-name rule in Core is the place (see conformance.md).
+
+**Specs restated, not weakened.** `CachetoolsSpec` §3's negative result was about
+`_uncached_info.cache_clear` reaching `scope:nonlocal-write`; cell conversion translated
+it, so the theorem is now about `TTLCache.__iter__` reaching `gen:generator`. Two mined
+`SpecsGen` laws (`idempotent_…cached`, `…cachedmethod`) became false because H's defaults
+make the one-argument re-application hit `param:default-nonliteral`; they are now stated as
+`= false` with `¬` of the obligation. `check_specs_fresh --record` was run only after both
+modules elaborated against the new AST: `synth_specs.py` would regenerate `C_tfFree`, which
+`C_not_tfFree` refutes, so it cannot regenerate `SpecsGen/Cachetools.lean` as-is.
+
+
+## 60. A C address model: provenance, not addresses
 
 `cstr:address-compare`, `op:addressOf:element:*`, `op:*crement:pointer` and the int-to-pointer
 casts were the largest SQLite hole family, and they had one cause: Core could only operate on

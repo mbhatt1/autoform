@@ -30,7 +30,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 209 | 86% | 101 (48%) | 0.8% | **yes** (CPython) |
+| Python | yes | yes | yes | `.python` ✅ | 209 | 80% | 99 (47%) | 0.8% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | **none** |
 | Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | **none** |
@@ -47,6 +47,19 @@ to within the ledger's slightly different node-counting.
 
 ⚠️ = the dialect *is* in `render_lean.py`'s `DIALECT` map, but every non-Python language
 maps to the single `.cLike` constructor, which is 32-bit truncating C. See below.
+
+> **Dated correction (2026-10-02, at `46c65fc`).** The non-Python rows were measured at or
+> before `16f7c88` (2026-08-20) and have not been re-run. The *Dialect inferred* column no
+> longer describes the renderer for JS/TS: `Dialect` now has a third constructor,
+> `.javascript`, and `render_lean.py` maps `.js .ts .tsx .jsx .mjs .cjs` to it. `.java`,
+> `.kt` and `.go` still map to `.cLike`. An unknown extension is now a hard error
+> (`infer_dialect` raises), not a silent `.python`. The Python row was regenerated from
+> `ast-Cachetools.json` + `Autoform/Generated/Cachetools.lean` with
+> `scripts/ledger.lean.tmpl` (26 holes over 5,574 nodes at `46c65fc`; 46 over 5,661 after
+> the item-L re-export of `ast-Cachetools.json`, which is what the row now shows). Note that
+> `scripts/lang_matrix.py` carries its own copy of the extension table, which still says
+> `.js`/`.ts` → `cLike` and does not know `.cc`, so its *dialect* column is stale even
+> though its counts are recomputed.
 
 ### Failures observed, verbatim
 
@@ -108,6 +121,26 @@ Java object creation, which is untranslated.
 These are the §12 failure mode: a construct that looks the same across languages and means
 something different, producing a **wrong answer rather than a hole**. Each was measured —
 Lean output from the generated module, real output from the real runtime.
+
+**Current status (2026-10-02, at `46c65fc`).** The items below are the original
+measurements and are kept as recorded. Since then the semantics changed under several of
+them. Each "Core now" entry is `#eval applyBinop <dialect> …` against the built
+`Autoform.Lang.Core.Semantics` at that commit; the runtime column is copied from the
+original measurement, not re-run.
+
+| item | input | runtime | Core now | status |
+|---|---|---|---|---|
+| 1 | Python `0 or 5` | `5` | `int 5` | **fixed** (`Dialect.boolOpsAreValues`) |
+| 1 | JS `2 && 3` | `3` | `int 3` | **fixed** |
+| 2 | `.tsx`/`.jsx` dialect | — | `.javascript`; unknown extension is an error | **fixed** |
+| 3 | JS `2147483647 + 1` | `2147483648` | `int 2147483648` | **fixed** (`.javascript` uses `NumConfig.python`) |
+| 3 | JS `7 / 2` | `3.5` | `float 3.5` | **fixed** (`jsIntDiv`: inexact quotients go to IEEE binary64) |
+| 3 | JS `5 / 0` | `Infinity` | `float +inf` | **fixed** (`jsIntDiv`; `5 % 0` is `NaN`) |
+| 3 | JS `-7 % 3` | `-1` | `int (-1)` | **fixed** (`jsIntMod` truncates) |
+| 3 | JS `-5.5 % 2.0` | `-1.5` (JS `%` truncates) | `-1.5` | **fixed** under `.javascript` (truncated `fmod`); `.cLike` float `%` still uses Python's floored `pyMod` |
+| 4 | JS `1 == "1"` | `true` | `bool false` | **still wrong** (`==`/`===` are not distinguished) |
+| 5 | Java `long` / Go `int` | 64-bit | 32-bit `.cLike` | **still wrong** — `.java`/`.go` still map to `.cLike` |
+| 6 | JS `"a" + "b"` | `"ab"` | `str "ab"` | **fixed** (`Dialect.stringsAreValues`) |
 
 ### 1. `and` / `or` return an operand, not a boolean (Python, JS, TS) — NEW, and it hits the flagship corpus
 
@@ -259,7 +292,9 @@ inverse of the C case, and it shows that `.cLike` is not one dialect.
    silence) and JavaScript at scale (renderer `RecursionError`).
 5. **A file-extension typo is a semantics change.** `.tsx` gets Python's floored modulo.
    The dialect is inferred from a lookup table with a silent default; a language not in
-   the table does not fail, it gets Python.
+   the table does not fail, it gets Python. *(Fixed since: see the status table above.
+   Item 2 of this verdict now applies to Java and Go, and JS integer `/` and `%` are wrong
+   in a different way; items 3 and 4 have not been re-measured.)*
 
 The accurate claim today: *"Python is supported and checked. C is supported and partially
 checked. Java, Go, JavaScript and TypeScript parse, translate and type-check — their

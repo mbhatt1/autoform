@@ -1,6 +1,8 @@
 # Contracts at holes
 
-`Autoform/Contracts.lean`
+`Autoform/Contracts.lean` (expression holes), `Autoform/HoleContracts.lean`
+(statement holes, site-scoped), `Autoform/Ledger.lean` (conditional counts, named
+hole assumptions), `scripts/emit_contracts.py` → `scripts/sacm.py` (assurance case).
 
 ## Why this exists
 
@@ -9,8 +11,8 @@ superlinearly with program size. Hence: **verified core + contracts**, never
 whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is the
 other half.
 
-On `cachetools`, 180 of 209 functions are
-hole-free and 101 are call-closed. A single untranslated construct anywhere in a function
+On `cachetools`, 168 of 209 functions are
+hole-free and 99 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
@@ -156,15 +158,156 @@ Together: the mechanism admits a function that was previously outside the core, 
 admission is exactly as strong as the stated assumption, and both degenerate contracts are
 rejected by theorems rather than by convention.
 
-## Statement holes are deliberately out of scope
+## Statement holes: site-scoped contracts on effects
 
-`substS` does **not** fill `Stmt.hole`. A statement-level hole is an untranslated
-*effect*; replacing it with an expression is a category error. The contract for one would
-have to be a relation on control outcomes (`Ctl`), including `brk`/`cont`/`ret` escaping
-from inside it. That is separate work. Until then
-`control:TRY-finally-escaping` (31 occurrences) and `scope:nonlocal-write` (8) remain
-outside the mechanism, which is the conservative direction: they stay unspeakable rather
-than becoming speakable on a shaky footing.
+`Autoform/HoleContracts.lean`. `substS` above still does **not** fill `Stmt.hole`; a
+separate substitution, `fillS`, does, and nothing else. The two are disjoint, so neither
+can silently repair the other's holes.
+
+A statement hole is an untranslated *effect*, so its contract is a relation on how
+control leaves it:
+
+```lean
+structure SContract where
+  site  : String   -- the function containing the hole
+  label : String   -- the CPG hole label
+  stmt  : String   -- unchecked prose for the assurance case
+  fuel  : Nat      -- budget the implementation is assumed to need
+  post  : Heap → Env → Heap × Ctl → Prop   -- footprint + result relation
+```
+
+* **Per site, not per label.** Contracts and implementations are keyed by
+  `(function, label)`. `del self.__data[key]` in `Cache.__delitem__` touches no attribute;
+  `del self[key]` in `Cache.pop` dispatches to `__delitem__` and writes
+  `_Cache__currsize`. A label-wide contract would be false at one of them.
+* **Footprint and result relation live in `post`.** `AttrFrame h h'` is the standard
+  footprint (every pre-existing object keeps its class, attributes, captured bindings
+  and *kind* — a builtin container stays one, an ordinary instance stays one; container
+  contents may change). The kind clause was added when boxed containers entered Core:
+  attribute access on an object with a `list`/`dict` payload now holes
+  (`field:…:builtin-container`), so a footprint that let a hole turn `self` into a container
+  would not protect the attributes it claims to protect. `completesOrRaisesFramed` is the standard contract:
+  normal completion with the environment unchanged, or a raise, plus `AttrFrame`.
+* **The wrapper is a hypothesis, not an axiom.**
+  `UnderS Γ p Q := ∀ τ, ConsistentS Γ p τ → TotalS Γ τ → Q (τ.onProgram p)`. `Q` is any
+  property of the instantiated program — `Refines` (`RefinesUnderS`) or a heap-level
+  post-condition of a method, which is what a footprint is for. `#print axioms` on every
+  theorem in the file reports only `propext`, `Classical.choice`, `Quot.sound`, so the
+  audit tells a conditional result from an unconditional one by its *statement* (a
+  non-empty `Γ`), exactly as before. `tests/test_contracts.py` fails if either contracts
+  file ever declares an `axiom`, uses `sorry` or `native_decide`.
+* **The same guards, re-proved.** `underS_nil_iff` (empty `Γ` is no assumption),
+  `underS_of_unsatisfiable` (an unmeetable `Γ` proves everything — so `SatisfiableS` is an
+  obligation), `not_underS_false` (a satisfiable `Γ` does not prove `False`),
+  `unsatisfiableS_of_false_post`.
+* **The hole-aware evaluation lemma** is `filled_hole`: at a contracted site the
+  instantiated body contains *some* statement `s`, and running `s` at any fuel above the
+  budget, in any heap and environment, satisfies `post`. A proof never learns `s`.
+  `resolve_onProgram` / `resolveMethod_onProgram` say filling changes no name resolution,
+  and `resolveMethod_of_unique` resolves a method on a 209-entry table by evaluation
+  (`decide +kernel`) instead of unfolding the table in `simp`.
+
+### Worked example: `Cache.__delitem__`, as currently translated
+
+```python
+def __delitem__(self, key):
+    size = self.__size.pop(key)
+    del self.__data[key]          # Stmt.hole "op:delete-index"
+    self.__currsize -= size
+```
+
+The theorems are about `Autoform.Generated.Cachetools.program` itself — all 209
+functions, imported, not a slice.
+
+> **Tied to the committed AST.** This example is about `Autoform/Generated/Cachetools.lean`
+> as rendered from the *committed* `ast-Cachetools.json`, where `del self.__data[key]` is
+> still `Stmt.hole "op:delete-index"`. The merged exporter translates Python `del e[i]` to
+> `Stmt.delIndex` (`docs/boxed-containers.md`), so once the AST is regenerated
+> `Cache.__delitem__` is hole-free, the `op:delete-index` site disappears, and these
+> theorems stop elaborating (the generated `Func` no longer has the hole they fill). That
+> is the intended outcome — the function should then get an *unconditional* theorem, as
+> `methodkey` did — and the example should be re-pointed at a hole that survives. The
+> best candidate is **`op:delete-slice`** in `RRCache.clear` / `TLRUCache.clear`
+> (`del x[:]`; the exporter still emits `holeS("op:delete-" …)` for slice deletion, and both
+> functions are conditionally verifiable today): a statement hole whose natural contract is
+> exactly a footprint — it empties one container and touches no attribute. For an
+> expression-hole example via `Contracts.lean`, `call:computed-callee` in the six
+> `cachetools/func.py` decorators is the remaining candidate.
+
+* `delitem_reaches_hole` — today, on every `Cache`-shaped receiver, the generated function
+  reaches `hole "op:delete-index"`. No unconditional statement about it exists.
+* `satisfiable_delContract` — the one assumption, `delContract` (site `Cache.__delitem__`,
+  `completesOrRaisesFramed`), can be met; witness `skip`.
+* `delitem_under : UnderS Γdel P DelitemPost` — for a `Cache` (an ordinary instance, not
+  a builtin container) whose size table is a `_DefaultSize` instance and whose
+  `_Cache__currsize` is `c`, at every fuel ≥ 12, `__delitem__`
+  **either returns `None` with `_Cache__currsize = c - 1`, or raises with
+  `_Cache__currsize = c`**, for every implementation of the hole meeting the contract.
+  The footprint is load-bearing: without `AttrFrame` the hole could rewrite
+  `_Cache__currsize` and the first disjunct would be false.
+* `delitem_not_provable_under_top` — under `topSContract` (assume nothing) the same
+  property is *false*, because leaving the hole in place is an admitted implementation.
+* `delitem_not_vacuous` — `False` does not follow from `Γdel`.
+* `#eval` cross-checks on the full program: filled with `skip` → `val unit`,
+  `_Cache__currsize` 5 → 4; filled with `raise "KeyError"` → `exn`, stays 5; unfilled →
+  `hole "op:delete-index"`.
+
+**Reader obligations specific to this example** (none is in `Γ`; all are the reader's):
+`del d[k]` on a CPython `dict` has no attribute side effect *provided* `k`'s
+`__hash__`/`__eq__` have none; the domain fixes `_Cache__size` as a `_DefaultSize`
+*instance attribute*, whereas real `cachetools` reaches `_DefaultSize` through a class
+attribute that the translation does not model (`Cache.__init__` only sets the field when
+`getsizeof` is given); and a boxed `dict` size table is out of scope of this theorem
+(its `pop` goes through `boxedMethod`, a different path, not covered by the domain).
+After boxed containers were merged, `CacheShape` gained two clauses — the receiver and the
+size table have `payload = .none` — because the semantics now dispatches on payload; the
+conclusion is unchanged.
+
+## Conditionally verifiable and conditionally verified — separate numbers
+
+The ledger (`Autoform/Ledger.lean`, `ledger-<Module>.json`) and the assurance case
+(`scripts/sacm.py`, `sacm-<Module>.json`) now report, **apart from the verifiable core and
+never added to it**:
+
+| figure | meaning | source |
+|---|---|---|
+| `conditionallyVerifiable` | functions with ≥ 1 hole whose calls all resolve: a statement about them is expressible relative to contracts on their holes. An upper bound, like hole-free. | `Program.conditionallyVerifiable` |
+| `conditionalAssumptions` | hole occurrences in those functions, i.e. the named assumptions such statements would rest on | ledger |
+| `holeAssumptions` | **every** hole occurrence, named `H:<function>#<i>:<label>`, with kind `stmt`/`expr`. Complete by `Analysis.holeSites_labels` (the inventory's labels *are* `Stmt.holes`). | `Program.holeAssumptionsJson` |
+| `conditionallyVerified` | functions *of this module's generated program* with a contract-relative theorem whose contracts are proved satisfiable | `contracts-<Module>.json` |
+
+On `cachetools` (`lake env lean` on `scripts/ledger.lean.tmpl` instantiated for
+`Cachetools`, then `scripts/emit_contracts.py Cachetools` and
+`scripts/sacm.py --module Cachetools`): 19 of 209 functions are conditionally
+verifiable, resting on 23 named hole assumptions; 1 is conditionally verified
+(`Cache.__delitem__`, as of `46c65fc`: item G's boxed containers closed the hole that example
+rests on, and `Autoform/HoleContracts.lean` is being retargeted); 46 hole occurrences are named in all. The `methodkey` theorems are
+about the historical slice `keysProgramHoled`, so their registry records carry
+`program: Autoform.Contracts.Demo.keysProgramHoled` and sacm.py labels them "NOT about the
+current module" and does not count them.
+
+In the SACM case: claim `G3.3` carries the conditional number (STATIC evidence `E8`); it is
+linked to `G3` as `CONTEXT`, never `SUPPORTS`, and nothing conditional supports `G1`. Each
+`H:` occurrence is an `Assumption` refining its label's `A.<label>` node; each contract of
+a theorem is an `Assumption` of that theorem's own claim, and names the `H:` occurrence(s)
+it assumes, so the other occurrences of the same label visibly remain unassumed.
+
+## What remains
+
+* **Mixed environments.** A function with both an expression hole and a statement hole
+  needs `Contracts.Consistent` and `ConsistentS` at once; the two substitutions commute
+  (they touch disjoint constructors) but no combined wrapper is stated yet.
+* **Callee holes.** `conditionallyVerifiable` mirrors `callClosed`: it checks that calls
+  *resolve*, not that callees are hole-free. A result about a function whose callee has a
+  hole must contract that hole too; `UnderS` accepts any site in `Γ`, so this is
+  expressible, but the ledger does not compute the transitive assumption set.
+* **`Analysis.sCalls` does not descend into `breakBlock`, `tryFinally`, `setGlobal` or
+  `setDerefIref`**, so both `callClosed` and `conditionallyVerifiable` can over-count on
+  functions whose only unresolved calls sit there (pre-existing; not changed here).
+* **Contracts are hand-written.** The ledger names every hole; it does not propose a
+  `post` for any. Inferring candidate footprints per label (e.g. `AttrFrame` for
+  `op:delete-index` on a `dict`) and checking them against the differential oracle is the
+  next step. SQLite has no worked example yet.
 
 ## The API for assumption extraction
 
@@ -210,7 +353,8 @@ What `scripts/sacm.py` should do with it:
 
 > **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
 > `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
-> fails on a mismatch. Current: 209 functions, 180 hole-free, 101 call-closed, 40 holes.
+> fails on a mismatch. Current: 209 functions, 168 hole-free, 99 call-closed, 46 holes,
+> 19 conditionally verifiable.
 > Historical figures elsewhere in this repository (238 functions, 208 functions, cores of
 > 45, 69, 74) are superseded snapshots taken before the exporter changes that removed
 > `<metaClassCallHandler>` synthetics and closed `op:starredUnpack`.

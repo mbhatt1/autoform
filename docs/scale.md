@@ -1,7 +1,8 @@
 # Scale: behaviour on a large codebase
 
-Every number in `README.md` and `STRATEGY.md` comes from one corpus: `cachetools`, 1,637
-lines, 238 functions at the time of writing (now 209). "Point it at an arbitrary codebase"
+When this was written, every number in `README.md` and `STRATEGY.md` came from one corpus:
+`cachetools`, 1,637 lines, 238 functions at the time (now 209). (The README has since
+added a SQLite hole census, and `docs/evidence-*.md` cover V8, Linux and Ansible.) "Point it at an arbitrary codebase"
 was never tested. This document records that test, on seven open-source Python
 repositories from 8.8k to 165k lines. Figures move with every change to the pipeline;
 where a document and an artifact disagree, the artifact wins.
@@ -65,9 +66,14 @@ below).
 
 ### Coverage, from the ledger
 
+The `cachetools` row was regenerated on 2026-10-02 on the item-L branch (after merging `8d3a970`),
+from a fresh re-export of `ast-Cachetools.json` at cachetools `01af8e5` (`scripts/ledger.lean.tmpl`
+over the tracked AST; provenance in `provenance/ast-Cachetools.json.prov.json`); `scripts/check_docs.py` checks it. The other rows
+predate the exporter changes described below and were not re-run.
+
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 209 | 180 (86%) | 101 (48%) | 118 | 5,416 | 1,014 |
+| `cachetools` (published) | 209 | 168 (80%) | 99 (47%) | 46 | 5,661 | 915 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |
@@ -83,18 +89,21 @@ was read as evidence that call closure is largely an artifact of corpus *size*: 
 library calls mostly outward into an unmodelled stdlib, while a large framework calls
 mostly inward and its callees resolve inside the translated program.
 
-**That reading no longer follows from these two numbers.** `cachetools` is now 101/209 =
-48%, against Django's 52%. The change came from exporter work — emitting Joern's resolved
+**That reading no longer follows from these two numbers.** `cachetools` was 105/209 =
+50% at `46c65fc` (99/209 = 47% after the re-export that made generators, defaults and
+local-name calls honest), against Django's 52%. The change came from exporter work — emitting Joern's resolved
 `fullName` so `Ctx.resolve`'s exact match fires, closing `op:starredUnpack`, and dropping
 `<metaClassCallHandler>` synthetics — not from the corpus getting larger. So most of the
 original gap was a resolution defect in the exporter, not a property of corpus size.
 
-The size effect may still exist; it is simply not measurable from a 48%-versus-52%
+The size effect may still exist; it is simply not measurable from a 50%-versus-52%
 comparison. Establishing it would require re-running Django with the current exporter,
 which has not been done — every Django figure in this table predates that work.
 
-Hole *density* is stable — 2.4%-3.0% of AST nodes across every corpus including Django's
-397,571 nodes — so translation quality is size-independent. The hole causes shift:
+Hole *density* was stable — 2.4%-3.0% of AST nodes across every corpus including Django's
+397,571 nodes — so translation quality was size-independent at the time these rows were
+measured. `cachetools` has since dropped to 0.5% (26 / 5,574) through exporter work, which
+the other rows have not been re-run against. The hole causes shift:
 Django's top cause is `import:unresolved` (5,122), which barely registers on `cachetools`.
 
 ## Where it breaks, in the order it breaks
@@ -200,7 +209,9 @@ kept as `Program.callClosedRef`, and `Program.callClosureAgrees` re-derives the 
 both ways: `scripts/ledger.lean.tmpl` aborts if they differ, so the faster number can
 never be reported unchecked.
 
-Measured in one process per corpus, `callClosedRef` vs `callClosed`, identical results:
+Measured in one process per corpus, `callClosedRef` vs `callClosed`, identical results
+(a timing snapshot, not re-run; the Cachetools verifiable core is 105 today, see the
+coverage table above):
 
 | corpus | functions | verifiable core | before | after |
 |---|---|---|---|---|
@@ -228,6 +239,193 @@ Joern is the other memory consumer and is better behaved: 5.2 GB parsing Django'
 165k lines, 4.8 GB exporting it, both well inside default JVM settings. **Joern never
 failed, never OOM'd and never timed out on any target.**
 
+## SQLite (C, full tree): generated header and a conformance sample
+
+Everything above is Python. This section is the one C corpus run at scale through the
+static census *and* the runtime oracle. Numbers are from the commands below, run on
+2026-10-02 against `sqlite/sqlite` 3.54.0 (`manifest.uuid` `52f84cfc…`), Joern 4.0.606.
+
+### Reproduce
+
+```sh
+scripts/sqlite_corpus.sh /opt/corpus/sqlite-src /opt/corpus/D/full all
+#   gen:    copy the tree, build autosetup/jimsh0.c and tool/mksourceid.c, run
+#           tool/mksqlite3h.tcl -> tree/src/sqlite3.h (no system tclsh needed)
+#   parse:  c2cpg with SQLITE_OS_UNIX, SQLITE_TEST and the linkage macros
+#   export: cartographer/export_ast.sc with the same cppDefines -> ast.json + metrics
+# amalgamation of the SAME checkout, for the C side of the sample:
+(cp -r <sqlite-src> amal && cd amal && ./configure && make sqlite3.c)
+scripts/sqlite_sample.py /opt/corpus/D/full/ast.json /opt/corpus/D/full/tree \
+    amal/sqlite3.c /opt/corpus/D/sample
+python3 cartographer/render_lean.py /opt/corpus/D/sample/ast-SqliteSample.json \
+    Autoform/Generated/SqliteSample.lean SqliteSample
+lake build Autoform.Generated.SqliteSample
+(cd /opt/corpus/D/sample && python3 <repo>/scripts/differential.py \
+    ast-SqliteSample.json csrc SqliteSample 20)
+```
+
+`tclsh` is not installed on the measurement box. Instead of substituting the
+amalgamation's header (the corpus copy at `/opt/corpus/sqlite/sqlite3.h` is 3.47.0, the
+tree is 3.54.0, so it would be the wrong header), `gen` runs SQLite's own generator
+under the Tcl interpreter SQLite ships for exactly this case. `make sqlite3.c` in a
+configured copy produced a byte-identical `sqlite3.h` (`cmp`).
+
+A bare `--define NAME` makes `NAME` defined but EMPTY in c2cpg: on a two-branch fixture
+`#if FOO` took the false branch under `--define FOO` and the true one under
+`--define FOO=1`. `SQLITE_OS_UNIX` and `SQLITE_TEST` are passed bare to match the
+published configuration, not because that is right.
+
+### Census
+
+| Run | Functions | Hole-free | Holes | `op:cast*` | `op:sizeOf*` |
+|---|--:|--:|--:|--:|--:|
+| checkout as is (`/opt/corpus/final/full`, exporter at `46c65fc`) | 7,772 | 5,054 (65.0%) | 11,759 | 1,511 | 1,083 |
+| generated `sqlite3.h` + linkage macros, same exporter | 8,105 | 5,736 (70.8%) | 10,451 | 404 | 652 |
+| plus the `<operators>.` normalization | 8,105 | 5,724 (70.6%) | 10,497 | 404 | 652 |
+
+Per function (keyed by file and name), between the first and last rows: 7,738 functions
+are in both; 441 became hole-free and 43 lost it. The 367 functions only in the new run
+(283 hole-free) are mostly `src/test*.c`, whose bodies c2cpg could not parse without the
+header. The 34 only in the old run are `<duplicate>N` names that were renumbered. Every
+loss checked is a more precise refusal: `sqlite3DbstatRegister`'s `sqlite3_module`
+initializer had been exported as a positional `listE` because the type was unknown and is
+now `op:arrayDecl:static-initializer`; `sqlite3_status`'s `*pCurrent = (int)iCur` had
+been a `cast:i32` of an unknown type and is now `assign:lhs:indirection`.
+
+The hole-free figure was more inflated than the census showed. Without the header,
+`SQLITE_OK`, `SQLITE_BUSY`, ... are not expanded, and a function that reads one is
+"hole-free" but reads an undefined name at run time. 1,597 hole-free functions did so
+before; 291 after. The rest are `TK_*` (156 functions) and `OP_*` (112), defined in
+`parse.h` and `opcodes.h`, which are also generated and still absent, and 49 `SQLITE_*`
+names. Generating those headers too is the next step.
+
+### Exporter fix: `<operators>.`
+
+Joern names six compound assignments with a plural prefix: `x |= 1` has
+`METHOD_FULL_NAME` `<operators>.assignmentOr` (also `.assignmentAnd`, `.assignmentXor`,
+`.assignmentShiftLeft`, `.assignmentArithmeticShiftRight`, `.assignmentModulo`), while
+`x += 1` is `<operator>.assignmentPlus`. Every operator test in `export_ast.sc` is a
+`<operator>.` key or `startsWith("<operator>")`, which `"<operators>.…"` fails, so these
+were exported as calls to a function of that name with the target passed by value. The
+function stayed hole-free and the write was lost. 157 hole-free SQLite functions had one.
+The exporter now renames them to the singular spelling on C CPGs, so they take the
+existing `augOps` / `>>=` path (the translation `x = x | m` already gets, with its
+single-evaluation guards). Of the 157, 145 now translate and 12 hole
+(`assign:aug-impure-target` 7, `op:shiftRight:64-bit-operand` 4, one `>>=` of unknown
+signedness). On a fixture of `|= &= ^= <<= %= >>=` the result agreed with `cc` on 40/40
+random cases. Python is deliberately left alone: there `a |= b` mutates a set in place,
+which `a = a | b` does not.
+
+### Conformance sample
+
+`scripts/sqlite_sample.py` keeps only what the C leg of `differential.py` can run with
+nothing invented. The AST carries no C types, so a candidate must be hole-free,
+call-closed through other candidates, have integer parameter and return types, and contain
+no preprocessor line in its body, no free names, and no objects. Its file must be compiled
+by the default amalgamation of the same checkout. The C side is SQLite's own code:
+`csrc/sample.c` renames each function by macro, `#include`s the amalgamation unchanged,
+and exports a wrapper under the original name with the function's own signature.
+`csrc/ctypes.json` records each parameter's and the result's width and signedness, read
+from a program compiled against the same amalgamation (`probe_types`), so `LogEst` is
+16-bit signed and `sqlite3_int64` 64-bit because the compiler says so. Selection is by
+sha256 of the name, so it is deterministic.
+
+Of 5,724 hole-free functions, 3,269 are in files the default amalgamation does not
+compile (`autosetup/jimsh0.c`, `tool/`, `ext/fts5`, `ext/jni`, `src/test*.c`, ...),
+1,135 return a non-integer type (849 `void`), 1,125 have a non-integer parameter
+(pointer, struct, float, ...), 133 have a definition the signature reader could not
+match, and the remaining filters remove 53 more (no parameters, preprocessor lines,
+non-candidate callees, ...). **9 qualify**, the same 9 as before the typed leg:
+admitting `_Bool`, `Bitmask`, `<stdint.h>` names and `SQLITE_OPT_INLINE u64` moved 8
+functions from "return type" to "parameter" (every one also takes a pointer), and no
+function in the population was refused for an integer *width* alone. The binding
+constraint is pointers, not integer types.
+
+**Typed C leg.** `differential.py` reads `ctypes.json` when it is present: values are
+passed and read at their real C width and signedness (`char`/`short`/`int`/`long`/`long
+long`, `unsigned`, `_Bool`) through ctypes, and each argument is drawn over its whole type
+(a boundary of the type with probability 0.35: min, max, their neighbours, the
+power-of-two edges), so a `sqlite3_int64` parameter now receives values a 32-bit model
+cannot hold. The basis is `c-typed-v1`; it is not comparable with the int-only basis.
+`tests/test_cboolint_cc.py` checks that every typed argument is representable in its
+type and that both boundaries are drawn.
+
+Commands, 2026-10-02, Core at this branch (`Dialect.promotesBool`):
+
+```sh
+python3 scripts/sqlite_sample.py /opt/corpus/D/full/ast.json /opt/corpus/D/amal \
+    /opt/corpus/D/amal/sqlite3.c <out>
+python3 cartographer/render_lean.py <out>/ast-SqliteSample.json \
+    Autoform/Generated/SqliteSample.lean SqliteSample
+lake build Autoform.Generated.SqliteSample
+(cd <out> && python3 <repo>/scripts/differential.py ast-SqliteSample.json csrc SqliteSample 20)
+# int-only basis: the same command on a copy of round 1's /opt/corpus/D/sample (no ctypes.json)
+```
+
+| Basis | Functions compared | Agree | Diverge | Inconclusive |
+|---|--:|--:|--:|--:|
+| int-only (`varargs-attempted-v2`), before the fix | 9/9 | 140/170 | 30 | 10 |
+| int-only, after | 9/9 | **170/170** | 0 | 10 |
+| typed (`c-typed-v1`), after | 9/9 | **168/168** | 0 | 12 |
+
+**The 30 round-1 divergences** (`isFatalError` 20, `validJulianDay` 10) had one root
+cause: C's relational, equality, `!`, `&&`, `||` results are `int` 0/1 (C11 6.5.8-6.5.14,
+6.5.3.3), and Core's were `Val.bool`, which `==` against an `int` compared false
+(`Val.beq`) and arithmetic holed. In the sample they all surfaced at the RETURN (`return
+rc!=0 && rc!=5 && rc!=6` gave `bool true`, `cc` 1); the same root cause is a silent wrong
+answer one step inside a function: `int t = (a < b); if (t == 1) return 7; return 3;`
+returned 3 where `cc` returns 7.
+
+The fix is in Core, not the exporter, and it is a promotion rather than a change of
+result type, because `.cLike` also serves Java, Go, Kotlin and C++. There `a < b` is a
+`boolean`/`bool`: Java's `boolean` must stay a `bool` (Java's `&` on two of them is a
+`boolean`), C++ integral-promotes `bool` to `int` 0/1 in arithmetic and comparison
+([conv.prom]/6), and in Java/Go/Kotlin mixing a boolean with a number is a compile error,
+so no well-typed program of theirs reaches the promoted cases. So comparisons still yield
+`Val.bool`, and under `.cLike` (`Dialect.promotesBool`) a `bool` meeting an integer or a
+float in `applyBinop` (`binopFallback`), or under unary `-`/`~`, is promoted to 0/1 --
+the C++ rule, which for C is its own arithmetic. `(a<b) == 1` is now true, `(a<b) +
+(b<a)` is 1, `(a<b) & (b>0)` stays a `bool` (Java) that a later integer context reads as
+1 (C). `cIntBinop_eq` proves the promoted arms compute exactly what the integer arms
+compute. No proof needed changing: the integer arms are untouched, and `simp` lemmas for
+the split-out fallback (`binopFallback_int_int`, `binopTail_eq`, ...) keep
+`Specs/V8Spec.lean`'s `simp [applyBinop, ...]` working as it was.
+
+The one integer context Core does not see is the return conversion to the function's
+declared type: `int f(void) { return a < b; }` returns `Val.bool`. The harness applies
+that conversion (`c_return_conversion`: `bool` compares as exactly 0/1, nothing looser),
+and so does `tests/test_cboolint_cc.py`. Of the 30, all 30 agree through it; the Core
+promotion is what fixes the in-function form, which the sample happens not to contain and
+the fixture does. Emitting a `cast:<T>` on `return` from the exporter would move the
+conversion into the translation; it needs the declared return type at each `Return`
+and a re-export, and is not done.
+
+`tests/fixtures/cboolint/cboolint_cases.c` (15 cases, including the fixture above,
+`(a<b)+(b<a)`, `-(a<b)`, `~(a>b)`, `(a<b)<<3`, a loop counting `i % 3 == 0`, and `(a<b) +
+0.5 > 1.0`) is exported by Joern, rendered to `Autoform/CBoolIntProgram.lean`, pinned in
+`Autoform/CBoolInt.lean` with `#guard_msgs`, and compared with `cc` by
+`tests/test_cboolint_cc.py`: 15/15 agree, none holes.
+
+**Float `%`.** `.cLike` `%` on a double used CPython's floored `pyMod`. The only
+`.cLike` languages that accept a floating `%` are Java and Kotlin (C, C++ and Go reject
+it at compile time), and both truncate: `-5.5 % 2.0` is `-1.5` (JLS 15.17.3; `javac`/
+`java` on this box print `-1.5`, and `1.5` for `5.5 % -2`). `.cLike` now uses `fmod`, pinned
+by `#guard`s in `Semantics.lean` (with Python's `0.5` pinned alongside).
+
+**The inconclusive cases.** 11 (typed) / 10 (int-only) are `validJulianDay(iJD)` on
+`iJD >= 0`: `INT_464269060799999` is `((i64)0x1a640 << 32) | 0x1072fdff`, and Core's
+`.cLike` integers are 32-bit, so `<< 32` is `ub:shift count out of range`, a hole. The
+typed leg adds one: `vdbeSorterTreeDepth(nPMA)` keeps an `i64 nDiv` and multiplies it by
+16 until it exceeds `nPMA`. At 32 bits `16^8 = 2^32` wraps to 0, the loop never ends, and
+Core answers `outOfFuel` (checked directly: `runFunc` gives 6 for `nPMA = 2^28`, which
+`cc` agrees with, and `outOfFuel` for `2^28 + 1` and `INT_MAX`, where `cc` gives 7). Not
+a wrong answer here, but the same gap: **64-bit C arithmetic is computed at 32 bits**
+(`Dialect.toNumConfig .cLike = c32Wrapv` for every C integer type), and a function whose
+`i64`/`u64`/`unsigned` arithmetic leaves the `int` range without hitting a hole or a
+loop would be a wrong answer. The int-only leg could not reach it (`randint(-20, 20)`);
+the typed leg reaches it, and on this sample it lands on a hole and `outOfFuel` only.
+Per-type widths in Core (the exporter already resolves them for `>>`) are the fix.
+
 ## What was *not* measured
 
 * **`Heap` as a `List` with `mapIdx` writes.** `Heap.setField` is `h.mapIdx …`, i.e. O(heap)
@@ -239,7 +437,9 @@ failed, never OOM'd and never timed out on any target.**
 * **`assure.sh`** end to end (axiom sweep, mutation gate, SACM) on a large corpus. Only
   the `autoform.sh` stages were run.
 * **Conformance percentages at scale.** The 100% figures in `README.md` remain
-  `cachetools`-only. Nothing here confirms or refutes them on a larger corpus.
+  `cachetools`-only for Python. The one large-corpus run, SQLite (above), compared 9
+  functions, found a real semantic divergence (C comparison results as `int`), and after
+  its fix agrees on every conclusive case.
 
 ## Caveats on these runs
 
