@@ -3736,10 +3736,40 @@ function-local class, refused because the ancestor's method may close over anoth
 * **Data descriptors and `__getattr__`**: `property` is a class attribute (hole), and an
   absent method is `mcall:<C>.<m>`, not `AttributeError`.
 * **One globals frame** for all modules: a name bound in module A is visible from module B.
-* `ast-Cachetools.json` is not regenerated here (the brief leaves it to item L): doing so
-  switches cachetools to the new rules and moves the specs bound to its hash.
-* `synth_specs.py`'s context (`def C : Ctx := …`) omits `pyClasses`, like `builtinBases`;
-  harmless until a corpus with a class table is synthesised.
+* `synth_specs.py`'s context (`def C : Ctx := …`) still omits `builtinBases`.
+
+### The re-export (`ast-Cachetools.json` with the class table)
+
+`ast-Cachetools.json` was re-exported from cachetools `01af8e5` with the head exporter
+(provenance recorded; `check_render --record`, `check_specs_fresh --record` after both spec
+modules elaborated). Against the previous AST: 8 bodies change (the `super()` lowering) and
+the five module initialisers gain `pyClasses`; holes 46 and hole-free 168 are unchanged.
+What moved, and how it was repaired — no statement was weakened silently:
+
+* **Ledger.** Under Python's scoping a bare call name is a variable, so `Ctx.resolvableIn`
+  counts it resolvable only as a caller's own local or a modelled builtin (stricter than the
+  interpreter, which also sees captured and global bindings). Core 99 → 98
+  (`_unlocked.cache_clear` calls the enclosing function's `cache`); conditionally verifiable
+  19 → 32 and their named assumptions 23 → 36 (13 methods whose only holes are parameter
+  defaults call that parameter, e.g. `cache_getitem(self, key)`).
+* **`Specs/CachetoolsSpec.TimedCache_expire_raises` is now false** and is refuted
+  (`TimedCache_expire_raises_false`); what holds is `TimedCache_expire_holes`: with no
+  globals frame, `raise NotImplementedError` reaches `name:unbound:NotImplementedError`.
+* **`HoleContracts`.** `DelShape`/`RRShape` gain "the `_DefaultSize` object has no instance
+  attribute `pop`/`clear`": without it `delitem_refines` and `rrclear_under` are false
+  under the new rules (an instance attribute shadows the method). The proofs take the MRO
+  path (`resolveMethod_of_lookup`, `resolveMethod_onProgram_found`, and
+  `lookupMethod_onProgram`: filling holes changes no lookup).
+* **`BuiltinBase`.** `cachetoolsBefore` also clears `pyClasses` (it is the measured
+  before-state), and the hand-written `lenkey` calls `hashkey` by its qualified name, as the
+  exporter would.
+* **`SpecsGen/Cachetools`.** `C` (and `synth_specs.py`'s template) now carries
+  `pyClasses := P.pyClasses`, so the mined laws are evaluated under the rules the program
+  runs under; all of them still elaborate. Its frozen globals heap `h0` is **stale, and was
+  already before this change**: `initGlobals` on the program gives 7 heap objects to `h0`'s
+  6 under the legacy rules too (checked with `#eval` on `reprStr`); re-freezing it is left
+  to a `synth_specs.py` regeneration, which L recorded cannot run as-is.
+* **Differential** on the committed AST: 41 compared, 215/215, 0 divergences.
 
 ## 63. Width-typed integer arithmetic: `long` is not `int`, and Java's `>>` was `>>>`
 

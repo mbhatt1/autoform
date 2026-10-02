@@ -531,9 +531,9 @@ theorem TimedCache_expire_holes (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
   have hsn : (ctxOf P).scopedName "NotImplementedError" = true := by decide +kernel
   have hv : ∀ ρ : Env, ρ.find? (·.1 == "NotImplementedError") = none →
-      evalExpr (ctxOf P) (k + 6) [] ρ (.name "NotImplementedError")
+      evalExpr (ctxOf P) (k + 7) [] ρ (.name "NotImplementedError")
         = ([], .hole "name:unbound:NotImplementedError") :=
-    fun ρ hx => evalExpr_name_unbound_py (ctxOf P) (k + 5) [] ρ "NotImplementedError" hx rfl hsn
+    fun ρ hx => evalExpr_name_unbound_py (ctxOf P) (k + 6) [] ρ "NotImplementedError" hx rfl hsn
   have hne : ((none : Option String) != some "time") = true := rfl
   -- `time=None` is a default now (the exporter records defaults); the call supplies `time`,
   -- so the default contributes no binding and the body runs unguarded.
@@ -548,6 +548,7 @@ theorem TimedCache_expire_holes (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
         List.contains_nil, Bool.not_false,
         List.nil_append]
   rw [hv _ (by simp)]
+  simp +decide
 
 /-- The former statement, refuted: `_TimedCache.expire` does not raise under the class
 table's scoping rules (it holes; see `TimedCache_expire_holes`). -/

@@ -5,7 +5,7 @@
  "command": "git clone https://github.com/tkem/cachetools && git -C cachetools checkout 01af8e5 (v7.1.7); joern-parse cachetools/src --language pythonsrc --output <cpg>; joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-Cachetools.json. Joern 4.0.606 from Maven Central (io.joern:joern-cli_3:4.0.606, io.joern:pysrc2cpg_3:4.0.606, codepropertygraph_3:1.7.70), run as io.joern.joerncli.JoernParse / io.joern.joerncli.console.ReplBridge --script; joern_version was detected from those jars.",
  "cpg_schema_version": "1.7.70",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "105421dbf218d7138bdd7ed0cd16b2032ae0792328fdc35aab33e8d377b8a30f",
+ "exporter_sha256": "c024b0ea6d062f7990871baa128f00324b265d31a3c3c458c52809edc51f62c7",
  "joern_version": "4.0.606",
  "recorded_by": "scripts/provenance.py record",
  "schema_version": 1,

@@ -521,7 +521,9 @@ theorem mroWalk_congr {c₁ c₂ : Ctx} (m : String) (h : c₁.pyClasses = c₂.
   intro l
   induction l with
   | nil => rfl
-  | cons c cs ih => simp only [Ctx.mroWalk, Ctx.pyClass?, h, hk, ih]
+  | cons c cs ih =>
+    have hpc : c₁.pyClass? c = c₂.pyClass? c := by simp only [Ctx.pyClass?, h]
+    rw [Ctx.mroWalk, Ctx.mroWalk, hpc, hk c, ih]
 
 theorem ownMethodKeys_onProgram (τ : SImpl) (p : Program) (c m : String) :
     (ctxOf (τ.onProgram p)).ownMethodKeys c m = (ctxOf p).ownMethodKeys c m := by
@@ -556,7 +558,7 @@ theorem classResponds_onProgram (τ : SImpl) (p : Program) (c m : String) :
     (ctxOf (τ.onProgram p)).classResponds c m = (ctxOf p).classResponds c m := by
   unfold Ctx.classResponds
   rw [pyStrict_onProgram, lookupMethod_onProgram]
-  simp [ctxOf, table_onProgram]
+  simp [ctxOf, table_onProgram, List.any_map, Function.comp_def]
 
 /-! ### Name resolution on the full program (by evaluation, not by unfolding) -/
 
@@ -574,21 +576,21 @@ theorem resolve_rrclear :
 theorem resolveMethod_pop :
     (ctxOf P).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
-  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>._DefaultSize.pop" _ rfl rfl
+  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>._DefaultSize.pop" _ rfl (by decide +kernel)
   · decide +kernel
   · rfl
 
 theorem resolveMethod_sizeclear :
     (ctxOf P).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>._DefaultSize.clear" _ rfl rfl
+  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>._DefaultSize.clear" _ rfl (by decide +kernel)
   · decide +kernel
   · rfl
 
 theorem resolveMethod_cacheclear :
     (ctxOf P).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>.Cache.clear" _ rfl rfl
+  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>.Cache.clear" _ rfl (by decide +kernel)
   · decide +kernel
   · rfl
 
@@ -784,11 +786,11 @@ theorem rrclear_under : UnderS Γslice P RRPost := by
     rw [classResponds_onProgram]; exact classResponds_cacheclear
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_cacheclear rfl]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_cacheclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
   have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_sizeclear rfl]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_sizeclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
   have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
       = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
@@ -854,11 +856,11 @@ theorem rrclear_reaches_hole_of (τ : SImpl)
     rw [classResponds_onProgram]; exact classResponds_cacheclear
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_cacheclear rfl]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_cacheclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
   have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_sizeclear rfl]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_sizeclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
   have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
       = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
