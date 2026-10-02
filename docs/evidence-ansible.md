@@ -1,13 +1,26 @@
 # Evidence for `Ansible` (Python, 5,546 functions)
 
-> **Staleness notice added during the merge (STRATEGY.md §40).** The figures in this
-> document were produced against the `Autoform/Generated/<M>.lean` that was committed at
-> the time. That module has since been re-rendered: every large corpus's committed render
-> was behind its neutral AST, and all five were regenerated and re-pinned in
-> `artifact-manifest.json`. The counts below therefore describe the *previous* render.
-> `core_oracle.py`'s own body-staleness gate is what makes this visible rather than
-> silent; re-running it against the current module is the way to refresh these numbers,
-> and until that is done they should be read as a dated measurement, not as today's.
+> **DATED SNAPSHOT, produced 2026-08-20. Not current. Status re-checked 2026-10-02 (tree `9639df0`).**
+>
+> * **Internal consistency, verified:** the ledger and oracle figures below match the tracked
+>   `evidence-Ansible.summary.json` (5,546 functions, 3,304 hole-free, 2,096 core, 8,786 cases,
+>   511 / 1,585, 139 real-input functions, 87 holed on a real input, ratio 4.1).
+> * **Not re-derivable from a clone, and the pinned file is not the measured one:**
+>   `ast-Ansible.json` is in no clone; `scripts/check_render.py` reports `Ansible` as `NOT-TRACKED`
+>   by reviewed policy (never counted as verified). The manifest pins a **136.6 MB** AST
+>   (`sha256 f9d015520c65...`), while this document says the measured AST was 52 MB: different
+>   artifacts. `core-oracle-Ansible.json` is not in the tree at all (only its sha256 in the
+>   summary; the summary records 1,280,412 bytes, this document says 2.0 MB, and this pass could not
+>   settle which). `scale.md`'s Ansible row (5,547 functions, core 2,205) is yet another export.
+> * **Produced by an older pipeline** (before typed integers, boxed containers, the class table,
+>   the generator and scoping fixes of STRATEGY.md §59-66). The import-dominated hole profile and
+>   the 4.1x overstatement are 2026-08-20 figures; none has been re-measured.
+> * **Reproduction needs a Python 3.12+** for `lib/ansible` (PEP 695 syntax), per the commands
+>   below, unlike the cachetools runs, which use 3.11.
+> * **Superseded statements** are marked "(as of 2026-08-20)" below.
+>
+> The original staleness notice (STRATEGY.md §40) said the module had since been re-rendered; the
+> counts describe the previous render.
 
 
 The first of the five large corpora to get all three evidence artifacts: a trust ledger, an
@@ -46,8 +59,9 @@ Imports dominate: 3,924 of 8,060 holes (49%) are one of the three import labels,
 single highest-value transpiler fix for this corpus is import resolution, not control flow.
 
 **Cost.** 33.7 s wall clock for the whole ledger, not the multi-minute quadratic feared
-from Django's 10k-function run (363 s). `Ctx.resolve` is still O(n) per lookup; at 5,546
-functions that constant has not yet bitten.
+from Django's 10k-function run (363 s). `Ctx.resolve` was still O(n) per lookup; at 5,546
+functions that constant had not yet bitten. (As of 2026-08-20; the ledger's call-closure now goes
+through `ResolveIndex`, `docs/scale.md`, which timed it at 72 ms on a later Ansible export.)
 
 ## 2. Assurance case (`sacm-Ansible.json`)
 
@@ -55,7 +69,7 @@ Top claim **G1: UNDEVELOPED**. Sub-goals:
 
 | Goal | Status | Why |
 |---|---|---|
-| G2 semantics agrees with the runtime | UNDEVELOPED | `conformance.json` absent — no differential run has ever been made for this module. Faithfulness is untested here, not merely unproved. |
+| G2 semantics agrees with the runtime | UNDEVELOPED | `conformance.json` absent — no differential run had been made for this module (as of 2026-08-20). Faithfulness is untested here, not merely unproved. |
 | G3 every function translated without holes | UNSUPPORTED | 2,242 / 5,546 functions carry at least one hole; 8,060 occurrences over 38 distinct causes. |
 | G3.1 the 2,096-function core is hole-free and call-closed *in the AST* | SUPPORTED (static) | from the ledger — but see the defeater below |
 | G3.2 the core is hole-free at **runtime** | **DEFEATED** | settled by execution: 511 of 2,096 never holed; 1,585 did |
@@ -152,6 +166,6 @@ Two traps, both of which produce *silence* rather than an error:
   `/tmp/core_oracle_scratch.lean` and overwrite each other's batches. Always pass a
   private directory.
 
-`ledger-*.json` and `sacm-*.json` are gitignored and `core-oracle-Ansible.json` is 2.0 MB,
-so the numbers above are also committed in machine-readable form, with the sha256 of each
+`ledger-*.json` and `sacm-*.json` are gitignored and `core-oracle-Ansible.json` is too large to
+track, so the numbers above are also committed in machine-readable form, with the sha256 of each
 artifact this run produced, as `evidence-Ansible.summary.json`.

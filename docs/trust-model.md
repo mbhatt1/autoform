@@ -1,6 +1,10 @@
 # The trust model
 
-What this system claims, on what basis, and what it does not claim.
+What this system claims, on what basis, and what it does not claim. Last checked against
+the tree at `9639df0` (2026-10-02): the descriptions of the audit, CI and the integrity gates
+below were compared with `scripts/audit_all.py`, `.github/workflows/ci.yml`,
+`scripts/check_render.py` and `scripts/check_provenance.py`; the assurance-case vocabulary
+with `scripts/sacm.py`.
 
 The deliverable is not "your codebase is verified." It is a machine-generated statement of
 *what is proved, about what model, under what assumptions*, such that a reader can locate
@@ -44,7 +48,13 @@ They are not redundant. Each sees a class of failure the others are structurally
 `scripts/differential.py`. Runs the repository's own test suite under a `sys.settrace`
 hook, recording `(function, receiver, args, outcome)` for every call landing in a
 translated function, then replays exactly those tuples against the Lean interpreter and
-compares structured values and exceptions.
+compares structured values and exceptions. That is the Python path. The harness also has
+legs for other languages, each against that language's real runtime and each needing it
+installed: C (`cc`), Java (`java`), Go (`go`), JavaScript/TypeScript (`node`) and Kotlin
+(`kotlinc`); for these there is no test suite to trace, so inputs are generated (for C, over
+each parameter type's full range when a `ctypes.json` is present). Separate fixtures pin
+integer-width, address-model, scoping, MRO, arithmetic and `==`/`===` behaviour against the
+real runtime (`tests/fixtures/*`, `docs/running.md` §1). See `docs/conformance.md`.
 
 It covers a blind spot of every other oracle: a proof about a semantics that does not match
 the runtime is about the wrong `eval`, and no amount of proving surfaces that. Each of the
@@ -109,6 +119,35 @@ claim is sound; the per-theorem breakdown is not yet trustworthy.
 3. **Kernel re-verification** — `leanchecker` replays the compiled `.olean`s through the
    kernel from an empty environment.
 
+What fails the audit, exactly (from the script): a declaration whose axiom basis contains
+`sorryAx`, `Lean.ofReduceBool` or `Lean.ofReduceNat`; a `sorry` or `native_decide` outside
+`Demo.lean`; the replay failing, erroring or timing out; an axiom sweep that could not run;
+and, under `--strict`, a missing `leanchecker`. `partial`, `unsafe`, `@[implemented_by]`,
+`@[extern]`, `axiom` and a `sorryAx` token are **reported** by the source sweep but do not by
+themselves fail it, and a finding under `Autoform/Lang/Core` prints `CLAIM FALSE` for the
+Core-is-clean claim without failing the exit code. Any other axiom is recorded as
+non-standard, not as a leak. Run on 2026-10-02
+for this edit (`audit_all.py --strict --skip-kernel`, tree `9639df0`, built `.lake` copied from
+the previous session): 7,974 declarations swept, axiom histogram `propext` 2,609, `Quot.sound`
+1,495, `Classical.choice` 1,422, no `axiom` of the project's own, no `sorryAx` /
+`ofReduceBool` / `ofReduceNat`; source sweep over 135 `.lean` files found the demonstration
+`sorry` in `Demo.lean`, three `partial` definitions (`Harness/Audit.lean`, two in
+`Tactics/Portfolio.lean`, none under Core), and nothing under `Autoform/Lang/Core`; verdict `PASS`,
+kernel replay `DELEGATED` (not run).
+
+**The replay is a separate CI job and takes hours.** Replaying every constant reachable from
+`Autoform` is single-threaded, and with the 73 `V8Base` spec parts in the import graph the
+timed pieces (about 5 minutes fixed plus 5 to 13 minutes per heavy part) extrapolate to
+roughly 2.5 to 3 hours. That is an extrapolation: no full replay of the current tree has
+been observed to finish. So the `build-and-audit` job runs `audit_all.py --strict
+--skip-kernel`, which reports the replay as `DELEGATED` in `audit.json` and prints `VERDICT:
+PASS (no trusted-code leak); the kernel replay was NOT run here`, and a `kernel-replay` job
+(`needs: build-and-audit`, restores the saved `.lake`, fails on a cache miss) runs
+`audit_all.py --kernel-only --strict`. `DELEGATED` is neither a pass nor a failure of the
+replay; `tests/test_ci_kernel_replay.py` pins that neither job can be dropped without the other
+noticing. The replay's own limit is `$AUTOFORM_LEANCHECKER_TIMEOUT` (default 4 h), and on a
+timeout the whole process group is killed.
+
 Three facts about check 3:
 
 * `leanchecker` **ships with the Lean toolchain** (v4.28.0+). The standalone `lean4checker`
@@ -117,8 +156,8 @@ Three facts about check 3:
   only imports and no declarations of its own — the shape of `Autoform.lean`. The naive
   invocation produces a VERIFIED result that checked nothing. The audit records which mode
   ran, because the two are not equally strong.
-* **A missing checker is UNVERIFIED, never a pass**, and `--strict` (which CI uses) turns
-  that into a build failure.
+* **A missing checker is UNVERIFIED, never a pass**, and `--strict` (which both CI audit
+  steps use) turns that into a build failure.
 
 That the checker rejects bad input has been demonstrated twice rather than assumed: by
 installing a bogus declaration with `Environment.addDeclCore (doCheck := false)`, and by
@@ -147,6 +186,30 @@ after `Numeric.lean` was wired into binary operators, so `-INT_MIN` evaluated to
 that does not exist in a 32-bit integer. No differential test negated `INT_MIN`; the
 refinement layer found it, because stating `applyUnop_int_neg` as an unconditional `rfl`
 made the unconditionality visibly wrong.
+
+### 2.5 The integrity gates — catch *measuring the wrong artifact*
+
+Not oracles of semantics, but without them every oracle above could be pointed at the wrong
+program (`docs/integrity.md` names the incident behind each):
+
+* **`scripts/check_render.py`** compares each tracked `ast-<M>.json` and the render it
+  produces with the hashes pinned in `artifact-manifest.json`, and any module present in the
+  working tree with a fresh render. Three corpora (`Ansible`, `LinuxCrypto`, `LinuxLib`) are
+  pinned but their ASTs exist in no clone; they are on a reviewed `untracked_by_policy`
+  allowlist and reported **NOT-TRACKED**: named on every run, counted separately, **never
+  counted as verified**, exit 0. An entry applies only if `git check-ignore` confirms the
+  ignore, `git ls-files` that the file is untracked, the manifest says `ast_tracked: false`,
+  and no spec module is pinned to that corpus; `--strict` ignores the list. Last run: 15
+  verified, 3 not checked by policy.
+* **`scripts/check_provenance.py`** requires every tracked AST to have a provenance record
+  (Joern version, exporter digest, source revision, command) or a named entry in the
+  unattributed baseline. The baseline is a named gap: 9 of 15 ASTs are on it today, so the
+  green result means "attributed or explicitly excused". It does not re-run the exporter
+  (`scripts/reproduce_ast.py` does). Fixture ASTs under `tests/` carry a checked
+  `exporter_sha256` (`tests/test_fixture_exporter_fresh.py`).
+* **`scripts/check_specs_fresh.py`** binds each spec module to the hash of the corpus AST it
+  was generated against; **`scripts/check_docs.py`** binds documented figures to artifact
+  fields.
 
 ## 3. The assurance case: G1–G5
 
@@ -228,6 +291,16 @@ the tool.
 * **A verified core is not a verified repository.** The whole codebase will never be
   formalized; that is a design decision. Everything outside the core is covered by declared
   assumptions and boundary contracts.
+* **Three corpora's evidence cannot be re-derived from a clone.** Ansible, LinuxCrypto and
+  LinuxLib are NOT-TRACKED (above); the figures in `docs/evidence-ansible.md`,
+  `evidence-LinuxCrypto.md` and `evidence-LinuxLib.md` are dated snapshots of an older
+  exporter and are labelled so. `V8Base` is tracked but its AST has no provenance record.
+* **Some measurements are not re-run.** The mutation run for `cachetools` was not re-run after
+  the two attribution fixes in `scripts/mutate.py` (per the last session's notes; the committed
+  `mutation-Cachetools.json` is an older run of 57 mutants, 2 invalid, and its per-theorem
+  attribution is the coarse kind the fixes address). The `Imp` run was re-done: 24 of 27
+  valid mutants killed in `Semantics`, 7 of 9 in `Syntax`, 5 survivors classified equivalent
+  (`mutation-Imp.json`).
 * **The axiom sweep is repo-wide, not module-scoped.** It bounds the axiom basis of
   everything in the repository, including the semantics a given module is interpreted by,
   but it is not evidence about theorems specific to that module. G5 is capped accordingly.
@@ -245,12 +318,14 @@ the tool.
 Every figure in this repository is regenerable.
 
 ```sh
-lake build && python3 scripts/audit_all.py --strict   # axioms, escapes, kernel replay
-cat audit.json                                        # incl. which leanchecker mode ran
+lake build && python3 scripts/audit_all.py --strict --skip-kernel   # axioms + escapes, minutes
+python3 scripts/audit_all.py --strict --kernel-only                 # kernel replay: HOURS (CI: its own job)
+cat audit.json                                        # incl. whether the replay ran and which mode
 python3 scripts/differential.py ast-<M>.json <src> <M> 5 && cat conformance.json
 python3 scripts/core_oracle.py ast-<M>.json <M> <src>  && cat core-oracle.json
 python3 scripts/mutate.py <lean-file> <module>         && cat mutation.json
 python3 scripts/sacm.py --module <M>                   && cat sacm-<M>.json
+python3 scripts/check_render.py && python3 scripts/check_provenance.py && python3 scripts/check_docs.py
 cat ledger-<M>.json
 ```
 

@@ -1,8 +1,11 @@
 # Installing and running autoform
 
-Written for someone who has never run this repository. Nothing below embeds a result;
-where a number would be useful, the command that produces it is given instead. Figures
-move with every change; where a document and an artifact disagree, the artifact wins.
+Written for someone who has never run this repository. Nothing below embeds a result
+except where it is dated; where a number would be useful, the command that produces it is
+given instead. Figures move with every change; where a document and an artifact disagree,
+the artifact wins. Last checked against the tree at `9639df0` (2026-10-02): every command
+named here exists and `--help` runs; the long ones (the kernel replay, a full `lake build`)
+were not re-run end to end for this edit.
 
 ---
 
@@ -33,6 +36,18 @@ subsequent builds are incremental.
 
 ```sh
 lake build
+```
+
+The previous working session reported a default `lake build` of 497 jobs with 0 errors and
+all 73 `Autoform.SpecsGen.V8Base.Part*` modules elaborating (not re-run for this edit). The
+V8Base parts are heavy: that session built them at most two at a time because three at once
+ran a 15 GB machine out of memory, and CI pins its `lake build` to one core for a similar
+reason (comment in `ci.yml`).
+`Autoform/Generated/V8Base.lean` is a build product that the root import graph needs, so a
+clean clone must render it first (CI does):
+
+```sh
+python3 cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.lean V8Base
 ```
 
 ### Joern — pinned, like the Lean toolchain
@@ -137,7 +152,43 @@ python3.11 scripts/differential.py ast-Cachetools.json ~/src/cachetools Cachetoo
 
 See [`conformance.md`](conformance.md) for what is recorded and how to read the result.
 
-A C compiler (`cc`) is needed only for the C conformance corpus.
+### Optional real runtimes (the oracles and their tests)
+
+Everything that compares Core with a real language runtime needs that runtime. None of it
+is needed to build the library or run the trust audit. Where a test can tell the runtime
+is missing it skips; where it cannot it fails, so a missing `cc` is a red test, not a pass.
+
+| Runtime | Used by | When absent |
+|---|---|---|
+| `python3.11` (any CPython that has `pytest` and runs the corpus' own suite) | `scripts/differential.py` and `scripts/core_oracle.py` on a Python corpus (cachetools: `requires-python >= 3.10`; the recorded runs use 3.11.15; both scripts name `python3.11` in their messages) | `differential.py` prints a `WARNING` when the suite does not pass under tracing; `core_oracle.py` tells you to re-run under 3.11 |
+| `cc` | the C leg of `differential.py` (`TOOLCHAIN["c"]`), `tests/test_cboolint_cc.py`, `tests/test_cintwidth_cc.py` | those two tests fail (they do not skip) |
+| `java` and `javac` | the Java leg, `tests/test_javaintwidth_java.py`, and the JDK that runs Kotlin | the test skips |
+| `node` | the JavaScript/TypeScript leg, `tests/test_jsnode_node.py` | the test skips |
+| `go` | the Go leg, `tests/test_gointwidth_go.py` | the test skips |
+| Kotlin compiler | `tests/test_kotlinintwidth_kotlin.py`: `kotlinc` on `PATH`, **or** the directory in `AUTOFORM_KOTLIN_JARS` holding `kotlin-compiler-embeddable-*.jar` and its companions (stdlib, script-runtime, reflect, coroutines, annotations, daemon), run on a JDK | the test skips (this is the one skip in the last recorded full run) |
+
+`python3 -m pytest -q tests`, run 2026-10-02 on a machine with `cc`, `java`/`javac`, `node`, `go` and
+`python3.11` but no Kotlin compiler: **334 passed, 1 skipped, 1 xfailed in 69 s**. The skip is the Kotlin
+test; the xfail is the known gap that `ast-V8Numbers.json` encodes small integers as strings.
+
+## 1b. What CI runs
+
+Read from `.github/workflows/ci.yml` (it triggers on pushes to `main`, on pull requests and
+on `workflow_dispatch`). Four jobs:
+
+| Job | Gate | What it runs |
+|---|---|---|
+| `python-tests` (`pytest (Python tooling)`, 20 min) | yes | Python 3.12, `pip install pytest`, `python3 -m pytest tests/ -q`, then `python3 scripts/check_provenance.py`. No Lean and no Joern. |
+| `build-and-audit` (`build + trust audit`, job limit 340 min) | yes | regenerate `Autoform/Generated/V8Base.lean` from the tracked AST; restore `.lake` from cache; `taskset -c 0 lake build` (own limit 300 min, so a slow cold build fails that step rather than the job); **save `.lake` even on failure** (`if: always()`, key ends in the run id so a partial build is replaced rather than frozen); `audit_all.py --strict --skip-kernel`; `check_render.py`; `check_specs_fresh.py`; clone cachetools at the pinned `01af8e5` and require the conformance oracle to compare more than 0 cases; regenerate `ledger-Cachetools.json` and run `check_docs.py`; the FuelMono exclusion-list guard; the theorem-count floors; `check_specs.py Basis`; the `C_not_tfFree` refutation guard; `check_render.py --strict` for the log only (`|| true`); the demo. |
+| `kernel-replay` (job limit 340 min) | yes, but only runs if `build-and-audit` succeeded (`needs`) | restores the `.lake` the build job saved and **fails on a cache miss** rather than rebuilding; `lake build` as a no-op bounded to 30 min; then `audit_all.py --kernel-only --strict`. |
+| `joern-pipeline` (120 min) | no: only on `workflow_dispatch` with `run_joern: true` | installs Joern (about 1.7 GB), builds, runs `./autoform.sh` on a sample directory. |
+
+What this does and does not establish. The build job's audit prints `VERDICT: PASS (no
+trusted-code leak); the kernel replay was NOT run here` and records the replay as
+`DELEGATED` in `audit.json`; that line is a pass of the axiom and source sweeps only. The
+replay itself is the other job. CI does **not** run the mutation gate, the execution
+oracle, any non-Python oracle fixture except through pytest, or Joern on the gating path;
+the conformance step only asserts the oracle is alive, not what its agreement rate is.
 
 ## 2. The two entry points
 
@@ -167,7 +218,7 @@ Runs `autoform.sh`, then:
 | Stage | Tool | Artefact |
 |---|---|---|
 | 2/5 conformance | `scripts/differential.py` | `conformance.json` |
-| 3/5 axiom + escape-hatch audit | `scripts/audit_all.py` (after a full `lake build`) | `audit.json` |
+| 3/5 axiom + escape-hatch audit | `scripts/audit_all.py` (after a full `lake build`), with **no** `--strict` and no `--skip-kernel`, so it includes the kernel replay: expect hours on the full library | `audit.json` |
 | 4/5 specification teeth | `scripts/mutate.py` | `mutation.json` |
 | 5/5 assurance case | `scripts/sacm.py` | `sacm-<Module>.json` |
 
@@ -229,7 +280,10 @@ python3.11 scripts/core_oracle.py ast-<M>.json <M> <src-dir> [-n 24] [--fuel 500
 # pass) and the `kernel-replay` job uses --kernel-only.
 python3 scripts/audit_all.py --strict                 # everything, in one go (hours)
 python3 scripts/audit_all.py --strict --skip-kernel   # axioms + source only (minutes)
-python3 scripts/audit_all.py --strict --kernel-only   # the replay only
+python3 scripts/audit_all.py --strict --kernel-only   # the replay only (source sweep still runs)
+python3 scripts/audit_all.py --skip-lean              # source sweep only, no lake at all
+python3 scripts/audit_all.py --no-fresh               # leanchecker without --fresh: weaker, see Troubleshooting
+AUTOFORM_LEANCHECKER_TIMEOUT=28800 python3 scripts/audit_all.py --kernel-only --strict   # seconds; default 4 h
 
 # mutation gate, hand-written Lean
 python3 scripts/mutate.py Autoform/Lang/Imp/Semantics.lean Autoform.Lang.Imp.Semantics --max-mutants 8
@@ -246,6 +300,25 @@ python3 scripts/sacm.py --module <M> [--markdown sacm-<M>.md]
 python3 scripts/scale_test.py --out results.json --target Name /path/to/repo
 ```
 
+**What each audit mode does and does not report** (read from `scripts/audit_all.py`):
+
+* The axiom sweep fails the audit on `sorryAx`, `Lean.ofReduceBool` or `Lean.ofReduceNat` in
+  any declaration under `Autoform`, and records any other non-standard axiom without failing.
+  The last recorded sweep found only `propext`, `Quot.sound` and `Classical.choice`, and no
+  `axiom` of the project's own.
+* The source sweep (instant, always run) looks for `sorry`, `sorryAx`, `partial`, `unsafe`,
+  `native_decide`, `@[implemented_by]`, `axiom` and `@[extern]` in comment-stripped source, skipping
+  `.lake/` and `.claude/`. Only `sorry` and `native_decide` outside `Demo.lean` fail the
+  audit; the rest are reported, and a `sorryAx` token is a name mention that only the axiom
+  sweep can judge. A finding under `Autoform/Lang/Core` prints `CLAIM FALSE` for the Core
+  "free of escape hatches" claim but is not by itself a failure in the code.
+* `--strict` makes a missing `leanchecker` (status `UNVERIFIED`) a failure. Its `--help` text
+  also says it fails on demonstration sorries; in the code, demonstration findings are
+  excluded either way.
+* `--skip-kernel` sets the replay's status to `DELEGATED`: no failure, not a pass. A timeout
+  or an unrunnable checker is `ERROR` and fails; a timeout kills the whole process group, so
+  no orphan `leanchecker` is left running.
+
 `Demo.lean` (`lake env lean Demo.lean`) is a guided tour of the refutation gate, the axiom
 audit, vacuity detection and the ledger. It **deliberately contains an admitted theorem and
 two failing audits**, so `lean` exits non-zero by design; what matters is that
@@ -255,7 +328,12 @@ two failing audits**, so `lean` exits non-zero by design; what matters is that
 
 `lake-manifest.json` pins every Lean dependency and `lean-toolchain` pins the compiler, so
 the Lean half of the pipeline is reproducible. `joern-version` plus the records under
-`provenance/` do the same for the front-end half.
+`provenance/` do the same for the front-end half. On the final tree `check_provenance.py`
+reports 6 of 15 in-repository ASTs fully attributed to Joern 4.0.606 (`ast-CAddr`, `Cachetools`, `LangGo`,
+`LangJS`, `LangKt`, `LangTS`), 9 named in the unattributed baseline, 0 violations. Test fixtures
+under `tests/fixtures/*` and `tests/boxed_sample` carry their own `provenance.json`, whose
+`exporter_sha256` is **checked** by `tests/test_fixture_exporter_fresh.py`: a fixture AST that no
+longer matches the current `cartographer/export_ast.sc` fails the suite.
 
 ### The cheap check — run it anywhere
 
@@ -292,9 +370,9 @@ scripts/export_with_provenance.sh <source-dir> <ModuleName>
 ```
 
 `joern-parse` → `export_ast.sc` → `provenance.py record`, refusing to start unless the
-installed Joern matches the pin. `./autoform.sh` does **not** yet record provenance (see
-docs/architecture.md, "Merge-phase changes this asks for elsewhere"), so an AST it produces
-is unattributed and the checker will name it.
+installed Joern matches the pin. `./autoform.sh` does **not** yet record provenance (it
+contains no call to `provenance.py`; see docs/architecture.md, "Merge-phase changes this
+asks for elsewhere"), so an AST it produces is unattributed and the checker will name it.
 
 To record provenance for an artifact produced some other way:
 
@@ -329,13 +407,16 @@ It is a **named gap, not an exemption**: every entry is printed by name on every
 entry stops applying the moment its artifact's digest changes — regenerate one and you must
 record real provenance for it.
 
-Three of them were re-exported to find out rather than assumed, and **all three differ from
-a fresh export** with the pinned Joern and the committed exporter: `ast-Sample.json` and
-`ast-Stress.json` are missing the module-initializer entries the exporter now emits, and in
-`ast-CMath.json` every integer literal is `"v": 0` where a fresh export writes `"v": "0"`.
-That is recorded in the file as the finding it is. The remaining eight were not reproduced
-because the source tree they came from is not identified anywhere in the repository — which
-is the same gap, one step earlier.
+Nine entries remain on the final tree: `CMath`, `LangC`, `LangJava`, `LinuxLibSample`,
+`Sample`, `Stress`, `V8Base`, `V8BaseSample`, `V8Numbers`. Three of them were re-exported to
+find out rather than assumed, and **all three differ from a fresh export** with the pinned
+Joern and the committed exporter: `ast-Sample.json` and `ast-Stress.json` are missing the
+module-initializer entries the exporter now emits (`Stress` was additionally hand-patched for
+`//` and verified against a real export), and in `ast-CMath.json` every integer literal is
+`"v": 0` where a fresh export writes `"v": "0"`. `LinuxLibSample` and `V8BaseSample` are
+extractions from larger ASTs with no committed extractor; `V8Base` and `V8Numbers` predate
+width-typed integer operators and no V8 tree survives, so a re-export would be a different
+artifact. `LangC` and `LangJava` have no identified source tree. Each reason is in the file.
 
 ## 6. Troubleshooting
 
@@ -348,8 +429,12 @@ when this was written and is **hours** now that the 73 V8Base spec parts are in 
 graph: each `leanchecker --fresh <module>` costs about 5 minutes (core plus V8Base context)
 plus 5-13 minutes for each heavy part (timed on `Semantics`, `V8Base.Base`, `Part1`, `Part33`,
 `Part60`: 396 s, 291 s, 283 s, 574 s, 774 s), so the whole library is roughly 2.5-3 hours
-single-threaded -- an extrapolation, not an end-to-end measurement. The audit's limit is
+single-threaded -- an extrapolation, not an end-to-end measurement. **No full replay of
+the current tree has been observed to finish**: the comment in `scripts/audit_all.py` records
+two full runs lost (one to the audit's own earlier timeout, one to a container restart), and
+the 1.5-minute figure was measured before the V8Base parts were in the graph. The audit's limit is
 `$AUTOFORM_LEANCHECKER_TIMEOUT` (default 4 h), and a timeout kills the whole process group.
+CI's job limit for it is 340 minutes.
 
 **`leanchecker` is missing.** The audit reports UNVERIFIED — never a pass — and `--strict`
 turns that into a non-zero exit. A gap that is reported is a gap; a gap that is skipped

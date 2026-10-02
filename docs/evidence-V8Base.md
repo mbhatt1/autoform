@@ -1,13 +1,19 @@
 # Evidence — V8Base (C++, `v8/src/base`)
 
-> **Staleness notice added during the merge (STRATEGY.md §40).** The figures in this
-> document were produced against the `Autoform/Generated/<M>.lean` that was committed at
-> the time. That module has since been re-rendered: every large corpus's committed render
-> was behind its neutral AST, and all five were regenerated and re-pinned in
-> `artifact-manifest.json`. The counts below therefore describe the *previous* render.
-> `core_oracle.py`'s own body-staleness gate is what makes this visible rather than
-> silent; re-running it against the current module is the way to refresh these numbers,
-> and until that is done they should be read as a dated measurement, not as today's.
+> **DATED SNAPSHOT. The sections below describe the AST and render of the date they were produced
+> (August 2026) and are NOT current; the current ledger and execution-oracle figures are in "Current figures
+> (re-derived 2026-10-02)" directly below. Status re-checked 2026-10-02 (tree `9639df0`).**
+>
+> * **Internal consistency, verified:** the oracle figures below (807 core, 9,684 cases, 682
+>   survivors, 125 refuted, 12 inputs per function) match the tracked `core-oracle-V8Base.json`.
+> * **The AST this document measured is not the tracked one.** It reports 1,513 holes and a
+>   core of 807; the tracked `ast-V8Base.json` (sha256 `3aee4390e020...`, pinned in
+>   `artifact-manifest.json`, no provenance record) has 1,249 holes and a core of 830. The numbers
+>   below therefore describe an earlier export of the same corpus (V8 `src/base`), and a re-export
+>   from a known V8 revision is not possible (no V8 tree survives; `provenance/unattributed.json`).
+> * **Reproducible today:** the current-figures table below needs only the tracked AST and a built
+>   `Autoform.Generated.V8Base` (`scripts/check_render.py` verifies the render byte-for-byte).
+> * **Superseded statements** are marked "(as of August 2026)" below.
 
 
 First ledger + assurance case + execution oracle for one of the five large corpora.
@@ -20,10 +26,33 @@ ignored are committed: `ast-V8Base.json` (the neutral AST the module is rendered
 and `core-oracle-V8Base.json` (the full execution record: every refuted function, its
 hole labels, and the inputs that reached them).
 
-Regenerate:
+## Current figures (re-derived 2026-10-02 from the tracked AST)
+
+Produced with `sed s/@MODULE@/V8Base/g scripts/ledger.lean.tmpl` over the module rendered from
+the tracked `ast-V8Base.json` (the render is byte-identical to the one the main tree built), run with
+`lake env lean`; 5 s wall clock, and the script's own cross-check that `ResolveIndex` agrees with
+`Ctx.resolvable` passed (830 functions).
+
+| | August 2026 snapshot (below) | current (tracked AST) |
+|---|--:|--:|
+| functions translated | 1,920 | 1,920 |
+| AST nodes | 24,755 | 27,335 |
+| holes | 1,513 (6% of nodes) | 1,249 (4%) |
+| hole-free (static upper bound) | 1,290 / 1,920 (67%) | 1,367 / 1,920 (71%) |
+| **verifiable core** (hole-free AND call-closed) | 807 (42%) | **830 (43%)** |
+| conditionally verifiable (call-closed but holed; relative to named hole assumptions, NOT in the core) | not a ledger line then | 182 (9%), over 299 named assumptions |
+| dynamic-hole risk | 6,240 | 7,126 |
+
+Top hole causes now: `expr:CONTROL_STRUCTURE:DO` 138, `assign:lhs:indirection` 98,
+`op:indirection:pointer` 93, `op:cast:opaque-type` 92, `op:cast:pointer` 90,
+`op:alloc:ctor-unresolved-class` 82, `op:addressOf:local:opaque-type` 72, `op:sizeOf` 65,
+`op:addressOf:local:scalar` 57 (59 distinct labels). The static figures above are an upper bound
+and say nothing about runtime. Execution, re-run 2026-10-02 (`python3.11 scripts/core_oracle.py ast-V8Base.json V8Base -n 12 --no-tests --chunk 120`, about 16 minutes, synthetic inputs only, fuel 5000): 830 claimed-core functions x 12 inputs = 9,960 cases, all answered; **684 never holed, 146 holed on some input** (100 of them on every input), 0 functions exercised with a real input; static-over-runtime overstatement 830 / 684 = 1.21x (August 2026: 1.18x). 50 of the 146 hole only on `field:…:non-object` / `setField:…` labels, the receiver-shape caveat of section 3. The oracle's freshness gate confirmed AST and module agree (1,249 holes each). Top runtime labels: `field:nullopt:non-object` 144, `field:FromLittleEndian:non-object` 144, `call:DCHECK` 84, `unop:cast:u64` 77, `binop:+` 66. The same synthetic-input denominator caveats as section 3 apply.
+
+Regenerate (as of August 2026; the first command is still valid, `core_oracle.py` is the second):
 
 ```
-sed s/@MODULE@/V8Base/g scripts/ledger.lean.tmpl > /tmp/L.lean && lake env lean --run /tmp/L.lean
+sed s/@MODULE@/V8Base/g scripts/ledger.lean.tmpl > /tmp/L.lean && lake env lean /tmp/L.lean   # not --run: it prints the ledger but exits 1, the template has no `main`
 python3 scripts/core_oracle.py ast-V8Base.json V8Base -n 12 --no-tests --chunk 120 \
         --out core-oracle-V8Base.json
 python3 scripts/sacm.py --module V8Base            # with core-oracle-V8Base.json as core-oracle.json
@@ -40,8 +69,9 @@ python3 scripts/sacm.py --module V8Base            # with core-oracle-V8Base.jso
 | **verifiable core** (hole-free AND call-closed) | **807 / 1920 (42%)** | 74 / 238 |
 | dynamic-hole risk | 6240 constructs may hole at runtime | 971 |
 
-Wall clock: **4.3 s**, not the quadratic blow-up seen on Django's 10k functions (363 s).
-`Ctx.resolve` is still O(n) per lookup; 1920 functions is simply small enough.
+Wall clock: **4.3 s** (August 2026), not the quadratic blow-up seen on Django's 10k functions (363 s).
+`Ctx.resolve` is still O(n) per lookup; 1920 functions is simply small enough (the ledger's
+call-closure now goes through a separate index, `docs/scale.md`).
 
 Top hole causes (79 distinct labels in all):
 
@@ -66,16 +96,17 @@ fixed-width integers, unlike the pointer and cast families around them.
 ## 2. Assurance case (`scripts/sacm.py --module V8Base`)
 
 Top claim **G1: UNDEVELOPED** — 1513 unresolved holes carried as assumptions, and
-faithfulness not established over the module.
+faithfulness not established over the module. (As of August 2026; the assurance case was not
+regenerated for the current AST.)
 
 | goal | status | why |
 |---|---|---|
-| G2 translation faithfulness | UNDEVELOPED | `conformance.json` absent — no differential run exists for V8Base. The differential harness traces a *Python* test suite; C++ has no equivalent path, so this is not a missed run but an unbuilt capability. |
+| G2 translation faithfulness | UNDEVELOPED | `conformance.json` absent — no differential run existed for V8Base (as of August 2026). The differential harness traces a *Python* test suite; C++ had no equivalent path, so this was not a missed run but an unbuilt capability. A C leg against `cc` exists now (run on a SQLite sample, `docs/scale.md`) and `Autoform/Specs/CppCastSpec.lean` pins C++ cast widths against `cc`; neither is a run over V8Base. |
 | G3 every function translated without holes | **UNSUPPORTED** | 630/1920 functions carry at least one hole; 1513 occurrences over 79 causes. |
 | G3.1 the 807-function core is statically hole-free and call-closed | SUPPORTED, then **countered** | evidence E6 (ledger); defeater D3.1 below. |
 | G3.2 the core is hole-free at RUNTIME | **DEFEATED** (coverage 84.5%) | settled by execution, not estimated: 682 of 807 never holed, 125 did. |
 | G4 specifications non-vacuous | UNDEVELOPED | `mutation.json` absent; no source-level mutation gate for this module, and no specifications about V8Base exist to mutate against. |
-| G5 no unsound axiom | WEAK | `audit.json` is repo-wide: 2741 declarations on `Classical.choice, Quot.sound, propext`, kernel-replayed fresh by `leanchecker`. **No theorem about V8Base exists**, so nothing here is attributable to this module — the WEAK cap is the honest reading, not a defect in the sweep. |
+| G5 no unsound axiom | WEAK | `audit.json` is repo-wide: 2741 declarations on `Classical.choice, Quot.sound, propext`, kernel-replayed fresh by `leanchecker` (as of August 2026; the library has since grown, and the replay is now a separate, multi-hour CI job, `docs/trust-model.md`). **No theorem about V8Base exists**, so nothing here is attributable to this module — the WEAK cap is the honest reading, not a defect in the sweep. |
 
 Nothing was tuned to make a goal green. G3/G3.2 are red because execution says so.
 
@@ -95,9 +126,9 @@ Nothing was tuned to make a goal green. G3/G3.2 are red because execution says s
 | **static-over-runtime overstatement** | **1.18×** | ~2.5× |
 
 The cachetools column is the committed `core-oracle.json`, which describes an earlier
-revision of that module (238 functions, core 74); the module in the tree today has 208
-functions and a 100-function core. It is quoted for order of magnitude, not as a
-same-revision comparison.
+revision of that module (238 functions, core 74); the module in the tree today has 209
+functions and a 98-function core (`ledger-Cachetools.json`). It is quoted for order of magnitude,
+not as a same-revision comparison.
 
 **C++ overstates by 1.18×, not the 2.5× measured on Python.** The direction is the same
 but the magnitude is far smaller, and the reason is visible in the labels: cachetools'
@@ -159,5 +190,7 @@ re-learning.
    against the module's 1513 — and the gate passed in silence because the names matched.
    It now also compares a body-derived fingerprint (total hole count, `hole` + `holeS`)
    and says DISAGREE loudly; the result is recorded in the output as
-   `ast_body_staleness`. The AST committed here is a fresh export from
-   `v8run/base.cpg` and agrees with the module exactly: 1513 = 1513.
+   `ast_body_staleness`. The AST committed at the time was a fresh export from
+   `v8run/base.cpg` and agreed with the module exactly: 1513 = 1513. (The AST tracked now has
+   1,249 holes and its render agrees with the built module, 1,249 = 1,249, per `core_oracle.py`'s
+   freshness gate on 2026-10-02.)
