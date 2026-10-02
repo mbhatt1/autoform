@@ -3624,3 +3624,79 @@ a JS CPG; `ast-LangJS.json` was not re-exported. `.unit` is both `null` and `und
 so `===` between two of them is a hole. jssrc2cpg also maps `??` to `logicalOr`
 (`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed, and not recoverable the same way without a
 new Core operator.
+
+## 62. Width-typed integer arithmetic: `long` is not `int`, and Java's `>>` was `>>>`
+
+§28 item 5 recorded it and §38 left it standing: "`Dialect.cLike` is still 32-bit signed
+for *arithmetic*". Every C, C++ and Java integer operation ran at signed 32 bits
+(`Dialect.toNumConfig .cLike = c32Wrapv`), whatever its type. `100000L * 100000L` was
+1410065408; `unsigned u = -1; long long y = u;` held -1; `0u - 1 > 0` was false; SQLite's
+`(i64)0x1a640 << 32` was a shift-count hole and `vdbeSorterTreeDepth`'s `i64` loop wrapped
+at 2^32 and ran out of fuel (docs/scale.md).
+
+**Design.** A `Val.int` has no type and should not get one: the type is static, the
+exporter knows it, so the exporter names it in the operator, the device `cast:i64`
+already uses. `"*:i64"`, `"<:u32"`, `">>:u64"`, `"-:u32"`, `"+:j64"` are still
+`Expr.binop`/`Expr.unop`, so no constructor, no fuel lemma, no renderer and no ledger code
+changed. `Lang/Core/TypedInt.lean` gives them their meaning: convert each integer operand
+to the tag's type (`IntType.wrap` — the usual arithmetic conversions, which are
+value-preserving or modular and nothing else; only the left operand of a shift), then the
+`NumConfig` operation at that width. C tags take their overflow policy from
+`Dialect.toNumConfig .cLike`, so §16's one switch still flips every width; division by
+zero and `MIN / -1` are `ub` holes at every policy (`-fwrapv` defines neither). Java tags
+use `java32`/`java64`, which §28 found unreachable. Typed operators are claimed in
+`binopTail`'s and `applyUnop`'s catch-all arms, after every literal arm, through a
+`List Char` split that reduces by `rfl`: no existing theorem, `simp` set or `rfl` example
+changed, and `Refine`, `Overflow`, `FuelMono`, `SpecsGen.Basis`, `V8Spec`, `CppCastSpec`
+and `CBoolInt` build unmodified. Their statements stay true because the untyped operators
+mean what they meant; what changed is that the exporter no longer emits an untyped
+integer operator for C/C++/Java.
+
+**The conversion invariant.** Converting operands at the operation is exact only if every
+`Val.int` holds the mathematical value of its own C object. So stores convert too:
+`x op= e` and `x++` compute at the promoted type and `cast:<T>` back (`u8 c = 255; c++`
+is 0), `x = e` and `return e` cast when `e`'s type is not known to fit `T`. Plain `char`
+(implementation-defined signedness) and `_Bool` (converts by `!= 0`) are not cast to: an
+arithmetic store into one is `op:int:store-char-or-bool`. Bit-field stores truncate,
+which is not modelled: they are left as they were (plain) or holed (arithmetic).
+Argument passing does not convert yet; a callee converts at each use, so the gap shows
+only when a parameter is widened before any arithmetic (`void f(u32 x) { i64 y = x; }`
+called with `-1`).
+
+**A hole, not a default.** When `cIntExprType` cannot resolve the operation's type and no
+operand is provably floating or pointer-valued, the operator is `op:int:unresolved-type`.
+Resolution was extended for this: members through the owner's typedef chain with every
+declaration agreeing (`Mem` -> `sqlite3_value`), bit-fields by their promotion, `sizeof`
+as `size_t`, `p - q` as `ptrdiff_t`, assignments and increments as their target, and the
+ISO C return types of `strcmp`/`strncmp`/`memcmp`/`strcoll`/`strlen`/`strspn`/`strcspn`
+when Joern left the call `ANY` and the program does not define the function. What stays
+unresolved on SQLite is mostly members of nested or anonymous aggregates, which c2cpg
+4.0.606 records with no members. SQLite amalgamation: hole-free 1,985 -> 1,774, with
+1,073 `op:int:unresolved-type` holes (sole label in 224 functions); 28,950 operators
+typed, 7,399 of them `u32`/`i64`/`u64`. The 211 lost functions were counted as good while
+computing at the wrong width; CONTRIBUTING rule 1 says which number is the honest one.
+Conformance sample: 168/168 agree + 12 inconclusive -> 198/198 + 2 (C-UB shifts).
+
+**Java's shifts were swapped.** javasrc2cpg 4.0.606 calls `x >>> 28`
+`<operator>.arithmeticShiftRight` and `x >> 1` `<operator>.logicalShiftRight` (checked on a
+fixture with the frontend assembled from Maven Central). The exporter mapped both by name,
+so each was the other: `-16 >> 1` gave 2147483640. The token is now read from the source
+text (`javaShiftToken`; unreadable is `op:shiftRight:unknown-token`). The plural
+`<operators>.assignment*` normalization (docs/scale.md, "Exporter fix") now covers Java as well, so `x >>= 2` is no
+longer an unresolved call. The javasrc2cpg type of `Integer * Long` is
+`java.lang.Integer`; Java operation types are therefore computed from the operands by
+binary numeric promotion, not read off the operator.
+
+**Checked against the runtimes.** `tests/fixtures/cintwidth` (23 cases) and
+`tests/fixtures/javaintwidth` (22) are exported, rendered, pinned with `#guard_msgs` and
+compared with `cc -O0 -fwrapv` / `javac`+`java` by pytest. With the integration-head
+exporter: C 4 agree, 16 silent wrong answers, 2 holes, 1 `outOfFuel`; Java 7 agree, 11
+wrong, 4 holes. Now 23/23 and 22/22.
+
+**Not done.** Kotlin and Go (`.kt`, `.go`) keep untyped 32-bit operators; Go's `int`
+is 64-bit, so Go arithmetic is still §28 item 5's wrong answer (no Go frontend here to
+test against). Argument conversion at call sites. Nested/anonymous aggregate members
+(the bulk of the remaining unresolved types) need the struct text parsed, as
+`activeStructText` does for `sizeof`. Untyped `.cLike` arithmetic survives in byte-cursor
+`$off` bookkeeping and pointer-index arithmetic, whose values are offsets. Java `(char)`
+casts still hole as C's `char` does, although Java's `char` is `u16`.

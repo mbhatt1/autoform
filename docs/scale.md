@@ -426,6 +426,64 @@ loop would be a wrong answer. The int-only leg could not reach it (`randint(-20,
 the typed leg reaches it, and on this sample it lands on a hole and `outOfFuel` only.
 Per-type widths in Core (the exporter already resolves them for `>>`) are the fix.
 
+### Width-typed integers (item O)
+
+That fix is in (STRATEGY.md §62): the exporter names the C type of every integer
+operation (`"*:i64"`, `"<:u32"`, `">>:u64"`), converts stores, and an operation whose type
+does not resolve is the hole `op:int:unresolved-type` instead of the 32-bit operator.
+Commands, 2026-10-02; "before" is the exporter at integration head `70401b4`, "after"
+this branch's (`sha256 1f016f63…`), Core at this branch for both (the untyped operators'
+meaning is unchanged):
+
+```sh
+/opt/corpus/measure.sh <exporter> <out> amalg                     # the census rows
+scripts/sqlite_corpus.sh /opt/corpus/sqlite-src <out> export      # full tree, after only
+python3 scripts/sqlite_sample.py <full ast.json> /opt/corpus/D/full/tree \
+    /opt/corpus/D/amal/sqlite3.c <out>
+python3 cartographer/render_lean.py <out>/ast-SqliteSample.json \
+    Autoform/Generated/SqliteSample.lean SqliteSample
+lake build Autoform.Generated.SqliteSample
+(cd <out> && python3 <repo>/scripts/differential.py ast-SqliteSample.json csrc SqliteSample 20)
+```
+
+| Amalgamation (2,433 functions) | Hole-free | Holes | `op:int:unresolved-type` | `op:shiftRight:*` |
+|---|--:|--:|--:|--:|
+| before (`70401b4`) | 1,985 (81.6%) | 1,834 | — | 15 (9 `64-bit-operand`) |
+| after | 1,774 (72.9%) | 2,820 | 1,073 (sole label in 224 functions) | 4 |
+
+The 211 functions that stopped being hole-free were counted as good while every integer
+operation in them ran at signed 32 bits whatever its type; they now name the operation
+whose type the exporter could not recover. In the after export 28,950 operators carry a
+type (21,551 `i32`, 4,776 `u32`, 952 `i64`, 1,671 `u64`); every `u32`, `i64` and `u64`
+one was a signed 32-bit operation before. Store conversions raised the number of `cast:`
+operators from 1,511 to 4,363. What stays unresolved is dominated by members of nested or
+anonymous structs and unions (`pItem->fg.jointype`, `pMem->u.i`, `db->init.busy`), for
+which c2cpg 4.0.606 records a type declaration with no members, and by receivers whose
+own type is `ANY`. The full tree with this exporter: 8,105 functions, 5,295 hole-free
+(65.3%), `op:int:unresolved-type` 5,143 (sole label in 807). There is no full-tree
+"before" at `70401b4` (one 13 GB export was the budget); the 5,724 of the census table
+above is an older exporter.
+
+The conformance sample, before (round-2's full export `/opt/corpus/D/full/ast.json`) and
+after (this branch's full export):
+
+| Sample | Functions compared | Agree | Diverge | Inconclusive |
+|---|--:|--:|--:|--:|
+| before | 9/9 | 168/168 | 0 | 12 (`validJulianDay` 11 `ub:shift count out of range`, `vdbeSorterTreeDepth` 1 `outOfFuel`) |
+| after | 10/10 | **198/198** | 0 | 2 (`sqlite3LogEstToInt`: `ub:shift count out of range`) |
+
+The 12 inconclusive cases of round 2 are now compared, and agree. `sqlite3LogEstToInt` is
+new to the sample (its `u64` arithmetic typed); its two inconclusive cases draw a negative
+`LogEst`, for which `(n+8)>>(3-x)` shifts a `u64` by 64 or more — undefined in C, a hole in
+Core, whatever `cc` happens to print.
+
+Fixtures, each exported by Joern, rendered, pinned with `#guard_msgs` and compared with
+the real runtime by pytest: `tests/fixtures/cintwidth` (23 C cases: before 4 agree with
+`cc -O0 -fwrapv`, 16 silent wrong answers, 2 holes, 1 `outOfFuel`; after 23/23) and
+`tests/fixtures/javaintwidth` (22 Java cases through javasrc2cpg 4.0.606 assembled from
+Maven Central: before 7 agree with `java`, 11 wrong, 4 holes; after 22/22). The cboolint
+fixture was re-exported with typed operators and its 15 pins are unchanged.
+
 ## What was *not* measured
 
 * **`Heap` as a `List` with `mapIdx` writes.** `Heap.setField` is `h.mapIdx …`, i.e. O(heap)
