@@ -115,7 +115,8 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
     doc_functions = ledger_functions if doc_functions is None else doc_functions
     with open(os.path.join(d, LEDGER), "w") as fh:
         json.dump({"functions": ledger_functions, "holeFree": 100,
-                   "verifiableCore": 45}, fh)
+                   "verifiableCore": 45, "conditionallyVerifiable": 7,
+                   "conditionalAssumptions": 7}, fh)
     write_ast(os.path.join(d, AST), [fn(name="f%d" % i) for i in range(ast_functions)])
     with open(os.path.join(d, "docs", "scale.md"), "w") as fh:
         fh.write("| `cachetools` (published) | %d | 100 (42%%) | 45 (19%%) |\n"
@@ -127,6 +128,8 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
         # matches" and the fixture -- not the checker -- is what is broken.
         fh.write("On `cachetools`, 100 of %d functions are hole-free.\n"
                  % doc_functions)
+        fh.write("7 of %d functions are conditionally verifiable, "
+                 "resting on 7 named hole assumptions.\n" % doc_functions)
     with open(os.path.join(d, "docs", "languages.md"), "w") as fh:
         fh.write("| Python | x | %d | 42%% |\n" % doc_functions)
         fh.write("the ledger's population (%d for cachetools) is the denominator.\n"
