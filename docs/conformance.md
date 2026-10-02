@@ -77,19 +77,20 @@ The same AST, the same corpus commit (`01af8e5`), the same Python (3.11.15) and 
 command were used for both runs. `build_stable: true` held in both. Both runs used
 `python3.11 scripts/differential.py ast-Cachetools.json <cachetools> Cachetools 5`.
 
-| | harness at `46c65fc` | this round |
+| | harness at `46c65fc` | this round (merged with item I) |
 |---|--:|--:|
 | functions in `ast-Cachetools.json` | 209 | 209 |
 | hole-free | 184 | 184 |
-| exercised (≥ 1 case built) | 106 | 124 |
-| **compared** (≥ 1 case adjudicated) | **48** | **57** |
+| exercised (≥ 1 case built) | 106 | 128 |
+| **compared** (≥ 1 case adjudicated) | **48** | **60** |
 | cases agreeing | 246 / 248 | 233 / 247 |
 | divergences | 2 | **14** |
 | INCONCLUSIVE cases | 290 | 353 |
-| cases cut by the 600-case budget (counted) | 0 | 49, from 16 functions |
-| by status: compared / blocked by semantics or transpiler / AST holes / value model / unexercised | 48 / 57 / 25 / 22 / 57 | 57 / 66 / 25 / 37 / 24 |
+| cases cut by the 600-case budget (counted) | 0 | 64, from 17 functions |
+| by status: compared / blocked by semantics or transpiler / AST holes / value model / unexercised | 48 / 57 / 25 / 22 / 57 | 60 / 67 / 25 / 33 / 24 |
 
-The README's earlier "30 of 208" was stale. At `46c65fc` the harness compares 48 of 209
+The "this round" column was re-run on the merged branch (items C and I: the class-aware
+`_HashedTuple` encoding adds three compared functions). The README's earlier "30 of 208" was stale. At `46c65fc` the harness compares 48 of 209
 (208 entries carry a `.py` file; the 209th is `<module-objects>`).
 
 Compared, gained: `LRUCache.__setitem__`, `TTLCache.__contains__`, `TTLCache.ttl`,

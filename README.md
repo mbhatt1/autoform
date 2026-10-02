@@ -198,7 +198,7 @@ population (see `docs/languages.md`) and have not been re-run against it.
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **57 of 209** `cachetools` functions compared, **14 divergences**, all root-caused: 11 are an exporter call misbinding, 3 are Core method dispatch with no class hierarchy ([docs/conformance.md](docs/conformance.md)) |
+| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **60 of 209** `cachetools` functions compared, **14 divergences**, all root-caused: 11 are an exporter call misbinding, 3 are Core method dispatch with no class hierarchy ([docs/conformance.md](docs/conformance.md)) |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
@@ -222,7 +222,7 @@ run's score as the other's.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
-It was wrong to say 100%, because the denominator is small. Only 57 of 209 `cachetools`
+It was wrong to say 100%, because the denominator is small. Only 60 of 209 `cachetools`
 functions are compared (`python3.11 scripts/differential.py ast-Cachetools.json
 <cachetools@01af8e5> Cachetools 5`). The rest are INCONCLUSIVE, and each one carries a
 counted reason in `conformance.json`: a value the harness cannot encode, a receiver it
