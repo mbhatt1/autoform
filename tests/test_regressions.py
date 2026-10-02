@@ -99,6 +99,75 @@ class TestMutateErrorAttribution:
         assert mutate.error_lines("", "X.lean") == []
 
 
+# ---------------------------------------------------------------------------
+# 1b. The same path on a REAL Lean 4.30.0-rc1 diagnostic, and the line it reports.
+# ---------------------------------------------------------------------------
+
+# Captured verbatim from `lake build Autoform.Lang.Imp.Semantics` on Lean 4.30.0-rc1,
+# with `| .and a b => evalBExpr s a && evalBExpr s b` mutated to `||` in the file as of
+# 46c65fc (only the absolute worktree prefix in the `trace:` line is shortened to /w).
+# The first error is reported at 158:0 -- the `/--` doc comment ABOVE the theorem
+# keyword on line 159, because the failing check is the `@[simp]` attribute's
+# definitional-equality test, which Lean anchors at the start of the declaration.
+LEAN_430_REAL = """\
+✖ [49/49] Building Autoform.Lang.Imp.Semantics (2.0s)
+trace: .> LEAN_PATH=/w/.lake/build/lib/lean /root/.elan/toolchains/leanprover--lean4---v4.30.0-rc1/bin/lean /w/Autoform/Lang/Imp/Semantics.lean -o /w/.lake/build/lib/lean/Autoform/Lang/Imp/Semantics.olean -i /w/.lake/build/lib/lean/Autoform/Lang/Imp/Semantics.ilean -c /w/.lake/build/ir/Autoform/Lang/Imp/Semantics.c --setup /w/.lake/build/ir/Autoform/Lang/Imp/Semantics.setup.json --json
+error: Autoform/Lang/Imp/Semantics.lean:158:0: Not a definitional equality: the left-hand side
+  evalBExpr s (p.and q)
+is not definitionally equal to the right-hand side
+  evalBExpr s p && evalBExpr s q
+error: Autoform/Lang/Imp/Semantics.lean:160:65: Type mismatch
+  rfl
+has type
+  ?m.3 = ?m.3
+but is expected to have type
+  evalBExpr s (p.and q) = (evalBExpr s p && evalBExpr s q)
+error: Lean exited with code 1
+Some required targets logged failures:
+- Autoform.Lang.Imp.Semantics
+error: build failed
+"""
+
+# Lines 155-160 of Autoform/Lang/Imp/Semantics.lean at 46c65fc, at their real line numbers.
+_IMP_EXCERPT = [
+    "/-- `not` really is boolean negation. -/\n",
+    "@[simp] theorem evalBExpr_not : evalBExpr s (.not p) = !evalBExpr s p := rfl\n",
+    "\n",
+    "/-- `and` really is boolean conjunction, and in particular is not `or`. -/\n",
+    "@[simp] theorem evalBExpr_and :\n",
+    "    evalBExpr s (.and p q) = (evalBExpr s p && evalBExpr s q) := rfl\n",
+]
+IMP_LINES = ["\n"] * 154 + _IMP_EXCERPT
+
+
+class TestMutateRealLean430Diagnostic:
+    def test_old_behaviour_regex_misses_the_real_output(self):
+        assert _old_error_lines(LEAN_430_REAL, "Semantics.lean") == []
+
+    def test_fixed_regex_matches_the_real_output(self, mutate):
+        assert mutate.error_lines(LEAN_430_REAL, "Semantics.lean") == [158, 160]
+        assert ("Semantics.lean", 158) in mutate.all_error_lines(LEAN_430_REAL)
+        # the `trace:` line names .lean paths but carries no position: not an error
+        assert all(f == "Semantics.lean" for f, _ in mutate.all_error_lines(LEAN_430_REAL))
+
+    def test_old_behaviour_credited_the_kill_to_the_previous_theorem(self, mutate):
+        """Keyword-anchored ranges put line 158 inside `evalBExpr_not`."""
+        decls = mutate.parse_decls(IMP_LINES)
+        kw_owner = max((d for d in decls if d.kw <= 158), key=lambda d: d.kw)
+        assert kw_owner.name == "evalBExpr_not"
+
+    def test_fixed_attributes_both_errors_to_the_theorem_that_broke(self, mutate):
+        decls = mutate.parse_decls(IMP_LINES)
+        for line in mutate.error_lines(LEAN_430_REAL, "Semantics.lean"):
+            assert mutate.decl_at(decls, line).name == "evalBExpr_and", line
+
+    def test_doc_comment_lines_are_not_mutated(self, mutate):
+        src = ["/-- a + b -/\n", "def f (a b : Nat) : Nat := a + b\n"]
+        decls = mutate.parse_decls(src)
+        assert decls[0].start == 1 and decls[0].kw == 2
+        assert all(m.line == 2 for m in mutate.gen_mutants(src, decls))
+
+
 # ===========================================================================
 # 2/3. check_docs.py: passing against a stale artifact, and going quiet
 #      when an input is absent
