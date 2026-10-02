@@ -133,10 +133,10 @@ original measurement, not re-run.
 | 1 | JS `2 && 3` | `3` | `int 3` | **fixed** |
 | 2 | `.tsx`/`.jsx` dialect | — | `.javascript`; unknown extension is an error | **fixed** |
 | 3 | JS `2147483647 + 1` | `2147483648` | `int 2147483648` | **fixed** (`.javascript` uses `NumConfig.python`) |
-| 3 | JS `7 / 2` | `3.5` | `int 3` | **still wrong** |
-| 3 | JS `5 / 0` | `Infinity` | `exn "ZeroDivisionError"` | **still wrong** |
-| 3 | JS `-7 % 3` | `-1` | `int 2` | **now wrong**: was right by accident under `.cLike`'s truncated remainder; `NumConfig.python` floors it |
-| 3 | JS `-5.5 % 2.0` | `-1.5` (JS `%` truncates) | `0.5` | **wrong**: float `%` is Python's floored `pyMod` in every dialect |
+| 3 | JS `7 / 2` | `3.5` | `float 3.5` | **fixed** (`jsIntDiv`: inexact quotients go to IEEE binary64) |
+| 3 | JS `5 / 0` | `Infinity` | `float +inf` | **fixed** (`jsIntDiv`; `5 % 0` is `NaN`) |
+| 3 | JS `-7 % 3` | `-1` | `int (-1)` | **fixed** (`jsIntMod` truncates) |
+| 3 | JS `-5.5 % 2.0` | `-1.5` (JS `%` truncates) | `-1.5` | **fixed** under `.javascript` (truncated `fmod`); `.cLike` float `%` still uses Python's floored `pyMod` |
 | 4 | JS `1 == "1"` | `true` | `bool false` | **still wrong** (`==`/`===` are not distinguished) |
 | 5 | Java `long` / Go `int` | 64-bit | 32-bit `.cLike` | **still wrong** — `.java`/`.go` still map to `.cLike` |
 | 6 | JS `"a" + "b"` | `"ab"` | `str "ab"` | **fixed** (`Dialect.stringsAreValues`) |

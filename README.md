@@ -251,9 +251,9 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   type in C (`op:cast:float`), and `float()`/`str()`/`repr()` conversions (the Python
   stdlib model has no float builtins). Two known gaps that are *not* holes: Python's `/`
   on two ints still floors, because the exporter maps `//` onto `/`
-  (`Semantics.lean`, "Floating point"); and float `%` uses Python's floored remainder in
-  every dialect, so under `.javascript` `-5.5 % 2.0` evaluates to `0.5` where JavaScript
-  gives `-1.5`. The differential harness still refuses float arguments
+  (`Semantics.lean`, "Floating point"); and float `%` uses Python's floored remainder under
+  `.cLike` as well as `.python`, so Java's `-5.5 % 2.0` (`-1.5`) is mis-modelled
+  (`.javascript` uses the truncated remainder and matches Node). The differential harness still refuses float arguments
   (`Unencodable("float")`), so none of this is oracle-checked yet.
 - **Calling convention, remainder.** `op:starredUnpack` is **closed** (STRATEGY.md §35);
   what is left is default parameter values, keyword-only parameters, and starred
