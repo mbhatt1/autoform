@@ -194,11 +194,17 @@ theorem resolve_onProgram (τ : SImpl) (p : Program) (n : String) :
     simp only [Option.map_none]
     exact resolve_go_map τ _ p.table none
 
-theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String) :
+/-- For a program under the legacy lookup rules (`hp`: no class table). With a class table
+an unanswerable lookup is `holeFunc`, whose hole an implementation may fill, so the
+equation would not hold as stated (STRATEGY.md §59). -/
+theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String)
+    (hp : p.pyClasses = none) :
     (ctxOf (τ.onProgram p)).resolveMethod cls meth
       = ((ctxOf p).resolveMethod cls meth).map τ.onFunc := by
   have hr := resolve_onProgram τ p meth
-  simp only [Ctx.resolveMethod, ctxOf, table_onProgram] at hr ⊢
+  have hp' : (τ.onProgram p).pyClasses = none := hp
+  simp only [Ctx.resolveMethod, Ctx.pyStrict, Ctx.resolveMethodLegacy, ctxOf, hp, hp',
+    Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false, table_onProgram] at hr ⊢
   rw [List.filter_map]
   simp only [Function.comp_def]
   cases hfl : List.filter (fun q => q.1.endsWith ("." ++ cls ++ "." ++ meth)) p.table with
@@ -209,10 +215,14 @@ theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String) :
 if exactly one key matches the method suffix, the method is the function stored under
 that key. Both hypotheses are decidable by evaluation. -/
 theorem resolveMethod_of_unique (ctx : Ctx) (cls meth n : String) (f : Func)
+    (hs : ctx.pyStrict = false)
     (hf : (ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))).map (·.1) = [n])
     (hr : ctx.table.find? (·.1 == n) = some (n, f)) :
     ctx.resolveMethod cls meth = some f := by
   unfold Ctx.resolveMethod
+  rw [hs]
+  simp only [Bool.false_eq_true, if_false]
+  unfold Ctx.resolveMethodLegacy
   generalize hF : ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) = F at hf
   match F, hf with
   | [x], hx =>
@@ -482,6 +492,7 @@ theorem resolveMethod_pop :
     (ctxOf P).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
   apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.pop"
+  · rfl
   · decide +kernel
   · rfl
 
@@ -497,7 +508,7 @@ theorem delitem_under : UnderS Γdel P DelitemPost := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   have hpop : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
-    rw [resolveMethod_onProgram, resolveMethod_pop]
+    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_pop]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
   have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
   unfold runMethodIn
@@ -542,7 +553,7 @@ theorem delitem_reaches_hole_of (τ : SImpl)
   obtain ⟨o, od, hro, hsz, hcur, hcap, hdo, hdcls, hdcap⟩ := hshape
   have hpop : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
-    rw [resolveMethod_onProgram, resolveMethod_pop]
+    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_pop]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
   unfold runMethodIn
   rw [resolve_onProgram, resolve_delitem]

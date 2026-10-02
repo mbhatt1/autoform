@@ -391,7 +391,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
                 -- A closure-valued local is applied before the table is consulted.
-                cases hcl : (Env.get ρ f).closParts? with
+                cases hcl : (Ctx.calleeVal ctx h₁ ρ f).closParts? with
                 | some gc =>
                     obtain ⟨g, cap⟩ := gc
                     rw [hcl] at hy
@@ -402,12 +402,14 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 | none =>
                 rw [hcl] at hy
                 dsimp only at hy ⊢
-                cases hres : Ctx.resolve ctx f with
-                | some fn => rw [hres] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                cases hres : Ctx.resolveCallee ctx f with
+                | some fn =>
+                    rw [hres] at hy
+                    exact ihF _ hctx _ _ (hctx.1 _ _ (Ctx.resolve_of_resolveCallee hres)) _ _ _ _ _ hy hne
                 | none =>
                     rw [hres] at hy
                     dsimp only at hy ⊢
-                    cases hg : Env.get ρ f
+                    cases hg : Ctx.calleeVal ctx h₁ ρ f
                     case fn g =>
                         rw [hg] at hy
                         dsimp only at hy ⊢
@@ -486,9 +488,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     | inr vs =>
                         rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
                         dsimp only at hy ⊢
-                        -- three nested branches now: the `classDefines` guard, the
+                        -- three nested branches now: the `classResponds` guard, the
                         -- method lookup, and splitting the receiver off the positionals.
-                        cases hcd : Ctx.classDefines ctx (classNameOfValue g) m with
+                        cases hcd : Ctx.classResponds ctx (classNameOfValue g) m with
                         | false => simp only [hcd, Bool.false_eq_true, if_false] at hy ⊢; exact hy
                         | true =>
                             simp only [hcd, if_true] at hy ⊢
@@ -608,7 +610,20 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                          | (cases hy; exact absurd rfl hne)
                          | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
                    | inr vs =>
-                       rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                       -- Every other receiver: a `super()` proxy dispatches through
+                       -- `applyFunc` (the one recursive call), anything else is `Stdlib`.
+                       rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                       obtain ⟨vs, kws⟩ := vs
+                       dsimp only at hy ⊢
+                       revert hy
+                       split
+                       · split
+                         · split
+                           · intro hy
+                             exact ihF _ hctx _ _ (hctx.1 _ _ (by assumption)) _ _ _ _ _ hy hne
+                           · intro hy; exact hy
+                         · intro hy; exact hy
+                       · intro hy; exact hy)
         | alloc cls args =>
             simp only [evalExpr, Heap.alloc] at hy ⊢
             rcases hA : evalList ctx k h ρ args with ⟨h₁, s⟩
@@ -1066,6 +1081,16 @@ theorem tfFree_of_table {ctx : Ctx}
   refine ⟨hres, ?_⟩
   intro c m fn hr
   rw [Ctx.resolveMethod] at hr
+  split at hr
+  · -- Python's rules: a table entry reached by its exact qualified name, or `holeFunc`.
+    rw [Ctx.resolveMethodPy] at hr
+    split at hr
+    · simp at hr
+    · split at hr
+      · exact hres _ _ hr
+      · simp at hr
+      · cases hr; rfl
+  rw [Ctx.resolveMethodLegacy] at hr
   split at hr
   · rename_i a f rest hfilt
     have hmem : (a, f) ∈ ctx.table.filter

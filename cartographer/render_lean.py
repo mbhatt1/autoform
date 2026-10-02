@@ -674,16 +674,41 @@ def _run_main():
     bb = ", ".join("({}, {})".format(lean_str(c), base_ctor[bases[c]])
                    for c in sorted(bases))
 
+    # The Python class table (STRATEGY.md §59), recorded by the exporter on every Python
+    # module initializer -- present, possibly empty, exactly when the export knows classes.
+    # Its presence is what selects Python's lookup rules in Core (`Program.pyClasses`), so
+    # an AST without the key renders exactly as before. A short name recorded twice is
+    # dropped (Core keys classes by short name), which makes it unknown: a hole, not a guess.
+    py_tables = [f["pyClasses"] for f in funcs if "pyClasses" in f]
+    py_classes = None
+    if py_tables:
+        rows, seen = {}, {}
+        for t in py_tables:
+            for cls, row in sorted(t.items()):
+                seen[cls] = seen.get(cls, 0) + 1
+                rows[cls] = row
+        py_classes = ", ".join(
+            "{{ name := {}, bases := [{}], attrs := [{}] }}".format(
+                lean_str(c), ", ".join(lean_str(b) for b in rows[c].get("bases", [])),
+                ", ".join(lean_str(a) for a in rows[c].get("attrs", [])))
+            for c in sorted(rows) if seen[c] == 1)
+    fields = "dialect := " + dialect
     if bb:
-        out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention).")
+        fields += ", builtinBases := [" + bb + "]"
+    if py_classes is not None:
+        fields += ", pyClasses := some [" + py_classes + "]"
+    out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention)."
+               + ("" if bb or py_classes is not None else " -/"))
+    if bb or py_classes is not None:
         out.append("")
+    if bb:
         out.append("`builtinBases` lists the classes whose base is a builtin type, so that")
-        out.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`. -/")
-        out.append("def program : Program := { dialect := " + dialect
-                   + ", builtinBases := [" + bb + "], funcs := [")
-    else:
-        out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
-        out.append("def program : Program := { dialect := " + dialect + ", funcs := [")
+        out.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`."
+                   + ("" if py_classes is not None else " -/"))
+    if py_classes is not None:
+        out.append("`pyClasses` is the class table: methods resolve along the C3 MRO, and bare")
+        out.append("names by Python scoping (STRATEGY.md §59). -/")
+    out.append("def program : Program := { " + fields + ", funcs := [")
     out.append(",\n".join("  " + n for n in names))
     out.append("] }")
     out.append("")

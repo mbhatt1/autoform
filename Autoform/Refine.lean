@@ -259,12 +259,22 @@ theorem evalExpr_name (x : String) {v : Val} (hx : ρ.find? (·.1 == x) = some (
     evalExpr ctx (k+1) h ρ (.name x) = (h, .val v) := by
   simp [evalExpr, hx]
 
-/-- A name that is neither local nor a known function evaluates to `unit`. -/
+/-- A name that is neither local nor a known function evaluates to `unit` -- under the
+legacy rules (`Ctx.scopedName` false: every non-Python program, and every Python program
+without a class table). See `evalExpr_name_unbound_py` for Python's rule. -/
 theorem evalExpr_name_free (x : String)
     (hx : ρ.find? (·.1 == x) = none) (hf : ctx.resolve x = none)
-    (hg : h.get ctx.globals = none) :
+    (hg : h.get ctx.globals = none) (hs : ctx.scopedName x = false) :
     evalExpr ctx (k+1) h ρ (.name x) = (h, .val .unit) := by
-  simp [evalExpr, hx, hf, hg]
+  simp [evalExpr, hx, hf, hg, Ctx.unboundName, hs]
+
+/-- Under Python's rules an identifier bound neither locally nor globally is a hole, never
+a same-suffix function and never `unit` (STRATEGY.md §59). -/
+theorem evalExpr_name_unbound_py (x : String)
+    (hx : ρ.find? (·.1 == x) = none) (hg : h.get ctx.globals = none)
+    (hs : ctx.scopedName x = true) :
+    evalExpr ctx (k+1) h ρ (.name x) = (h, .hole s!"name:unbound:{x}") := by
+  simp [evalExpr, hx, hg, Ctx.unboundName, hs]
 theorem evalExpr_fnref (f : String) :
     evalExpr ctx (k+1) h ρ (.fnref f) = (h, .val (.fn f)) := rfl
 theorem evalExpr_hole (l : String) :
@@ -463,7 +473,12 @@ theorem applyUnop_int_neg (x : Int) :
 /-- The context `runFunc` builds internally. Exposed so that resolution facts can be
 stated and proved once per program. -/
 def ctxOf (p : Program) : Ctx :=
-  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases }
+  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
+    pyClasses := p.pyClasses }
+
+/-- `ctxOf` carries the program's class table; a program without one runs the legacy
+lookup rules (`Ctx.resolveMethod_of_none` and its siblings). -/
+@[simp] theorem ctxOf_pyClasses (p : Program) : (ctxOf p).pyClasses = p.pyClasses := rfl
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable
@@ -1807,13 +1822,15 @@ theorem ew5 : "cnt.py:<module>.Counter.bump".endsWith ".Counter.__init__" = fals
 theorem ew6 : "cnt.py:<module>.total".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
 
 theorem resolve_bump : ctxT.resolveMethod "Counter" "bump" = some f_counter_bump := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
+  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Ctx.resolveMethodLegacy,
+        Ctx.pyStrict, Program.table, List.map, f_counter_init, f_counter_bump, f_counter_total,
+        List.filter, Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false]
   rw [show ("." ++ "Counter" ++ "." ++ "bump") = ".Counter.bump" from rfl, ew1, ew2, ew3]
 
 theorem resolve_init : ctxT.resolveMethod "Counter" "__init__" = some f_counter_init := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
+  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Ctx.resolveMethodLegacy,
+        Ctx.pyStrict, Program.table, List.map, f_counter_init, f_counter_bump, f_counter_total,
+        List.filter, Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false]
   rw [show ("." ++ "Counter" ++ "." ++ "__init__") = ".Counter.__init__" from rfl, ew4, ew5, ew6]
 
 

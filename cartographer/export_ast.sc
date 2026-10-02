@@ -633,6 +633,203 @@ import scala.annotation.tailrec
     builtinBaseRows.filterNot(r => conflictingBaseNames.contains(r._2))
       .groupBy(_._1).map { case (f, rs) => f -> rs.map(r => r._2 -> r._3).toMap }
 
+  // ---- the Python class table (STRATEGY.md §59) ------------------------------
+  //
+  // Core resolves a method along `type(obj).__mro__` when the program carries a class
+  // table (`Program.pyClasses`); without one it falls back to a name-suffix rule that
+  // knows nothing of inheritance (docs/conformance.md finding 3). The table needs every
+  // class's bases IN SOURCE ORDER, and the CPG does not have them in a usable form:
+  // `inheritsFromTypeFullName` for `class Mid(Base)` is a list of eight mangled names
+  // (`pkg/m/py:<module>.py:<module>.Base`, `f/pkg/m/py:...`, `<fakeNew>/...`), duplicated
+  // for some bases and differently mangled for imported ones. So the bases are read back
+  // from the `class` header in the source text -- the same precondition `paramStars`
+  // already imposes -- and resolved by Python's own rules, conservatively:
+  //
+  //   * a bare name is a corpus class when one is visible under that name: declared in an
+  //     enclosing scope of the class statement (module level, the enclosing function, or
+  //     the class body it is nested in), or bound by a `from M import N [as A]` whose
+  //     module resolves to the file declaring it at module level;
+  //   * a bare or dotted name that matches no corpus class at all is EXTERNAL (`<ext>…`):
+  //     Core holes at it if lookup ever reaches it, so a wrong guess here costs reach,
+  //     never correctness;
+  //   * anything else -- a call (`namedtuple(...)`), a subscript (`Generic[T]`), an
+  //     attribute of a non-module (`self.Cache`), a corpus-class name that is not visible,
+  //     a keyword other than `metaclass=ABCMeta` -- makes the class UNKNOWN: it is left out
+  //     of the table, and every lookup through it holes.
+  //
+  // Core keys classes by SHORT name (that is what `Expr.alloc` and `Obj.cls` carry), so a
+  // short name declared twice anywhere in the corpus is dropped too; cachetools'
+  // `_cachedmethod.py` declares `Descriptor` and `Wrapper` six times each.
+  case class PyClassDecl(td: TypeDecl, full: String, short: String, file: String)
+  val pyClassDecls: List[PyClassDecl] =
+    cpg.typeDecl.isExternal(false).l
+      .filter(_.method.name.l.contains("<body>"))
+      .filterNot(_.name.contains("<"))
+      .filter(_.filename.toLowerCase.endsWith(".py"))
+      .map(td => PyClassDecl(td, td.fullName, td.name, td.filename))
+  val pyClassByFull: Map[String, PyClassDecl] = pyClassDecls.map(d => d.full -> d).toMap
+  val pyShortCount: Map[String, Int] = pyClassDecls.groupBy(_.short).map { case (k, v) => k -> v.size }
+
+  /** The scope a definition lives in: its full name minus the last segment. */
+  def parentScope(full: String): String = full.substring(0, math.max(full.lastIndexOf('.'), 0))
+
+  /** The text between the parentheses of a `class` header, `None` when the header has no
+    * parentheses, or `Some(None)`-style failure as `Left` when it cannot be read. */
+  def classHeaderArgs(d: PyClassDecl): Either[String, List[String]] = {
+    val txt = fileText(d.file).getOrElse(
+      sys.error(s"export_ast: cannot read source for ${d.file} (root='$srcRoot') to read the bases of class ${d.short}"))
+    val from = d.td.offset.getOrElse(-1)
+    if (from < 0) return Left("no-offset")
+    val hdr = ("""\bclass\s+""" + java.util.regex.Pattern.quote(d.short) + """\b""").r
+    hdr.findFirstMatchIn(txt.substring(math.min(from, txt.length))) match {
+      case None => Left("no-header")
+      case Some(mt) =>
+        var i = from + mt.end
+        while (i < txt.length && (txt.charAt(i) == ' ' || txt.charAt(i) == '\t')) i += 1
+        if (i < txt.length && txt.charAt(i) == ':') Right(Nil)
+        else if (i >= txt.length || txt.charAt(i) != '(') Left("header-shape")
+        else {
+          // Balanced scan to the matching `)`, splitting on top-level commas. Strings and
+          // comments inside a class header are not something this reads; seeing a quote or
+          // `#` makes the class unknown rather than mis-split.
+          var depth = 0; var j = i; val parts = collection.mutable.ListBuffer.empty[String]
+          var start = i + 1; var bad = false; var done = false
+          while (j < txt.length && !done && !bad) {
+            txt.charAt(j) match {
+              case '(' | '[' | '{' => depth += 1
+              case ')' | ']' | '}' =>
+                depth -= 1
+                if (depth == 0) { parts += txt.substring(start, j); done = true }
+              case ',' if depth == 1 => parts += txt.substring(start, j); start = j + 1
+              case '\'' | '"' | '#' => bad = true
+              case _ =>
+            }
+            j += 1
+          }
+          if (bad || !done) Left("header-unreadable")
+          else Right(parts.toList.map(_.replaceAll("\\s+", " ").trim).filter(_.nonEmpty))
+        }
+    }
+  }
+
+  /** `from M import a, b as c` bindings of one file: bound name -> (file of M, name). Only
+    * module files of this corpus are kept; anything else binds an external name. */
+  val pyImportsCache = collection.mutable.Map.empty[String, Map[String, (String, String)]]
+  def pyImports(file: String): Map[String, (String, String)] = pyImportsCache.getOrElseUpdate(file, {
+    val txt = fileText(file).getOrElse("")
+    val files = pyClassDecls.map(_.file).toSet ++ cpg.method.isExternal(false).filename.l.filter(_.endsWith(".py"))
+    val dir = file.split('/').dropRight(1).toList
+    val rx = """(?m)^[ \t]*from[ \t]+(\.*)([\w.]*)[ \t]+import[ \t]+(\([^)]*\)|[^\n#]*)""".r
+    rx.findAllMatchIn(txt).flatMap { mt =>
+      val dots = mt.group(1).length
+      val mod = mt.group(2)
+      val base: Option[List[String]] =
+        if (dots == 0) Some(Nil) else if (dots - 1 <= dir.length) Some(dir.dropRight(dots - 1)) else None
+      val path = base.map(b => (b ++ (if (mod.isEmpty) Nil else mod.split('.').toList)).mkString("/"))
+      val target = path.flatMap(p => List(p + ".py", p + "/__init__.py").find(files.contains))
+      val names = mt.group(3).stripPrefix("(").stripSuffix(")").split(',').toList.map(_.trim).filter(_.nonEmpty)
+      target.toList.flatMap { tf =>
+        names.flatMap { n =>
+          n.split("\\s+as\\s+").toList match {
+            case List(orig, alias) => Some(alias.trim -> (tf, orig.trim))
+            case List(orig)        => Some(orig -> (tf, orig))
+            case _                 => None
+          }
+        }
+      }
+    }.toMap
+  })
+
+  /** One base expression of class `d`, resolved: `Right(Some(entry))` for a table entry
+    * (a corpus short name or `<ext>dotted`), `Right(None)` for a base that adds nothing
+    * (`object`, `metaclass=ABCMeta`), `Left(reason)` when it makes the class unknown. */
+  def resolvePyBase(d: PyClassDecl, b: String): Either[String, Option[String]] = {
+    val ident  = """[A-Za-z_]\w*""".r
+    val dotted = """[A-Za-z_]\w*(\.[A-Za-z_]\w*)+""".r
+    val kw     = """([A-Za-z_]\w*)\s*=\s*(.+)""".r
+    val scope  = parentScope(d.full)
+    b match {
+      case "object" => Right(None)
+      case kw(k, v) =>
+        if (k == "metaclass" && v.trim.split('.').last == "ABCMeta") Right(None)
+        else Left(s"keyword:$k")
+      case ident() =>
+        // Visible corpus classes of that short name, by Python scoping.
+        val local = pyClassDecls.filter { k =>
+          k.short == b && k.file == d.file && {
+            val ks = parentScope(k.full)
+            ks == scope || ks == d.file + ":<module>" ||
+              (scope.startsWith(ks + ".") && !pyClassByFull.contains(ks))
+          }
+        }
+        val imported = pyImports(d.file).get(b).toList.flatMap { case (tf, orig) =>
+          pyClassByFull.get(tf + ":<module>." + orig).toList
+        }
+        (local ++ imported).distinct match {
+          case List(k) => Right(Some(k.short))
+          case Nil =>
+            if (pyShortCount.contains(b) || pyImports(d.file).contains(b)) Left(s"base-not-visible:$b")
+            else Right(Some("<ext>" + b))
+          case _ => Left(s"base-ambiguous:$b")
+        }
+      case dotted(_) =>
+        if (pyShortCount.contains(b.split('.').last)) Left(s"dotted-corpus-base:$b")
+        else Right(Some("<ext>" + b))
+      case _ => Left("base-expression")
+    }
+  }
+
+  /** Names the class body binds to something other than a plain `def` of that name (or
+    * `staticmethod` of one, which Core already calls correctly through an instance: the
+    * receiver it binds is not a parameter of the function). */
+  def pyClassAttrs(d: PyClassDecl): List[String] = {
+    val own = (n: String) => d.full + "." + n
+    // Only the body's OWN statements: the AST of `<body>` also contains every method
+    // defined in it, whose locals (`tmp0 = super()`) are not class attributes.
+    d.td.method.name("<body>").l.flatMap { b =>
+      b.ast.isCall.name("<operator>.assignment").l.filter(_.method.fullName == b.fullName)
+    }.flatMap { a =>
+      val ks = kidsOf(a)
+      ks match {
+        case (i: Identifier) :: rhs :: Nil =>
+          val isDef = rhs match {
+            case r: MethodRef => r.methodFullName == own(i.name)
+            case c: Call if c.name == "staticmethod" =>
+              kidsOf(c).exists { case r: MethodRef => r.methodFullName == own(i.name); case _ => false }
+            case _ => false
+          }
+          // Stored under the name the attribute has at run time: `__size` in the body of
+          // `Cache` is `_Cache__size`, which is also how the exporter spells every method
+          // name and every `self.__x` access.
+          if (isDef) None else Some(mangleName(i.name, Some(d.short)))
+        case _ => None
+      }
+    }.distinct.sorted
+  }
+
+  /** Can a bare name in function `from` denote function `target` under Python scoping?
+    * Yes when `target` is module-level (in any module: an import binds the same object),
+    * defined in `from` itself or in an enclosing FUNCTION scope of it, or -- for the class
+    * body only -- defined in that class. A method of a class is never visible as a bare
+    * name from inside a method: class scopes do not enclose their methods' scopes. */
+  def pyBareNameReaches(target: String, from: String): Boolean = {
+    val p = parentScope(target)
+    p.endsWith(":<module>") || p == from || from == p + ".<body>" ||
+      (from.startsWith(p + ".") && !pyClassByFull.contains(p))
+  }
+
+  /** The table rows, by file: short name -> (bases, attrs). */
+  val pyClassTableByFile: Map[String, List[(String, List[String], List[String])]] =
+    pyClassDecls.filter(d => pyShortCount.getOrElse(d.short, 0) == 1).flatMap { d =>
+      classHeaderArgs(d) match {
+        case Left(_) => None
+        case Right(args) =>
+          val rs = args.map(a => resolvePyBase(d, a))
+          if (rs.exists(_.isLeft)) None
+          else Some((d.file, (d.short, rs.flatMap(_.toOption.flatten), pyClassAttrs(d))))
+      }
+    }.groupBy(_._1).map { case (f, rs) => f -> rs.map(_._2).sortBy(_._1) }
+
   // ---- lexical scope analysis ------------------------------------------------
   //
   // Joern's `fullName` *is* the lexical nesting path: `f.py:<module>.outer.inner`,
@@ -8661,6 +8858,21 @@ import scala.annotation.tailrec
             // Only a call the frontend left *unnamed* can be one of these; a named call
             // already says what it invokes, and rerouting it on a name coincidence would
             // be a guess.
+            // Zero-argument `super()` directly in a method of class `C` whose receiver is
+            // `self` IS `super(C, self)`: the compiler supplies `__class__` and the first
+            // argument. Core has no `__class__` cell, so the exporter writes the class in
+            // (`Ctx.makeSuper`, STRATEGY.md §59). Anywhere else -- a nested function, a
+            // `classmethod` whose first parameter is `cls` -- it stays `super()`, which Core
+            // holes as `call:super`.
+            case None if pyFile && c.name == "super" && mfn == "__builtin.super" &&
+                         args.isEmpty && kwArgs.isEmpty &&
+                         pyClassByFull.contains(parentScope(currentMethodFull)) &&
+                         methodByName.get(currentMethodFull).exists(
+                           _.parameter.l.sortBy(_.index).headOption.exists(_.name == "self")) =>
+              ujson.Obj("k" -> "call", "f" -> "super",
+                        "args" -> ujson.Arr(
+                          ujson.Obj("k" -> "str", "v" -> pyClassByFull(parentScope(currentMethodFull)).short),
+                          ujson.Obj("k" -> "name", "v" -> "self")))
             case None => (if (c.name.isEmpty) boundMethodCall(c, callee, args) else None)
               .getOrElse {
               // A call with no callee name is not a call we can emit. `Expr.call` is *by
@@ -8685,6 +8897,18 @@ import scala.annotation.tailrec
               // `nonlocal` write a hole. Non-capturing targets keep the full name.
               else if (methodByName.contains(mfn) && pyFile && capturesEnv.getOrElse(mfn, false) &&
                        callee.exists { case i: Identifier => true; case _ => false })
+                ujson.Obj("k" -> "call", "f" -> callee.collect { case i: Identifier => i.name }.get,
+                          "args" -> argExprs(args, kwArgs))
+              // A BARE name cannot denote a function Python scoping does not make visible
+              // from here. Joern resolves `orphan()` to `Holder.orphan` -- a METHOD, which no
+              // bare name outside the class body can reach -- and `cache(self)` in
+              // `_cachedmethod.py` to the property `_WrapperBase.cache` rather than the
+              // enclosing function's parameter (docs/conformance.md finding 2). Such a target
+              // is dropped and the call is emitted by its NAME, which Core then resolves the
+              // way CPython does (local, global, builtin; STRATEGY.md §59).
+              else if (pyFile && methodByName.contains(mfn) &&
+                       callee.exists(_.isInstanceOf[Identifier]) &&
+                       !pyBareNameReaches(mfn, currentMethodFull))
                 ujson.Obj("k" -> "call", "f" -> callee.collect { case i: Identifier => i.name }.get,
                           "args" -> argExprs(args, kwArgs))
               else if (methodByName.contains(mfn))
@@ -12737,6 +12961,17 @@ import scala.annotation.tailrec
         obj("classBases") = ujson.Obj.from(cb.toList.sortBy(_._1).map { case (k, v) =>
           k -> (ujson.Str(v): ujson.Value)
         })
+    }
+    // The Python class table (`pyClassTableByFile`) rides on the module initializer for the
+    // same reason. It is emitted for EVERY Python module, empty or not: its presence is what
+    // tells `render_lean.py` that this export recorded classes, which switches Core to
+    // Python's lookup rules for the whole program (`Program.pyClasses`).
+    if (isModule && m.filename.toLowerCase.endsWith(".py")) {
+      val rows = pyClassTableByFile.getOrElse(m.filename, Nil)
+      obj("pyClasses") = ujson.Obj.from(rows.map { case (n, bs, as) =>
+        n -> (ujson.Obj("bases" -> ujson.Arr.from(bs.map(b => ujson.Str(b): ujson.Value)),
+                        "attrs" -> ujson.Arr.from(as.map(a => ujson.Str(a): ujson.Value))): ujson.Value)
+      })
     }
     // Emitted only when present, so an AST with no variadic parameters renders exactly
     // as it did before this existed.
