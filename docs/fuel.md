@@ -39,8 +39,8 @@ FUEL = true` says the law holds when evaluated with 400 units of fuel. It does n
 the law failing at 401. Every synthesized specification in `Autoform/SpecsGen/` was of this
 shape, and each carried an open obligation reading *"proved at FUEL only; fuel-independence
 unproved"* — one per law. (The count was 71 at one point and 72 later; the population moves
-when the generated module is re-exported, which is why this document quotes the *ratio*
-closed rather than a snapshot.)
+when the generated module is re-exported, so any figure below is a snapshot of the tree at
+the commit named in the "Where it stands" section, to be re-derived.)
 
 Since the laws are `Bool`-valued and `outOfFuel` is a distinct constructor, a law could in
 principle hold at `FUEL` for the wrong reason.
@@ -108,7 +108,7 @@ counterexample rather than weakening the statement.
 
 ## Discharging the obligations
 
-With monotonicity available, every `…_at_FUEL` theorem lifts to its ∀-fuel form:
+With monotonicity available, a `…_at_FUEL` theorem lifts to its ∀-fuel form:
 
 ```lean
 theorem X : ∀ fuel, FUEL ≤ fuel → ((dom_X).all (lawY C fuel f_…)) = true
@@ -116,25 +116,44 @@ theorem X : ∀ fuel, FUEL ≤ fuel → ((dom_X).all (lawY C fuel f_…)) = true
 
 The route, in `Autoform/SpecsGen/Basis.lean`: `runCase_fuel_mono` reduces a `Case` to
 `applyFunc_fuel_mono`; `all_transfer` lifts a per-element guard-and-law implication over
-the domain list; twelve per-law transport lemmas and five guards handle the law families.
-`C_tfFree : TFFreeCtx C` is proved by computation (`tfFree_of_table` over `C.table.all`, by
-`rfl`), and each theorem additionally discharges `tfFreeS f_X.body = true` per subject, so
-the exclusion is checked per function rather than assumed globally.
+the domain list; per-law `law*_fuel_mono` transport lemmas handle the law families. A
+module that uses it proves `C_tfFree : TFFreeCtx C` by computation (`tfFree_of_table` over
+`C.table.all`, by `rfl`), and each theorem additionally discharges `tfFreeS f_X.body = true`
+per subject, so the exclusion is checked per function rather than assumed globally.
 
-Result: 72 of 72 fuel obligations closed, zero `def ob_*` stubs left. The 11 remaining
-obligations are not fuel-related; they are statements the proof portfolio cannot close at
-all, so there was no `_at_FUEL` theorem to lift.
+### Where it stands (tree at 9639df0)
+
+The route is closed for the modules whose context really is `tryFinally`-free:
+`SpecsGen/LinuxLib.lean`, `V8Exp.lean` and `V8Base/Base.lean` each state
+`theorem C_tfFree : TFFreeCtx C`. (I did not re-derive how many of their laws are transported
+rather than stated at one fuel; that is per-module, in each file's `obligations`.)
+
+**It is NOT closed for `cachetools`, and the hypothesis is refuted.** The exporter learned to
+translate `try/finally` after `SpecsGen/Cachetools.lean` was generated; 8 of the rendered
+bodies (the `_cachedmethod`/`_cached` lock wrappers) now contain `Stmt.tryFinally`, the one
+construct `FuelMono` excludes. `Autoform.SpecsGen.Cachetools.C_not_tfFree : ¬ TFFreeCtx C`
+(proved, axioms `propext`/`Classical.choice`/`Quot.sound`) states this, and every
+`∀ fuel ≥ FUEL` law that rested on `C_tfFree` has been turned into a `Prop`-valued `def`
+(an open obligation, asserting nothing) with its content at `FUEL` kept as a theorem. In the
+current file: 144 `…_at_FUEL` theorems (72 laws and 72 `…_guard_at_FUEL` guards, checked by
+kernel computation), 72 fuel-transport obligations open, and 11 further obligations the
+proof portfolio never closed (not fuel-related): `Cachetools.obligations.length = 83`
+(`#eval`). Closing the 72 needs a reachability-restricted fuel-monotonicity lemma (one that
+only requires the `tryFinally`-free property of bodies actually reachable from the subject)
+or a corpus whose reachable bodies are `tryFinally`-free. The earlier claim here, "72 of 72
+fuel obligations closed", was true of the previous export and is false now.
 
 ## Vacuity in `lawCommutes`
 
 `EResult.beq r₁ r₂` is `true` when both sides are `outOfFuel`. A commutation law could
 therefore hold vacuously, with both orders equally failing to compute. The guard `gComm`
-checks both argument orders, and it is evaluated over each law's own domain before emission,
-for all 83 live laws.
+checks both argument orders, and it is evaluated over each law's own domain before emission;
+each law family carries such a guard, and in `SpecsGen/Cachetools.lean` every law has its
+`…_guard_at_FUEL` theorem (7 `commutes_*` guards among the 72), kernel-checked.
 
-Result: 0 cases reached `outOfFuel` at `FUEL`. It never mattered on this corpus. The guard
-remains on the emission path, because "it does not happen to bite here" and "it cannot bite"
-are different claims.
+When this was first measured (an earlier export, 83 live laws), 0 cases reached `outOfFuel`
+at `FUEL`: it never mattered on that corpus. The guard remains on the emission path,
+because "it does not happen to bite here" and "it cannot bite" are different claims.
 
 ## Regenerating
 

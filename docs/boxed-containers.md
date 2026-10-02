@@ -1,8 +1,18 @@
 # Boxed containers for Core
 
-**Status: steps 1-4 landed for Python (the 2026-10 section directly below says how, where
-it departs from this design, and why); step 5 -- the oracle's encoder -- is not done.**
-Read this before changing `Syntax.lean` or `Semantics.lean`.
+**Status (verified against the tree at 9639df0): steps 1-4 are done for Python; step 5, the
+differential oracle's encoder, is NOT done.** Sections 1-10 below are the original design,
+written before any of it landed; each carries a status note where the tree departs from it.
+The "as landed" section directly below is the record of what was built and where it departs
+from the design. Read this before changing `Syntax.lean` or `Semantics.lean`.
+
+| Step | What | State | Where |
+|---|---|---|---|
+| 1 | `Payload`/`version` on `Obj`, `Heap.payload`/`setPayload` | **Done** | `Syntax.lean` (`Payload`, `Obj`, `Heap.setPayload`) |
+| 2 | `Val.identical` (`is`) and `Val.eqPy` (`==`) | **Done**, by diverting at one call site instead of re-typing `applyBinop` (below) | `Syntax.lean` (`Val.identical`, `Val.eqPy`), `Semantics.lean` (`binopNeedsHeap`) |
+| 3 | A list/dict display allocates: `Expr.boxContainer` | **Done** (Python only) | `Syntax.lean`, `Semantics.lean`, `Boxed.lean` |
+| 4 | `Stmt.setIndex` writes, `Stmt.delIndex`, mutating methods wired | **Done** | `Semantics.lean`, `Boxed.lean` |
+| 5 | `differential.py` / `core_oracle.py` encode containers as heap objects | **Not done** (`lean_heap` emits no `payload`; a list/dict is still encoded by value) | `scripts/differential.py` |
 
 ## Steps 3-4 as landed (Python)
 
@@ -81,7 +91,9 @@ carried such a prologue with the exporter at 46c65fc.
   (pinned Joern 4.0.606 + pysrc2cpg) and renderer and compared with CPython 3.11: 31 agree,
   the 3 unmodelled shapes are pinned as holes, 0 diverge.
 * cachetools 7.1.7 (GitHub tag `v7.1.7`, commit `01af8e5`), ledger
-  (`scripts/ledger.lean.tmpl`), exporter at 46c65fc vs this change:
+  (`scripts/ledger.lean.tmpl`), exporter at 46c65fc vs this change. This is the change-time
+  record: the cachetools figures have moved since (many later items), and the current ones
+  are in `ledger-Cachetools.json` and `docs/contracts.md`, not here:
 
   | | before | after |
   |---|--:|--:|
@@ -108,14 +120,18 @@ carried such a prologue with the exporter at 46c65fc.
   list/dict fields as VALUES, so `self._Cache__data[k] = v` on an encoded receiver is still
   `setIndex:immutable-containers`, and `skip_self_not_object` is unchanged. §8 is the
   plan; the receiver `base` arithmetic and the `base - 1` fault injection must be redone
-  with it. (`core_oracle.py` does not run at 46c65fc at all: its probe opens
-  `Autoform.Generated` rather than the per-corpus namespace.)
+  with it. (`core_oracle.py` did not run at 46c65fc at all, because its probe opened
+  `Autoform.Generated` rather than the per-corpus namespace; its Lean probes have since been
+  fixed to open the generated module's namespace, STRATEGY.md §66.)
 * Live dict views; `list.sort`/`reverse`; slice reads, writes and deletes; `__setitem__`
   inherited through a translated base class (needs an MRO); `list`/`dict` SUBCLASS
   receivers (`Val.bobj`, still value semantics); `**kwargs` dicts and `*args` tuples are
   unboxed values (mutating a `kwargs` dict holes).
-* `True == 1` is `False` in Core (`Val.beq` has no bool/int case), so `d[True]` misses a
-  key `1`. Pre-existing and not introduced here, but boxing makes dict writes reachable.
+* (Closed since this section was written: `True == 1` is now `true` -- `Val.beq` identifies a
+  `bool` with the `int` of the same value, so `d[True]` finds a key `1`; STRATEGY.md §64,
+  checked by `#eval Val.beq (.bool true) (.int 1)`.)
+* Starred assignment (`a, *b = xs`, `Stdlib.unpackEx`) sees through a boxed list and boxes the
+  starred slot, as CPython's produces a fresh list.
 
 Step 2 landed WITHOUT re-typing `applyBinop`, which this document proposed and which is the
 wrong trade: 155 call sites, and it destroys the reducible scalar path that `Refine.lean`'s
@@ -141,30 +157,36 @@ and fuel could not be done without breaking the corpora. It landed anyway (step 
 relation, reached only through the `binopNeedsHeap` guard described at the top of this
 section.
 
-Step 1 (`Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`) is in the tree and is
-INERT: nothing constructs a payload other than `.none`. It cost zero proof changes and zero
-corpus regeneration, and the oracle is unchanged at 35 compared / 169-174 agree, which is
-the check that it is really inert. It is landed separately for the reason section 10 gives --
-the numbers move at step 3, and a number that moves two steps after the field appeared cannot
-be blamed on the field.
+Step 1 (`Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`) landed first and was INERT
+at the time: nothing constructed a payload other than `.none`. It cost zero proof changes
+and zero corpus regeneration, and the oracle was unchanged at 35 compared / 169-174 agree
+(historical figures), which was the check that it was really inert. It was landed
+separately for the reason section 10 gives -- the numbers move at step 3, and a number that
+moves two steps after the field appeared cannot be blamed on the field. (It is no longer
+inert: `Expr.boxContainer` constructs `.list`/`.dict` payloads; nothing yet constructs
+`.tuple`.)
 
-**Problem.** `Val.list`, `Val.tuple` and `Val.dict` are *values*. Python's are *objects*.
-The consequences are all currently visible in the ledger and the oracle:
+**Problem (as stated when the design was written; the "Now" column is the state of the tree).**
+`Val.list`, `Val.tuple` and `Val.dict` are *values*. Python's are *objects*.
+The consequences were all visible in the ledger and the oracle:
 
-| symptom | where | size |
-|---|---|---|
-| `Stmt.setIndex` is an unconditional hole | `execStmt`'s `.setIndex` case, `Semantics.lean` | `setIndex:immutable-containers` |
-| `del d[k]` / `del xs[a:b]` are holes | transpiler | `op:delete-index`, `op:delete-slice` |
-| `list.append` / `dict.pop` implemented but unwireable | `MethodResult`, `Stdlib.lean` | `MethodResult.mutating` |
-| `dict`/`tuple`-subclass receivers refused by the oracle | `differential.py` | `skip_self_not_object` 1,361 |
-| `==` cannot distinguish "equal" from "the same object" | `Val.beq` | see §5 |
+| symptom | where | size | Now |
+|---|---|---|---|
+| `Stmt.setIndex` is an unconditional hole | `execStmt`'s `.setIndex` case, `Semantics.lean` | `setIndex:immutable-containers` | Closed for a boxed container; still the hole for an unboxed value and outside Python |
+| `del d[k]` / `del xs[a:b]` are holes | transpiler | `op:delete-index`, `op:delete-slice` | `del d[k]` is `Stmt.delIndex` (Python); slices still holes |
+| `list.append` / `dict.pop` implemented but unwireable | `MethodResult`, `Stdlib.lean` | `MethodResult.mutating` | Wired for a boxed receiver |
+| `dict`/`tuple`-subclass receivers refused by the oracle | `differential.py` | `skip_self_not_object` 1,361 (historical count) | **Open** (step 5; the counter still exists) |
+| `==` cannot distinguish "equal" from "the same object" | `Val.beq` | see §5 | Closed via `Val.eqPy` / `Val.identical` |
 
-All five are one defect. This document specifies the proposed fix, what it would cost, and
+All five were one defect. This document specified the fix, what it would cost, and
 what it would not fix.
 
 ---
 
 ## 1. The representation
+
+*Status: landed as described, except that nothing yet constructs `Payload.tuple` (plain
+tuples stay values, as §1 says) and the field defaults differ slightly.*
 
 Containers move into the existing heap. No new heap, no new address space, no `Ref`
 namespace split — `Val.ref` already means "a mutable thing with identity", which is
@@ -221,8 +243,9 @@ Rather than pay allocation on every dict key and lose structural key comparison,
 immutability is preserved by construction — there is nowhere to write — and the one
 observable difference is made a hole:
 
-* `a is b` where either side is an unboxed value (`int`, `str`, `bool`, `float`, `tuple`)
-  → `Expr.hole "is:unboxed-value-identity"`. CPython interns small ints, some strings and
+* `a is b` where either side is an unboxed value (`int`, `str`, `float`, `tuple`)
+  → `Expr.hole "is:unboxed-value-identity"` (landed; `Val.identical` also decides `bool`
+  singletons, `unit`/`null` and named functions, see `Syntax.lean`). CPython interns small ints, some strings and
   no tuples, all of it implementation-defined; this is the same refusal `Stdlib.lean`
   already makes for `id()` and `hash()`.
 
@@ -292,7 +315,9 @@ else match Heap.payload r with
   | .tuple _  => .exn (.str "TypeError")
   | .none     => .exn (.str "TypeError")   -- unless __setitem__ resolved above
 ```
-with `i` a slice → `Expr.hole "setIndex:slice"` (§8, item 3).
+with `i` a slice → a hole. (As built: the exporter emits the static hole
+`assign:lhs:slice` for `xs[a:b] = v`, pinned by `tests/test_boxed_containers.py`'s `slc`; there
+is no `setIndex:slice` label.)
 
 `Stdlib.dictSet` already implements CPython's replace-in-place / append-at-end rule, so
 key order stays observable and correct.
@@ -330,7 +355,7 @@ match recvV with
       | some (h₂, .pure res)        => (h₂, res)
       | some (h₂, .mutating res nv) => (h₂.setPayload r (valToPayload nv), res)
       | none                        => (h₁, .hole s!"mcall:{name}")
-| _ => (h₁, .hole s!"mcall:{name}:unboxed-receiver")
+| _ => (h₁, .hole s!"mcall:{name}:unboxed-receiver")   -- as built: `mcall:<m>:unboxed-container`
 ```
 
 `payloadToVal`/`valToPayload` are the only adapters needed, because `Stdlib.method` speaks
@@ -376,6 +401,9 @@ Both fall out of the design without a special case.
 
 ## 4. Iteration
 
+*Status: NOT built as designed. The tree keeps snapshot iteration, guarded by `Obj.version`
+(`forIn:container-mutated-during-iteration`); see "Where this departs" above.*
+
 `for x in xs` currently reads `Val.iterable : Val → Option (List Val)` and iterates a
 *snapshot*. After boxing there is a choice:
 
@@ -397,6 +425,10 @@ For an unboxed `Val.tuple` or `Val.str`, snapshot iteration remains exactly righ
 ---
 
 ## 5. `==` versus `is`
+
+*Status: `Val.identical` and `Val.eqPy` exist as specified. `Val.beq` was NOT re-typed (see the
+note on step 2 above); `eqPy` is reached through `binopNeedsHeap`, and the cost table below
+is the cost of the rejected alternative.*
 
 This part of the change is the most likely to produce false divergences.
 
@@ -487,6 +519,9 @@ migration cost that buys something.
 
 ## 7. Migration cost, measured
 
+*Status: this is the pre-implementation estimate; the line numbers and counts are historical
+(`Refine.lean` has grown). Kept for the reasoning, not as a description of the tree.*
+
 Counts taken from this repository, not estimated:
 
 ### `Autoform/Refine.lean` — 2,067 lines, 115 theorems
@@ -529,15 +564,20 @@ that re-verifies six corpora without re-running Joern.
 
 ### `Autoform/Ledger.lean`, `Demo.lean`
 
-New hole labels to register: `setIndex:slice`, `op:delete-slice`,
-`mcall:<name>:unboxed-receiver`, `is:unboxed-value-identity`. Removed:
-`setIndex:immutable-containers`, `op:delete-index`. The verifiable-core numbers will move
+New hole labels to register (as built: `assign:lhs:slice`, `op:delete-slice`,
+`mcall:<m>:unboxed-container`, `is:unboxed-value-identity`, plus the labels in
+`docs/core-language.md` §8). `setIndex:immutable-containers` was NOT removed (it remains for
+unboxed values and non-Python); `op:delete-index` is gone for Python. The verifiable-core numbers will move
 in both directions and should be reported as a before/after pair, not a single number
 (§17).
 
 ---
 
 ## 8. What breaks in `scripts/differential.py`
+
+*Status: step 5, NOT done (verified: `lean_heap` emits `cls`, `fields`, `captured` only, and
+`Encoder` encodes a list/dict by value). Line numbers below are from when this was written.
+Item 7 (floats) is done.*
 
 The encoder is where boxing costs the most, because it currently encodes containers
 *by value* and that is now wrong in a way that would show up as divergences.
@@ -595,7 +635,7 @@ Stated explicitly so they are not rediscovered as divergences.
 3. **Slice assignment and slice deletion** (`xs[a:b] = …`, `del xs[a:b]`). Needs a slice
    *value* with tri-state `start`/`stop`/`step`, plus CPython's extended-slice length
    rules (`xs[::2] = [...]` requires matching lengths, `xs[a:b] = ...` does not). Holes
-   `setIndex:slice`, `op:delete-slice` until Core has a slice value. Boxing is a
+   `assign:lhs:slice`, `op:delete-slice` until Core has a slice value. Boxing is a
    prerequisite for that work, not a substitute.
 4. **Anything observing deallocation**: `weakref`, `__del__`, refcount-driven finalisation.
    The heap is append-only and never collects. `cachetools` uses `functools` machinery
@@ -614,20 +654,20 @@ Stated explicitly so they are not rediscovered as divergences.
 
 ---
 
-## 10. Suggested landing order
+## 10. Suggested landing order (and where each step stands)
 
 Each step is independently checkable, which matters because the oracle numbers move at
 step 4 and must not be attributed to step 1.
 
-1. `Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`, no behaviour change yet
+1. **Done.** `Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`, no behaviour change yet
    (nothing constructs a payload). Refine.lean untouched; all corpora re-verify.
-2. `Val.beq` → `Val.identical` + `Val.eqPy` (§5), still on unboxed containers. This is the
-   mechanical `Option`/heap/fuel plumbing, and it is separable from boxing. Corpora
-   re-verify; oracle numbers unchanged.
-3. Container literals allocate; `Expr.index`, `valIn`, iteration read through refs (§4).
-   `total_run` rewritten. **Oracle numbers change here for reasons 8.1–8.5.**
-4. `setIndex`, `delIndex`, and the `MethodResult.mutating` wiring (§2). The holes close.
-5. `differential.py` encoder and comparison (§8), including re-running §25's
+2. **Done** (without re-typing `Val.beq`). `Val.beq` → `Val.identical` + `Val.eqPy` (§5), still on
+   unboxed containers. Corpora re-verify; oracle numbers unchanged.
+3. **Done** (Python only, via `Expr.boxContainer`). Container literals allocate; `Expr.index`,
+   `valIn`, iteration read through refs (§4). `total_run` rewritten. **Oracle numbers change
+   here for reasons 8.1–8.5.**
+4. **Done.** `setIndex`, `delIndex`, and the `MethodResult.mutating` wiring (§2). The holes close.
+5. **Not done.** `differential.py` encoder and comparison (§8), including re-running §25's
    `base - 1` fault injection.
 
 Step 3 is the one that can regress the conformance number while being correct. Report

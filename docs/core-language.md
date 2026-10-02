@@ -9,7 +9,7 @@ Where this document and the source disagree, the source is right and this docume
 bug. Nothing here restates a number; the shapes are stable, the counts are not.
 
 Core is shaped to match **Joern's CPG node vocabulary**, not any one language's grammar.
-That is why one semantics can cover C, C++, Java, JavaScript, Python and Kotlin: the front
+That is why one semantics can cover C, C++, Java, JavaScript/TypeScript, Python, Go and Kotlin (the languages `cartographer/render_lean.py` maps onto a dialect, §6): the front
 ends have already normalized to a common vocabulary, so Core only has to be faithful to
 *that*.
 
@@ -84,7 +84,7 @@ class with a builtin base, and `Cache` derives from `collections.abc.MutableMapp
 `dict`.
 
 **Floats are partially wired.** `Val.float` and `Lit.float` exist; the exporter emits
-float literals and `render_lean.py` encodes them as exact binary64 bit patterns. Evaluated:
+float literals and `cartographer/render_lean.py` encodes them as exact binary64 bit patterns. Evaluated:
 `+ - * / %` (an `int` operand is promoted; a failed promotion is Python's `OverflowError`),
 the six comparisons (exact `int`/`float` comparison under `.python`, promote-then-compare
 under `.cLike`/`.javascript`; NaN is unordered), unary `-`, truthiness and equality. Still
@@ -94,17 +94,21 @@ float builtins). Python `/` on two ints is true division (`pyIntTrueDiv`: a floa
 both operands are at most 2^53 in magnitude, the hole `binop:/:int-true-division-beyond-2^53`
 beyond, `ZeroDivisionError` on a zero divisor) and `//` is its own operator, exported from
 `<operator>.floorDiv`; `bool` is an `int` under `.python` (`Dialect.promotesBool`, `Val.beq`).
-A known wrong answer rather than a hole: float
-`%` is Python's floored remainder under `.cLike` as well as `.python`, which is wrong for
-Java (`-5.5 % 2.0` is `-1.5`); `.javascript` uses the truncated remainder. The differential harness refuses float
-arguments, so none of this is oracle-checked yet.
+Float `%` is the remainder of TRUNCATED division (`fc.fmod`, C's `fmod`, which IEEE makes
+exact) under `.cLike` and `.javascript`, and Python's floored remainder (`fc.pyMod`) only
+under `.python`: Java's and Kotlin's `-5.5 % 2.0` is `-1.5`, CPython's is `0.5`. The
+`.cLike` arm used to be the floored one, which answered `0.5` for Java; it is now pinned by
+`#guard`s in `Semantics.lean` that compare the IEEE bits under `.cLike` and `.python`.
+The differential harness no longer refuses float arguments: `scripts/differential.py`
+encodes a Python `float` as an exact binary64 bit pattern (`Val.float (Fl.ofBits …)`) and
+reads one back, and only refuses a float used as a dict KEY (CPython merges `1` and `1.0`) and float subclasses.
 
 ## 2. The memory model: `Heap`, `Obj`, `Env`, `Ctx`
 
 ```lean
 abbrev Ref  := Nat
 structure Obj where cls : String; fields : List (String × Val); captured : List (String × Val)
-                    payload : Payload; version : Nat   -- both inert: boxed-containers.md, step 1
+                    payload : Payload; version : Nat   -- a boxed list/dict's contents; bumped on mutation (boxed-containers.md)
 abbrev Heap := List Obj                 -- index into the list is the Ref; alloc appends
 abbrev Env  := List (String × Val)      -- local variables; `set` conses, shadowing
 structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; globals : Ref
@@ -120,7 +124,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
   then `unit`.
 * **Globals live on the heap, not in `Env`.** Module-level bindings must be mutable and
   must outlive any single call, so they occupy a distinguished object (`cls = "<globals>"`)
-  at `Ctx.globals`. `runMain` allocates it first, so it is ref 0, and any harness building
+  at `Ctx.globals`. `runMainH` (`runMain` is its `.2`, the result without the final heap) allocates it first, so it is ref 0, and any harness building
   its own heap must allocate fresh objects from `heap.length` onward.
 * **The heap is threaded explicitly** through `evalExpr`/`execStmt` rather than hidden in a
   monad. That cost keeps the fuel recursion visibly structural, so Lean accepts the
@@ -339,8 +343,8 @@ theorems therefore quantify `∀ fuel ≥ N` rather than picking one.
 inductive Dialect | python | cLike | javascript
 ```
 
-Every program carries the dialect the transpiler inferred (`render_lean.py` infers it from
-the file extension). Arithmetic and string semantics are parameterized by it.
+Every program carries the dialect the transpiler inferred (`cartographer/render_lean.py` infers it from
+the file extension: `.js`/`.ts`/`.tsx`/`.jsx`/`.mjs`/`.cjs` give `.javascript`). Arithmetic and string semantics are parameterized by it.
 
 This was not designed in. The differential harness's first run reported:
 
@@ -362,28 +366,53 @@ them.
 
 The dialect currently controls:
 
-* `Dialect.idiv`/`imod` — floored vs truncated division and remainder.
+* `Dialect.idiv`/`imod` — floored vs truncated division and remainder. These are the
+  historical pattern and are **unused by `applyBinop`** (superseded by `NumConfig`'s
+  `divRound`, plus the JS/Python special cases below); they are kept exhaustive.
+* Integer `/` and `%` in `applyBinop`: under `.python`, `/` on two ints is TRUE division
+  (`pyIntTrueDiv`, §1) and `//` floors (`Dialect.python` only; any other dialect is the
+  hole `binop://:non-python`); under `.javascript`, `/` is IEEE division of two doubles
+  (`jsIntDiv`: an exact integer quotient stays an `.int`, `7 / 2` is `3.5`, `5 / 0` is
+  `Infinity`) and `%` is the TRUNCATED remainder (`jsIntMod`; `x % 0` is `NaN`, a zero
+  remainder of a negative dividend is `-0`); under `.cLike`, `NumConfig.div`/`mod` of the
+  configured width.
+* JavaScript equality and bitwise operators (STRATEGY.md §61, §65): `===`/`!==` are their
+  own operator strings (`binop:===:non-javascript` under any other dialect); `==`/`!=`
+  decide same-type and null/undefined pairs and hole cross-type coercion
+  (`js:==:cross-type-coercion`, `js:eq:object-identity-unknown`); `&`, `|`, `^`, `<<`,
+  `>>`, `>>>` apply ECMA-262 `ToInt32`/`ToUint32` (`jsBitwise`) and hole an operand
+  beyond 2^53 (`js:bitwise:operand-beyond-2^53`). `a ?? b` is lowered by the exporter from
+  the source token (`op:js-nullish-impure-lhs` when the left side has effects).
+* `Dialect.promotesBool` — a `bool` is an integer in arithmetic: `.python` (`True + True ==
+  2`, while `bool & bool` stays `bool`) and `.cLike` (C comparison results are `0`/`1`);
+  not `.javascript`.
 * `Dialect.toNumConfig` — the `NumConfig` from `Numeric.lean`: Python gets unbounded
-  integers, `.cLike` gets 32-bit two's complement, and `.javascript` gets Python's
-  unbounded config (exact up to `Number.MAX_SAFE_INTEGER`; integer `/` and `%` therefore
-  *floor*, which is wrong for JavaScript — see `docs/languages.md`). (Which C policy is selected —
-  `c32` surfacing undefined behaviour, or `c32Wrapv` matching what `cc` actually does — is
-  a recorded choice, not a default: see §8 and `Numeric.lean`.) That 32-bit config is
-  only the meaning of an *untyped* `.cLike` operator. The exporter names the type of every
-  C/C++, Java, Go and Kotlin integer operation in the operator itself — `"*:i64"`,
-  `"<:u32"`, `">>:u64"`, `"+:j64"`, Go `"*:g64"` / `"-:w08"` (signed / unsigned, at the
-  operand's own width: Go has no integer promotion), Kotlin `"*:k64"` / `"-:q32"`
-  (`TypedInt.lean`): operands are converted to that type (the usual arithmetic
-  conversions; the left operand only, for shifts) and the operation is performed at it,
-  C tags under the configured C overflow policy, Java and Kotlin tags under
-  `NumConfig.java32`/`java64` (wrap, masked shift counts, `ArithmeticException`), Go tags
-  under `NumConfig.go64` (wrap, a shift count at or above the width gives 0 / -1, a
-  negative one or a zero divisor panics). An operation whose type does not resolve is the
-  hole `op:int:unresolved-type`, not the untyped operator (STRATEGY.md §63, §66).
+  integers (`NumConfig.python`), `.cLike` gets 32-bit two's complement
+  (`NumConfig.c32Wrapv`, the policy that matches what `cc` does; `c32` instead surfaces
+  undefined behaviour), and `.javascript` gets `NumConfig.python` as well (exact up to
+  `Number.MAX_SAFE_INTEGER`; integer `/`, `%` and the bitwise operators bypass it as
+  listed above). That 32-bit config is only the meaning of an *untyped* `.cLike` operator.
+  The exporter names the type of every C/C++, Java, Go and Kotlin integer operation in the
+  operator itself (`TypedInt.lean`), as `"<op>:<tag>"`:
+
+  | Tags | Language | Type | Rules |
+  |---|---|---|---|
+  | `i32` `i64` `u32` `u64` | C / C++ | signed / unsigned at that width | usual arithmetic conversions; overflow under the configured C policy (`Dialect.toNumConfig .cLike`); unsigned wraps; division by zero, `MIN / -1`, a shift count outside `[0, width)` are `ub:` holes |
+  | `j32` `j64` | Java | signed | `NumConfig.java32`/`java64`: wrap, shift count masked, `MIN / -1 = MIN`, division by zero is `ArithmeticException` |
+  | `g08` `g16` `g32` `g64` / `w08` `w16` `w32` `w64` | Go | signed / unsigned at the operand's own width (no integer promotion) | wrap; `MIN / -1 = MIN`; a shift count at or above the width gives 0 (`-1` for `>>` of a negative); a negative count or a zero divisor panics |
+  | `k32` `k64` / `q32` `q64` | Kotlin | `Int`/`Long` / `UInt`/`ULong` | Java's rules; unsigned wraps modulo 2^n |
+
+  Operands are converted to the tag's type and the operation is performed at it. An
+  operation whose type does not resolve is the hole `op:int:unresolved-type`, not the
+  untyped operator; Go adds `op:int:constant-expression` / `op:int:untyped-constant-shift`
+  (STRATEGY.md §63, §66). A `Lang`-level table (`Lang.numConfig`, `Lang.dialect` in
+  `Numeric.lean`) maps each source language to its config: Python unbounded, C `c32`,
+  Java and Kotlin `java64`, Go `go64`, JavaScript/TypeScript the `.javascript` config.
 * `Dialect.toFConfig` — the float format and rules (`FConfig.python` or
   `FConfig.cDouble`; §1).
 * `Dialect.comparesIntFloatExactly` — whether `int`/`float` comparison is exact (Python)
-  or promotes the integer first (C, JavaScript).
+  or promotes the integer first (C, JavaScript). Float `%` is `fmod` (truncated) under
+  `.cLike` and `.javascript`, `pyMod` (floored) under `.python` (§1).
 * `Dialect.boolOpsAreValues` — whether `and`/`or` yield an operand (Python, JavaScript)
   or a boolean (C).
 * String operators (`Dialect.stringsAreValues`): under `.python` and `.javascript`, `+`
@@ -403,7 +432,7 @@ The dialect currently controls:
 |---|---|
 | `ok v` | A defined result. |
 | `divZero` | Division or remainder by zero → `ZeroDivisionError`. |
-| `trap r` | The language *defines* this as a runtime fault (Go's `INT_MIN / -1`) → an exception. |
+| `trap r` | The language *defines* this as a runtime fault (a negative shift count, Go's shift-count and zero-divisor panics) → an exception. (Go's `INT_MIN / -1` is no longer one: the spec defines it as `INT_MIN`.) |
 | `ub r` | The language does not define this at all → **`Expr.hole "ub:<reason>"`**. |
 
 C's signed overflow, `INT_MIN / -1` and shifts past the width have no correct answer; the
@@ -457,11 +486,15 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `op:cast:<kind>` | A C cast that could not be translated. `pointer:int-to-pointer`: a pointer cast whose operand is not known to be a pointer (Core has no value for an arbitrary address; `(T*)0` is `unit` and a pointer-to-pointer cast passes its operand through). `opaque-type`: the target's type did not resolve to anything classifiable (a *type* gap) -- including a typedef name declared more than once in the program whose declarations do not all resolve to the same width (`i64` in the full SQLite tree without a generated `sqlite3.h`). `model-dependent`: the width depends on a data model that was not stated. `float`: a cast to `float`/`double` (`Val.float` exists, but the int↔float conversion is not wired into the exporter). `char-signedness`: a cast to plain `char`, whose signedness is implementation-defined and not fixed by the data model (x86-64 and AArch64 Linux are both LP64 and disagree). `scalar`/`object`: a known scalar or aggregate target with no Core model. | Mixed: `opaque-type` is frontend/type work; `float` needs the conversion wired (`FConfig.ofInt` exists); `char-signedness` needs a target-ABI parameter; `int-to-pointer` is a hole **by choice** (§2.1): what remains is an operand statically known to be an integer, or an integer constant (`(sqlite3_destructor_type)-1`, `(T*)8`). An operand with no type evidence is `unop "cast:ptr"`, decided at run time. |
 | `op:sizeOf:<kind>` | A `sizeof` that could not be folded to a constant. Folding uses the exporter's `dataModel` for pointer and `long`-family widths and standard C layout for aggregates (members in source order, each at the next multiple of its own alignment; an array has its element's alignment; an aggregate the maximum of its members'; 8-byte scalars are refused under ILP32, where their in-struct alignment is ABI-dependent). An aggregate is refused (`object`) when a member is a bit-field, when the struct is packed, when its tag has more than one distinct definition, when a `#if` in its body cannot be decided for the parsed configuration (only `#ifdef`/`#ifndef`/`defined()` of macros the corpus never defines and the frontend was not given are decided; see `cppDefines`), or when Joern's member list is not exactly the declarators of the source (it omits function-pointer members and lists every `#if` branch). `array-bound`: an array whose bound is neither a literal, an integer constant expression over literals, a resolvable `NAME±N` macro, nor (for `T x[] = {...}`) a countable initializer. `model-dependent`, `opaque-type`, `unknown-type`, `pointer` as for casts. | Not yet implemented beyond the shapes named. |
 | `op:shiftRight:unknown-signedness`, `op:shiftRight:unknown-token` | C `>>` is arithmetic or logical depending on the promoted left operand's signedness, and Core performs it at that operand's width (`">>:u64"`); the type is taken from resolved types only (typedef chains, casts, literals, the usual arithmetic conversions; enums refused). `unknown-signedness`: that type did not resolve. `unknown-token`: a Java shift whose `>>`/`>>>` token could not be read from the source (javasrc2cpg 4.0.606 swaps the two operator names, so the name is not used). `op:shiftRight:64-bit-operand` no longer occurs: 64-bit shifts translate. | Type work. |
-| `op:int:unresolved-type`, `op:int:unsupported-width`, `op:int:store-char-or-bool` | A C/C++/Java integer operation (`+ - * / % & \| ^ << >>`, comparisons in C, unary `-`/`~`, `x op= e`, `++`/`--`) whose operation type did not resolve and whose operands are not provably floating or pointer-valued; Core would otherwise have computed it at 32 bits. Resolution: `cIntExprType` (identifiers with a declaration, literals by C11 6.4.4.1, casts, the usual arithmetic conversions, members through the owner's typedef chain with every declaration agreeing, bit-fields by their promotion, `sizeof` as `size_t`, `p - q` as `ptrdiff_t`, assignments/increments as their target, a few ISO C library return types), widths from `dataModel`. What stays unresolved on SQLite is mostly members of nested or anonymous structs/unions, which c2cpg 4.0.606 records without members, and receivers whose own type is `ANY`. `unsupported-width`: a type wider than 64 bits. `store-char-or-bool`: an arithmetic store (`c += 1`, `c++`) into plain `char` (implementation-defined signedness) or `_Bool` (converts by `!= 0`). | Type-recovery work (nested aggregates); `char` needs a target-ABI parameter. |
+| `op:int:unresolved-type`, `op:int:unsupported-width`, `op:int:store-char-or-bool` | A C/C++/Java/Go/Kotlin integer operation (`+ - * / % & \| ^ << >>`, comparisons in C, unary `-`/`~`, `x op= e`, `++`/`--`) whose operation type did not resolve and whose operands are not provably floating or pointer-valued; Core would otherwise have computed it at 32 bits. Resolution: `cIntExprType` (identifiers with a declaration, literals by C11 6.4.4.1, casts, the usual arithmetic conversions, members through the owner's typedef chain with every declaration agreeing, bit-fields by their promotion, `sizeof` as `size_t`, `p - q` as `ptrdiff_t`, assignments/increments as their target, a few ISO C library return types), widths from `dataModel`. What stays unresolved on SQLite is mostly members of nested or anonymous structs/unions, which c2cpg 4.0.606 records without members, and receivers whose own type is `ANY`. `unsupported-width`: a type wider than 64 bits. `store-char-or-bool`: an arithmetic store (`c += 1`, `c++`) into plain `char` (implementation-defined signedness) or `_Bool` (converts by `!= 0`). | Type-recovery work (nested aggregates); `char` needs a target-ABI parameter. |
+| `op:int:constant-expression`, `op:int:untyped-constant-shift` | Go only. A constant expression the exporter could not evaluate exactly (Go evaluates constants at arbitrary precision; a successfully evaluated one is emitted as the resulting literal), and a non-constant shift of an untyped constant (`1 << n`), whose type comes from a context the exporter cannot see. | Type work. |
 | `stmt:va_arg` | A statement reading a variadic argument with `va_arg(ap, T)`. The frontend cannot parse it (the second argument is a type), and Core has no C variadic calling convention to read from. | Needs a variadic-argument model in Core. |
 | `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]` outside Python (Python's is `Stmt.delIndex`), slice deletion, attribute deletion. | Slices need a slice value (`docs/boxed-containers.md` §9); the rest not yet implemented. |
 | `op:dictLiteral-nonempty`, `op:stringExpressionList`, `op:fieldAccess-shape` | CPG node shapes the exporter does not recognise. | Not yet implemented. |
+| `op:arrayInitializer:zero-init`, `op:arrayInitializer:index-designator`, `op:arrayInitializer:element-shape`, `op:arrayInitializer:mixed-designators`, `op:starredUnpack-arity`, `op:formatString:<reason>` | A C/C++ array initializer with no children, with `[i] = v` designators, with elements of an unrecognised shape, or mixing designator kinds; a starred unpack whose arity is not one; an f-string the exporter cannot lower (`escape`: a backslash in a segment; `shape`: an unrecognised part). A string conversion that remains is the run-time hole `call:str`. | Not yet implemented (per shape). |
+| `op:alloc:ctor-unresolved-class`, `op:alloc:ctor-shape` | A C++ constructor allocation with no class name: Joern's frontend emitted it as `ANY.ANY()` with no name, argument or type (not recoverable from the CPG), versus a constructor block of an unexpected shape. | Frontend limit for the first. |
 | `op:raise-bare` | A bare `raise` re-raising the in-flight exception; Core has no ambient current-exception. | Not yet implemented. |
+| `op:js-token-unrecovered:<op>`, `op:js-nullish-impure-lhs` | JS/TS: the source token distinguishing `==`/`===` (or `>>`/`>>>`, `\|\|`/`??`) could not be read back from the source, so the operator is refused rather than guessed; and `a ?? b` whose left operand has effects (the exporter lowers a pure one to a conditional). | Residual only. |
 | `control:TRY-finally-escaping` | `try/finally` whose body can `return`/`break`. The non-escaping case *is* translated; when control escapes, `ret` would bypass the trailing finalizer. | Design-limited; needs a richer `Ctl` interaction than one `tryCatch` can express. |
 | `control:TRY-else-without-except`, `control:TRY-multiCatch`, `control:TRY-multiFinally`, `control:TRY-shape` | `try/except/else` (the `else` must run only when nothing was raised, *and* its own exceptions must not be caught), multiple `except` clauses (the CPG discards exception types), and unrecognised `try` shapes. | Partly permanent (the CPG loses the exception types), partly not yet implemented. |
 | `control:WHILE-iterator` | A desugared iterator loop the exporter could not reconstruct into `forIn`. | Not yet implemented. |
@@ -469,15 +502,15 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `scope:del-cell` | `del x` where `x` is such a cell. Core's `del` would drop this frame's reference to the cell rather than empty it for every closure. | Not yet implemented. |
 | `param:default-nonliteral` | A parameter default that is not a literal (`acc=[]`, `t=time.monotonic`, `f=Cache.__setitem__`). `pysrc2cpg` drops default expressions entirely; the exporter reads the default's *text* back from the source, and can translate only literals, for which evaluating once at `def` time and once per call cannot be told apart. Sits in `Func.defaults`, not the body: it is raised only by a call that omits the argument, and counted by `Func.holes`. | Needs `def` statements to execute in Core (a value captured when the function object is created) **and** a CPG node for the default expression, which Joern does not provide. |
 | `param:signature-unparsed` | The exporter could not read the function's parameter list back from the source into exactly the CPG's parameters, so its defaults / keyword-only / positional-only markers are unknown. Prefixed to the whole body. | Residual parser limits (0 in a fresh export of `cachetools` v7.1.7). |
-| `scope:class-closure` | A class defined inside a function whose methods read the enclosing scope, where `classClosure` does not apply. | Being closed; check the current AST. |
 | `assign:arity`, `assign:lhs:<shape>`, `assign:aug-impure-target`, `assign:aug-impure-receiver` | Multiple assignment targets, assignment to a shape Core has no statement for, and augmented assignment whose target or receiver would have to be evaluated twice. | Mostly not yet implemented; the "impure" ones are a correctness refusal, not a gap. |
 | `op:indirection:<kind>`, `assign:lhs:indirection`, `op:<incr>:unsupported-target` | `*p` read, `*p = v` / `*p op= v`, and `(*p)++` where `p` is not provably an interior pointer (`Val.iref`), an alias of one boxed local, or a closed out-parameter. `<kind>` is `addrKind` of `p`'s static type (`pointer`, `scalar`, `object`, `unknown-type`, `opaque-type`). What remains is mostly `p` a parameter of a function with an external or unclosable caller (the public C API), `p` a struct pointer dereferenced whole (`*pA = *pB` struct copy), and pointers loaded from fields/arrays. `&n` of a boxed scalar is `irefField n "v"`, so a scalar out-parameter and an `&s->f`/`&a[i]` out-parameter are the same runtime shape and a callee's `*p` is `derefIref`/`setDerefIref` for both. A cast that changes the pointee type of a scalar (`*(char*)&one`, `*(i64*)&u64Val`, `f((u32*)&intVal)`) is a reinterpretation of bits, so it is never seen through and the dereference stays one of these holes; pointer-to-pointer pointee changes (`(void**)&pData`) are allowed because Core pointer values carry no C type. | Needs a location model for pointers of unknown provenance, and a byte-level memory model for type punning; not yet implemented. |
 | `call:computed-callee`, `call:no-callee-name` | A call whose callee is an expression rather than a name the CPG resolved. | Not yet implemented. |
 | `call:through-cell` | A Python call `f(...)` where `f` is a local or captured name held in a `nonlocal` cell. A call through any other local or captured name is emitted *by that name* (`Expr.call "f"`), never by the function `pysrc2cpg` resolved by short name, unless that function is the one `def f` binding `f` in that very scope (docs/conformance.md, finding 2). A cell holds the function one field down, and `Expr.call` takes a name, not a value. | Not yet implemented (needs a call-a-value form in Core). |
 | `gen:generator`, `gen:yield` | A Python generator function, and each `yield` / `yield from` in it (statement or value position). `pysrc2cpg` lowers `yield` to a `RETURN` node; it was translated as `return`, i.e. "return the first element" (docs/conformance.md, finding 1). Calling a generator runs none of its body, so `gen:generator` is prefixed to the whole body; the body is kept after it for reading only. Eager materialisation into a list was rejected: wrong for an infinite generator, a consumer that stops early, and a body that reads mutable state between yields (`TTLCache.__iter__`). | Needs suspension (a generator value) in Core. |
-| `import:module-value`, `import:unresolved`, `import:absent:external`, `import:absent:prefix-in-cpg`, `import:absent:relative` | A module used as a value, or an import the CPG could not resolve. The `absent:` labels split the second case by *why*: the module is external to the CPG, a proper prefix of its path is in the CPG (so more resolver work could reach it), or it is a relative import whose target is missing. | Permanent for genuinely external modules; that is the boundary the assurance case declares. `absent:prefix-in-cpg` is the part that is not permanent. |
-| ~~`lit:float`~~, `lit:unquoted` | `lit:float` was a float literal before Core had a float value; the exporter now emits `{"k": "float"}` and the label no longer occurs. `lit:unquoted` is a literal the exporter could not decode. | `lit:float`: implemented. |
+| `import:operand`, `import:member-not-found` | `import:operand`: a bare dotted identifier in literal position, which the Python front end synthesises as the operand of an `import` statement. `import:member-not-found`: `from m import x` where module `m` is in the CPG but `x` is not a function, class or submodule of it (in practice a module-level variable or a re-export, which a module object deliberately does not carry). | Residual only. An import that resolves to a module *outside* the CPG is no longer a static hole: the exporter binds the name to an opaque `fnref "<absent:external>"` / `"<absent:prefix-in-cpg>"` / `"<absent:relative>"` value (reason: not in the CPG at all / a proper prefix of its path is in the CPG / relative import with a missing target), and every USE of it holes at run time (`module-attr:<x>`, `module-call:<m>:not-a-function`, `call:<name>`). Permanent for genuinely external modules; that is the boundary the assurance case declares. The old static labels `import:unresolved`, `import:module-value` and `import:absent:*` no longer occur in a fresh export. |
+| ~~`lit:float`~~, `lit:unquoted`, `lit:bytes`, `lit:ellipsis`, `lit:joern-synthetic` | `lit:float` was a float literal before Core had a float value; the exporter now emits `{"k": "float"}` and the label no longer occurs. `lit:bytes`: a Python `b'…'` literal (Core has `str`, not `bytes`; they are not interchangeable). `lit:ellipsis`: Python `...`. `lit:joern-synthetic`: Joern's `<global>` namespace marker, not a literal the source contains. `lit:unquoted` is a literal the exporter could not decode (also the fallback for a bare identifier in a non-Python file). | `lit:float`: implemented. The others need a `bytes` / `Ellipsis` value, or are not literals. |
 | `expr:BLOCK`, `expr:BLOCK-impure`, `expr:BLOCK-prelude`, `expr:empty-block`, `expr:genExp`, `expr:<label>` | Statement-expressions and generator expressions. `genExp` needs laziness Core does not have. In C/C++ a BLOCK in a *prelude-aware* position (`exprV`: conditions, returns, assignment RHS, call arguments, operands) that is a pure comma expression (`(e1, e2)`, or a multi-child macro expansion such as `UNUSED_PARAMETER2`) is translated as `e1` run as a statement then `e2` as the value; a block containing a declaration (`SWAP(T,a,b)` expanding to `{T t=a; ...}`: block scope Core's flat environment cannot express) or a statement stays a hole. | Mixed. |
+| `expr:abort:<M>`, `expr:assert:<M>`, `expr:macro:<M>`, `expr:CONTROL_STRUCTURE:<T>` | A C/C++ control-structure node that is really a macro invocation: `UNREACHABLE` / `IMMEDIATE_CRASH` (`abort`), `CHECK*` / `DCHECK*` (`assert`), any other upper-case macro (`macro`); `USE(...)` is elided to `unit`. Anything else is the CPG control-structure type. | Not yet implemented. |
 | `control:GOTO` | A `goto` none of the lowerings in `methodBody` proves safe. Translated today: a forward jump to the single top-level label (`while(true){...;break}`); jumps to several top-level labels whose tail ends in a `return` **or falls off the end of the function** (the tail is spliced at the jump with an explicit `return` appended, which `applyFunc` makes identical to falling off the end); a backward jump to a single top-level restart label, from outside any loop/switch (`while(true){ tail; break }` with `goto` as `continue`); and a jump to a label inside the body of the jump's innermost enclosing loop or switch (directly, or through plain `{}` blocks): the rest of that body from the label is spliced at the jump, followed by `continue` (loop) or `break` (switch). Everything else — jumps into nested blocks, backward jumps from inside loops, mixtures of a restart label with other labels, label cycles — stays a hole. | Partly implemented; the remainder needs a general reducible-CFG structuring pass or a Core `Stmt.label`/`goto`. |
 | `control:FOR:elided-clause` | A `for` with fewer than four children whose clauses could not be identified. Omitted clauses are resolved when the children's CPG `order` (init 1, cond 2, step 3, body 4) *and* the blank clauses of the header text agree; an omitted condition is `true` (C11 6.8.5.3p2). | Residual only on disagreement. |
 | `op:assignment`, `op:<incr>:value` | An assignment / `++` / `--` used as a value where no prelude slot exists (plain `expr()` positions such as `&&`'s operand under a non-prelude path, `switch` scrutinees with impure targets, etc.). Loop conditions (`while`, `do`, `for`) now thread a prelude re-run before every test; `&&`/`||` evaluate their right operand's prelude only when the left does not decide (it previously ran unconditionally — a soundness bug). | Not yet implemented in the remaining positions. |
@@ -534,6 +567,20 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `ptr:member-box-alias` | A cross-block comparison involving a separately boxed array member, whose address may coincide with a member of another block. |
 | `ptr:stride-mismatch`, `ptr:untyped-block`, `ptr:str-non-ascii`, `ptr:str-before-start`, `ptr:str-past-terminator`, `ptr:member-order`, `ptr:mixed-selector`, `ptr:whole-vs-member`, `ptr:fn-identity`, `ptr:fn-vs-object`, `ptr:non-pointer-operand`, `ptr:offset-non-int`, `ptr:diff-non-index`, `ptr:arith-non-pointer` | The address model cannot answer from what the values carry (§2.1). |
 | `op:cast:pointer:int-to-pointer`, `op:cast:pointer:non-pointer` | `unop "cast:ptr"` met a non-zero integer / a non-pointer value. |
+| `call:<f>:not-callable`, `call:<f>:keyword-to-builtin`, `mcall:<m>:keyword-to-builtin` | A name that holds a heap object which is not a (boxed) function; a call with keyword arguments to a stdlib builtin or method, which has no keyword convention (refused rather than silently dropped). |
+| `mcall:<C>.<m>:no-receiver`, `mcall:<C>.<m>:not-a-class-method` | An unbound method reached through a class value, called with no receiver argument / on a class that does not define `m` (not falling back to an unrelated free function). |
+| `module-attr:<x>`, `module-call:<m>:not-a-function` | Reading, or calling, a module-level *datum* or non-function through a module object (the exporter's `<module>` objects carry only functions, classes and submodules). |
+| `binop://:non-python` | `//` outside `.python`. |
+| `is:unboxed-value-identity` | `is` on two values Core cannot identify (`Val.identical` answers only where identity is known, e.g. not for equal list/int values whose interning is unknown). |
+| `js:==:cross-type-coercion`, `js:eq:object-identity-unknown`, `js:bitwise:operand-beyond-2^53`, `binop:===:non-javascript`, `binop:!==:non-javascript` | JavaScript `==` between types needing coercion, `==` on objects whose identity Core cannot decide, a bitwise operand past the exactly-representable range, and the strict-equality operators under another dialect (§6). |
+| `alloc:builtin-base:<C>:own-<dunder>`, `alloc:builtin-base:<C>:multiple-args`, `…:non-iterable`, `…:dict-from-non-dict`, `…:str-of-non-str` | Construction of a builtin-base instance (`Val.bobj`) that Core refuses to model: the class overrides a dunder in `builtinBaseRefusedDunders`, or the constructor argument has the wrong shape. |
+| `field:<f>:absent-from-aggregate` | A key read from a C aggregate initializer (`Val.dict`) that the initializer did not mention: in C every field exists, so this means the exporter and semantics disagree about the shape. |
+| `op:keyword-in-literal` | A keyword argument inside a list/tuple display. |
+| `boxArray:negative-length`, `boxArray:non-int-length`, `boxFields:non-string-key`, `irefIndex:non-int-index`, `irefIndex:non-object`, `irefField:non-object`, `derefIref:non-iref`, `setDerefIref:non-iref`, `iref:arith-on-field`, `iref:cmp-non-index`, `iref:cross-object`, `iref:sub-non-index` | Ill-shaped operands to the C box / interior-pointer expressions (§2.1, §3). Shapes the exporter should not produce; a hole rather than a guess. |
+| `strByte:negative-index`, `strByte:out-of-bounds`, `strByte:non-integer-index`, `strByte:non-string-receiver`, `strFrom:negative-index`, `strFrom:non-integer-index`, `strFrom:non-string-receiver` | `strByte`/`strFrom` outside their domain (a read past the terminator, a negative or non-integer position, a non-string receiver). |
+| `setIndex:non-container`, `delIndex:non-container` | Subscript write/delete where the boxed object's payload is not a list or dict. |
+| `float:format-mismatch`, `float:unreachable-nonfinite`, `float:repr-shortest-roundtrip`, `float:hash`, `float:exp` (and other `float:<name>`) | `Float.lean`'s explicitly unmodelled results: a float of the wrong format, a non-finite value on a path that cannot produce one, shortest-round-trip `repr`, `hash`, transcendental functions. |
+| `call:str` | `str(x)` / an f-string segment on a `Val.str`: Core cannot tell an exception payload from an ordinary string, so the stdlib `str` answers only on `int` and `bool`. |
 | `call:stray-control-flow` | A `brk`/`cont` escaped a function body — a transpiler bug if it appears. |
 | `initializers:outOfFuel` | Module initializers did not finish within the fuel budget. |
 
