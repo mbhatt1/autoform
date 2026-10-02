@@ -170,6 +170,14 @@ def expr_shape(n):
                 raise ValueError(f"boxFieldsRange node has invalid esz: {esz!r}")
             atom = (f"({atom} ++ [(Expr.lit (Lit.str \"$esz\"), "
                     f"Expr.lit (Lit.int {esz}))])")
+        # An array MEMBER of a boxed struct, boxed separately: its address coincides
+        # with a member address of the enclosing block (`Heap.isMemberBox`).
+        member = n.get("member", False)
+        if not isinstance(member, bool):
+            raise ValueError(f"boxFieldsRange node has invalid member flag: {member!r}")
+        if member:
+            atom = (f"({atom} ++ [(Expr.lit (Lit.str \"$member\"), "
+                    f"Expr.lit (Lit.bool true))])")
         return ".boxFields", [("atom", atom)]
     # `010-reach-90pct-hole-free`: `boxFieldsRange` above needs `n` known at EXPORT
     # time (it bakes the literal into the generated source text) -- no help for a

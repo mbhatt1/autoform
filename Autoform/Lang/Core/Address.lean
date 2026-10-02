@@ -59,6 +59,16 @@ that consult them.
   which the exporter emits separately) is `str:pointer-compare-not-modelled` /
   `str:pointer-equality-not-modelled`, the labels the heap-free path already used.
 
+## Member boxes
+
+The exporter boxes an ARRAY member of a boxed struct as its own block, so the C address of
+that member has two Core spellings: `&s.arr` (`Val.iref s (.fld "arr")`) and `s.arr`
+decayed (a pointer into the member's block) -- and if `arr` is the first member, `&s`
+shares it too. "Different blocks" therefore does not mean "different addresses" for a
+member box. The exporter marks such blocks (`"$member"`, `Heap.isMemberBox`), and any
+cross-block equality involving one, or between a member selector and its own nested box
+(`Heap.memberBoxIs`), is `ptr:member-box-alias` rather than `false`.
+
 ## Pointer ↔ integer
 
 **Hole, not an encoding.** C11 6.3.2.3p5–6 make both directions implementation-defined,
@@ -178,6 +188,32 @@ def ptrRelCross (op : String) (pa pb : PtrPos) : EResult :=
   else if pa == .onePast || pb == .onePast then .hole "ptr:eq-one-past-unspecified"
   else ptrEqAns op false
 
+/-- Does selector `s` of block `r` name a member whose value is a NESTED box, block `q`?
+Then `&r.f` and a pointer into `q` are two Core spellings of one C address (the exporter
+boxes an array member separately, `boxedStructArrayMembers`), and the blocks differing
+says nothing. -/
+def Heap.memberBoxIs (h : Heap) (r : Ref) (s : Sel) (q : Ref) : Bool :=
+  match s with
+  | .fld f => match h.getField r f with
+              | .ref q'    => q' == q
+              | .iref q' _ => q' == q
+              | _          => false
+  | .idx _ => false
+
+/-- Is block `r` an array MEMBER boxed separately from its struct (`"$member"`, set by
+the exporter)? Its address coincides with a member address of another block, so "different
+blocks" does not mean "different addresses" for it. -/
+def Heap.isMemberBox (h : Heap) (r : Ref) : Bool :=
+  match h.getField r "$member" with
+  | .bool b => b
+  | _       => false
+
+/-- Two different blocks whose addresses could coincide although they are different blocks:
+one is a nested member box of the other, or either is a member box at all. -/
+def Heap.mayAlias (h : Heap) (r : Ref) (s : Sel) (q : Ref) (t : Option Sel) : Bool :=
+  h.isMemberBox r || h.isMemberBox q || h.memberBoxIs r s q ||
+  (match t with | some t => h.memberBoxIs q t r | none => false)
+
 /-- `a op b` for a relational or equality operator on two pointer values. -/
 def ptrRel (h : Heap) (op : String) (a b : Val) : EResult :=
   match PtrView.of a, PtrView.of b with
@@ -201,21 +237,26 @@ def ptrRel (h : Heap) (op : String) (a b : Val) : EResult :=
   | .fn _, _ | _, .fn _ => .hole "ptr:fn-vs-object"
   | .whole r, .whole q =>
       if r == q then ptrRelInts op 0 0
-      else if ptrIsEq op then ptrEqAns op false else .hole "ub:ptr-compare-cross-object"
+      else if !ptrIsEq op then .hole "ub:ptr-compare-cross-object"
+      else if h.isMemberBox r || h.isMemberBox q then .hole "ptr:member-box-alias"
+      else ptrEqAns op false
   | .whole r, .blk q s =>
-      if r != q then ptrRelCross op .inside (h.selPos q s)
+      if r != q && h.mayAlias q s r none then .hole "ptr:member-box-alias"
+      else if r != q then ptrRelCross op .inside (h.selPos q s)
       else match s with
         | .idx i => if h.idxPos q i == .outside then .hole "ub:ptr-out-of-bounds"
                     else ptrRelInts op 0 i
         | .fld _ => .hole "ptr:whole-vs-member"
   | .blk r s, .whole q =>
-      if r != q then ptrRelCross op (h.selPos r s) .inside
+      if r != q && h.mayAlias r s q none then .hole "ptr:member-box-alias"
+      else if r != q then ptrRelCross op (h.selPos r s) .inside
       else match s with
         | .idx i => if h.idxPos r i == .outside then .hole "ub:ptr-out-of-bounds"
                     else ptrRelInts op i 0
         | .fld _ => .hole "ptr:whole-vs-member"
   | .blk r s, .blk q t =>
-      if r != q then ptrRelCross op (h.selPos r s) (h.selPos q t)
+      if r != q && h.mayAlias r s q (some t) then .hole "ptr:member-box-alias"
+      else if r != q then ptrRelCross op (h.selPos r s) (h.selPos q t)
       else match s, t with
         | .idx i, .idx j =>
             if h.idxPos r i == .outside || h.idxPos r j == .outside then .hole "ub:ptr-out-of-bounds"
@@ -344,6 +385,15 @@ example : isHole (applyPtrOp tH "<" 0 .unit (.iref 0 (.idx 0))) "ub:ptr-order-nu
 -- Struct members: equality by member, no order.
 example : isB (applyPtrOp tH "==" 0 (.iref 2 (.fld "x")) (.iref 2 (.fld "y"))) false := by decide
 example : isHole (applyPtrOp tH "<" 0 (.iref 2 (.fld "x")) (.iref 2 (.fld "y"))) "ptr:member-order" := by decide
+-- A member whose value is a nested box: `&s.arr` and `s.arr` are one address, two spellings.
+private def tN : Heap := [tA, { cls := "<local>", fields := [("arr", .ref 0)] }]
+example : isHole (applyPtrOp tN "==" 0 (.iref 1 (.fld "arr")) (.iref 0 (.idx 0)))
+    "ptr:member-box-alias" := by decide
+-- A block marked as a member box never compares unequal to another block by default.
+private def tM : Heap := [{ tA with fields := tA.fields ++ [("$member", .bool true)] }, tB]
+example : isHole (applyPtrOp tM "==" 0 (.ref 0) (.ref 1)) "ptr:member-box-alias" := by decide
+example : isHole (applyPtrOp tM "==" 0 (.iref 0 (.idx 1)) (.iref 1 (.idx 0)))
+    "ptr:member-box-alias" := by decide
 -- Strings have no address.
 example : isHole (applyPtrOp tH "==" 0 (.str "a") (.str "a")) "str:pointer-equality-not-modelled" := by decide
 -- Arithmetic: element-stepped within the array, one-past-the-end allowed, stride checked.

@@ -304,3 +304,41 @@ class TestModuleShape:
         assert 'vararg := some "args"' in text
         assert text.count("vararg") == 1
         assert "kwarg" not in text
+
+
+# ---------------------------------------------------------------------------
+# the C address model (Autoform/Lang/Core/Address.lean)
+# ---------------------------------------------------------------------------
+
+class TestAddressModel:
+    def test_ptr_op_renders_operator_size_and_operands(self, render_lean):
+        node = {"k": "ptrOp", "op": "+", "esz": 4,
+                "a": {"k": "name", "v": "p"}, "b": {"k": "int", "v": 1}}
+        assert render_lean.expr(node) == '(.ptrOp "+" 4 (.name "p") (.lit (.int 1)))'
+
+    @pytest.mark.parametrize("esz", [-1, "4", True, None])
+    def test_ptr_op_refuses_a_bad_element_size(self, render_lean, esz):
+        """The size is the stride `applyPtrOp` checks against the block; a malformed one
+        must not render as some other number."""
+        node = {"k": "ptrOp", "op": "+", "esz": esz,
+                "a": {"k": "name", "v": "p"}, "b": {"k": "int", "v": 1}}
+        with pytest.raises(ValueError):
+            render_lean.expr(node)
+
+    def test_box_range_records_its_element_size_in_band(self, render_lean):
+        tagged = render_lean.expr({"k": "boxFieldsRange", "n": 3, "esz": 2})
+        assert '(Expr.lit (Lit.str "$esz"), Expr.lit (Lit.int 2))' in tagged
+        assert "List.range 3" in tagged
+        untagged = render_lean.expr({"k": "boxFieldsRange", "n": 3})
+        assert "$esz" not in untagged
+        with pytest.raises(ValueError):
+            render_lean.expr({"k": "boxFieldsRange", "n": 3, "esz": 0})
+
+    def test_box_range_marks_a_member_box(self, render_lean):
+        """An array member boxed apart from its struct shares an address with a member
+        of the struct's block; the mark is what stops `ptrOp` calling them unequal."""
+        marked = render_lean.expr({"k": "boxFieldsRange", "n": 2, "esz": 1, "member": True})
+        assert '(Expr.lit (Lit.str "$member"), Expr.lit (Lit.bool true))' in marked
+        assert "$member" not in render_lean.expr({"k": "boxFieldsRange", "n": 2})
+        with pytest.raises(ValueError):
+            render_lean.expr({"k": "boxFieldsRange", "n": 2, "member": 1})

@@ -9,6 +9,13 @@
       "render_bytes": 22878485,
       "render_sha256": "3a19a6b11619ae4d448f65e822e07d28f21e714c6bd3239c6de726b653bcf4e3"
     },
+    "CAddr": {
+      "ast_bytes": 38914,
+      "ast_sha256": "7ab18d4ea271e5fb21c4060f4a4a4c6f526b72932809cd0a43574a9aadcaa77b",
+      "ast_tracked": true,
+      "render_bytes": 21172,
+      "render_sha256": "d3320a485ff9c0a288ce20839bfe8336bac2e069540302ef97e31287e264f79f"
+    },
     "CMath": {
       "ast_bytes": 4564,
       "ast_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
