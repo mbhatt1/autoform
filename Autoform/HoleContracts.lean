@@ -212,10 +212,14 @@ theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String)
 if exactly one key matches the method suffix, the method is the function stored under
 that key. Both hypotheses are decidable by evaluation. -/
 theorem resolveMethod_of_unique (ctx : Ctx) (cls meth n : String) (f : Func)
+    (hs : ctx.pyStrict = false)
     (hf : (ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))).map (·.1) = [n])
     (hr : ctx.table.find? (·.1 == n) = some (n, f)) :
     ctx.resolveMethod cls meth = some f := by
   unfold Ctx.resolveMethod
+  rw [hs]
+  simp only [Bool.false_eq_true, if_false]
+  unfold Ctx.resolveMethodLegacy
   generalize hF : ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) = F at hf
   match F, hf with
   | [x], hx =>
@@ -503,21 +507,21 @@ theorem resolve_rrclear :
 theorem resolveMethod_pop :
     (ctxOf P).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
-  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.pop"
+  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.pop" _ rfl
   · decide +kernel
   · rfl
 
 theorem resolveMethod_sizeclear :
     (ctxOf P).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.clear"
+  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.clear" _ rfl
   · decide +kernel
   · rfl
 
 theorem resolveMethod_cacheclear :
     (ctxOf P).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>.Cache.clear"
+  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>.Cache.clear" _ rfl
   · decide +kernel
   · rfl
 
@@ -581,12 +585,16 @@ theorem delitem_refines (h : Heap) (r d a : Ref) (c : Int) (kvs : List (Val × V
     hne⟩ := hs
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   have hdial : (ctxOf P).dialect = .python := rfl
+  -- `obj.pop(…)` resolves through `resolveMethodOn`, which is `resolveMethod` on the
+  -- object's class for a program without a class table (`pyClasses = none`).
+  have hOn : ∀ o m, (ctxOf P).resolveMethodOn o m = (ctxOf P).resolveMethod o.cls m :=
+    fun _ _ => Ctx.resolveMethodOn_of_none rfl
   unfold runMethodIn
   rw [resolve_delitem]
   simp only [delitemSpec]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
     execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
-    hdpay, hdat, hao, hapay, resolveMethod_pop,
+    hdpay, hdat, hao, hapay, resolveMethod_pop, hOn,
     f_cachetools___init___py__module__Cache___delitem__,
     f_cachetools___init___py__module___DefaultSize_pop, hdial, Dialect.isPython, payloadDelete]
   have hg' := get_setPayload_ne h (Payload.dict (Stdlib.dictDel kvs key)) hne
@@ -674,8 +682,15 @@ theorem rrclear_under : UnderS Γslice P RRPost := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 30 := ⟨fuel - 30, by omega⟩
   have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
   have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
+  have hOn : ∀ o m, (ctxOf (τ.onProgram P)).resolveMethodOn o m
+      = (ctxOf (τ.onProgram P)).resolveMethod o.cls m :=
+    fun _ _ => Ctx.resolveMethodOn_of_none rfl
   have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
     rw [classDefines_onProgram]; exact classDefines_cacheclear
+  -- Calling through the class value `Cache` is guarded by `classResponds`, which for a
+  -- program without a class table is the same table test as `classDefines`.
+  have hcr : (ctxOf (τ.onProgram P)).classResponds "Cache" "clear" = true := by
+    rw [Ctx.classResponds_of_none rfl]; exact hcd
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
     rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_cacheclear]
@@ -695,7 +710,8 @@ theorem rrclear_under : UnderS Γslice P RRPost := by
   simp only [hlk]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
     execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
-    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcd, hcc, hsc, hdial, hglob,
+    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcr, hcc, hsc, hdial, hglob,
+    hOn,
     className_Cache, Heap.payload, boxed_clear_dict, boxed_clear_list,
     get_setPayload_ne _ _ hra, get_setPayload_ne _ _ hda,
     get_setPayload_ne _ _ hia, get_setField_ne _ _ _ (Ne.symm hri), Payload.toVal,
@@ -736,8 +752,15 @@ theorem rrclear_reaches_hole_of (τ : SImpl)
     hdcap, hdpay, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
   have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
   have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
+  have hOn : ∀ o m, (ctxOf (τ.onProgram P)).resolveMethodOn o m
+      = (ctxOf (τ.onProgram P)).resolveMethod o.cls m :=
+    fun _ _ => Ctx.resolveMethodOn_of_none rfl
   have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
     rw [classDefines_onProgram]; exact classDefines_cacheclear
+  -- Calling through the class value `Cache` is guarded by `classResponds`, which for a
+  -- program without a class table is the same table test as `classDefines`.
+  have hcr : (ctxOf (τ.onProgram P)).classResponds "Cache" "clear" = true := by
+    rw [Ctx.classResponds_of_none rfl]; exact hcd
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
     rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_cacheclear]
@@ -757,7 +780,8 @@ theorem rrclear_reaches_hole_of (τ : SImpl)
   simp only [hfill]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
     execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
-    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcd, hcc, hsc, hdial, hglob,
+    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcr, hcc, hsc, hdial, hglob,
+    hOn,
     className_Cache, Heap.payload, boxed_clear_dict, boxed_clear_list,
     get_setPayload_ne _ _ hra, get_setPayload_ne _ _ hda,
     get_setPayload_ne _ _ hia, get_setField_ne _ _ _ (Ne.symm hri), Payload.toVal,
