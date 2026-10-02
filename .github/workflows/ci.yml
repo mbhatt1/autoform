@@ -134,8 +134,12 @@ jobs:
       # --strict additionally fails if `leanchecker` is missing, so the kernel
       # re-check can never be silently skipped in CI: an oracle that no-ops is
       # worse than no oracle (STRATEGY.md 19).
-      - name: Trust audit sweep (incl. kernel re-verification)
-        run: python3 scripts/audit_all.py --strict
+      # The independent kernel replay is NOT run here: it re-checks every constant reachable
+      # from `Autoform` single-threaded and, with the 73 V8Base spec parts in the graph, takes
+      # hours (measured pieces: ~5 min fixed + 5-13 min per heavy part). It is its own job,
+      # `kernel-replay`, below; this step says so in its verdict instead of passing silently.
+      - name: Trust audit sweep (axioms + source; kernel replay is its own job)
+        run: python3 scripts/audit_all.py --strict --skip-kernel
 
       - name: Upload audit.json
         if: always()
@@ -366,6 +370,64 @@ jobs:
           lake env lean Demo.lean 2>&1 | tee demo.out || true
           grep -q "TRUSTED-CODE LEAK" demo.out
           grep -q "VACUOUS" demo.out
+
+  # ------------------------------------------------------------------ #
+  # Independent kernel replay (`leanchecker --fresh Autoform`): every constant reachable
+  # from `Autoform` is re-checked by a second kernel run, starting from an empty
+  # environment. It is single-threaded and takes hours now that the V8Base specs are in
+  # the graph (pieces timed locally: ~5 min fixed, +5 to +13 min per heavy part), so it
+  # does not share a clock with `lake build`. It restores the `.lake` the build job just
+  # saved and fails fast if there is none -- rebuilding from nothing here would spend the
+  # budget on the wrong job.
+  # ------------------------------------------------------------------ #
+  kernel-replay:
+    name: kernel replay (leanchecker --fresh)
+    runs-on: ubuntu-latest
+    needs: build-and-audit
+    timeout-minutes: 340
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read toolchain
+        id: toolchain
+        run: echo "version=$(cat lean-toolchain)" >> "$GITHUB_OUTPUT"
+
+      - name: Install elan / Lean (${{ steps.toolchain.outputs.version }})
+        run: |
+          set -euo pipefail
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Regenerate Autoform/Generated/V8Base.lean from the tracked AST
+        run: |
+          set -euo pipefail
+          python3 cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.lean V8Base
+          test -s Autoform/Generated/V8Base.lean
+
+      - name: Restore .lake (saved by the build job)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-
+          fail-on-cache-miss: true
+
+      # A complete cache makes this a no-op; an incomplete one would silently turn this job
+      # into a second build, so bound it.
+      - name: lake build (must be a no-op)
+        timeout-minutes: 30
+        run: lake build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Kernel replay of the whole library
+        run: python3 scripts/audit_all.py --kernel-only --strict
 
   # ------------------------------------------------------------------ #
   # The Python tooling is ~8,000 lines that gate every downstream claim; until

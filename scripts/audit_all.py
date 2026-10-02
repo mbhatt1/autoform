@@ -343,7 +343,14 @@ def _leanchecker_exe() -> str | None:
 # constant reachable from `Autoform` is single-threaded and, since the V8Base specs (73
 # parts of `rfl`-by-computation laws) joined the import graph, takes hours rather than the
 # ~1.5 minutes it took when this script was written: a local run was still going after 62
-# minutes. Override with $AUTOFORM_LEANCHECKER_TIMEOUT (seconds).
+# minutes. Timed in pieces on the final tree (one `leanchecker --fresh <module>` each, which
+# includes ~75 s of `lake env` start-up): `Autoform.Lang.Core.Semantics` 396 s,
+# `V8Base.Base` 291 s, `Part1` 283 s, `Part33` 574 s, `Part60` 774 s -- so about 5 minutes
+# fixed plus 5-13 minutes for each heavy part. Summed over the 73 parts that is roughly
+# 2.5-3 hours: an extrapolation from those five runs, NOT a measured end-to-end time (two
+# full runs were lost, one to this script's own timeout and one to a container restart).
+# CI runs the replay as its own job (`kernel-replay`) for that reason.
+# Override with $AUTOFORM_LEANCHECKER_TIMEOUT (seconds).
 LEANCHECKER_TIMEOUT_S = int(os.environ.get("AUTOFORM_LEANCHECKER_TIMEOUT", 4 * 3600))
 
 
@@ -442,22 +449,39 @@ def main() -> int:
                     help="source sweep only (no lake invocation)")
     ap.add_argument("--strict", action="store_true",
                     help="also fail on demonstration sorries and on a missing leanchecker")
+    ap.add_argument("--skip-kernel", action="store_true",
+                    help="do not run the kernel replay in this invocation: it is reported as "
+                         "DELEGATED (it is its own CI job, because it takes hours) and does "
+                         "not fail the audit, even under --strict. NOT a pass: the verdict "
+                         "line says the replay was not run")
+    ap.add_argument("--kernel-only", action="store_true",
+                    help="run only the kernel replay (no axiom sweep); the source sweep, "
+                         "which is instant, still runs")
     ap.add_argument("--no-fresh", action="store_true",
                     help="run leanchecker without --fresh (faster, weaker: it may check "
                          "almost nothing for a re-export-only root module)")
     args = ap.parse_args()
+    if args.skip_kernel and args.kernel_only:
+        ap.error("--skip-kernel and --kernel-only are opposites")
 
     report: dict = {"repo": str(REPO)}
     report["source_sweep"] = source_sweep()
     report["axiom_sweep"] = (
         {"status": "SKIPPED", "leaks": [], "declarations": 0,
          "declared_axioms": [], "nonstandard_axioms": [], "axiom_histogram": {}}
-        if args.skip_lean else axiom_sweep()
+        if (args.skip_lean or args.kernel_only) else axiom_sweep()
     )
-    report["lean4checker"] = (
-        {"status": "SKIPPED", "available": False} if args.skip_lean
-        else lean4checker(fresh=not args.no_fresh)
-    )
+    if args.skip_lean:
+        report["lean4checker"] = {"status": "SKIPPED", "available": False}
+    elif args.skip_kernel:
+        report["lean4checker"] = {
+            "status": "DELEGATED", "available": False,
+            "detail": "NOT RUN in this invocation (--skip-kernel). The kernel replay of every "
+                      "constant reachable from `Autoform` takes hours, so CI runs it as its own "
+                      "job (`kernel-replay`, `audit_all.py --kernel-only --strict`). Nothing "
+                      "below speaks for it."}
+    else:
+        report["lean4checker"] = lean4checker(fresh=not args.no_fresh)
 
     ax = report["axiom_sweep"]
     src = report["source_sweep"]
@@ -495,7 +519,9 @@ def main() -> int:
     p("=" * 74)
     p("")
     p(f"[1] AXIOM SWEEP  ({ax['status']})")
-    if ax["status"] == "ERROR":
+    if ax["status"] == "SKIPPED":
+        p("    skipped in this invocation")
+    elif ax["status"] == "ERROR":
         p("    could not run:")
         for line in str(ax.get("error", ""))[-1500:].splitlines():
             p("      " + line)
@@ -537,7 +563,7 @@ def main() -> int:
             p(f"      {f['file']}:{f['line']} [{f['kind']}] {f['text'][:90]}")
     p("")
     p(f"[3] KERNEL RECHECK / leanchecker  ({l4c['status']})")
-    if l4c["status"] in ("UNVERIFIED", "ERROR"):
+    if l4c["status"] in ("UNVERIFIED", "ERROR", "DELEGATED"):
         p("    " + str(l4c.get("detail")))
     elif l4c["status"] == "SKIPPED":
         p("    skipped (--skip-lean)")
@@ -554,7 +580,10 @@ def main() -> int:
         for f in failures:
             p("  - " + f)
     else:
-        p("VERDICT: PASS (no trusted-code leak)")
+        if l4c["status"] == "DELEGATED":
+            p("VERDICT: PASS (no trusted-code leak); the kernel replay was NOT run here")
+        else:
+            p("VERDICT: PASS (no trusted-code leak)")
         if l4c["status"] == "UNVERIFIED":
             p("  caveat: kernel re-check UNVERIFIED (leanchecker absent)")
     p(f"wrote {args.output}")

@@ -223,8 +223,13 @@ python3.11 scripts/differential.py ast-<M>.json <src-dir> <M> 5 [--tests DIR]
 # execution oracle over the claimed verifiable core
 python3.11 scripts/core_oracle.py ast-<M>.json <M> <src-dir> [-n 24] [--fuel 5000]
 
-# axioms, escape hatches, kernel replay  (--strict fails on a missing leanchecker)
-python3 scripts/audit_all.py --strict
+# axioms, escape hatches, kernel replay  (--strict fails on a missing leanchecker).
+# The replay takes HOURS on the full library (see the note under Troubleshooting), so CI runs
+# it as its own job: the build job uses --skip-kernel (reported as DELEGATED, never as a
+# pass) and the `kernel-replay` job uses --kernel-only.
+python3 scripts/audit_all.py --strict                 # everything, in one go (hours)
+python3 scripts/audit_all.py --strict --skip-kernel   # axioms + source only (minutes)
+python3 scripts/audit_all.py --strict --kernel-only   # the replay only
 
 # mutation gate, hand-written Lean
 python3 scripts/mutate.py Autoform/Lang/Imp/Semantics.lean Autoform.Lang.Imp.Semantics --max-mutants 8
@@ -338,7 +343,13 @@ is the same gap, one step earlier.
 can silently no-op on a module that has only imports and no declarations of its own —
 exactly the shape of `Autoform.lean`. `scripts/audit_all.py` uses `--fresh` by default and
 records which mode ran in `audit.json`; `--no-fresh` exists but is strictly weaker. If you
-invoke the checker by hand, use `lake env leanchecker --fresh Autoform` (~1.5 min).
+invoke the checker by hand, use `lake env leanchecker --fresh Autoform`. That was ~1.5 minutes
+when this was written and is **hours** now that the 73 V8Base spec parts are in the import
+graph: each `leanchecker --fresh <module>` costs about 5 minutes (core plus V8Base context)
+plus 5-13 minutes for each heavy part (timed on `Semantics`, `V8Base.Base`, `Part1`, `Part33`,
+`Part60`: 396 s, 291 s, 283 s, 574 s, 774 s), so the whole library is roughly 2.5-3 hours
+single-threaded -- an extrapolation, not an end-to-end measurement. The audit's limit is
+`$AUTOFORM_LEANCHECKER_TIMEOUT` (default 4 h), and a timeout kills the whole process group.
 
 **`leanchecker` is missing.** The audit reports UNVERIFIED — never a pass — and `--strict`
 turns that into a non-zero exit. A gap that is reported is a gap; a gap that is skipped
