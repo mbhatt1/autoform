@@ -455,6 +455,9 @@ def build_case(module, root):
 
     # ---- G3 coverage -------------------------------------------------------
     ast = art["ast"]
+    # function -> [contract-relative theorem names], filled from contracts-<M>.json.
+    cond_verified = {}
+    cond_verifiable = cond_assumptions = None
     if ast is None:
         st = UNDEVELOPED
         cov = c.claim("G3", f"Every function of {module} is translated without holes.",
@@ -482,6 +485,7 @@ def build_case(module, root):
         c.link("E2", cov, "SUPPORTS" if st == SUPPORTED else "COUNTERS")
 
         # The key move: each hole label becomes an explicit named Assumption.
+        label_aid = {}
         for label, n in labels.most_common():
             aid = c.assume(
                 "A." + label.replace(" ", "-"),
@@ -492,6 +496,34 @@ def build_case(module, root):
                 count=n, sites=sites.get(label))
             c.link(aid, cov, "SUPPORTS")
             c.link(aid, top, "SUPPORTS")
+            label_aid[label] = aid
+
+        # ---- One named assumption per hole OCCURRENCE ------------------------
+        # The label-level nodes above say "something somewhere depends on `del x[k]`".
+        # A contract-relative theorem needs finer names: it assumes a contract at ONE
+        # site, and the other sites with the same label stay unassumed. The Lean ledger
+        # names every occurrence `H:<function>#<i>:<label>` (`Program.holeAssumptionsJson`,
+        # complete by `Analysis.holeSites_labels`); each becomes an Assumption node that
+        # refines its label's node. Nothing is silently trusted: an occurrence missing
+        # here would have to be missing from `Stmt.holes` too.
+        led_early = art["ledger"]
+        site_nodes = collections.defaultdict(list)   # (function, label) -> [node ids]
+        if isinstance(led_early, dict) and led_early.get("module") == module:
+            for ha in led_early.get("holeAssumptions") or []:
+                fnm, lbl = ha.get("function", "?"), ha.get("label", "?")
+                hid = c.assume(
+                    ha.get("id", f"H:{fnm}:{lbl}"),
+                    f"Assumed at ONE site: occurrence of `{lbl}` "
+                    f"({ha.get('kind', '?')} position) in `{fnm}`. Unconstrained unless a "
+                    f"contract-relative theorem names it, in which case only that theorem "
+                    f"relies on the contract.",
+                    count=1, sites=[fnm])
+                c.assumptions[-1]["holeSite"] = {
+                    "function": fnm, "label": lbl, "kind": ha.get("kind"),
+                    "conditionallyVerifiable": bool(ha.get("conditionallyVerifiable"))}
+                site_nodes[(fnm, lbl)].append(hid)
+                if lbl in label_aid:
+                    c.link(hid, label_aid[lbl], "SUPPORTS")
 
         # ---- Contract-relative theorems ------------------------------------
         # A theorem proved under a contract is a *conditional* claim, and the condition
@@ -543,6 +575,9 @@ def build_case(module, root):
                 sat = bool(t.get("satisfiable"))
                 proof = t.get("satisfiabilityProof")
                 short = name.rsplit(".", 1)[-1]
+                prog = t.get("program")
+                fnm = t.get("function")
+                on_subject = prog == f"Autoform.Generated.{module}.program"
                 tid = c.claim(
                     "G.CONTRACT." + short,
                     f"`{name}` holds relative to {len(rel)} contract(s). "
@@ -550,22 +585,43 @@ def build_case(module, root):
                        if sat else
                        "NO satisfiability proof: by `refinesUnder_of_unsatisfiable` an "
                        "unsatisfiable environment proves every spec, so this theorem "
-                       "carries no information."),
+                       "carries no information.")
+                    + (f" Subject: `{fnm}` in `{prog}`." if prog else "")
+                    + ("" if on_subject or not prog else
+                       f" NOT about the current {module} module (a different or "
+                       f"historical program), so it is not counted as a conditionally "
+                       f"verified function of {module}."),
                     status=SUPPORTED if sat else DEFEATED,
                     evidence_kind=PROOF, scope=name)
                 c.link(tid, cong, "SUPPORTS" if sat else "COUNTERS")
+                # A conditionally VERIFIED function: satisfiable, non-empty contracts,
+                # about this module's generated program. Proved, but conditional --
+                # reported apart from the core, never added to it.
+                if sat and rel and on_subject and fnm:
+                    cond_verified.setdefault(fnm, []).append(name)
                 for a in rel:
                     lbl = a.get("label", "?")
+                    site = a.get("site")
+                    refined = site_nodes.get((site, lbl), []) if site else []
                     aid2 = c.assume(
                         f"A.{short}.{lbl}".replace(" ", "-"),
-                        f"Assumed of `{name}` only: the hole `{lbl}` satisfies "
-                        f"\"{a.get('statement', '')}\" at fuel >= "
+                        f"Assumed of `{name}` only: the hole `{lbl}`"
+                        + (f" at `{site}` ({a.get('kind', 'expr')} position)"
+                           if site else "")
+                        + f" satisfies \"{a.get('statement', '')}\" at fuel >= "
                         f"{a.get('fuelBound', '?')}. This is an assumption of THIS "
                         f"theorem, not of {module}: the same label occurs elsewhere "
-                        f"and is not discharged there.",
+                        f"and is not discharged there."
+                        + (f" Names the occurrence(s) {', '.join(refined)}."
+                           if refined else ""),
                         count=1)
+                    c.assumptions[-1]["contractOf"] = name
+                    if refined:
+                        c.assumptions[-1]["holeAssumptions"] = refined
                     # Attached to the theorem's goal, never to the module's top goal.
                     c.link(aid2, tid, "SUPPORTS")
+                    for hid in refined:
+                        c.link(hid, aid2, "SUPPORTS")
         # ---- The restricted core -------------------------------------------
         # §17: static hole-freedom is an UPPER BOUND, not a guarantee — the
         # interpreter introduces holes at runtime that the AST cannot show. So the
@@ -586,6 +642,46 @@ def build_case(module, root):
                           "dynamicHoleRisk": risk},
                    metric="call-closed-core", evidence_kind=STATIC,
                    status=None)
+
+        # ---- G3.3: the CONDITIONALLY verifiable functions ---------------------
+        # A separate, clearly labelled number, never added to the core: functions
+        # that are call-closed but contain holes, so a statement about them is
+        # expressible only RELATIVE TO named contracts on those holes
+        # (docs/contracts.md). Like hole-freedom it is a static upper bound on what
+        # could be proved conditionally; what HAS been proved is `cond_verified`.
+        if led_ok and led.get("conditionallyVerifiable") is not None:
+            cond_verifiable = led.get("conditionallyVerifiable")
+            cond_assumptions = led.get("conditionalAssumptions")
+            c.evid("E8",
+                   f"Trust ledger: {cond_verifiable}/{led_fns} functions CONDITIONALLY "
+                   f"verifiable — call-closed but holed; analysable only relative to "
+                   f"{cond_assumptions} named hole assumption(s).",
+                   artifact=f"ledger-{module}.json",
+                   value={"conditionallyVerifiable": cond_verifiable,
+                          "conditionalAssumptions": cond_assumptions,
+                          "functions": led_fns},
+                   metric="conditionally-verifiable", evidence_kind=STATIC)
+            proved = sorted(cond_verified)
+            g33 = c.claim(
+                "G3.3",
+                f"CONDITIONAL, not part of the core: {cond_verifiable} function(s) of "
+                f"{module} outside the verifiable core are call-closed except for "
+                f"{cond_assumptions} hole(s), each a named assumption; any result about "
+                f"them holds only relative to contracts on those holes. "
+                f"{len(proved)} of them have a contract-relative theorem with proved-"
+                f"satisfiable contracts (conditionally VERIFIED).",
+                SUPPORTED, evidence_kind=STATIC,
+                scope={"conditionallyVerifiable": cond_verifiable,
+                       "conditionallyVerified": len(proved),
+                       "functionsTotal": led_fns, "quantifiedOver": "holed, call-closed"},
+                notes="Never added to G3.1's core and never supports G1: a conditional "
+                      "result is a different claim from an unconditional one. "
+                      "Conditionally verified: "
+                      + (", ".join(proved) if proved else "none") + ".")
+            c.link("E8", g33, "SUPPORTS")
+            # Context for G3, not support: G3 says every function is hole-free, and
+            # these are exactly functions that are not.
+            c.link(g33, cov, "CONTEXT")
 
         core_n = closed if closed is not None else holefree
         core_st = SUPPORTED if core_n else UNSUPPORTED
@@ -888,7 +984,12 @@ def build_case(module, root):
         "artifactsMissing": sorted(set(paths) - set(present)),
         "counts": {"functions": fn_total, "holeFree": holefree,
                    "holeOccurrences": sum(labels.values()) if labels else 0,
-                   "distinctHoleCauses": len(labels)},
+                   "distinctHoleCauses": len(labels),
+                   # Conditional results, reported apart from the unconditional core.
+                   "conditionallyVerifiable": cond_verifiable,
+                   "conditionalAssumptions": cond_assumptions,
+                   "conditionallyVerified": len(cond_verified),
+                   "conditionallyVerifiedFunctions": sorted(cond_verified)},
         "subClaimStatus": sub_status,
         "topStatus": top_status,
     }
@@ -962,7 +1063,7 @@ def render_markdown(c, meta):
     L.append("```")
     L.append(f"{GLYPH[st]} G1  module {c.module} behaves as specified   [{st}]")
     L.append("└── S1  argue over the four failure modes")
-    order = ["G2", "G2.1", "G2.2", "G3", "G3.1", "G3.2", "G4", "G5", "G5.1"]
+    order = ["G2", "G2.1", "G2.2", "G3", "G3.1", "G3.2", "G3.3", "G4", "G5", "G5.1"]
     for cid in order:
         n = byid.get(cid)
         if not n:
@@ -998,10 +1099,23 @@ def render_markdown(c, meta):
                  "argument, not an omission from it.\n")
         L.append("| Assumption | Occurrences | Example sites |")
         L.append("|---|---|---|")
-        for a in sorted(c.assumptions, key=lambda x: -(x.get("occurrences") or 0)):
+        per_site = [a for a in c.assumptions if a.get("holeSite")]
+        for a in sorted((a for a in c.assumptions if not a.get("holeSite")),
+                        key=lambda x: -(x.get("occurrences") or 0)):
             sites = ", ".join((a.get("exampleSites") or [])[:2]) or "—"
             L.append(f"| `{a['id']}` | {a.get('occurrences', '—')} | {sites} |")
         L.append("")
+        if per_site:
+            # One row per occurrence would swamp the summary on a large corpus; the
+            # JSON carries every one. Shown here: those in conditionally verifiable
+            # functions, which are the ones a contract-relative result can name.
+            cv = [a for a in per_site if a["holeSite"].get("conditionallyVerifiable")]
+            L.append(f"Per-occurrence hole assumptions: **{len(per_site)}** "
+                     f"(`H:<function>#<i>:<label>`, all in the JSON case); "
+                     f"**{len(cv)}** lie in conditionally verifiable functions:\n")
+            for a in cv:
+                L.append(f"- `{a['id']}` ({a['holeSite'].get('kind')})")
+            L.append("")
 
     und = [n["id"] for n in c.claims
            if n["status"] == UNDEVELOPED and n["id"] != "G1"]
@@ -1012,6 +1126,17 @@ def render_markdown(c, meta):
              f"{meta['counts']['functions']}** functions hole-free.")
     L.append(f"- Assumptions carried: **{meta['counts']['holeOccurrences']}** hole "
              f"occurrences over **{meta['counts']['distinctHoleCauses']}** distinct causes.")
+    cnt = meta["counts"]
+    if cnt.get("conditionallyVerifiable") is not None:
+        L.append(f"- **Conditionally** verifiable (separate from the core, NOT "
+                 f"unconditional): **{cnt['conditionallyVerifiable']}/"
+                 f"{cnt['functions']}** functions — call-closed but holed; results only "
+                 f"relative to **{cnt.get('conditionalAssumptions')}** named hole "
+                 f"assumption(s).")
+    L.append(f"- **Conditionally verified** (contract-relative theorem, satisfiable "
+             f"contracts): **{cnt.get('conditionallyVerified', 0)}** function(s)"
+             + (f" — {', '.join(cnt.get('conditionallyVerifiedFunctions') or [])}"
+                if cnt.get("conditionallyVerified") else "") + ".")
     L.append(f"- Undeveloped goals: **{', '.join(und) or 'none'}**.")
     L.append(f"- Unsupported/defeated: **{', '.join(bad) or 'none'}**.")
     L.append(f"- Artifacts missing: **{', '.join(meta['artifactsMissing']) or 'none'}**.")

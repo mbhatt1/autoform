@@ -54,6 +54,7 @@ rules.
 | `E4` | axiom basis, theorem count | `axioms.json`, falling back to `audit.json`'s `axiom_sweep` | `#audit_axioms` (`Autoform/Harness/Audit.lean`) |
 | `E5` | population context: function count, purity, effect histogram | `formalization-graph.json` | `cartographer/formalization_graph.sc` |
 | `E6` | call-closed core (`verifiableCore`), `dynamicHoleRisk` | `ledger-<Module>.json` | `Program.ledgerJson` (`Autoform/Ledger.lean`) |
+| `E8` | **conditionally** verifiable functions (`conditionallyVerifiable`), the named hole assumptions they rest on (`conditionalAssumptions`); every hole occurrence named in `holeAssumptions` | `ledger-<Module>.json` | `Program.ledgerJson` (`Autoform/Ledger.lean`); see `docs/contracts.md` |
 
 `E5` is **context, not support**: the formalization graph is corpus-scoped, not
 module-scoped, so it is attached to the strategy with an explicit context claim saying so.
@@ -176,6 +177,12 @@ them apart:
   hole on some input. `SUPPORTED` only when that risk is 0; otherwise it starts at `WEAK`
   and is coverage-capped by how many functions execution has actually reached (R8) — 92/238 as measured at the time
   on `cachetools`, hence `UNSUPPORTED`.
+- `G3.3` — the **conditionally** verifiable functions (E8): holed but call-closed, so a
+  statement about them is expressible only relative to named contracts on their holes,
+  plus how many are conditionally *verified* (`contracts-<Module>.json`: satisfiable,
+  about this module's program). A separate number, linked to `G3` as `CONTEXT`, never
+  `SUPPORTS`, never added to `G3.1`. Every hole occurrence is an `Assumption` node
+  `H:<function>#<i>:<label>` refining its label's `A.<label>` node (`docs/contracts.md`).
 - Defeater `D3` records the reason: `Func.total` is computed from the same AST it
   describes, so it cannot see what the interpreter does with that AST.
 

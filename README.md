@@ -259,8 +259,11 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   what is left is default parameter values, keyword-only parameters, and starred
   *destructuring* (`op:starred-outside-call`).
 
-Contracts at holes, listed here earlier, now exist: `Autoform/Contracts.lean`, described in
-`docs/contracts.md`.
+- **Contract *inference* at holes.** The mechanism for reasoning about partially translated
+  functions under named assumptions exists (`Autoform/Contracts.lean` for expression holes,
+  `Autoform/HoleContracts.lean` for statement holes), as do the ledger's separate
+  conditional count and a worked example (`docs/contracts.md`); every hole contract is
+  still hand-written.
 
 ## Dependencies
 
