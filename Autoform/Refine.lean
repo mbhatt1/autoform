@@ -259,12 +259,33 @@ theorem evalExpr_name (x : String) {v : Val} (hx : ρ.find? (·.1 == x) = some (
     evalExpr ctx (k+1) h ρ (.name x) = (h, .val v) := by
   simp [evalExpr, hx]
 
-/-- A name that is neither local nor a known function evaluates to `unit`. -/
+/-- A name that is neither local nor a known function evaluates to `unit` -- under the
+legacy rules (`Ctx.scopedName` false: every non-Python program, and every Python program
+without a class table). See `evalExpr_name_unbound_py` for Python's rule. -/
 theorem evalExpr_name_free (x : String)
     (hx : ρ.find? (·.1 == x) = none) (hf : ctx.resolve x = none)
-    (hg : h.get ctx.globals = none) :
+    (hg : h.get ctx.globals = none) (hs : ctx.scopedName x = false) :
     evalExpr ctx (k+1) h ρ (.name x) = (h, .val .unit) := by
-  simp [evalExpr, hx, hf, hg]
+  simp [evalExpr, hx, hf, hg, Ctx.unboundName, hs]
+
+/-- Under Python's rules an identifier bound neither locally nor globally, and not a
+builtin exception class Core models, is a hole, never a same-suffix function and never
+`unit` (STRATEGY.md §62). -/
+theorem evalExpr_name_unbound_py (x : String)
+    (hx : ρ.find? (·.1 == x) = none) (hg : h.get ctx.globals = none)
+    (hs : ctx.scopedName x = true) (he : Stdlib.excNames.contains x = false) :
+    evalExpr ctx (k+1) h ρ (.name x) = (h, .hole s!"name:unbound:{x}") := by
+  have hm : x ∉ Stdlib.excNames := by simpa using he
+  simp [evalExpr, hx, hg, Ctx.unboundName, hs, hm]
+
+/-- Under Python's rules a builtin exception class name bound neither locally nor
+globally is found in `builtins`: the class value `Val.fn "__builtin.<x>"`. -/
+theorem evalExpr_name_builtin_exc_py (x : String)
+    (hx : ρ.find? (·.1 == x) = none) (hg : h.get ctx.globals = none)
+    (hs : ctx.scopedName x = true) (he : Stdlib.excNames.contains x = true) :
+    evalExpr ctx (k+1) h ρ (.name x) = (h, .val (.fn ("__builtin." ++ x))) := by
+  have hm : x ∈ Stdlib.excNames := by simpa using he
+  simp [evalExpr, hx, hg, Ctx.unboundName, hs, hm]
 theorem evalExpr_fnref (f : String) :
     evalExpr ctx (k+1) h ρ (.fnref f) = (h, .val (.fn f)) := rfl
 theorem evalExpr_hole (l : String) :
@@ -273,7 +294,7 @@ theorem evalExpr_hole (l : String) :
 /-- Value-passing form for `unop`: the shape actually used when discharging obligations. -/
 theorem evalExpr_unop_val {a : Expr} {h₁ : Heap} {v : Val} (op : String)
     (ha : evalExpr ctx k h ρ a = (h₁, .val v)) :
-    evalExpr ctx (k+1) h ρ (.unop op a) = (h₁, applyUnop ctx.dialect op v) := by
+    evalExpr ctx (k+1) h ρ (.unop op a) = (h₁, applyUnop ctx.dialect op (h₁.view v)) := by
   simp [evalExpr, ha]
 
 /-- Value-passing form for `binop` at a **strict** operator. Note the heap threads
@@ -287,14 +308,15 @@ theorem evalExpr_binop_val {a b : Expr} {h₁ h₂ : Heap} {x y : Val} (op : Str
     (hheap : binopNeedsHeap op x y = false)
     (ha : evalExpr ctx k h ρ a = (h₁, .val x))
     (hb : evalExpr ctx k h₁ ρ b = (h₂, .val y)) :
-    evalExpr ctx (k+1) h ρ (.binop op a b) = (h₂, applyBinop ctx.dialect op x y) := by
+    evalExpr ctx (k+1) h ρ (.binop op a b)
+      = (h₂, applyBinop ctx.dialect op (h₂.view x) (h₂.view y)) := by
   simp [evalExpr, ha, hb, hand, hor, hheap]
 
 /-- `&&` does not evaluate its right operand once the left is falsy, and yields the
 **left operand itself** under Python value semantics (`0 and 5` is `0`, not `False`).
 Only C-like dialects collapse it to a boolean. -/
 theorem evalExpr_and_short {a b : Expr} {h₁ : Heap} {x : Val}
-    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = false) :
+    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : (h₁.view x).truthy = false) :
     evalExpr ctx (k+1) h ρ (.binop "&&" a b)
       = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false)) := by
   cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
@@ -302,7 +324,7 @@ theorem evalExpr_and_short {a b : Expr} {h₁ : Heap} {x : Val}
 /-- `||` does not evaluate its right operand once the left is truthy, and yields the
 **left operand itself** under Python value semantics (`5 or 0` is `5`, not `True`). -/
 theorem evalExpr_or_short {a b : Expr} {h₁ : Heap} {x : Val}
-    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = true) :
+    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : (h₁.view x).truthy = true) :
     evalExpr ctx (k+1) h ρ (.binop "||" a b)
       = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true)) := by
   cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
@@ -315,12 +337,12 @@ theorem evalExpr_binop_stuck {a b : Expr} {h₁ : Heap} {r : EResult} (op : Stri
   cases r <;> simp [evalExpr, ha] <;> exact absurd rfl (hr _)
 
 theorem evalExpr_cond_true {c t e : Expr} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true) :
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : (h₁.view v).truthy = true) :
     evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k h₁ ρ t := by
   simp [evalExpr, hc, hv]
 
 theorem evalExpr_cond_false {c t e : Expr} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : (h₁.view v).truthy = false) :
     evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k h₁ ρ e := by
   simp [evalExpr, hc, hv]
 
@@ -369,9 +391,12 @@ theorem execStmt_expr_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
     execStmt ctx (k+1) h ρ (.expr e) = (h₁, .normal ρ) := by simp [execStmt, he]
 
+/-- `raise e` raises `e`'s value, except that a builtin exception *class* is instantiated
+(`Ctx.raisePayload`: `raise KeyError` is `raise KeyError()`). -/
 theorem execStmt_raise_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
-    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v) := by simp [execStmt, he]
+    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn (ctx.raisePayload v)) := by
+  simp [execStmt, he]
 
 theorem execStmt_seq_normal {a b : Stmt} {h₁ : Heap} {ρ' : Env}
     (ha : execStmt ctx k h ρ a = (h₁, .normal ρ')) :
@@ -382,12 +407,12 @@ theorem execStmt_seq_ret {a b : Stmt} {h₁ : Heap} {v : Val}
     execStmt ctx (k+1) h ρ (.seq a b) = (h₁, .ret v) := by simp [execStmt, ha]
 
 theorem execStmt_ifte_true {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true) :
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : (h₁.view v).truthy = true) :
     execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k h₁ ρ t := by
   simp [execStmt, hc, hv]
 
 theorem execStmt_ifte_false {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : (h₁.view v).truthy = false) :
     execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k h₁ ρ e := by
   simp [execStmt, hc, hv]
 
@@ -397,14 +422,14 @@ theorem execStmt_tryCatch_exn {b : Stmt} {x : String} {hd : Stmt} {h₁ : Heap} 
   simp [execStmt, hb]
 
 theorem execStmt_loop_false {c : Expr} {body : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : (h₁.view v).truthy = false) :
     execStmt ctx (k+1) h ρ (.loop c body) = (h₁, .normal ρ) := by
   simp [execStmt, hc, hv]
 
 /-- One turn of the loop, when the body finishes normally. Unrolling a loop by hand is
 exactly this lemma applied `n` times. -/
 theorem execStmt_loop_step {c : Expr} {body : Stmt} {h₁ h₂ : Heap} {v : Val} {ρ' : Env}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true)
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : (h₁.view v).truthy = true)
     (hb : execStmt ctx k h₁ ρ body = (h₂, .normal ρ')) :
     execStmt ctx (k+1) h ρ (.loop c body) = execStmt ctx k h₂ ρ' (.loop c body) := by
   simp [execStmt, hc, hv, hb]
@@ -421,7 +446,7 @@ theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val)
       (let base : Env := match self? with | some s => [("self", s)] | none => []
        let ρ' := bindParams fn base vs kws
        if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
-       match execStmt ctx k h ρ' fn.body with
+       match execStmt ctx k h ρ' (fn.guardedBody vs kws) with
        | (h₁, .ret v)     => (h₁, .val v)
        | (h₁, .normal _)  => (h₁, .val .unit)
        | (h₁, .exn v)     => (h₁, .exn v)
@@ -463,7 +488,12 @@ theorem applyUnop_int_neg (x : Int) :
 /-- The context `runFunc` builds internally. Exposed so that resolution facts can be
 stated and proved once per program. -/
 def ctxOf (p : Program) : Ctx :=
-  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases }
+  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
+    pyClasses := p.pyClasses }
+
+/-- `ctxOf` carries the program's class table; a program without one runs the legacy
+lookup rules (`Ctx.resolveMethod_of_none` and its siblings). -/
+@[simp] theorem ctxOf_pyClasses (p : Program) : (ctxOf p).pyClasses = p.pyClasses := rfl
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable
@@ -616,9 +646,9 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           simp only [evalExpr, hA, hB]
           -- three cases: the two short-circuit exits (heap untouched by construction)
           -- and the strict path (heap untouched by both induction hypotheses).
-          by_cases hs1 : (op == "&&" && !x.truthy) = true
+          by_cases hs1 : (op == "&&" && !(hB'.view x).truthy) = true
           · simp [hs1]
-          · by_cases hs2 : (op == "||" && x.truthy) = true
+          · by_cases hs2 : (op == "||" && (hB'.view x).truthy) = true
             · simp [hs1, hs2]
             · simp only [hs1, hs2, Bool.false_eq_true, if_false]
               -- `==`/`!=` on a ref now branches through `Val.eqPy`. BOTH branches leave the
@@ -639,7 +669,7 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
         simp only [evalExpr, hC]
         cases rC with
         | val v =>
-          by_cases hv : v.truthy
+          by_cases hv : (hC'.view v).truthy
           · simpa [hv] using iht (k := m) (h := hC') (ρ := ρ)
           · simp only [hv, Bool.false_eq_true, if_false]
             exact ihe (k := m) (h := hC') (ρ := ρ)
@@ -683,9 +713,9 @@ theorem execStmt_loop_rule (ctx : Ctx) (c : Expr) (body : Stmt) (B : Nat)
     (I : Nat → Heap → Env → Prop) (Q : Heap → Env → Prop)
     (hstep : ∀ m h ρ k, B ≤ k → I m h ρ →
       ∃ h₁ v, evalExpr ctx k h ρ c = (h₁, .val v) ∧
-        (v.truthy = true →
+        ((h₁.view v).truthy = true →
           ∃ m' h₂ ρ', m' < m ∧ execStmt ctx k h₁ ρ body = (h₂, .normal ρ') ∧ I m' h₂ ρ') ∧
-        (v.truthy = false → Q h₁ ρ)) :
+        ((h₁.view v).truthy = false → Q h₁ ρ)) :
     ∀ k m h ρ, I m h ρ → B + m + 1 ≤ k →
       ∃ h' ρ', execStmt ctx k h ρ (.loop c body) = (h', .normal ρ') ∧ Q h' ρ' := by
   intro k
@@ -694,7 +724,7 @@ theorem execStmt_loop_rule (ctx : Ctx) (c : Expr) (body : Stmt) (B : Nat)
   | succ k ih =>
     intro m h ρ hI hk
     obtain ⟨h₁, v, hc, htrue, hfalse⟩ := hstep m h ρ k (by omega) hI
-    cases hv : v.truthy with
+    cases hv : (h₁.view v).truthy with
     | false =>
       refine ⟨h₁, ρ, ?_, hfalse hv⟩
       simp [execStmt, hc, hv]
@@ -815,9 +845,10 @@ theorem evalExpr_field_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
 theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f : String} {w : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
+    (hp : h₁.payload r = .none)
     (he : evalExpr ctx k h₁ ρ e = (h₂, .val w)) :
     execStmt ctx (k+1) h ρ (.setField a f e) = (h₂.setField r f w, .normal ρ) := by
-  simp [execStmt, ha, he]
+  simp [execStmt, ha, hp, he, Payload.toVal]
 
 theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {o : Obj} {fn : Func}
@@ -825,11 +856,12 @@ theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
     (has : evalList ctx k h₁ ρ args = (h₂, .inr (vs, kws)))
     (ho : h₂.get r = some o)
+    (hp : o.payload = .none)
     (hcap : o.captured = [])
-    (hm : ctx.resolveMethod o.cls m = some fn) :
+    (hm : ctx.resolveMethodOn o m = some fn) :
     evalExpr ctx (k+1) h ρ (.mcall recv m args)
       = applyFunc ctx k h₂ fn (some (.ref r)) vs kws := by
-  simp [evalExpr, hr, has, ho, hm, hcap]
+  simp [evalExpr, hr, has, ho, hp, hm, hcap]
 
 theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val}
@@ -852,7 +884,9 @@ theorem execStmt_forIn_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {x : String} {e : Expr} {body : Stmt} {h₁ : Heap} {v : Val} {vs : List Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) (hv : v.iterable = some vs) :
     execStmt ctx (k+1) h ρ (.forIn x e body) = execFor ctx k h₁ ρ x vs body := by
-  simp [execStmt, he, hv]
+  -- `v.iterable = some _` rules out a reference, so the heap view is `v` itself and the
+  -- boxed-container version check is not on this path.
+  cases v <;> simp_all [execStmt, he, Val.iterable, Heap.view]
 
 /-! ## 4. End-to-end: real translated functions
 
@@ -1447,12 +1481,12 @@ theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
     (hfitN : Fits32 (triN (n.toNat + 1))) :
     ∀ m h ρ k, 4 ≤ k → sumtoInv n m h ρ →
       ∃ h₁ v, evalExpr ctxC k h ρ (.binop "<=" (.name "i") (.name "n")) = (h₁, .val v) ∧
-        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
+        ((h₁.view v).truthy = true → ∃ m' h₂ ρ', m' < m ∧
           execStmt ctxC k h₁ ρ
             (.seq (.assign "acc" (.binop "+" (.name "acc") (.name "i")))
                   (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))
             = (h₂, .normal ρ') ∧ sumtoInv n m' h₂ ρ') ∧
-        (v.truthy = false → sumtoPost n h₁ ρ) := by
+        ((h₁.view v).truthy = false → sumtoPost n h₁ ρ) := by
   intro m h ρ k hk hI
   obtain ⟨rfl, d, hdm, hnv, hiv, haccv, hga, hgi⟩ := hI
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 4 := ⟨k - 4, by omega⟩
@@ -1603,13 +1637,13 @@ def gcdPost (g : Nat) (h : Heap) (ρ : Env) : Prop :=
 theorem gcdish_step (g : Nat) :
     ∀ m h ρ k, 5 ≤ k → gcdInv g m h ρ →
       ∃ h₁ v, evalExpr ctxS k h ρ (.binop "!=" (.name "b") (.lit (.int 0))) = (h₁, .val v) ∧
-        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
+        ((h₁.view v).truthy = true → ∃ m' h₂ ρ', m' < m ∧
           execStmt ctxS k h₁ ρ
             (.seq (.assign "t" (.name "b"))
               (.seq (.assign "b" (.binop "%" (.name "a") (.name "b")))
                     (.assign "a" (.name "t"))))
             = (h₂, .normal ρ') ∧ gcdInv g m' h₂ ρ') ∧
-        (v.truthy = false → gcdPost g h₁ ρ) := by
+        ((h₁.view v).truthy = false → gcdPost g h₁ ρ) := by
   intro m h ρ k hk hI
   obtain ⟨rfl, x, y, hx, hy, hym, hgcd, hav, hbv, hga, hgb, hgt⟩ := hI
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 5 := ⟨k - 5, by omega⟩
@@ -1766,37 +1800,55 @@ def CounterProgram : Program :=
 
 abbrev ctxT : Ctx := ctxOf CounterProgram
 
+-- A `Counter` is a plain object: not a boxed list/dict (`docs/boxed-containers.md`), whose
+-- attribute reads and writes the interpreter refuses.
 def counterRep : HeapRep Int :=
   { cls := "Counter"
-  , abs := fun o => if o.captured = [] then
-                      (match o.fields.find? (·.1 == "n") with
-                       | some (_, .int i) => some i
-                       | _                => none)
-                    else none }
+  , abs := fun o => match o.payload with
+                    | .none =>
+                      if o.captured = [] then
+                        (match o.fields.find? (·.1 == "n") with
+                         | some (_, .int i) => some i
+                         | _                => none)
+                      else none
+                    | _ => none }
+
+/-- Everything `counterRep` abstracting an object says about it. -/
+theorem counterRep_abs {o : Obj} {a : Int} (ha : counterRep.abs o = some a) :
+    o.payload = .none ∧ o.captured = [] ∧ o.fields.find? (·.1 == "n") = some ("n", .int a) := by
+  simp only [counterRep] at ha
+  cases hpl : o.payload with
+  | list _  => simp [hpl] at ha
+  | dict _  => simp [hpl] at ha
+  | tuple _ => simp [hpl] at ha
+  | none =>
+    simp only [hpl] at ha
+    by_cases hcap : o.captured = []
+    · rw [if_pos hcap] at ha
+      refine ⟨rfl, hcap, ?_⟩
+      cases hf : o.fields.find? (·.1 == "n") with
+      | none => rw [hf] at ha; simp at ha
+      | some p =>
+        obtain ⟨kk, w⟩ := p
+        have hk : kk = "n" := by
+          have hp := List.find?_some hf
+          simpa using hp
+        rw [hf] at ha
+        cases w <;> simp at ha
+        subst ha; subst hk; rfl
+    · rw [if_neg hcap] at ha; simp at ha
 
 theorem counter_getField {h : Heap} {r : Ref} {a : Int}
     (hR : Represents counterRep h r a) : h.getField r "n" = .int a := by
   obtain ⟨o, ho, _, ha⟩ := hR
-  simp only [counterRep] at ha
-  simp only [Heap.getField, ho]
-  by_cases hcap : o.captured = [] <;> simp only [hcap, if_true, if_false, if_neg, reduceIte] at ha
-  · cases hf : o.fields.find? (·.1 == "n") with
-    | none => rw [hf] at ha; simp at ha
-    | some p =>
-      obtain ⟨kk, w⟩ := p
-      rw [hf] at ha
-      cases w <;> simp at ha
-      subst ha; rfl
-  · simp at ha
+  obtain ⟨_, _, hf⟩ := counterRep_abs ha
+  simp [Heap.getField, ho, hf]
 
 theorem counter_set {h : Heap} {r : Ref} {a b : Int} (hR : Represents counterRep h r a) :
     Represents counterRep (h.setField r "n" (.int b)) r b := by
   obtain ⟨o, ho, hc, ha⟩ := hR
-  have hcap : o.captured = [] := by
-    by_cases hcap : o.captured = []
-    · exact hcap
-    · simp only [counterRep, if_neg hcap] at ha; simp at ha
-  exact Represents.update ⟨o, ho, hc, ha⟩ ho (by simp [counterRep, hcap])
+  obtain ⟨hpl, hcap, _⟩ := counterRep_abs ha
+  exact Represents.update ⟨o, ho, hc, ha⟩ ho (by simp [counterRep, hcap, hpl])
 
 /-- Suffix facts, needed because `String.endsWith` does not reduce definitionally. -/
 theorem ew1 : "cnt.py:<module>.Counter.__init__".endsWith ".Counter.bump" = false := by simp [String.endsWith]; decide
@@ -1807,37 +1859,26 @@ theorem ew5 : "cnt.py:<module>.Counter.bump".endsWith ".Counter.__init__" = fals
 theorem ew6 : "cnt.py:<module>.total".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
 
 theorem resolve_bump : ctxT.resolveMethod "Counter" "bump" = some f_counter_bump := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
+  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Ctx.resolveMethodLegacy,
+        Ctx.pyStrict, Program.table, List.map, f_counter_init, f_counter_bump, f_counter_total,
+        List.filter, Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false]
   rw [show ("." ++ "Counter" ++ "." ++ "bump") = ".Counter.bump" from rfl, ew1, ew2, ew3]
 
 theorem resolve_init : ctxT.resolveMethod "Counter" "__init__" = some f_counter_init := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
+  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Ctx.resolveMethodLegacy,
+        Ctx.pyStrict, Program.table, List.map, f_counter_init, f_counter_bump, f_counter_total,
+        List.filter, Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false]
   rw [show ("." ++ "Counter" ++ "." ++ "__init__") = ".Counter.__init__" from rfl, ew4, ew5, ew6]
 
 
 
 theorem counter_find {h : Heap} {r : Ref} {a : Int} (hR : Represents counterRep h r a) :
     ∃ o, h.get r = some o ∧ o.cls = "Counter" ∧
-      o.fields.find? (·.1 == "n") = some ("n", .int a) ∧ o.captured = [] := by
+      o.fields.find? (·.1 == "n") = some ("n", .int a) ∧ o.captured = [] ∧
+      o.payload = .none := by
   obtain ⟨o, ho, hc, ha⟩ := hR
-  have hcap : o.captured = [] := by
-    by_cases hcap : o.captured = []
-    · exact hcap
-    · simp only [counterRep, if_neg hcap] at ha; simp at ha
-  simp only [counterRep, if_pos hcap] at ha
-  refine ⟨o, ho, hc, ?_, hcap⟩
-  cases hf : o.fields.find? (·.1 == "n") with
-  | none => rw [hf] at ha; simp at ha
-  | some p =>
-    obtain ⟨kk, w⟩ := p
-    have hk : kk = "n" := by
-      have hp := List.find?_some hf
-      simpa using hp
-    rw [hf] at ha
-    cases w <;> simp at ha
-    subst ha; subst hk; rfl
+  obtain ⟨hpl, hcap, hf⟩ := counterRep_abs ha
+  exact ⟨o, ho, hc, hf, hcap, hpl⟩
 
 /-- One `bump` call: the heap-mutating method dispatch, proved end to end. -/
 theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
@@ -1846,8 +1887,8 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
     (hx : ρ.find? (·.1 == "x") = some ("x", .int iv)) :
     execStmt ctxT (j+8) h ρ (.expr (.mcall (.name "c") "bump" [(.name "x")]))
       = (h.setField r "n" (.int (acc + iv)), .normal ρ) := by
-  obtain ⟨o, ho, hcls, hfind, hcap⟩ := counter_find hR
-  obtain ⟨o', ho', hcls', hfind', hcap'⟩ := counter_find (counter_set (b := acc + iv) hR)
+  obtain ⟨o, ho, hcls, hfind, hcap, hpl⟩ := counter_find hR
+  obtain ⟨o', ho', hcls', hfind', hcap', hpl'⟩ := counter_find (counter_set (b := acc + iv) hR)
   have hslf : ([("k", Val.int iv), ("self", Val.ref r)] : Env).find? (·.1 == "self")
       = some ("self", .ref r) := by simp
   have hkk : ([("k", Val.int iv), ("self", Val.ref r)] : Env).find? (·.1 == "k")
@@ -1866,7 +1907,7 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
         (.setField (.name "self") "n" (.binop "+" ((Expr.name "self").field "n") (.name "k")))
       = (h.setField r "n" (.int (acc + iv)), .normal [("k", Val.int iv), ("self", Val.ref r)]) :=
     execStmt_setField_val ctxT (j+3) h _
-      (evalExpr_name ctxT (j+2) h _ "self" hslf) hplus
+      (evalExpr_name ctxT (j+2) h _ "self" hslf) (by simp [Heap.payload, ho, hpl]) hplus
   have hret : execStmt ctxT (j+4) (h.setField r "n" (.int (acc + iv)))
         [("k", Val.int iv), ("self", Val.ref r)] (.ret ((Expr.name "self").field "n"))
       = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) :=
@@ -1884,7 +1925,7 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
     rw [applyFunc_succ ctxT (j+5) h f_counter_bump (some (.ref r)) [Val.int iv] []]
     simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, Bool.false_or,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
-      Bool.false_eq_true, if_false, bindParams_mk,
+      Bool.false_eq_true, if_false, bindParams_mk, Func.guardedBody_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
     rw [hbody]
   have hmc : evalExpr ctxT (j+7) h ρ (.mcall (.name "c") "bump" [(.name "x")])
@@ -1893,7 +1934,9 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
       (evalExpr_name ctxT (j+5) h ρ "c" hc)
       (evalList_cons_val ctxT (j+5) h ρ rfl (evalExpr_name ctxT (j+4) h ρ "x" hx)
         (evalList_nil ctxT (j+4) h ρ))
-      ho hcap (by rw [hcls]; exact resolve_bump)]
+      ho hpl hcap (by
+        rw [Ctx.resolveMethodOn_of_none (by simp [ctxT, ctxOf, CounterProgram]), hcls]
+        exact resolve_bump)]
     exact happ
   exact execStmt_expr_val ctxT (j+7) h ρ hmc
 
@@ -1948,7 +1991,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }],
            .normal [("n0", Val.int 0), ("self", Val.ref 0)]) :=
       execStmt_setField_val ctxT (G+6) _ _
-        (evalExpr_name ctxT (G+5) _ _ "self" hslf)
+        (evalExpr_name ctxT (G+5) _ _ "self" hslf) rfl
         (evalExpr_name ctxT (G+5) _ _ "n0" hn0)
     simp only [f_counter_init]
     rw [execStmt_seq_normal ctxT (G+7) _ _ hsf]
@@ -1959,7 +2002,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
     rw [applyFunc_succ ctxT (G+8) _ f_counter_init (some (.ref 0)) [Val.int 0] []]
     simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, Bool.false_or,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
-      Bool.false_eq_true, if_false, bindParams_mk,
+      Bool.false_eq_true, if_false, bindParams_mk, Func.guardedBody_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
     rw [hinitbody]
   have halloc : evalExpr ctxT (G+10) [] [("xs", Val.list (ys.map Val.int))]
@@ -1997,7 +2040,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
     | nil => simp only [isum] at hsum; omega
     | cons a t => simp at hzs
   subst hacc
-  obtain ⟨o', ho', hcls', hfind', hcap'⟩ := counter_find hR'
+  obtain ⟨o', ho', hcls', hfind', hcap', hpl'⟩ := counter_find hR'
   have hforIn : execStmt ctxT (G+10)
         [{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }]
         [("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))]
@@ -2019,7 +2062,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
   rw [applyFunc_succ ctxT (G+12) [] f_counter_total none [Val.list (ys.map Val.int)] []]
   simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, Bool.false_or,
     List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
-    Bool.false_eq_true, if_false, bindParams_mk,
+    Bool.false_eq_true, if_false, bindParams_mk, Func.guardedBody_mk,
     List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
   rw [hbody]
 

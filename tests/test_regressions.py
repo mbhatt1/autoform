@@ -99,6 +99,75 @@ class TestMutateErrorAttribution:
         assert mutate.error_lines("", "X.lean") == []
 
 
+# ---------------------------------------------------------------------------
+# 1b. The same path on a REAL Lean 4.30.0-rc1 diagnostic, and the line it reports.
+# ---------------------------------------------------------------------------
+
+# Captured verbatim from `lake build Autoform.Lang.Imp.Semantics` on Lean 4.30.0-rc1,
+# with `| .and a b => evalBExpr s a && evalBExpr s b` mutated to `||` in the file as of
+# 46c65fc (only the absolute worktree prefix in the `trace:` line is shortened to /w).
+# The first error is reported at 158:0 -- the `/--` doc comment ABOVE the theorem
+# keyword on line 159, because the failing check is the `@[simp]` attribute's
+# definitional-equality test, which Lean anchors at the start of the declaration.
+LEAN_430_REAL = """\
+✖ [49/49] Building Autoform.Lang.Imp.Semantics (2.0s)
+trace: .> LEAN_PATH=/w/.lake/build/lib/lean /root/.elan/toolchains/leanprover--lean4---v4.30.0-rc1/bin/lean /w/Autoform/Lang/Imp/Semantics.lean -o /w/.lake/build/lib/lean/Autoform/Lang/Imp/Semantics.olean -i /w/.lake/build/lib/lean/Autoform/Lang/Imp/Semantics.ilean -c /w/.lake/build/ir/Autoform/Lang/Imp/Semantics.c --setup /w/.lake/build/ir/Autoform/Lang/Imp/Semantics.setup.json --json
+error: Autoform/Lang/Imp/Semantics.lean:158:0: Not a definitional equality: the left-hand side
+  evalBExpr s (p.and q)
+is not definitionally equal to the right-hand side
+  evalBExpr s p && evalBExpr s q
+error: Autoform/Lang/Imp/Semantics.lean:160:65: Type mismatch
+  rfl
+has type
+  ?m.3 = ?m.3
+but is expected to have type
+  evalBExpr s (p.and q) = (evalBExpr s p && evalBExpr s q)
+error: Lean exited with code 1
+Some required targets logged failures:
+- Autoform.Lang.Imp.Semantics
+error: build failed
+"""
+
+# Lines 155-160 of Autoform/Lang/Imp/Semantics.lean at 46c65fc, at their real line numbers.
+_IMP_EXCERPT = [
+    "/-- `not` really is boolean negation. -/\n",
+    "@[simp] theorem evalBExpr_not : evalBExpr s (.not p) = !evalBExpr s p := rfl\n",
+    "\n",
+    "/-- `and` really is boolean conjunction, and in particular is not `or`. -/\n",
+    "@[simp] theorem evalBExpr_and :\n",
+    "    evalBExpr s (.and p q) = (evalBExpr s p && evalBExpr s q) := rfl\n",
+]
+IMP_LINES = ["\n"] * 154 + _IMP_EXCERPT
+
+
+class TestMutateRealLean430Diagnostic:
+    def test_old_behaviour_regex_misses_the_real_output(self):
+        assert _old_error_lines(LEAN_430_REAL, "Semantics.lean") == []
+
+    def test_fixed_regex_matches_the_real_output(self, mutate):
+        assert mutate.error_lines(LEAN_430_REAL, "Semantics.lean") == [158, 160]
+        assert ("Semantics.lean", 158) in mutate.all_error_lines(LEAN_430_REAL)
+        # the `trace:` line names .lean paths but carries no position: not an error
+        assert all(f == "Semantics.lean" for f, _ in mutate.all_error_lines(LEAN_430_REAL))
+
+    def test_old_behaviour_credited_the_kill_to_the_previous_theorem(self, mutate):
+        """Keyword-anchored ranges put line 158 inside `evalBExpr_not`."""
+        decls = mutate.parse_decls(IMP_LINES)
+        kw_owner = max((d for d in decls if d.kw <= 158), key=lambda d: d.kw)
+        assert kw_owner.name == "evalBExpr_not"
+
+    def test_fixed_attributes_both_errors_to_the_theorem_that_broke(self, mutate):
+        decls = mutate.parse_decls(IMP_LINES)
+        for line in mutate.error_lines(LEAN_430_REAL, "Semantics.lean"):
+            assert mutate.decl_at(decls, line).name == "evalBExpr_and", line
+
+    def test_doc_comment_lines_are_not_mutated(self, mutate):
+        src = ["/-- a + b -/\n", "def f (a b : Nat) : Nat := a + b\n"]
+        decls = mutate.parse_decls(src)
+        assert decls[0].start == 1 and decls[0].kw == 2
+        assert all(m.line == 2 for m in mutate.gen_mutants(src, decls))
+
+
 # ===========================================================================
 # 2/3. check_docs.py: passing against a stale artifact, and going quiet
 #      when an input is absent
@@ -115,7 +184,8 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
     doc_functions = ledger_functions if doc_functions is None else doc_functions
     with open(os.path.join(d, LEDGER), "w") as fh:
         json.dump({"functions": ledger_functions, "holeFree": 100,
-                   "verifiableCore": 45}, fh)
+                   "verifiableCore": 45, "conditionallyVerifiable": 7,
+                   "conditionalAssumptions": 7}, fh)
     write_ast(os.path.join(d, AST), [fn(name="f%d" % i) for i in range(ast_functions)])
     with open(os.path.join(d, "docs", "scale.md"), "w") as fh:
         fh.write("| `cachetools` (published) | %d | 100 (42%%) | 45 (19%%) |\n"
@@ -127,6 +197,8 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
         # matches" and the fixture -- not the checker -- is what is broken.
         fh.write("On `cachetools`, 100 of %d functions are hole-free.\n"
                  % doc_functions)
+        fh.write("7 of %d functions are conditionally verifiable, "
+                 "resting on 7 named hole assumptions.\n" % doc_functions)
     with open(os.path.join(d, "docs", "languages.md"), "w") as fh:
         fh.write("| Python | x | %d | 42%% |\n" % doc_functions)
         fh.write("the ledger's population (%d for cachetools) is the denominator.\n"
@@ -236,8 +308,22 @@ OLD_MAIN_DRIVER = textwrap.dedent("""
     spec = importlib.util.spec_from_file_location("rl", sys.argv[1])
     rl = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(rl)
-    # Reconstruct the pre-fix entry point: call _run_main directly on the main
-    # thread at Python's default recursion limit, which is what autoform.sh did.
+    # The fix has two independent halves, and the reconstruction has to undo both.
+    #
+    # (1) The spine walk. `render()` now hands a `.seq` chain to `_render_seq_chain`,
+    #     which walks it with a loop. Before that, `render()` fell through to its
+    #     generic structural case for `.seq` like any other node: one `render` ->
+    #     `render_child` -> `render` round trip per statement. Restore exactly that
+    #     fall-through (it is the tail of `render()`, verbatim).
+    def old_structural_seq(node, col):
+        head, children = rl.SHAPE["s"](node)
+        inner = min(col + rl.INDENT, rl.MAX_INDENT)
+        pad = " " * inner
+        parts = [rl.render_child(c, inner) for c in children]
+        return "(" + head + "\\n" + "\\n".join(pad + p for p in parts) + ")"
+    rl._render_seq_chain = old_structural_seq
+    # (2) The entry point: call _run_main directly on the main thread at Python's
+    #     default recursion limit, which is what autoform.sh did.
     sys.setrecursionlimit(1000)
     sys.argv = ["render_lean.py"] + sys.argv[2:]
     try:
@@ -266,6 +352,56 @@ class TestRenderRecursionDepth:
                            capture_output=True, text=True, timeout=600)
         assert r.returncode == 9, (r.returncode, r.stdout, r.stderr)
         assert "RECURSION_ERROR" in r.stdout
+
+    def test_spine_walk_alone_survives_the_old_entry_point(self, tmp_path, deep_ast):
+        """The iterative spine walk is a fix on its own, not just the big stack.
+
+        Same driver as above -- main thread, 1000-frame limit -- but without undoing
+        the spine walk. If someone deletes `_render_seq_chain`, this fails while the
+        thread-based tests below still pass, so neither half can quietly go."""
+        drv = str(tmp_path / "old_entry_only.py")
+        with open(drv, "w") as fh:
+            fh.write(OLD_MAIN_DRIVER.replace(
+                "rl._render_seq_chain = old_structural_seq\n", ""))
+        r = subprocess.run([sys.executable, drv, RENDER, deep_ast,
+                            str(tmp_path / "Old.lean"), "Deep"],
+                           capture_output=True, text=True, timeout=600)
+        assert r.returncode == 0, (r.returncode, r.stdout, r.stderr)
+        assert "RECURSION_ERROR" not in r.stdout
+
+    def test_spine_walk_is_byte_identical_to_full_recursion(self, render_lean):
+        """`_render_seq_chain` claims to reproduce `render()`'s old output exactly.
+
+        Compared at a depth the old recursion can still reach, and at several starting
+        columns so both the flat-fits and the must-wrap decisions are exercised."""
+        rl = render_lean
+
+        def old_render(node, kind, col):
+            try:
+                one = rl.flat_capped(node, kind, rl.WIDTH - col)
+                if one is not None:
+                    return one
+            except rl._RawNewline:
+                one = rl.flat(node, kind)
+                if col + len(one) <= rl.WIDTH or "\n" in one:
+                    return one
+            head, children = rl.SHAPE[kind](node)
+            if not children:
+                return head
+            inner = min(col + rl.INDENT, rl.MAX_INDENT)
+            pad = " " * inner
+            parts = []
+            for tag, val in children:
+                if tag in ("e", "s"):
+                    parts.append(old_render(val, tag, inner))
+                else:
+                    parts.append(rl.render_child((tag, val), inner))
+            return "(" + head + "\n" + "\n".join(pad + p for p in parts) + ")"
+
+        for n in (1, 2, 3, 7, 60):
+            body = seq_chain(n)
+            for col in (0, 4, 40, rl.WIDTH - 5):
+                assert rl.render(body, "s", col) == old_render(body, "s", col), (n, col)
 
     def test_fixed_renders_the_same_input(self, tmp_path, deep_ast):
         out = str(tmp_path / "Deep.lean")
@@ -349,7 +485,9 @@ class TestVarargContract:
             ext = os.path.splitext(f.get("file", ""))[1].lower()
             if ext in PY_EXTS:
                 continue
-            for key in ("vararg", "kwarg"):
+            # `kwonly`/`posonly`/`defaults` come from the same source read
+            # (`pySig`, STRATEGY.md §58) and are just as Python-only.
+            for key in ("vararg", "kwarg", "kwonly", "posonly", "defaults"):
                 if f.get(key) is not None:
                     yield (f.get("name"), f.get("file"), key)
 

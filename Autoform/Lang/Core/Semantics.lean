@@ -1,6 +1,9 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
+import Autoform.Lang.Core.TypedInt
 import Autoform.Lang.Core.Stdlib
+import Autoform.Lang.Core.Address
+import Autoform.Lang.Core.Boxed
 
 /-!
 # Core — semantics
@@ -62,19 +65,21 @@ propagating into `gcdish`. That is what the conformance oracle is for.
 
 Unused by `applyBinop` (superseded by `NumConfig.quot`, per this section's own intro);
 kept, and kept exhaustive, because `Numeric.lean` cites it as the pattern's first
-instance. `.javascript` mirrors `.python`'s arm: `Dialect.toNumConfig .javascript` is
-`NumConfig.python`, whose `divRound` is `.floor`. -/
+instance. JavaScript has no integer division at all (`7 / 2` is `3.5`; `applyBinop`
+routes `.javascript` through `jsIntDiv`), so its arm is the truncating quotient that
+matches its truncating remainder below -- NOT `.python`'s floor, which was this arm's
+earlier, wrong answer. -/
 def Dialect.idiv : Dialect → Int → Int → Int
   | .python,     a, b => Int.fdiv a b
   | .cLike,      a, b => Int.tdiv a b
-  | .javascript, a, b => Int.fdiv a b
+  | .javascript, a, b => Int.tdiv a b
 
 /-- Integer remainder under a dialect. See `idiv` — unused, kept exhaustive and
-consistent with it. -/
+consistent with it. JS `%` truncates (`-7 % 3` is `-1`), like C. -/
 def Dialect.imod : Dialect → Int → Int → Int
   | .python,     a, b => Int.fmod a b
   | .cLike,      a, b => Int.tmod a b
-  | .javascript, a, b => Int.fmod a b
+  | .javascript, a, b => Int.tmod a b
 
 
 /-- Result of executing a statement: how control left it. -/
@@ -185,8 +190,12 @@ def ordToE (op : String) (o : Option Ordering) : EResult :=
 /-- Binary operators where at least one operand is a float. -/
 def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   match op with
-  | "&&" => .val (.bool (a.truthy && b.truthy))
-  | "||" => .val (.bool (a.truthy || b.truthy))
+  -- Reached only when the left operand did not decide the result (`evalExpr`
+  -- short-circuits first), exactly as for `applyBinop`'s own `&&`/`||` arms, so under
+  -- value semantics the answer is the right operand: Node's `0.0 || 2` is `2`, and
+  -- CPython's `0.0 or 2` is `2`, not `True`.
+  | "&&" => .val (if d.boolOpsAreValues then b else .bool (a.truthy && b.truthy))
+  | "||" => .val (if d.boolOpsAreValues then b else .bool (a.truthy || b.truthy))
   | "<" | "<=" | ">" | ">=" | "==" | "!=" => ordToE op (flCmp d a b)
   | "+" | "-" | "*" | "/" | "%" =>
       match flOfVal d a, flOfVal d b with
@@ -197,7 +206,17 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                    | "-" => fc.sub x y
                    | "*" => fc.mul x y
                    | "/" => fc.div x y
-                   | _   => fc.pyMod x y)
+                   -- JS `%` on a `Number` is the remainder of TRUNCATED division
+                   -- (sign of the dividend): Node's `-7.5 % 2` is `-1.5`, CPython's
+                   -- is `0.5`. That is C's `fmod`, which IEEE makes exact.
+                   -- `.cLike` likewise: the only `.cLike` languages in which `%`
+                   -- accepts a floating operand at all are Java and Kotlin (C, C++ and
+                   -- Go reject it at compile time), and both define it as the
+                   -- truncated remainder (JLS 15.17.3: `-5.5 % 2.0` is `-1.5`). It was
+                   -- Python's floored `pyMod` here, which answered `0.5`.
+                   | _   => match d with
+                            | .javascript | .cLike => fc.fmod x y
+                            | .python              => fc.pyMod x y)
         -- a failed promotion (Python's `OverflowError` on a huge int) is the answer
       | some r, some (.ok _) => fresToE r
       | some (.ok _), some r => fresToE r
@@ -213,6 +232,137 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "**" => .hole "float:pow"
   | _    => .hole s!"binop:{op}"
 
+/-- JavaScript `x / y` on two operands that Core holds as `.int`s.
+
+A JS `Number` is a binary64, so the answer is IEEE division of the two doubles. When the
+quotient is an exact integer it is returned as `.int` (`6 / 3` is `2`), keeping integer
+code on the integer path; otherwise -- a fraction, division by zero (`Infinity`/`NaN`),
+or `0 / -3` (`-0`, which `.int` cannot represent) -- it is computed by `flBinop` as
+IEEE division under `Dialect.toFConfig .javascript` (`cDouble`, `onDivZero := .ieee`).
+The usual `.javascript` caveat applies: past 2^53 the `.int` path is exact where Node
+would round. -/
+def jsIntDiv (x y : Int) : EResult :=
+  if y != 0 && Int.tmod x y == 0 && !(x == 0 && y < 0) then .val (.int (Int.tdiv x y))
+  else flBinop .javascript "/" (.int x) (.int y)
+
+/-- JavaScript `x % y` on two `.int`s: the remainder of TRUNCATED division, taking the
+sign of the dividend (`-7 % 3` is `-1`). `x % 0` is `NaN` and a zero remainder of a
+negative dividend is `-0` (`-6 % 3`); neither is an `.int`, so both go to the float path
+(`flBinop`, which uses `fmod` under `.javascript`). -/
+def jsIntMod (x y : Int) : EResult :=
+  if y != 0 && (Int.tmod x y != 0 || x >= 0) then .val (.int (Int.tmod x y))
+  else flBinop .javascript "%" (.int x) (.int y)
+
+/-! ### JavaScript bitwise operators: ToInt32 / ToUint32
+
+Every JS bitwise operator converts its operands to 32-bit integers first (ECMA-262
+`ToInt32`/`ToUint32`, i.e. reduction modulo 2^32), and every one but `>>>` yields a
+signed 32-bit result; the shift count is `ToUint32(rhs) & 31`. `.javascript` borrows
+`NumConfig.python` (unbounded) for `+`/`-`/`*`, so routing `&`/`|`/`^`/`<<`/`>>`/`~`
+through it gave bignum answers: `1 << 32` was `4294967296` (Node: `1`), `1 << 31` was
+`2147483648` (Node: `-2147483648`), `~2147483648` was `-2147483649` (Node:
+`2147483647`), and `-1 >>> 0` was a `ub` hole (Node: `4294967295`).
+
+**Precision guard.** A Core `.int` under `.javascript` is exact past 2^53 where Node's
+double would already have rounded, so ToInt32 of such a value can disagree with Node.
+Operands with `|n| > 2^53` are a hole rather than an answer. Float operands (`1.5 | 0`)
+never reach here: `flBinop` holes every bitwise operator. -/
+
+/-- ECMA-262 `ToUint32` on an integer: reduction into `[0, 2^32)`. -/
+def jsToUint32 (n : Int) : Int := n % 4294967296
+
+/-- ECMA-262 `ToInt32` on an integer: reduction into `[-2^31, 2^31)`. -/
+def jsToInt32 (n : Int) : Int :=
+  let m := jsToUint32 n
+  if m ≥ 2147483648 then m - 4294967296 else m
+
+/-- `|n| ≤ 2^53`: every such integer is an exact binary64, so ToInt32 of the Core value
+is ToInt32 of the Node value. -/
+def jsExactInt (n : Int) : Bool := n.natAbs ≤ 9007199254740992
+
+/-- JS `x op y` for a bitwise operator on two `.int`s. -/
+def jsBitwise (op : String) (x y : Int) : EResult :=
+  if !(jsExactInt x && jsExactInt y) then .hole "js:bitwise:operand-beyond-2^53"
+  else
+    let ux := (jsToUint32 x).toNat
+    let uy := (jsToUint32 y).toNat
+    let s  := uy % 32
+    match op with
+    | "&"   => .val (.int (jsToInt32 (Nat.land ux uy)))
+    | "|"   => .val (.int (jsToInt32 (Nat.lor ux uy)))
+    | "^"   => .val (.int (jsToInt32 (Nat.xor ux uy)))
+    | "<<"  => .val (.int (jsToInt32 (jsToInt32 x * 2 ^ s)))
+    -- arithmetic (sign-propagating): floor division of the signed 32-bit value
+    | ">>"  => .val (.int (Int.fdiv (jsToInt32 x) (2 ^ s)))
+    -- zero-filling, and the result is UNSIGNED: `-1 >>> 0` is `4294967295`
+    | ">>>" => .val (.int ((ux / 2 ^ s : Nat) : Int))
+    | _     => .hole s!"binop:{op}"
+
+/-- JS `~x` on an `.int`: `-ToInt32(x) - 1`, always in int32 range. -/
+def jsBitNot (x : Int) : EResult :=
+  if jsExactInt x then .val (.int (-(jsToInt32 x) - 1))
+  else .hole "js:bitwise:operand-beyond-2^53"
+
+/-! ### JavaScript `===` and `==`
+
+`===` (IsStrictlyEqual) is `false` across JS types and value comparison within one,
+except that objects compare by identity. `==` (IsLooselyEqual) agrees with it on two
+operands of the same JS type; across types it coerces (`1 == "1"`, `0 == false`,
+`[1] == 1` are all `true`) through ToNumber/ToPrimitive, which this model does **not**
+implement -- those are holes. The one cross-type case that needs no coercion is decided:
+`null`/`undefined` are loosely equal to each other and to nothing else.
+
+Core's value representation limits what can be answered:
+
+* `.int` and `.float` are both a JS Number, compared numerically (`1 === 1.0`), with IEEE
+  rules via `flCmp` (`NaN !== NaN`, `0 === -0`).
+* `.unit` is **both** `null` and `undefined` -- Core does not distinguish them -- so
+  `.unit === .unit` is a hole (`null === undefined` is `false`), while `.unit == .unit` is
+  `true` in every combination and `.unit == <non-nullish>` is `false`.
+* Objects compare by identity. A `.ref` and a named `.fn` carry it; an unboxed
+  `.list`/`.tuple`/`.dict` or a closure value does not, so two of those are a hole. -/
+
+/-- The JS type of a Core value as far as equality needs it: 0 Number, 1 String,
+2 Boolean, 3 null/undefined, 4 Object. `none` for values that are not JS values. -/
+def jsEqTag : Val → Option Nat
+  | .int _ | .float _ => some 0
+  | .str _ => some 1
+  | .bool _ => some 2
+  | .unit => some 3
+  | .ref _ | .list _ | .tuple _ | .dict _ | .fn _ | .clos _ _ | .clsClos _ _
+  | .bobj _ _ => some 4
+  | .iref _ _ => none
+
+/-- Equality of two values of the same JS type (`jsEqTag x = jsEqTag y`), where Core can
+decide it. `.unit`/`.unit` is left to the caller (it differs between `==` and `===`). -/
+def jsSameTypeEq : Val → Val → Option Bool
+  | .int a,  .int b  => some (a == b)
+  | .str a,  .str b  => some (a == b)
+  | .bool a, .bool b => some (a == b)
+  | .ref a,  .ref b  => some (a == b)
+  | .fn a,   .fn b   => some (a == b)
+  | x, y =>
+      if x.kind == 3 || y.kind == 3 then some (flCmp .javascript x y == some .eq)
+      else none
+
+/-- JS `x === y` (`strict := true`) or `x == y` (`strict := false`), negated if `neg`. -/
+def jsEqE (strict neg : Bool) (x y : Val) : EResult :=
+  let r : Except String Bool :=
+    match jsEqTag x, jsEqTag y with
+    | some tx, some ty =>
+        if tx == ty then
+          if tx == 3 then
+            if strict then .error "js:===:null-vs-undefined" else .ok true
+          else match jsSameTypeEq x y with
+               | some b => .ok b
+               | none   => .error "js:eq:object-identity-unknown"
+        else if strict || tx == 3 || ty == 3 then .ok false
+        else .error "js:==:cross-type-coercion"
+    | _, _ => .error "js:eq:non-js-value"
+  match r with
+  | .ok b    => .val (.bool (if neg then !b else b))
+  | .error l => .hole l
+
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
 Only a REFERENCE forces it: two distinct objects with equal contents are `==` in Python, and
@@ -220,23 +370,151 @@ no structural compare of two refs can see that. Everything else stays on `applyB
 is heap-free and reducible -- the property `Refine.lean` is built on. Named rather than
 inlined so proofs can discharge it by `simp` on concrete operands. -/
 def binopNeedsHeap (op : String) (x y : Val) : Bool :=
-  (op == "==" || op == "!=") && (x.kind == 8 || y.kind == 8)
+  (op == "==" || op == "!=") &&
+    -- A reference, or a VALUE container (list 5, tuple 6, dict 7, builtin-based 12) that may
+    -- hold one: `(xs,) == ([1],)` compares a boxed list at depth 1, and `Val.beq` would
+    -- compare it by address.
+    (x.kind == 5 || x.kind == 6 || x.kind == 7 || x.kind == 8 || x.kind == 12 ||
+     y.kind == 5 || y.kind == 6 || y.kind == 7 || y.kind == 8 || y.kind == 12)
 
 @[simp] theorem binopNeedsHeap_int_left (op : String) (i : Int) (y : Val) :
-    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") && y.kind == 8) := by
+    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") &&
+      (y.kind == 5 || y.kind == 6 || y.kind == 7 || y.kind == 8 || y.kind == 12)) := by
   simp [binopNeedsHeap, Val.kind]
 
 @[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
     (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
   simp [binopNeedsHeap, beq_iff_eq, h, h2]
 
+/-! ### `bool` in integer contexts under `.cLike`
+
+C has no boolean results: `a < b`, `a == b`, `!a`, `a && b` are `int` 0 or 1 (C11
+6.5.8p6, 6.5.9p3, 6.5.3.3p5, 6.5.13p3, 6.5.14p3), and a `_Bool` promotes to `int`
+(6.3.1.1p2). C++ does have `bool`, and integral promotion turns it into `int` 0/1 in
+arithmetic, comparison and bitwise contexts ([conv.prom]/6). Java, Go and Kotlin share
+`.cLike` too, and there `a < b` is a `boolean` and mixing it with an integer is a
+**compile error** — so no well-typed program of theirs ever reaches the cases below.
+
+Core keeps producing `Val.bool` for comparisons under `.cLike` (Java's `boolean` and
+C++'s `bool` need it, and `Refine.applyBinop_int_lt` & co. state it for every dialect),
+and instead PROMOTES a `bool` operand to `0`/`1` wherever it meets an integer or a float:
+the C++ rule, which under C is the same arithmetic with the 0/1 already applied. Before
+this, `int t = (a < b); if (t == 1) ...` compared `Val.bool true` with `Val.int 1` via
+`Val.beq` and answered **false** (cc: true) — a silent wrong answer measured on SQLite
+(`docs/scale.md`), and `(a<b) + (b<a)` was a hole.
+
+Two `bool`s under `&`, `|`, `^` stay a `bool` (Java's logical `&`; in C the 0/1 that a
+later integer context promotes), and two `bool`s under `==`/`!=`/`&&`/`||` take the
+existing path, whose truth value is the same either way. Every other operator on two
+`bool`s promotes both (C/C++ only; a compile error elsewhere).
+
+What is NOT done here: the RETURN conversion. `int f(void) { return a < b; }` returns
+`Val.bool`, which every integer context above reads as `0`/`1`; the C oracle
+(`scripts/differential.py`) compares a `bool` result against an integer-typed C result as
+`0`/`1` for the same reason. -/
+
+/-- Does this dialect promote `bool` to `0`/`1` in integer contexts? See above. -/
+def Dialect.promotesBool : Dialect → Bool
+  | .python     => false
+  | .cLike      => true
+  | .javascript => false
+
+/-- `false`/`true` as the integers C gives them. -/
+def boolToInt (b : Bool) : Int := if b then 1 else 0
+
+/-- The operators a promoted `bool` takes part in as an integer. -/
+def cIntOps : List String :=
+  ["+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!="]
+
+/-- `applyBinop .cLike op (.int x) (.int y)` for `op ∈ cIntOps`, restated so the promoted
+`bool` arms of `applyBinop` can use it without recursion. `cIntBinop_eq` (below
+`applyBinop`) proves the two agree, so they cannot drift apart. -/
+def cIntBinop (op : String) (x y : Int) : EResult :=
+  let nc := Dialect.cLike.toNumConfig
+  match op with
+  | "+"   => numToE (nc.add x y)
+  | "-"   => numToE (nc.sub x y)
+  | "*"   => numToE (nc.mul x y)
+  | "/"   => numToE (nc.div x y)
+  | "%"   => numToE (nc.mod x y)
+  | "&"   => numToE (nc.band x y)
+  | "|"   => numToE (nc.bor x y)
+  | "^"   => numToE (nc.bxor x y)
+  | "<<"  => numToE (nc.shl x y)
+  | ">>"  => numToE (nc.shr x y)
+  | ">>>" => numToE ({ nc with negRightShift := .logical }.shr x y)
+  | "<"   => .val (.bool (x < y))
+  | "<="  => .val (.bool (x ≤ y))
+  | ">"   => .val (.bool (x > y))
+  | ">="  => .val (.bool (x ≥ y))
+  | "=="  => .val (.bool (x == y))
+  | "!="  => .val (.bool (!(x == y)))
+  | _     => .hole s!"binop:{op}"
+
+/-- What `applyBinop` answers for operands no typed arm claims: the generic tail of its
+match (structural `==`/`!=`, value-or-bool `&&`/`||`, otherwise a hole). -/
+def binopTail (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match op with
+  | "==" => .val (.bool (Val.beq a b))
+  | "!=" => .val (.bool (!Val.beq a b))
+  | "&&" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
+  | "||" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
+  -- A width-typed operator (`"*:i64"`, `"<:u32"`, `"+:j64"`; `TypedInt.lean`) is
+  -- claimed here: none of the literal arms above can match it. Untyped operators are
+  -- `none` there, and keep their hole.
+  | _    => match typedIntBinop op a b with
+            | some r => r
+            | none   => .hole s!"binop:{op}"
+
+/-- The tail of `applyBinop`: operand pairs no typed arm there claims. A `bool` meeting a
+number is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`); everything else is
+`binopTail`. A separate function, not more arms of `applyBinop`'s match, because every
+extra arm there multiplies the string-literal tests `simp` has to discharge in the
+operator lemmas below. -/
+def binopFallback (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match a, b with
+  | .bool p, .int y =>
+      if d.promotesBool && cIntOps.contains op then cIntBinop op (boolToInt p) y
+      else binopTail d op a b
+  | .int x, .bool q =>
+      if d.promotesBool && cIntOps.contains op then cIntBinop op x (boolToInt q)
+      else binopTail d op a b
+  | .bool p, .float _ =>
+      if d.promotesBool then flBinop d op (.int (boolToInt p)) b else binopTail d op a b
+  | .float _, .bool q =>
+      if d.promotesBool then flBinop d op a (.int (boolToInt q)) else binopTail d op a b
+  | .bool p, .bool q =>
+      if d.promotesBool then
+        match op with
+        | "&" => .val (.bool (p && q))
+        | "|" => .val (.bool (p || q))
+        | "^" => .val (.bool (p != q))
+        | "==" | "!=" | "&&" | "||" => binopTail d op a b
+        | _ => if cIntOps.contains op then cIntBinop op (boolToInt p) (boolToInt q)
+               else binopTail d op a b
+      else binopTail d op a b
+  | _, _ => binopTail d op a b
+
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
 Integer arithmetic goes through `NumConfig`, so width and overflow policy follow the
-source dialect: Python gets bignums, C-like gets 32-bit two's-complement. -/
+source dialect: Python gets bignums, C-like gets 32-bit two's-complement for an UNTYPED
+operator. A width-typed operator (`"*:i64"`, `TypedInt.lean`) matches none of the literal arms
+below and is answered by `binopTail`. -/
 def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
+  -- JavaScript strict equality. Its own operator string, emitted by the exporter only for
+  -- a JS `===`/`!==` source token (jssrc2cpg spells both `<operator>.equals`), and first
+  -- in the match so the float arms below cannot claim it. See `jsEqE`.
+  | "===", x, y =>
+      match d with
+      | .javascript => jsEqE true false x y
+      | _           => .hole "binop:===:non-javascript"
+  | "!==", x, y =>
+      match d with
+      | .javascript => jsEqE true true x y
+      | _           => .hole "binop:!==:non-javascript"
   | "+",  .int x,   .int y   => numToE (nc.add x y)
   -- Item 6: a C `char*` is not a Python `str`. In C, `+` on pointers is POINTER
   -- ARITHMETIC and `<`/`>`/`==` compare ADDRESSES, not contents. Core has one `Val.str`
@@ -250,8 +528,20 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "+",  .tuple x, .tuple y => .val (.tuple (x ++ y))
   | "-",  .int x, .int y => numToE (nc.sub x y)
   | "*",  .int x, .int y => numToE (nc.mul x y)
-  | "/",  .int x, .int y => numToE (nc.div x y)
-  | "%",  .int x, .int y => numToE (nc.mod x y)
+  -- JavaScript has no integer division. `NumConfig.python` (which `.javascript`
+  -- borrows for its unbounded `+`/`-`/`*`) FLOORS, and answering with it reproduced the
+  -- measured `.tsx`-as-Python bug (`docs/languages.md` §2) under a new name: `-7 % 3`
+  -- gave `2` (Node: `-1`), `7 / 2` gave `3` (Node: `3.5`), `5 / 0` raised
+  -- `ZeroDivisionError` (Node: `Infinity`). So `.javascript` splits off here; see
+  -- `jsIntDiv`/`jsIntMod`.
+  | "/",  .int x, .int y =>
+      match d with
+      | .javascript => jsIntDiv x y
+      | _           => numToE (nc.div x y)
+  | "%",  .int x, .int y =>
+      match d with
+      | .javascript => jsIntMod x y
+      | _           => numToE (nc.mod x y)
   -- ### Bitwise operators
   --
   -- These are `&`, `|`, `^`, `<<`, `>>` and `>>>` — the **bitwise** operations, not the
@@ -262,7 +552,7 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- strings here rather than sharing the logical ones.
   --
   -- The arithmetic is `NumConfig`'s, so the width and overflow policy are the dialect's:
-  -- under `.cLike` every integer is 32-bit two's-complement, so `1 << 31` is `INT_MIN`
+  -- under `.cLike` an UNTYPED operator is 32-bit two's-complement, so `1 << 31` is `INT_MIN`
   -- (the wrapping config the oracle measures) and `-1 & 255` is `255`.
   --
   -- `>>` and `>>>` are **two different operators** and the difference is only visible on
@@ -272,12 +562,24 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- from the CPG's static type, which of the two it emits, and holes when the type is
   -- unknown. Collapsing them here would reintroduce exactly the `<operator>.and` mistake
   -- in a place where it is much harder to see.
-  | "&",  .int x, .int y => numToE (nc.band x y)
-  | "|",  .int x, .int y => numToE (nc.bor x y)
-  | "^",  .int x, .int y => numToE (nc.bxor x y)
-  | "<<", .int x, .int y => numToE (nc.shl x y)
-  | ">>", .int x, .int y => numToE (nc.shr x y)
-  | ">>>", .int x, .int y => numToE ({ nc with negRightShift := .logical }.shr x y)
+  --
+  -- JavaScript is the exception to "the arithmetic is `NumConfig`'s": its integers are
+  -- unbounded for `+`, but its bitwise operators work on ToInt32/ToUint32 of their
+  -- operands. See `jsBitwise`.
+  | "&",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "&" x y  | _ => numToE (nc.band x y)
+  | "|",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "|" x y  | _ => numToE (nc.bor x y)
+  | "^",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "^" x y  | _ => numToE (nc.bxor x y)
+  | "<<", .int x, .int y =>
+      match d with | .javascript => jsBitwise "<<" x y | _ => numToE (nc.shl x y)
+  | ">>", .int x, .int y =>
+      match d with | .javascript => jsBitwise ">>" x y | _ => numToE (nc.shr x y)
+  | ">>>", .int x, .int y =>
+      match d with
+      | .javascript => jsBitwise ">>>" x y
+      | _           => numToE ({ nc with negRightShift := .logical }.shr x y)
   | "<",  .int x, .int y => .val (.bool (x < y))
   | "<=", .int x, .int y => .val (.bool (x ≤ y))
   | ">",  .int x, .int y => .val (.bool (x > y))
@@ -288,6 +590,11 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | ">",  .str x, .str y =>
       if d.stringsAreValues then .val (.bool (x > y))
       else .hole "str:pointer-compare-not-modelled"
+  -- `int == int` is the same in every dialect (JS: two Numbers). Its own arm so that it
+  -- does not depend on the dialect split in the generic `==` arm below, and
+  -- `Refine.applyBinop_int_eq` stays `rfl` for an arbitrary dialect.
+  | "==", .int x, .int y => .val (.bool (x == y))
+  | "!=", .int x, .int y => .val (.bool (!(x == y)))
   -- `==` on strings compares contents in Python and addresses in C. `Val.beq` is
   -- structural, so it is right for Python and wrong for C.
   | "==", .str _, .str _ =>
@@ -364,13 +671,21 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
            | _,      _      => .hole "iref:cmp-non-index"
   | "==", .iref r1 s1, .iref r2 s2 => .val (.bool (r1 == r2 && s1 == s2))
   | "!=", .iref r1 s1, .iref r2 s2 => .val (.bool !(r1 == r2 && s1 == s2))
-  | "==", x, y           => .val (.bool (Val.beq x y))
-  | "!=", x, y           => .val (.bool (!Val.beq x y))
-  -- Reached only when the left operand did not decide the result, so the value
-  -- of the expression is the RIGHT operand under value semantics.
-  | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | _, _, _              => .hole s!"binop:{op}"
+  -- JavaScript `==`/`!=` is LOOSE equality (`1 == "1"` is `true`), which `Val.beq`
+  -- answered `false`. Same-type operands are decided; cross-type coercion is a hole.
+  -- (`int`/`int`, `str`/`str` and the float arms above are already right for JS.)
+  | "==", x, y           =>
+      match d with
+      | .javascript => jsEqE false false x y
+      | _           => binopFallback d op x y
+  | "!=", x, y           =>
+      match d with
+      | .javascript => jsEqE false true x y
+      | _           => binopFallback d op x y
+  -- Everything else: structural `==`/`!=`, `&&`/`||` (reached only when the left
+  -- operand did not decide the result, so the value is the RIGHT operand under value
+  -- semantics), a `bool` promoted under `.cLike`, or a hole. See `binopFallback`.
+  | _, _, _              => binopFallback d op a b
 
 /-!
 ### Operator equations
@@ -420,6 +735,100 @@ give (32-bit wraparound). -/
 example : applyBinop .javascript "+" (.int 2147483647) (.int 1) = .val (.int 2147483648) := rfl
 #eval applyBinop .javascript "+" (.int 2147483647) (.int 1)  -- val (int 2147483648)
 
+/-! `/` and `%`: the `docs/languages.md` §2/§3 rows, which the `.javascript` dialect
+first got wrong by inheriting Python's floor (`-7 % 3` was `2`, `7 / 2` was `3`). -/
+example : applyBinop .javascript "%" (.int (-7)) (.int 3) = .val (.int (-1)) := rfl
+example : applyBinop .javascript "%" (.int 7) (.int (-3)) = .val (.int 1) := rfl
+example : applyBinop .javascript "/" (.int 6) (.int (-3)) = .val (.int (-2)) := rfl
+#eval applyBinop .javascript "%" (.int (-7)) (.int 3)   -- val (int (-1)), matches Node
+#eval applyBinop .javascript "/" (.int 7) (.int 2)      -- val (float 3.5), matches Node
+#eval applyBinop .javascript "/" (.int (-7)) (.int 2)   -- val (float -3.5), matches Node
+#eval applyBinop .javascript "/" (.int 5) (.int 0)      -- val (float +inf), matches Node
+#eval applyBinop .javascript "%" (.int 5) (.int 0)      -- val (float NaN), matches Node
+#eval applyBinop .javascript "%" (.int (-6)) (.int 3)   -- val (float -0), matches Node
+#eval applyBinop .javascript "%" (.float (Fl.ofBits (Float.toBits (-7.5)).toNat)) (.int 2)
+  -- val (float -1.5), matches Node (CPython's floored `%` gives 0.5)
+#eval applyBinop .javascript "||" (.float (Fl.ofBits (Float.toBits 0.0).toNat)) (.int 2)
+  -- val (int 2), matches Node's `0.0 || 2` (was `bool true`)
+
+/-! Java `%` on doubles is the TRUNCATED remainder (JLS 15.17.3): `-5.5 % 2.0` is `-1.5`.
+`.cLike` used CPython's floored `pyMod` and answered `0.5`. Pinned by `#guard`, which
+compares the IEEE bits, so a regression fails the build. -/
+#guard (match applyBinop .cLike "%" (.float (Fl.ofBits (Float.toBits (-5.5)).toNat))
+                                     (.float (Fl.ofBits (Float.toBits 2.0).toNat)) with
+        | .val (.float f) => f.bits == (Float.toBits (-1.5)).toNat
+        | _ => false)
+#guard (match applyBinop .cLike "%" (.float (Fl.ofBits (Float.toBits 5.5).toNat))
+                                     (.int (-2)) with
+        | .val (.float f) => f.bits == (Float.toBits 1.5).toNat
+        | _ => false)
+-- CPython is unchanged: `-5.5 % 2.0 == 0.5`.
+#guard (match applyBinop .python "%" (.float (Fl.ofBits (Float.toBits (-5.5)).toNat))
+                                      (.float (Fl.ofBits (Float.toBits 2.0).toNat)) with
+        | .val (.float f) => f.bits == (Float.toBits 0.5).toNat
+        | _ => false)
+
+/-! `==` vs `===` (`docs/languages.md` §4). Every right-hand side below is Node's answer,
+from `node -e` (v22); a hole is written where Core declines to answer. -/
+example : applyBinop .javascript "===" (.int 1) (.str "1") = .val (.bool false) := rfl
+example : applyBinop .javascript "!==" (.int 1) (.str "1") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.int 1) (.int 1) = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.str "a") (.str "a") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.bool true) (.int 1) = .val (.bool false) := rfl
+example : applyBinop .javascript "===" .unit (.int 0) = .val (.bool false) := rfl
+-- `1 == "1"` and `0 == false` are `true` in Node; Core used to say `false`. Now a hole:
+example : applyBinop .javascript "==" (.int 1) (.str "1")
+    = .hole "js:==:cross-type-coercion" := rfl
+example : applyBinop .javascript "==" (.int 0) (.bool false)
+    = .hole "js:==:cross-type-coercion" := rfl
+-- `null == undefined` is `true`, `null == 0` is `false`, `null === undefined` is `false`
+-- (Core cannot tell null from undefined, so `===` on two of them is a hole).
+example : applyBinop .javascript "==" .unit .unit = .val (.bool true) := rfl
+example : applyBinop .javascript "==" .unit (.int 0) = .val (.bool false) := rfl
+example : applyBinop .javascript "!=" .unit (.str "") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" .unit .unit = .hole "js:===:null-vs-undefined" := rfl
+-- same-type `==` is exact
+example : applyBinop .javascript "==" (.bool true) (.bool true) = .val (.bool true) := rfl
+example : applyBinop .javascript "==" (.int 2) (.int 3) = .val (.bool false) := rfl
+-- objects: identity (`[1] == [1]` is `false`; `o == o` is `true`)
+example : applyBinop .javascript "==" (.ref 0) (.ref 1) = .val (.bool false) := rfl
+example : applyBinop .javascript "===" (.ref 4) (.ref 4) = .val (.bool true) := rfl
+example : applyBinop .javascript "==" (.list [.int 1]) (.list [.int 1])
+    = .hole "js:eq:object-identity-unknown" := rfl
+-- `===` is not a JS-only spelling anywhere else: other dialects hole rather than guess.
+example : applyBinop .python "===" (.int 1) (.int 1) = .hole "binop:===:non-javascript" := rfl
+#eval applyBinop .javascript "===" (.int 1) (.float (Fl.ofBits (Float.toBits 1.0).toNat))
+  -- val (bool true), matches Node's `1 === 1.0`
+#eval applyBinop .javascript "===" (.float (Fl.ofBits (Float.toBits (0.0/0.0)).toNat))
+                                   (.float (Fl.ofBits (Float.toBits (0.0/0.0)).toNat))
+  -- val (bool false), matches Node's `NaN === NaN`
+#eval applyBinop .javascript "===" (.float (Fl.ofBits (Float.toBits (-0.0)).toNat)) (.int 0)
+  -- val (bool true), matches Node's `-0 === 0`
+
+/-! Bitwise operators: ToInt32/ToUint32 (`jsBitwise`). Right-hand sides from `node -e`. -/
+example : applyBinop .javascript "<<" (.int 1) (.int 31) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int 32) = .val (.int 1) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int 33) = .val (.int 2) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int (-1)) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "|" (.int 2147483648) (.int 0) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "|" (.int 4294967296) (.int 0) = .val (.int 0) := rfl
+example : applyBinop .javascript "^" (.int (-2147483649)) (.int 0) = .val (.int 2147483647) := rfl
+example : applyBinop .javascript "&" (.int 5) (.int (-1)) = .val (.int 5) := rfl
+example : applyBinop .javascript "&" (.int 4294967295) (.int 1) = .val (.int 1) := rfl
+example : applyBinop .javascript ">>" (.int (-8)) (.int 1) = .val (.int (-4)) := rfl
+example : applyBinop .javascript ">>" (.int 4294967295) (.int 0) = .val (.int (-1)) := rfl
+example : applyBinop .javascript ">>>" (.int (-1)) (.int 0) = .val (.int 4294967295) := rfl
+example : applyBinop .javascript ">>>" (.int (-1)) (.int 28) = .val (.int 15) := rfl
+example : applyBinop .javascript ">>>" (.int (-16)) (.int 2) = .val (.int 1073741820) := rfl
+example : applyBinop .javascript ">>>" (.int 3) (.int (-1)) = .val (.int 0) := rfl
+example : applyBinop .javascript "|" (.int 9007199254740992) (.int 0) = .val (.int 0) := rfl
+example : applyBinop .javascript "|" (.int 9007199254740994) (.int 0)
+    = .hole "js:bitwise:operand-beyond-2^53" := rfl
+-- C is untouched: `1 << 31` is still `INT_MIN` under `.cLike`, `~0` still `-1`.
+example : applyBinop .cLike "<<" (.int 1) (.int 31) = .val (.int (-2147483648)) := rfl
+#eval applyBinop .javascript ">>>" (.int (-1)) (.int 0)   -- val (int 4294967295), Node
+#eval applyBinop .javascript "<<" (.int 1) (.int 32)       -- val (int 1), Node
+
 /-! ### Float equations, and the two that must not regress
 
 `Val.beq` on floats is the place where a plausible-looking implementation is wrong. Both
@@ -446,7 +855,7 @@ theorem float_negzero_bits_differ :
 
 /-- `-0.0` is false, like `0.0`. -/
 @[simp] theorem truthy_float_negzero :
-    Val.truthy (.float (Fl.zero Format.binary64 true)) = false := by decide
+    Val.truthy (.float (Fl.zero Format.binary64 true)) = false := rfl
 
 /-- Representability under the 32-bit signed C configuration. -/
 abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
@@ -470,6 +879,38 @@ abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
 @[simp] theorem applyBinop_c_divZero (x : Int) :
     applyBinop .cLike "/" (.int x) (.int 0) = .exn (.str "ZeroDivisionError") := rfl
 
+/-! `binopFallback` on operands it does not promote is `binopTail`, and `binopTail` on a
+literal operator is one line. Stated as `simp` lemmas so that proofs which `simp` through
+`applyBinop` (`Specs/V8Spec.lean`) see the same terms as before the fallback was split
+out. -/
+@[simp] theorem binopFallback_int_int (d : Dialect) (op : String) (x y : Int) :
+    binopFallback d op (.int x) (.int y) = binopTail d op (.int x) (.int y) := rfl
+@[simp] theorem binopTail_eq (d : Dialect) (a b : Val) :
+    binopTail d "==" a b = .val (.bool (Val.beq a b)) := rfl
+@[simp] theorem binopTail_ne (d : Dialect) (a b : Val) :
+    binopTail d "!=" a b = .val (.bool (!Val.beq a b)) := rfl
+@[simp] theorem binopTail_and (d : Dialect) (a b : Val) :
+    binopTail d "&&" a b = .val (if d.boolOpsAreValues then b else .bool b.truthy) := rfl
+@[simp] theorem binopTail_or (d : Dialect) (a b : Val) :
+    binopTail d "||" a b = .val (if d.boolOpsAreValues then b else .bool b.truthy) := rfl
+
+/-- The promoted arms of `applyBinop` compute exactly what the integer arms do. -/
+theorem cIntBinop_eq (op : String) (x y : Int) (h : op ∈ cIntOps) :
+    cIntBinop op x y = applyBinop .cLike op (.int x) (.int y) := by
+  simp only [cIntOps, List.mem_cons, List.not_mem_nil, or_false] at h
+  rcases h with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl <;> rfl
+
+/-! The SQLite fixture of `docs/scale.md`, at the operator level: `(a < b) == 1` is true
+and `(a < b) + (b < a)` is `1` under `.cLike`, as `cc` computes. -/
+example : applyBinop .cLike "==" (.bool true) (.int 1) = .val (.bool true) := rfl
+example : applyBinop .cLike "+" (.bool true) (.bool false) = .val (.int 1) := rfl
+example : applyBinop .cLike "*" (.int 7) (.bool true) = .val (.int 7) := rfl
+-- Java's logical `&` on two `boolean`s stays a `boolean`.
+example : applyBinop .cLike "&" (.bool true) (.bool false) = .val (.bool false) := rfl
+-- Python is untouched by this change (its own `True == 1` is a separate matter).
+example : applyBinop .python "+" (.bool true) (.int 1) = .hole "binop:+" := rfl
+
 /-- Built-in unary operators. -/
 def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   match op, a with
@@ -486,7 +927,16 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- `<operator>.not` and `<operator>.logicalNot`; this exporter previously mapped *both*
   -- onto `"!"`, so `~0` translated to `false`. `bnot` is `-x-1` wrapped to the dialect's
   -- width, which is two's complement at every width and never overflows.
-  | "~", .int x => numToE ((d.toNumConfig).bnot x)
+  | "~", .int x =>
+      match d with
+      | .javascript => jsBitNot x            -- `~2147483648` is `2147483647` in Node
+      | _           => numToE ((d.toNumConfig).bnot x)
+  -- A `bool` operand is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`):
+  -- `-(a < b)` is `-1` in C. Elsewhere it stays the hole it was.
+  | "-", .bool b => if d.promotesBool then numToE ((d.toNumConfig).neg (boolToInt b))
+                    else .hole s!"unop:{op}"
+  | "~", .bool b => if d.promotesBool then numToE ((d.toNumConfig).bnot (boolToInt b))
+                    else .hole s!"unop:{op}"
   -- **Width conversions.** `static_cast<uint8_t>(e)` in C++ is a unary operator whose
   -- meaning is completely determined: since C++20, conversion to any integer type is
   -- two's-complement reduction modulo `2^width`, which is exactly `IntType.wrap`. So it
@@ -522,7 +972,15 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   | "cast:u32", .bool b => .val (.int (if b then 1 else 0))
   | "cast:i64", .bool b => .val (.int (if b then 1 else 0))
   | "cast:u64", .bool b => .val (.int (if b then 1 else 0))
-  | _, _        => .hole s!"unop:{op}"
+  -- The C address model (`Address.lean`): a cast to a pointer type whose operand's
+  -- static type was not resolved -- the identity on pointer values, a hole on a
+  -- non-zero integer. Pointer-to-INTEGER casts are the `cast:<w>` arms above, which
+  -- have no case for a pointer value and so stay holes: Core blocks have no address.
+  | "cast:ptr", v => ptrCast v
+  -- `-`/`~` at a typed width (`"-:u32"`, `"~:i64"`; `TypedInt.lean`).
+  | _, _        => match typedIntUnop op a with
+                   | some r => r
+                   | none   => .hole s!"unop:{op}"
 
 /-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
 than against `applyUnop`'s own definition. -/
@@ -541,6 +999,11 @@ example : applyUnop .cLike "cast:i8" (.int 200) = .val (.int (-56)) := by rfl
 
 /-- A cast of something that is not a number is a hole, not a guess. -/
 example : applyUnop .cLike "cast:u8" (.str "x") = .hole "unop:cast:u8" := by rfl
+
+/-- JS `~` is `-ToInt32(x) - 1` (`jsBitNot`); Node: `~2147483648` is `2147483647`, `~0`
+is `-1`. The unbounded `NumConfig.python` answer was `-2147483649`. -/
+example : applyUnop .javascript "~" (.int 2147483648) = .val (.int 2147483647) := rfl
+example : applyUnop .javascript "~" (.int 0) = .val (.int (-1)) := rfl
 
 /-- Negation is definitional under the unbounded (Python) config. -/
 @[simp] theorem applyUnop_py_neg (x : Int) :
@@ -585,6 +1048,9 @@ structure Ctx where
   /-- Heap address of the module-level bindings frame. Globals must be mutable and must
   outlive any single call, so they live on the heap rather than in `Env`. -/
   globals : Ref := 0
+  /-- The Python class table — see `Program.pyClasses`. `none` keeps the legacy
+  name-suffix resolution; `some` selects Python's own lookup rules (`Ctx.pyStrict`). -/
+  pyClasses : Option (List PyClass) := none
 
 /-- Build a function table from a program. -/
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
@@ -635,40 +1101,126 @@ def strKeyed : Val → Option (List (String × Val))
   | _ => none
 
 /-- The parameters that receive positional arguments: every parameter except the
-variadic ones. -/
+variadic and the keyword-only ones. -/
 def Func.posParams (fn : Func) : List String :=
-  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p
+  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p && !fn.kwonly.contains p
+
+/-- The parameters a **keyword** argument may bind: the positional ones that are not
+positional-only, then the keyword-only ones. A keyword naming anything else goes to
+`**kwargs`, or is rejected (`kwargsRejected`). -/
+def Func.kwParams (fn : Func) : List String :=
+  fn.posParams.filter (fun p => !fn.posonly.contains p) ++ fn.kwonly
+
+/-- The value of a literal, exactly as `evalExpr` gives it. -/
+def Lit.toVal : Lit → Val
+  | .int i   => .int i
+  | .str s   => .str s
+  | .bool b  => .bool b
+  | .float f => .float f
+  | .unit    => .unit
+
+/-- The value of a default expression **when evaluating it once at `def` time and
+evaluating it again at every call cannot be told apart**: a literal, or a tuple of
+literals. Both denote immutable values with no identity Core can observe, so binding the
+value per call is exactly CPython's evaluate-once rule.
+
+Anything else is `none`, and deliberately so. `def f(x=[])` evaluates `[]` once and every
+call shares that one list — the mutable-default aliasing every Python programmer meets
+once — and `def f(t=time.monotonic)` reads `time` at definition time. Re-evaluating either
+per call is the silently-wrong translation; `Func.defaultHole` turns it into a hole on
+exactly the calls that need the default. -/
+def defaultVal? : Expr → Option Val
+  | .lit l     => some l.toVal
+  | .tupleE es => (es.mapM fun (e : Expr) => match e with
+                                    | .lit l => some l.toVal
+                                    | _      => none).map .tuple
+  | _          => none
+
+/-- Was parameter `p` given a value by this call — positionally, or by a keyword that is
+allowed to bind it? -/
+def Func.supplied (fn : Func) (vs : List Val) (kws : List (String × Val)) (p : String) :
+    Bool :=
+  (fn.posParams.take vs.length).contains p || (fn.kwParams.contains p && kws.any (·.1 == p))
+
+/-- Bindings for the parameters this call leaves unsupplied whose default is a
+`defaultVal?` constant. Empty — by its first branch, so that it reduces without looking at
+`params` — for every function with no recorded defaults, which is every function rendered
+before defaults were modelled. -/
+def Func.defaultEnv (fn : Func) (vs : List Val) (kws : List (String × Val)) : Env :=
+  if fn.defaults.isEmpty then [] else
+  fn.params.filterMap fun p =>
+    if fn.supplied vs kws p then none else
+    match fn.defaults.lookup p with
+    | some e => (defaultVal? e).map (p, ·)
+    | none   => none
+
+/-- The first unsupplied parameter whose default is **not** a constant, as a hole label —
+the default's own hole label if it is one (the exporter writes
+`param:default-nonliteral` there), else `param:default-unsupported`. `none` when every
+default this call needs is a constant. -/
+def Func.defaultHole (fn : Func) (vs : List Val) (kws : List (String × Val)) :
+    Option String :=
+  if fn.defaults.isEmpty then none else
+  fn.params.findSome? fun p =>
+    if fn.supplied vs kws p then none else
+    match fn.defaults.lookup p with
+    | some e => match defaultVal? e with
+                | some _ => none
+                | none   => some (e.holes.headD "param:default-unsupported")
+    | none   => none
+
+/-- The statement a call actually runs: the body, unless the call needs a default Core
+cannot evaluate, in which case it is that hole. Pure and fuel-free, so it adds nothing to
+the interpreter's mutual recursion. -/
+def Func.guardedBody (fn : Func) (vs : List Val) (kws : List (String × Val)) : Stmt :=
+  match fn.defaultHole vs kws with
+  | some l => .hole l
+  | none   => fn.body
+
+/-- The function name and captured environment of a closure value; `none` for anything
+else. Named so that `Expr.call` can test for a closure-valued local with a two-way match
+instead of a wildcard over every `Val` constructor. -/
+def Val.closParts? : Val → Option (String × List (String × Val))
+  | .clos g cap => some (g, cap)
+  | _           => none
 
 /-- Bind a call's arguments into the callee's environment.
 
-The rule is CPython's, minus default values (which Core does not model):
+The rule is CPython's:
 
-* positional arguments fill `posParams` left to right;
+* positional arguments fill `posParams` left to right (keyword-only parameters are not
+  among them);
 * leftovers go to `vararg` as a `tuple` — an empty one when there are none, which is
   why `def f(*a)` called with no arguments binds `a` to `()` rather than to `unit`;
-* a keyword argument naming a positional parameter binds that parameter;
-* every other keyword argument goes to `kwarg` as a `dict` with `str` keys.
+* a keyword argument naming a `kwParams` parameter binds that parameter (a
+  positional-only parameter is not among them);
+* every other keyword argument goes to `kwarg` as a `dict` with `str` keys;
+* an unsupplied parameter with a constant default sees that default
+  (`Func.defaultEnv`). The defaults sit *under* the call's own bindings, in the base
+  environment, so a supplied argument always shadows its default.
 
-Two deliberate departures, both recorded rather than hidden:
+Departures, recorded rather than hidden:
 
-* **Surplus positional arguments are dropped when there is no `*args`.** CPython raises
-  `TypeError`. This is the behaviour `applyFunc` already had (`params.zip vs` truncates),
-  and it is left alone here so that this change is about starred arguments only.
-* **A keyword argument matching no parameter is dropped here** when there is no
-  `**kwargs`. `bindParams` is only the binding half; `kwargsRejected` below detects that
-  case and `applyFunc` turns it into CPython's `TypeError` before the body ever runs, so
-  the drop is never observable. Nothing previously produced keyword arguments, so this
-  cannot change any existing behaviour. -/
+* **Surplus positional arguments** with no `*args` are rejected by `posRejected` before
+  the body runs, so the truncation here is never observable.
+* **A keyword argument matching no parameter** with no `**kwargs` is dropped here and
+  rejected by `kwargsRejected`, likewise never observable.
+* **An unsupplied parameter with no default** is still left unbound (it reads `unit`),
+  where CPython raises `TypeError: missing required argument`. A function rendered
+  before defaults were recorded cannot be told apart from one that has none, so raising
+  would reject calls CPython accepts. -/
 def bindParams (fn : Func) (base : Env) (vs : List Val)
     (kws : List (String × Val)) : Env :=
   let ps    := fn.posParams
-  let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
+  let kp    := fn.kwParams
+  let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v)
+                 (fn.defaultEnv vs kws ++ base)
   let rest  := vs.drop ps.length
   let ρ₁    := match fn.vararg with
                | some a => Env.set ρ₀ a (.tuple rest)
                | none   => ρ₀
-  let named := kws.filter (fun kv => ps.contains kv.1)
-  let extra := kws.filter (fun kv => !ps.contains kv.1)
+  let named := kws.filter (fun kv => kp.contains kv.1)
+  let extra := kws.filter (fun kv => !kp.contains kv.1)
   let ρ₂    := named.foldl (fun (e : Env) (x, v) => Env.set e x v) ρ₁
   match fn.kwarg with
   | some k => Env.set ρ₂ k (.dict (extra.map fun kv => (.str kv.1, kv.2)))
@@ -684,10 +1236,10 @@ theorem `surplusPositional_is_a_known_divergence`, now
 direction: a call the real program rejects loudly runs to completion in Core and every
 theorem about it is a theorem about a program CPython never executes.
 
-Only a *surplus* is rejected. Too few arguments is still not an error here, because Core
-does not model default values: `def k(a=None)` renders as `params := ["a"]`, so raising
-on an under-supplied call would reject calls CPython accepts. That asymmetry is
-deliberate and is the reason this is not simply an arity equality test.
+Keyword-only parameters do not count: `def f(a, *, b)` called as `f(1, 2)` is a
+`TypeError` in CPython, and is here.
+
+Only a *surplus* is rejected; see `bindParams` for why a shortfall is not.
 
 A `*args` parameter absorbs any surplus, so a callee with `vararg` is never rejected. -/
 def posRejected (fn : Func) (vs : List Val) : Bool :=
@@ -700,12 +1252,12 @@ corpus are. -/
   simp [posRejected]
 
 /-- `posRejected` on the shape a rendered corpus actually presents: a `Func` literal with
-both variadic fields at their `none` defaults. The companion of `bindParams_mk`, and
+every calling-convention field at its default. The companion of `bindParams_mk`, and
 needed for the same reason — a proof about a literal `Func` cannot fire a hypothesis-form
 lemma without first deciding which `fn` it is about. -/
 @[simp] theorem posRejected_mk (name : String) (params : List String) (body : Stmt)
     (vs : List Val) :
-    posRejected ⟨name, params, body, none, none⟩ vs
+    posRejected ⟨name, params, body, none, none, [], [], []⟩ vs
       = decide (params.length < vs.length) := by
   have : (List.filter (fun p => none != some p) params) = params := by
     simp [List.filter_eq_self]
@@ -714,35 +1266,75 @@ lemma without first deciding which `fn` it is about. -/
 /-- Does this call pass a keyword argument the callee cannot accept? CPython raises
 `TypeError: f() got an unexpected keyword argument 'k'`; `bindParams` alone would silently
 drop it, which is the silently-wrong shape this project keeps catching, so the check is
-separate and `applyFunc` turns it into the exception. -/
+separate and `applyFunc` turns it into the exception. A keyword naming a positional-only
+parameter is one of these, as in CPython. -/
 def kwargsRejected (fn : Func) (kws : List (String × Val)) : Bool :=
-  fn.kwarg.isNone && kws.any (fun kv => !fn.posParams.contains kv.1)
+  fn.kwarg.isNone && kws.any (fun kv => !fn.kwParams.contains kv.1)
 
 /-- A call with no keyword arguments can never be rejected. -/
 @[simp] theorem kwargsRejected_nil (fn : Func) : kwargsRejected fn [] = false := by
   simp [kwargsRejected]
 
-/-- A function with no variadic parameters, called with no keyword arguments, binds
-exactly what `applyFunc` bound before the calling convention existed. This is the
-compatibility equation: every corpus rendered before starred arguments were modelled has
-`vararg = none` and `kwarg = none`, so nothing about it changed. -/
+/-- A function with no recorded defaults binds no defaults. -/
+@[simp] theorem Func.defaultEnv_nil {fn : Func} (vs : List Val) (kws : List (String × Val))
+    (hd : fn.defaults = []) : fn.defaultEnv vs kws = [] := by
+  simp [Func.defaultEnv, hd]
+
+/-- A function with no recorded defaults runs its body unchanged. -/
+@[simp] theorem Func.guardedBody_nil {fn : Func} (vs : List Val) (kws : List (String × Val))
+    (hd : fn.defaults = []) : fn.guardedBody vs kws = fn.body := by
+  simp [Func.guardedBody, Func.defaultHole, hd]
+
+/-- The literal form of `Func.guardedBody_nil`, for the same reason `bindParams_mk` exists. -/
+@[simp] theorem Func.guardedBody_mk (name : String) (params : List String) (body : Stmt)
+    (va kw : Option String) (ko po : List String) (vs : List Val)
+    (kws : List (String × Val)) :
+    Func.guardedBody ⟨name, params, body, va, kw, ko, po, []⟩ vs kws = body := rfl
+
+/-- The literal form of `Func.defaultEnv_nil`. -/
+@[simp] theorem Func.defaultEnv_mk (name : String) (params : List String) (body : Stmt)
+    (va kw : Option String) (ko po : List String) (vs : List Val)
+    (kws : List (String × Val)) :
+    Func.defaultEnv ⟨name, params, body, va, kw, ko, po, []⟩ vs kws = [] := rfl
+
+/-- A function with no variadic, keyword-only or defaulted parameters, called with no
+keyword arguments, binds exactly what `applyFunc` bound before the calling convention
+existed. This is the compatibility equation: every corpus rendered before starred
+arguments, keyword-only parameters and defaults were modelled has all of those fields at
+their defaults, so nothing about it changed. -/
 theorem bindParams_plain {fn : Func} (base : Env) (vs : List Val)
-    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) :
+    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) (h3 : fn.kwonly = [])
+    (h4 : fn.defaults = []) :
     bindParams fn base vs [] =
       (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base := by
   have : (List.filter (fun p => none != some p) fn.params) = fn.params := by
     simp [List.filter_eq_self]
-  simp [bindParams, Func.posParams, h1, h2, this]
+  simp [bindParams, Func.posParams, Func.defaultEnv, h1, h2, h3, h4, this]
+
+/-- A function with **no parameters at all**, called with no keyword arguments, binds
+nothing beyond `base` — whatever its other calling-convention fields say, because every
+one of them is keyed by a parameter name. This is the form the generated accessor
+theorems use (`SpecsGen/Basis.lean`): they already assume `fn.params = []`, so the fields
+added after them need no new hypothesis. -/
+theorem bindParams_noParams {fn : Func} (base : Env) (vs : List Val)
+    (hp : fn.params = []) (h1 : fn.vararg = none) (h2 : fn.kwarg = none) :
+    bindParams fn base vs [] = base := by
+  simp [bindParams, Func.posParams, Func.defaultEnv, hp, h1, h2]
+
+/-- The guard on a parameterless function is its body, for the same reason. -/
+theorem Func.guardedBody_noParams {fn : Func} (vs : List Val) (kws : List (String × Val))
+    (hp : fn.params = []) : fn.guardedBody vs kws = fn.body := by
+  simp [Func.guardedBody, Func.defaultHole, hp]
 
 /-- The same equation in the shape a rendered corpus actually presents: a `Func` literal
-with both variadic fields at their `none` defaults. Stated separately because the
+with every calling-convention field at its default. Stated separately because the
 hypothesis form of `bindParams_plain` cannot fire on a literal without first deciding
 which `fn` it is about. -/
 @[simp] theorem bindParams_mk (name : String) (params : List String) (body : Stmt)
     (base : Env) (vs : List Val) :
-    bindParams ⟨name, params, body, none, none⟩ base vs [] =
+    bindParams ⟨name, params, body, none, none, [], [], []⟩ base vs [] =
       (params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base :=
-  bindParams_plain base vs rfl rfl
+  bindParams_plain base vs rfl rfl rfl rfl
 
 /-- The short class name behind a class VALUE.
 
@@ -755,11 +1347,351 @@ def classNameOfValue (g : String) : String :=
   let base := if g.endsWith "<meta>" then g.dropRight 6 else g
   (base.splitOn ".").getLastD base
 
-/-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
-def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
+/-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`.
+
+This is the **legacy** rule, kept for every program without a class table
+(`Ctx.pyStrict` false): all non-Python corpora, and every Python export made before the
+exporter recorded classes. It knows nothing of inheritance -- a subclass instance's
+inherited method is found only through the any-`.meth` fallback, which takes *any*
+unique function of that name, and a subclass override of a method the base calls on
+`self` is reached only by accident. `docs/conformance.md` finding 3 is three wrong
+answers it produced. -/
+def Ctx.resolveMethodLegacy (ctx : Ctx) (cls meth : String) : Option Func :=
   match ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
+
+/-! ### Python method resolution (STRATEGY.md §62)
+
+With a class table (`Program.pyClasses`), a method is looked up the way CPython looks it
+up on an instance: along `type(obj).__mro__`, the C3 linearisation of the class and its
+bases, taking the first class that defines the name. Every step at which the table does
+not determine the answer is a hole, never a guess:
+
+* a class missing from the table (a test-suite subclass, a class the exporter dropped
+  because its bases were not resolvable or its short name is ambiguous) —
+  `mro:unknown-class:<C>`;
+* a base from outside the corpus (`<ext>…`) reached before the name is found: Core does
+  not know what `collections.abc.MutableMapping` defines — `mro:external-base:<B>.<m>`;
+* a class-body binding that is not a plain `def` (`get = __getitem__`, `property`,
+  `classmethod`) — `mro:class-attribute:<C>.<m>`;
+* a C3 failure (CPython raises `TypeError` at class creation, so no instance exists) —
+  also `mro:unknown-class`.
+
+A name found nowhere along a fully-known MRO is *absent*: `object` defines it or nothing
+does, and the callers keep their existing behaviour for that (`__init__` allocates a
+plain object; any other method is the hole `mcall:<C>.<m>`). -/
+
+/-- Python's own lookup rules are in force: a Python program carrying a class table. -/
+def Ctx.pyStrict (ctx : Ctx) : Bool :=
+  ctx.pyClasses.isSome && ctx.dialect == .python
+
+/-- The table entry for a short class name. A name with two entries is not a class Core
+can identify, so it is treated as missing (the exporter already drops such names; this
+makes a hand-built table obey the same rule). -/
+def Ctx.pyClass? (ctx : Ctx) (c : String) : Option PyClass :=
+  match ctx.pyClasses with
+  | none   => none
+  | some t => match t.filter (·.name == c) with
+              | [k] => some k
+              | _   => none
+
+/-- Prefix marking a base from outside the corpus. -/
+def extBasePrefix : String := "<ext>"
+
+/-- C3 merge: repeatedly take the first list head that is in no list's tail. `none` when
+no head qualifies (an inconsistent hierarchy — CPython's `TypeError`) or the fuel, the
+total length of the lists, runs out. -/
+def c3Merge : Nat → List (List String) → Option (List String)
+  | 0,   _  => none
+  | n+1, ls =>
+    let ls := ls.filter (fun l => !l.isEmpty)
+    if ls.isEmpty then some [] else
+    let good := ls.filterMap (fun l => match l with
+                  | c :: _ => if ls.any (fun l' => (l'.drop 1).contains c) then none else some c
+                  | []     => none)
+    match good with
+    | c :: _ => (c3Merge n (ls.map (fun l => l.filter (· != c)))).map (c :: ·)
+    | []     => none
+
+/-- The C3 linearisation of a class, by short name. An external base is a leaf: its own
+ancestors are unknown, and since lookup stops at the first external class it reaches
+(`Ctx.mroWalk`), the order of the classes *before* it is all that is ever used — and that
+prefix does not depend on what comes after an external class in its own MRO, because no
+corpus class can be an ancestor of an external one. -/
+def Ctx.mroAux (ctx : Ctx) : Nat → String → Option (List String)
+  | 0,   _ => none
+  | n+1, c =>
+    if c.startsWith extBasePrefix then some [c] else
+    match ctx.pyClass? c with
+    | none   => none
+    | some k =>
+      match k.bases.mapM (ctx.mroAux n) with
+      | none    => none
+      | some ls =>
+        let lists := ls ++ [k.bases]
+        (c3Merge (lists.foldl (fun a l => a + l.length) 0 + 1) lists).map (c :: ·)
+
+/-- `type(obj).__mro__` for a class of the table, by short name. The fuel bounds the
+inheritance depth by the number of classes, so a cyclic table is `none`, not a loop. -/
+def Ctx.mro (ctx : Ctx) (c : String) : Option (List String) :=
+  ctx.mroAux ((ctx.pyClasses.map List.length).getD 0 + 1) c
+
+/-- Keys of the function table that are a method `m` defined directly in class `c`. -/
+def Ctx.ownMethodKeys (ctx : Ctx) (c m : String) : List String :=
+  (ctx.table.filter (fun p => p.1.endsWith ("." ++ c ++ "." ++ m))).map (·.1)
+
+/-- Outcome of a method lookup along the MRO. -/
+inductive MLookup where
+  /-- Found: the qualified name of the defining function. -/
+  | found  (q : String)
+  /-- Not defined anywhere along a fully-known MRO. -/
+  | absent
+  /-- The table does not determine the answer. -/
+  | hole   (l : String)
+  deriving Repr, Inhabited, DecidableEq
+
+/-- Walk an MRO (already computed) for method `m`. -/
+def Ctx.mroWalk (ctx : Ctx) (m : String) : List String → MLookup
+  | []      => .absent
+  | c :: cs =>
+    if c.startsWith extBasePrefix then
+      .hole s!"mro:external-base:{c.drop extBasePrefix.length}.{m}"
+    else
+      let attrs := match ctx.pyClass? c with
+                   | some k => k.attrs
+                   | none   => []
+      if attrs.contains m then .hole s!"mro:class-attribute:{c}.{m}" else
+      match ctx.ownMethodKeys c m with
+      | [q] => .found q
+      | []  => ctx.mroWalk m cs
+      | _   => .hole s!"mro:ambiguous-method:{c}.{m}"
+
+/-- Look a method up on an instance of class `cls`, CPython's way. -/
+def Ctx.lookupMethod (ctx : Ctx) (cls m : String) : MLookup :=
+  match ctx.mro cls with
+  | none   => .hole s!"mro:unknown-class:{cls}"
+  | some l => ctx.mroWalk m l
+
+/-- A function whose only behaviour is to be the hole `l`, whatever it is called with:
+the variadic parameters accept any arguments, so `applyFunc` reaches the body, and the
+body is the hole. It is how a method lookup the table cannot answer surfaces as a hole
+at every call site without each one learning a new case. -/
+def holeFunc (l : String) : Func :=
+  { name := "<mro-hole>", params := ["<args>", "<kwargs>"], vararg := some "<args>"
+  , kwarg := some "<kwargs>", body := .hole l }
+
+/-- Method resolution under Python's rules. The reserved classes (`<module>…` module
+objects, `<function>` boxed functions, `<local>` cells, `<globals>`) are not classes of
+the program and keep `none`, which the callers already handle. -/
+def Ctx.resolveMethodPy (ctx : Ctx) (cls meth : String) : Option Func :=
+  if cls.startsWith "<" then none else
+  match ctx.lookupMethod cls meth with
+  | .found q => ctx.resolve q
+  | .absent  => none
+  | .hole l  => some (holeFunc l)
+
+/-- Resolve a method on an instance of class `cls`: Python's MRO rules when the program
+carries a class table, the legacy suffix rule otherwise. -/
+def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
+  if ctx.pyStrict then ctx.resolveMethodPy cls meth else ctx.resolveMethodLegacy cls meth
+
+/-- Method resolution for `obj.m(…)` on a heap object. Under Python's rules an attribute
+in the INSTANCE's own `__dict__` shadows a method of its class (CPython consults the
+instance dictionary before non-data class attributes), and such an attribute is called
+without a receiver. Core does not call it -- it is the hole
+`mcall:<C>.<m>:instance-attribute` -- but it no longer calls the class's method in its
+place. Reserved classes and legacy programs are unchanged. -/
+def Ctx.resolveMethodOn (ctx : Ctx) (o : Obj) (meth : String) : Option Func :=
+  if ctx.pyStrict && !o.cls.startsWith "<" && o.fields.any (·.1 == meth) then
+    some (holeFunc s!"mcall:{o.cls}.{meth}:instance-attribute")
+  else ctx.resolveMethod o.cls meth
+
+/-- With no instance attribute of that name, `obj.m` is the class's method, under either
+rule. -/
+theorem Ctx.resolveMethodOn_of_not_field {ctx : Ctx} {o : Obj} {m : String}
+    (h : o.fields.any (·.1 == m) = false) :
+    ctx.resolveMethodOn o m = ctx.resolveMethod o.cls m := by
+  simp [Ctx.resolveMethodOn, h]
+
+theorem Ctx.resolveMethodOn_of_none {ctx : Ctx} {o : Obj} {m : String}
+    (h : ctx.pyClasses = none) : ctx.resolveMethodOn o m = ctx.resolveMethod o.cls m := by
+  simp [Ctx.resolveMethodOn, Ctx.pyStrict, h]
+
+/-- Does looking `meth` up on class `cls` *reach* something — a method, or a hole? The
+guard for calling a method through a class value (`Base.m(self, …)`): under Python's
+rules an inherited method counts; under the legacy rule only the class's own does
+(`classDefines`, below), so that an unrelated global of that name is never taken. -/
+def Ctx.classResponds (ctx : Ctx) (cls meth : String) : Bool :=
+  if ctx.pyStrict then
+    (match ctx.lookupMethod cls meth with
+     | .absent => false
+     | _       => true)
+  else ctx.table.any (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))
+
+/-! ### `super()`
+
+The exporter lowers zero-argument `super()` in a method of class `C` to
+`super("C", self)` — CPython's own meaning of it, since the compiler supplies `__class__`
+and the first argument. The call evaluates to an inert proxy value (a `Val.clos` under a
+reserved name no source can spell: a field read on it is a `non-object` hole, calling it
+resolves to nothing), and `obj.m(…)` on the proxy looks `m` up along
+`type(self).__mro__` **after** `C`, then calls it with `self` as the receiver. -/
+
+/-- Reserved function name of a `super()` proxy. -/
+def superProxyName : String := "<super>"
+
+/-- Build a `super(C, self)` proxy, when this is that call under Python's rules. The class
+may arrive as a string (the exporter's lowering) or as a class value (`super(C, self)`
+written out, where `C` evaluates to the class's `<meta>` value). -/
+def Ctx.makeSuper (ctx : Ctx) (f : String) (vs : List Val) : Option Val :=
+  if ctx.pyStrict && f == "super" then
+    match vs with
+    | [.str c, s] => some (.clos superProxyName [("__thisclass__", .str c), ("__self__", s)])
+    | [.fn g,  s] => some (.clos superProxyName
+                             [("__thisclass__", .str (classNameOfValue g)), ("__self__", s)])
+    | _           => none
+  else none
+
+/-- The class and receiver of a `super()` proxy. -/
+def superParts? : Val → Option (String × Val)
+  | .clos g [("__thisclass__", .str c), ("__self__", s)] =>
+      if g == superProxyName then some (c, s) else none
+  | _ => none
+
+/-- Where `super(C, self).m` lands: the qualified name of the method, or a hole. `self`'s
+class is its heap object's class or its `bobj` class; an instance carrying captured
+bindings (a function-local class) is refused, because the ancestor's method may close over
+a different scope than the instance's class did. -/
+def Ctx.superTarget (ctx : Ctx) (h : Heap) (c : String) (s : Val) (m : String) :
+    Except String String :=
+  let tp : Option String := match s with
+    | .ref r    => match h.get r with
+                   | some o => if o.captured.isEmpty then some o.cls else none
+                   | none   => none
+    | .bobj b _ => some b
+    | _         => none
+  match tp with
+  | none    => .error s!"super:{c}.{m}:receiver"
+  | some tp =>
+    match ctx.mro tp with
+    | none   => .error s!"mro:unknown-class:{tp}"
+    | some l =>
+      match l.dropWhile (· != c) with
+      | _ :: rest =>
+        match ctx.mroWalk m rest with
+        | .found q => .ok q
+        | .absent  => .error s!"super:{c}.{m}:absent"
+        | .hole l  => .error l
+      | [] => .error s!"super:{c}:not-in-mro-of:{tp}"
+
+/-! ### Bare names under Python's rules
+
+A bare name is a local (or a closure's captured binding), else a module global, else a
+builtin. Legacy resolution consulted the **function table by suffix** first, so an
+unbound `f` reached any function whose qualified name ends in `.f` — a method of an
+unrelated class, a nested function of another scope. Under `pyStrict` the table is
+consulted only for names the exporter qualified (`file.py:<module>.f`), which it does
+exactly when Joern resolved the callee; an identifier is looked up by Python's scoping. -/
+
+/-- Is this a Python identifier (so the exporter left it unqualified)? -/
+def isPyIdent (s : String) : Bool :=
+  match s.toList with
+  | c :: cs => (c.isAlpha || c == '_') && cs.all (fun c => c.isAlphanum || c == '_')
+  | []      => false
+
+/-- Does Python scoping, rather than the function table, decide this name? -/
+def Ctx.scopedName (ctx : Ctx) (f : String) : Bool := ctx.pyStrict && isPyIdent f
+
+/-- The module-global binding of a name, if the globals frame has one. -/
+def Ctx.globalVal? (ctx : Ctx) (h : Heap) (x : String) : Option Val :=
+  match h.get ctx.globals with
+  | some g => match g.fields.find? (·.1 == x) with
+              | some (_, v) => some v
+              | none        => none
+  | none   => none
+
+/-- The function-table entry a call `f(…)` resolves to before any variable is consulted.
+Under Python's rules an identifier never does: it is a variable. -/
+def Ctx.resolveCallee (ctx : Ctx) (f : String) : Option Func :=
+  if ctx.scopedName f then none else ctx.resolve f
+
+/-- `resolveCallee` only ever answers what `resolve` answers. -/
+theorem Ctx.resolve_of_resolveCallee {ctx : Ctx} {f : String} {fn : Func}
+    (h : ctx.resolveCallee f = some fn) : ctx.resolve f = some fn := by
+  unfold Ctx.resolveCallee at h
+  split at h
+  · simp at h
+  · exact h
+
+/-- The value a called name holds. Legacy: the local environment only (`unit` if
+unbound). Under Python's rules: local, else module global, else `unit` — which sends the
+call to the builtins. A global bound to the builtin of the *same* name
+(`isinstance = __builtin.isinstance`, which module initialisers record) is that builtin,
+so it is also `unit` here. -/
+def Ctx.calleeVal (ctx : Ctx) (h : Heap) (ρ : Env) (f : String) : Val :=
+  if ctx.scopedName f then
+    match ρ.find? (·.1 == f) with
+    | some (_, v) => v
+    | none =>
+      match ctx.globalVal? h f with
+      | some (.fn g) =>
+          if g == "__builtin." ++ f || g == "__builtin." ++ f ++ "<meta>" then .unit else .fn g
+      | some v       => v
+      | none         => .unit
+  else ρ.get f
+
+/-- The builtin exception class a `__builtin.<E>` value names, if `E` is one Core models
+(`Stdlib.excNames`). -/
+def builtinExcClass? (g : String) : Option String :=
+  Stdlib.excNames.find? (fun e => "__builtin." ++ e == g)
+
+/-- A bare name that is neither local nor global. Legacy: any function of that suffix, or
+`unit`. Under Python's rules, a builtin exception class Core models (`Stdlib.excNames`)
+is found in `builtins`, as CPython finds it whatever the module globals hold: it is
+`Val.fn "__builtin.<E>"`, the value a module initialiser binds for a builtin it names
+(`len = __builtin.len`), and the value `Ctx.calleeVal` already assumes for a *called*
+name absent from the globals frame. Any other unbound identifier is a hole: CPython would
+find some other builtin or raise `NameError`, and Core can tell neither apart from a
+binding its globals frame did not receive (a module initialiser that holed, an import it
+does not model). -/
+def Ctx.unboundName (ctx : Ctx) (x : String) : Val ⊕ String :=
+  if ctx.scopedName x then
+    if Stdlib.excNames.contains x then .inl (.fn ("__builtin." ++ x))
+    else .inr s!"name:unbound:{x}"
+  else
+  match ctx.resolve x with
+  | some _ => .inl (.fn x)
+  | none   => .inl .unit
+
+/-- The payload `raise v` raises. CPython's `raise C` with `C` an exception *class*
+instantiates it: `raise NotImplementedError` is `raise NotImplementedError()`. Core
+represents an instance of a builtin exception class as the string naming the class
+(`Stdlib.builtin "KeyError" _ = .str "KeyError"`), so under Python's rules a builtin
+exception class value raises that string. Every other value -- and every value in a
+legacy program -- is raised as it is. -/
+def Ctx.raisePayload (ctx : Ctx) : Val → Val
+  | .fn g =>
+    if ctx.pyStrict then
+      match builtinExcClass? g with
+      | some e => .str e
+      | none   => .fn g
+    else .fn g
+  | v => v
+
+@[simp] theorem Ctx.raisePayload_str (ctx : Ctx) (s : String) :
+    ctx.raisePayload (.str s) = .str s := rfl
+@[simp] theorem Ctx.raisePayload_int (ctx : Ctx) (i : Int) :
+    ctx.raisePayload (.int i) = .int i := rfl
+@[simp] theorem Ctx.raisePayload_unit (ctx : Ctx) :
+    ctx.raisePayload .unit = .unit := rfl
+@[simp] theorem Ctx.raisePayload_ref (ctx : Ctx) (r : Ref) :
+    ctx.raisePayload (.ref r) = .ref r := rfl
+
+/-- `raisePayload` only ever changes a `Val.fn`. -/
+theorem Ctx.raisePayload_of_not_fn (ctx : Ctx) (v : Val) (hv : ∀ g, v ≠ .fn g) :
+    ctx.raisePayload v = v := by
+  cases v <;> first | rfl | exact absurd rfl (hv _)
 
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
@@ -803,24 +1735,44 @@ def unboxFn (h : Heap) (addr : Ref) : Option Val :=
   | some o => if o.cls == funcObjCls then o.fields.lookup funcObjField else none
   | none   => none
 
+/-- Dunders a class with a builtin base may **not** override and still be a `Val.bobj`:
+every one of them is an operation Core performs on the payload directly, so an override
+would be silently bypassed. Order matters only for which label a class that overrides
+several gets; `__init__` and `__eq__` come first so existing labels are unchanged. -/
+def builtinBaseRefusedDunders : List String :=
+  [ "__init__", "__eq__", "__new__", "__ne__", "__getitem__", "__len__", "__iter__"
+  , "__contains__", "__bool__", "__getattribute__" ]
+
 /-- Construct an instance of a class whose base is a builtin type: `X(iterable)` for
 `class X(tuple)` / `class X(list)`, `X(d)` for `class X(dict)`, `X(s)` for
 `class X(str)`, and `X()` for the empty instance.
 
-Deliberately **refuses** two shapes rather than approximating them:
+Deliberately **refuses** a class that overrides any dunder in
+`builtinBaseRefusedDunders`, rather than approximating it:
 
-* a class that defines its own `__init__` — Core would have to run it against a value
-  that has no mutable attributes, so whatever it did would be lost;
-* a class that defines its own `__eq__` — `Val.beq` compares `bobj`s by contents and
-  has no dunder dispatch, so an overridden `__eq__` would be silently ignored. That is
-  precisely the silent-wrong outcome this representation is supposed to avoid, so it is
-  a hole instead.
+* its own `__init__`/`__new__` — Core would have to run it against a value that has no
+  mutable attributes, so whatever it did would be lost;
+* its own `__eq__`/`__ne__` — `Val.beq` compares `bobj`s by contents and has no dunder
+  dispatch, so an overridden `__eq__` would be silently ignored;
+* its own `__getitem__`, `__len__`, `__iter__`, `__contains__`, `__bool__` or
+  `__getattribute__` — indexing, `len`, iteration, `in` and truthiness of a `bobj` go
+  straight to the payload (`Val.unbuiltin`, `Val.iterable`, `Stdlib.elems`, `valIn`,
+  `Val.truthy`), so an override would be bypassed exactly as `__eq__` would be.
 
-Both refusals are *holes*, i.e. counted ignorance, not wrong answers. -/
+That is precisely the silent-wrong outcome this representation is supposed to avoid, so
+each is a hole instead (`alloc:builtin-base:<cls>:own-<dunder>`).
+
+`__hash__` is **not** refused: Core's `dict` lookup is by `Val.beq` alone, which agrees
+with CPython for every class that keeps Python's documented invariant `a == b →
+hash(a) == hash(b)` (`_HashedTuple.__hash__` memoises `tuple.__hash__`, so it does).
+A class that breaks the invariant gets the builtin's lookup, not its own — recorded as an
+assumption in `docs/core-language.md`, not checked here. Arithmetic dunders (`__add__`,
+`__radd__`, …) need no refusal: `applyBinop` has no `bobj` case, so `+` on one is
+already `binop:+`, a hole. -/
 def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : EResult :=
-  if ctx.classDefines cls "__init__" then .hole s!"alloc:builtin-base:{cls}:own-__init__"
-  else if ctx.classDefines cls "__eq__" then .hole s!"alloc:builtin-base:{cls}:own-__eq__"
-  else
+  match builtinBaseRefusedDunders.find? (ctx.classDefines cls ·) with
+  | some d => .hole s!"alloc:builtin-base:{cls}:own-{d}"
+  | none =>
     match vs with
     | []  => .val (.bobj cls b.empty)
     | [v] =>
@@ -841,6 +1793,103 @@ def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : 
         | .str,   _         => .hole s!"alloc:builtin-base:{cls}:str-of-non-str"
     | _ => .hole s!"alloc:builtin-base:{cls}:multiple-args"
 
+/-- `len(A((0,)))` is `1` in CPython for `class A(tuple)`: `len` of a builtin-based
+instance is `len` of its payload. Done here, at the call site, rather than as a `bobj`
+case in `Stdlib.builtinCore`, because a case there defeats the branch enumeration in
+`Stdlib.builtin_heap_unchanged` (STRATEGY.md §35). Faithful because `allocBuiltin`
+refuses any class that overrides `__len__` (`builtinBaseRefusedDunders`), so the
+builtin's `len` is the one CPython would call. Every other builtin sees its arguments
+unchanged: the ones that iterate already see through the base via `Stdlib.elems`, and
+the rest must not be told a `bobj` is a plain container. -/
+def builtinSeeThrough (f : String) (vs : List Val) : List Val :=
+  if f == "len" then vs.map Val.unbuiltin else vs
+
+/-- An unbound builtin method called through a variable: `add(self, other)` where
+`add=tuple.__add__` is a default argument, which is how `cachetools`' `_HashedTuple`
+concatenates without re-entering its own `__add__`.
+
+Only `tuple.__add__` on two tuples (either possibly builtin-based) is answered, and the
+result is a **plain** `tuple`, as in CPython: `tuple.__add__(A((0,)), (1,))` is `(0, 1)`
+of type `tuple`, and the class is re-applied only by the caller's own `A(...)`. Every other
+shape is `none` (a `call:<g>` hole): a non-tuple `other` makes CPython return
+`NotImplemented` rather than raise, which Core has no value for. -/
+def unboundBuiltinMethod (d : Dialect) (g : String) (vs : List Val) : Option EResult :=
+  match d, g, vs with
+  | .python, "tuple.__add__", [a, b] =>
+      match a.unbuiltin, b.unbuiltin with
+      | .tuple x, .tuple y => some (.val (.tuple (x ++ y)))
+      | _,        _        => none
+  | _, _, _ => none
+
+/-! #### The legacy rules, as rewrites
+
+A program without a class table (every corpus exported before §62, every non-Python one)
+runs exactly the rules it always did. These equations say so per helper, as `simp` lemmas
+conditional on `ctx.pyClasses = none`, so that proofs about such programs evaluate through
+the new helpers without unfolding them. -/
+
+@[simp] theorem Ctx.pyStrict_of_none {ctx : Ctx} (h : ctx.pyClasses = none) :
+    ctx.pyStrict = false := by simp [Ctx.pyStrict, h]
+
+@[simp] theorem Ctx.scopedName_of_none {ctx : Ctx} {f : String} (h : ctx.pyClasses = none) :
+    ctx.scopedName f = false := by simp [Ctx.scopedName, h]
+
+@[simp] theorem Ctx.resolveCallee_of_none {ctx : Ctx} {f : String} (h : ctx.pyClasses = none) :
+    ctx.resolveCallee f = ctx.resolve f := by simp [Ctx.resolveCallee, h]
+
+@[simp] theorem Ctx.calleeVal_of_none {ctx : Ctx} {hp : Heap} {ρ : Env} {f : String}
+    (h : ctx.pyClasses = none) : ctx.calleeVal hp ρ f = ρ.get f := by
+  simp [Ctx.calleeVal, h]
+
+@[simp] theorem Ctx.unboundName_of_none {ctx : Ctx} {x : String} (h : ctx.pyClasses = none) :
+    ctx.unboundName x = (match ctx.resolve x with
+                         | some _ => .inl (.fn x)
+                         | none   => .inl .unit) := by
+  simp [Ctx.unboundName, h]
+
+@[simp] theorem Ctx.raisePayload_of_none {ctx : Ctx} {v : Val} (h : ctx.pyClasses = none) :
+    ctx.raisePayload v = v := by
+  cases v <;> simp [Ctx.raisePayload, Ctx.pyStrict, h]
+
+@[simp] theorem Ctx.makeSuper_of_none {ctx : Ctx} {f : String} {vs : List Val}
+    (h : ctx.pyClasses = none) : ctx.makeSuper f vs = none := by
+  simp [Ctx.makeSuper, h]
+
+theorem Ctx.resolveMethod_of_none {ctx : Ctx} {c m : String}
+    (h : ctx.pyClasses = none) : ctx.resolveMethod c m = ctx.resolveMethodLegacy c m := by
+  simp [Ctx.resolveMethod, h]
+
+theorem Ctx.classResponds_of_none {ctx : Ctx} {c m : String}
+    (h : ctx.pyClasses = none) :
+    ctx.classResponds c m = ctx.table.any (fun p => p.1.endsWith ("." ++ c ++ "." ++ m)) := by
+  simp [Ctx.classResponds, h]
+
+/-- Calling a builtin held as a VALUE (`fn = len; fn(x)`). Module initialisers bind the
+builtins a module names (`len = __builtin.len`), so under Python's rules a name read as a
+value is `Val.fn "__builtin.len"`; calling that is calling `len`. Legacy programs never
+hold such a value through this path and keep their `call:` hole. -/
+def Ctx.builtinOfValue (ctx : Ctx) (h : Heap) (g : String) (vs : List Val) :
+    Option (Heap × EResult) :=
+  if ctx.pyStrict && g.startsWith "__builtin." then
+    let b0 := (g.drop "__builtin.".length).toString
+    let b  := if b0.endsWith "<meta>" then b0.dropRight "<meta>".length else b0
+    -- Exactly what a call of `b` by name does (the `Expr.call` fallthrough): boxed
+    -- containers are seen through only where that is exact, and a fresh container a
+    -- builtin builds is boxed.
+    if builtinRefused h b vs then some (h, .hole s!"call:{b}:boxed-key") else
+    match Stdlib.builtin ctx.dialect h b (builtinSeeThrough b (builtinArgs h b vs)) with
+    | some (h₂, .val v) =>
+        if ctx.dialect.isPython && freshBuiltins.contains b then
+          let (h₃, v') := h₂.boxFresh v
+          some (h₃, .val v')
+        else some (h₂, .val v)
+    | r => r
+  else none
+
+@[simp] theorem Ctx.builtinOfValue_of_none {ctx : Ctx} {h : Heap} {g : String} {vs : List Val}
+    (hn : ctx.pyClasses = none) : ctx.builtinOfValue h g vs = none := by
+  simp [Ctx.builtinOfValue, hn]
+
 mutual
 
 /-- Evaluate an expression, threading the heap. -/
@@ -858,16 +1907,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- Item 5: a bare name that is not a local may still be a module-level function.
         -- Resolving it to a function value is what lets higher-order code (decorators,
         -- callbacks) be translated instead of holed.
+        -- Under Python's rules (`Ctx.pyStrict`) a name bound nowhere is a hole rather
+        -- than a same-suffix function: `Ctx.unboundName`.
         match h.get ctx.globals with
         | some g =>
           match g.fields.find? (·.1 == x) with
           | some (_, v) => (h, .val v)
-          | none        => match ctx.resolve x with
-                           | some _ => (h, .val (.fn x))
-                           | none   => (h, .val .unit)
-        | none => match ctx.resolve x with
-                  | some _ => (h, .val (.fn x))
-                  | none   => (h, .val .unit)
+          | none        => match ctx.unboundName x with
+                           | .inl v => (h, .val v)
+                           | .inr l => (h, .hole l)
+        | none => match ctx.unboundName x with
+                  | .inl v => (h, .val v)
+                  | .inr l => (h, .hole l)
   | _+1, h, _, .fnref f       => (h, .val (.fn f))
   | _+1, h, ρ, .closure f     => (h, .val (.clos f ρ))
   | _+1, h, ρ, .classClosure c => (h, .val (.clsClos c ρ))
@@ -880,7 +1931,8 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .dstarred _    => (h, .hole "op:starred-outside-call")
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op v)
+      -- Through the heap: `not xs` on a boxed empty list is `True`.
+      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op (h₁.view v))
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .binop op a b =>
       match evalExpr ctx n h ρ a with
@@ -896,9 +1948,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- value position; it survived because cachetools only uses them in
         -- conditions, where truthiness makes the two indistinguishable.
         -- C is the opposite: `&&`/`||` genuinely yield 0/1.
-        if op == "&&" && !x.truthy then
+        if op == "&&" && !(h₁.view x).truthy then
           (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false))
-        else if op == "||" && x.truthy then
+        else if op == "||" && (h₁.view x).truthy then
           (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true))
         else
           match evalExpr ctx n h₁ ρ b with
@@ -909,15 +1961,25 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- one `Refine.lean` needs reducible -- diverting here costs one call site
             -- instead of re-typing `applyBinop` and its 155 references.
             if binopNeedsHeap op x y then
+              match ctx.dialect with
+              -- JS `==` on objects is IDENTITY (`[1] == [1]` is `false`), never Python's
+              -- value equality; `applyBinop`'s `jsEqE` decides it or holes.
+              | .javascript => (h₂, applyBinop ctx.dialect op x y)
+              | _ =>
               match Val.eqPy h₂ (Val.eqFuel h₂) x y with
               | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
               | none   => (h₂, .outOfFuel)
-            else (h₂, applyBinop ctx.dialect op x y)
+            -- `and`/`or` yield an OPERAND, which must stay the object itself; every other
+            -- operator sees a boxed container's contents (`xs + ys` concatenates them into a
+            -- fresh value; the rest hole on containers exactly as before).
+            else if op == "&&" || op == "||" then (h₂, applyBinop ctx.dialect op x y)
+            else (h₂, applyBinop ctx.dialect op (h₂.view x) (h₂.view y))
           | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .cond c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v) => if v.truthy then evalExpr ctx n h₁ ρ t else evalExpr ctx n h₁ ρ e
+      | (h₁, .val v) => if (h₁.view v).truthy then evalExpr ctx n h₁ ρ t
+                        else evalExpr ctx n h₁ ρ e
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .isOp neg a b =>
       match evalExpr ctx n h ρ a with
@@ -939,7 +2001,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val x) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val c) =>
-            match valIn x c with
+            match valInH ctx.dialect h₂ x c with
             | .val (.bool r) => (h₂, .val (.bool (if neg then !r else r)))
             | r              => (h₂, r)
         | (h₂, r) => (h₂, r)
@@ -949,15 +2011,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
-          -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
-          match c.unbuiltin, k with
-          | .list vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
-              else (h₂, .exn (.str "IndexError"))
-          | .tuple vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
-              else (h₂, .exn (.str "IndexError"))
+          -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`; a boxed container is
+          -- read through the heap. A NEGATIVE index counts from the end under Python
+          -- (`seqRead`); `Int.toNat` used to clamp it, so `xs[-1]` answered the FIRST
+          -- element. Other dialects hole on it rather than guess.
+          match (h₂.view c).unbuiltin, k with
+          | .list vs, .int i  => (h₂, seqRead ctx.dialect vs i)
+          | .tuple vs, .int i => (h₂, seqRead ctx.dialect vs i)
           | .dict kvs, key =>
+              if ctx.dialect.isPython && h₂.unhashable key then (h₂, .exn (.str "TypeError"))
+              else
               match kvs.find? (fun kv => Val.beq kv.1 key) with
               | some (_, v) => (h₂, .val v)
               | none        => (h₂, .exn (.str "KeyError"))
@@ -1002,6 +2065,15 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, r) => (h₂, r)
       | (h₁, .val _) => (h₁, .hole "strFrom:non-string-receiver")
       | (h₁, r) => (h₁, r)
+  -- The C address model (`Address.lean`): strict, left then right, then the
+  -- heap-reading, fuel-free `applyPtrOp`.
+  | n+1, h, ρ, .ptrOp op esz a b =>
+      match evalExpr ctx n h ρ a with
+      | (h₁, .val x) =>
+        match evalExpr ctx n h₁ ρ b with
+        | (h₂, .val y) => (h₂, applyPtrOp h₂ op esz x y)
+        | (h₂, r)      => (h₂, r)
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .field a f =>
       match evalExpr ctx n h ρ a with
       | (h₁, .val (.ref r)) =>
@@ -1024,6 +2096,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            | none        =>
                              if o.cls.startsWith "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
+                             -- A boxed list or dict has no instance attributes (its fields
+                             -- are always empty: it is allocated with none and
+                             -- `Stmt.setField` refuses it), so an attribute read always lands
+                             -- here. CPython raises `AttributeError`; `unit` would be a silent
+                             -- wrong answer, so it is a hole.
+                             else if ctx.dialect.isPython && (o.payload).toVal.isSome then
+                               (h₁, .hole s!"field:{f}:builtin-container")
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -1042,6 +2121,26 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
   -- here (a dict display is `dictE`), so a keyword group in a list/tuple literal is a
   -- shape we do not model and it says so.
+  -- `docs/boxed-containers.md` step 3: a Python list/dict display is a fresh object.
+  -- A dict display's pairs are stored the way repeated `d[k] = v` would store them, so a
+  -- repeated key keeps its first position and its last value, and an unhashable key is
+  -- CPython's `TypeError`.
+  | n+1, h, ρ, .boxContainer e =>
+      -- Only Python has boxed containers; the exporter emits this node for `.py` only, and
+      -- refusing it elsewhere keeps "a payload object exists" a Python-only fact.
+      if !ctx.dialect.isPython then (h, .hole "boxContainer:non-python") else
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val (.list vs)) =>
+          let (h₂, r) := h₁.alloc { cls := "list", fields := [], payload := .list vs }
+          (h₂, .val (.ref r))
+      | (h₁, .val (.dict kvs)) =>
+          if kvs.any (fun kv => h₁.unhashable kv.1) then (h₁, .exn (.str "TypeError"))
+          else
+          let ps := kvs.foldl (fun acc kv => dictStore acc kv.1 kv.2) []
+          let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict ps }
+          (h₂, .val (.ref r))
+      | (h₁, .val _) => (h₁, .hole "boxContainer:non-container")
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .listE es =>
       match evalList ctx n h ρ es with
       | (h₁, .inr (vs, []))  => (h₁, .val (.list vs))
@@ -1060,12 +2159,33 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr (vs, kws)) =>
-        match ctx.resolve f with
+        -- A name bound in the environment to a CLOSURE is that closure, before any
+        -- function of the same (suffix) name in the table: Python resolves `inc()` in
+        -- `def outer(): n = 0; def inc(): nonlocal n; ...; inc()` to the local variable
+        -- `inc`, and the exporter, seeing Joern resolve the callee to
+        -- `...outer.inc`, would otherwise reach that `Func` through `applyFunc` with NO
+        -- captured environment -- every captured read unbound, and every write through a
+        -- `nonlocal` cell a hole. Only `.clos` values take this path: a plain `.fn` held
+        -- in a variable keeps the existing resolution order, so no closure-free program
+        -- changes meaning.
+        --
+        -- Under Python's rules (`Ctx.pyStrict`) an unqualified name is a VARIABLE, full
+        -- stop: `calleeVal` is the local, else the module global, and `resolveCallee`
+        -- never consults the function table for it -- so a local `f` holding a function
+        -- value is that value, and an unbound `f` goes to the builtins, never to some
+        -- `...Cls.f` that happens to share the suffix.
+        match (ctx.calleeVal h₁ ρ f).closParts? with
+        | some (g, cap) =>
+          match ctx.resolve g with
+          | some fn => applyClosure ctx n h₁ fn cap vs kws
+          | none    => (h₁, .hole s!"call:{g}")
+        | none =>
+        match ctx.resolveCallee f with
         | some fn => applyFunc ctx n h₁ fn none vs kws
         | none    =>
           -- Not a statically known function: it may be a function value or closure held
           -- in a variable (`f = g; f(x)`, decorators, callbacks).
-          match ρ.get f with
+          match ctx.calleeVal h₁ ρ f with
           | .fn g      => match ctx.resolve g with
                           | some fn =>
                             -- An unbound method reached through a VARIABLE -- a decorator's
@@ -1079,7 +2199,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                && vs.length == fn.params.length + 1 then
                               applyFunc ctx n h₁ fn (some (vs.headD .unit)) vs.tail kws
                             else applyFunc ctx n h₁ fn none vs kws
-                          | none    => (h₁, .hole s!"call:{g}")
+                          | none    =>
+                            -- `add=tuple.__add__` held in a variable (`_HashedTuple`).
+                            match (if kws.isEmpty then unboundBuiltinMethod ctx.dialect g vs
+                                   else none) with
+                            | some r => (h₁, r)
+                            | none   =>
+                            match (if kws.isEmpty then ctx.builtinOfValue h₁ g vs
+                                   else none) with
+                            | some (h₂, r) => (h₂, r)
+                            | none         => (h₁, .hole s!"call:{g}")
           | .clos g cap => match ctx.resolve g with
                           | some fn => applyClosure ctx n h₁ fn cap vs kws
                           | none    => (h₁, .hole s!"call:{g}")
@@ -1102,7 +2231,20 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- `Stdlib.builtin` takes positional arguments only: a keyword argument to a
             -- builtin is *not* passed silently, it is a named hole.
             if kws.isEmpty then
-              match Stdlib.builtin ctx.dialect h₁ f vs with
+              match ctx.makeSuper f vs with
+              | some v => (h₁, .val v)
+              | none   =>
+              -- A boxed container is seen through the heap only by the builtins for which
+              -- that is exact (`Boxed.builtinArgs`); a fresh container a builtin builds is
+              -- itself boxed under Python, because in CPython it is a new object.
+              if builtinRefused h₁ f vs then (h₁, .hole s!"call:{f}:boxed-key")
+              else
+              match Stdlib.builtin ctx.dialect h₁ f (builtinSeeThrough f (builtinArgs h₁ f vs)) with
+              | some (h₂, .val v) =>
+                  if ctx.dialect.isPython && freshBuiltins.contains f then
+                    let (h₃, v') := h₂.boxFresh v
+                    (h₃, .val v')
+                  else (h₂, .val v)
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
@@ -1114,8 +2256,19 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .inr (vs, kws)) =>
           match h₂.get r with
           | none   => (h₂, .hole "mcall:dangling-ref")
+          -- A boxed list/dict: its builtin methods, on the payload, written back to the SAME
+          -- reference. Checked BEFORE `resolveMethod`, whose free-function fallback would
+          -- otherwise let a global `append` answer `xs.append(1)`.
           | some o =>
-            match ctx.resolveMethod o.cls m with
+            match o.payload with
+            | .list ps =>
+                if kws.isEmpty then boxedMethod ctx.dialect h₂ r (.list ps) m vs
+                else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+            | .dict ps =>
+                if kws.isEmpty then boxedMethod ctx.dialect h₂ r (.dict ps) m vs
+                else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+            | _ =>
+            match ctx.resolveMethodOn o m with
             | none    =>
               -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
               -- `resolveMethod` finds nothing; what it has is a *field* holding a
@@ -1164,7 +2317,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           -- function of that name, which for an opaque external module (`time.monotonic`)
           -- would invent a method out of an unrelated global. A hole is the right answer
           -- there; a plausible wrong one is not.
-          if ctx.classDefines short m then
+          if ctx.classResponds short m then
             match ctx.resolveMethod short m with
             | some fn =>
                 match vs with
@@ -1195,8 +2348,22 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val recv) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
-        | (h₂, .inr (_, _ :: _)) => (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
-        | (h₂, .inr (vs, [])) =>
+        | (h₂, .inr (vs, kws)) =>
+          -- `super().m(…)`: the proxy built by `Ctx.makeSuper`. Keyword arguments are
+          -- passed through, exactly as to any method.
+          match superParts? recv with
+          | some (c, s) =>
+            match ctx.superTarget h₂ c s m with
+            | .ok q    => match ctx.resolve q with
+                          | some fn => applyFunc ctx n h₂ fn (some s) vs kws
+                          | none    => (h₂, .hole s!"call:{q}")
+            | .error l => (h₂, .hole l)
+          | none =>
+          if !kws.isEmpty then (h₂, .hole s!"mcall:{m}:keyword-to-builtin") else
+          match methodRefusal h₂ recv m vs with
+          | some l => (h₂, .hole l)
+          | none =>
+          if methodKeyError ctx.dialect h₂ recv m vs then (h₂, .exn (.str "TypeError")) else
           match Stdlib.method ctx.dialect h₂ recv m vs with
           | some (h₃, .pure r)       => (h₃, r)
           -- A mutating container method cannot be honoured while containers are values:
@@ -1256,7 +2423,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val (.int len)) =>
         if len < 0 then (h₁, .hole "boxArray:negative-length")
         else
-          let fields := (List.range len.toNat).map (fun i => (toString i, Val.unit))
+          -- The C address model: the block's elements are BYTES (the exporter emits
+          -- `boxArray` only for a `malloc`-shaped byte count assigned to a `char`/`u8`
+          -- pointer), recorded in-band as `$esz` so typed pointer arithmetic
+          -- (`Expr.ptrOp`) can check its stride. No decimal key, so `Heap.extent` and
+          -- every element read are unaffected.
+          let fields := (List.range len.toNat).map (fun i => (toString i, Val.unit)) ++
+                        [("$esz", Val.int 1)]
           let (h₂, r) := h₁.alloc { cls := "<local>", fields := fields }
           (h₂, .val (.ref r))
       | (h₁, .val _) => (h₁, .hole "boxArray:non-int-length")
@@ -1287,7 +2460,14 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- unconditionally, to the unchanged `Heap.getField` -- no `Heap`-level change.
   | n+1, h, ρ, .derefIref a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val (.iref r sel)) => (h₁, .val (h₁.getField r sel.key))
+      -- The C address model: an element read outside the array (one past the end
+      -- included) is undefined behaviour, a hole -- it used to read the absent key as
+      -- `.unit`, a value C never produced. Member selectors are unchanged.
+      | (h₁, .val (.iref r sel)) =>
+          match sel with
+          | .idx i => if h₁.idxPos r i == .inside then (h₁, .val (h₁.getField r sel.key))
+                      else (h₁, .hole "ub:ptr-deref-out-of-bounds")
+          | .fld _ => (h₁, .val (h₁.getField r sel.key))
       | (h₁, .val _)             => (h₁, .hole "derefIref:non-iref")
       | (h₁, res)                => (h₁, res)
   | n+1, h, ρ, .alloc cls args =>
@@ -1297,7 +2477,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match ctx.builtinBase cls with
         -- `class X(tuple)` and friends: the instance IS the builtin, not an opaque
         -- reference. See `Val.bobj`.
-        | some b => (h₁, allocBuiltin ctx cls b vs)
+        | some b => (h₁, allocBuiltin ctx cls b (vs.map h₁.view))
         | none =>
         -- A class defined inside a function is a *value*; instances carry the bindings it
         -- captured, so its methods can read the enclosing scope.
@@ -1326,7 +2506,7 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
                         | none   => []
       let ρ := bindParams fn base vs kws
       if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
-      match execStmt ctx n h ρ fn.body with
+      match execStmt ctx n h ρ (fn.guardedBody vs kws) with
       | (h₁, .ret v)    => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
       | (h₁, .exn v)    => (h₁, .exn v)
@@ -1338,8 +2518,11 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
 shadow them.
 
 Capture is by value. Reads of enclosing variables therefore work, which covers decorators
-and factory functions; a `nonlocal` **write** would need the binding to be a shared
-mutable cell, so the transpiler keeps it as an explicit hole rather than pretending. -/
+and factory functions. A `nonlocal` **write** needs the binding to be a shared mutable
+cell, and the exporter makes it one: every variable some inner function declares
+`nonlocal` is allocated by its owner as a heap cell (`Expr.boxNew`), so what is captured
+by value is the cell's reference, and a write through it is seen by the owner and every
+other closure (STRATEGY.md §58). -/
 def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) → List Val →
     List (String × Val) → Heap × EResult
   | 0,   h, _,  _,   _,  _   => (h, .outOfFuel)
@@ -1347,7 +2530,7 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
       let base : Env := cap
       let ρ : Env := bindParams fn base vs kws
       if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
-      match execStmt ctx n h ρ fn.body with
+      match execStmt ctx n h ρ (fn.guardedBody vs kws) with
       | (h₁, .ret v)     => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)
       | (h₁, .exn v)     => (h₁, .exn v)
@@ -1376,7 +2559,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .starred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
+        match (h₁.view v).iterable with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some xs =>
           match evalList ctx n h₁ ρ as with
@@ -1393,7 +2576,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .dstarred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match strKeyed v with
+        match strKeyed (h₁.view v) with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some ks =>
           match evalList ctx n h₁ ρ as with
@@ -1463,13 +2646,17 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .raise e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .exn v)
+      | (h₁, .val v)     => (h₁, .exn (ctx.raisePayload v))
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .setField r f v =>
       match evalExpr ctx n h ρ r with
       | (h₁, .val (.ref addr)) =>
+        -- CPython: `AttributeError: 'list' object has no attribute ...`. Not modelled as
+        -- that exception (a `list` SUBCLASS would accept it), so a hole.
+        if (h₁.payload addr).toVal.isSome then (h₁, .hole s!"setField:{f}:builtin-container")
+        else
         match evalExpr ctx n h₁ ρ v with
         | (h₂, .val vv)    => (h₂.setField addr f vv, .normal ρ)
         | (h₂, .exn e)     => (h₂, .exn e)
@@ -1495,9 +2682,104 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .exn e) => (h₁, .exn e)
       | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
-  | n+1, h, ρ, .setIndex _ _ _ =>
-      -- Container mutation needs boxed containers, which Core does not have yet.
-      (h, .hole "setIndex:immutable-containers")
+  -- `docs/boxed-containers.md` step 4. Only Python has boxed containers; every other
+  -- dialect keeps the original hole, unevaluated, exactly as before.
+  --
+  -- CPython's order for `e[i] = v` is `v`, then `e`, then `i`. A boxed container is
+  -- written with `Heap.setPayload` on the reference `e` evaluated to -- never through the
+  -- expression `e`, which is what makes a write through one alias visible through every
+  -- other. A plain object runs its class's own `__setitem__`; anything else is
+  -- `valueSubscriptWrite`'s `TypeError` (immutable values) or hole (unboxed containers).
+  | n+1, h, ρ, .setIndex e i v =>
+      if !ctx.dialect.isPython then (h, .hole "setIndex:immutable-containers") else
+      match evalExpr ctx n h ρ v with
+      | (h₁, .val x) =>
+        match evalExpr ctx n h₁ ρ e with
+        | (h₂, .val c) =>
+          match evalExpr ctx n h₂ ρ i with
+          | (h₃, .val k) =>
+            match c with
+            | .ref r =>
+              match h₃.get r with
+              | none => (h₃, .hole "setIndex:dangling-ref")
+              | some o =>
+                match o.payload with
+                | .none =>
+                  if ctx.classResponds o.cls "__setitem__" then
+                    match ctx.resolveMethod o.cls "__setitem__" with
+                    | some fn =>
+                      match (if o.captured.isEmpty
+                             then applyFunc ctx n h₃ fn (some (.ref r)) [k, x] []
+                             else applyClosure ctx n h₃ fn (("self", .ref r) :: o.captured)
+                                    [k, x] []) with
+                      | (h₄, .val _)     => (h₄, .normal ρ)
+                      | (h₄, .exn ex)    => (h₄, .exn ex)
+                      | (h₄, .hole l)    => (h₄, .hole l)
+                      | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+                    | none => (h₃, .hole s!"setIndex:{o.cls}")
+                  else (h₃, .hole s!"setIndex:{o.cls}:no-own-__setitem__")
+                | p =>
+                  match payloadStore h₃ p k x with
+                  | .ok p'   => (h₃.setPayload r p', .normal ρ)
+                  | .exn ex  => (h₃, .exn (.str ex))
+                  | .hole l  => (h₃, .hole l)
+            | c =>
+              match valueSubscriptWrite ctx.dialect c "setIndex" with
+              | .exn ex => (h₃, .exn ex)
+              | .hole l => (h₃, .hole l)
+              | _       => (h₃, .hole "setIndex:immutable-containers")
+          | (h₃, .exn ex)    => (h₃, .exn ex)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .exn ex)    => (h₂, .exn ex)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  -- `del e[i]`: CPython evaluates `e`, then `i`. Mirrors `setIndex`.
+  | n+1, h, ρ, .delIndex e i =>
+      if !ctx.dialect.isPython then (h, .hole "op:delete-index") else
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val c) =>
+        match evalExpr ctx n h₁ ρ i with
+        | (h₂, .val k) =>
+          match c with
+          | .ref r =>
+            match h₂.get r with
+            | none => (h₂, .hole "delIndex:dangling-ref")
+            | some o =>
+              match o.payload with
+              | .none =>
+                if ctx.classResponds o.cls "__delitem__" then
+                  match ctx.resolveMethod o.cls "__delitem__" with
+                  | some fn =>
+                    match (if o.captured.isEmpty
+                           then applyFunc ctx n h₂ fn (some (.ref r)) [k] []
+                           else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured)
+                                  [k] []) with
+                    | (h₃, .val _)     => (h₃, .normal ρ)
+                    | (h₃, .exn ex)    => (h₃, .exn ex)
+                    | (h₃, .hole l)    => (h₃, .hole l)
+                    | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+                  | none => (h₂, .hole s!"delIndex:{o.cls}")
+                else (h₂, .hole s!"delIndex:{o.cls}:no-own-__delitem__")
+              | p =>
+                match payloadDelete h₂ p k with
+                | .ok p'   => (h₂.setPayload r p', .normal ρ)
+                | .exn ex  => (h₂, .exn (.str ex))
+                | .hole l  => (h₂, .hole l)
+          | c =>
+            match valueSubscriptWrite ctx.dialect c "delIndex" with
+            | .exn ex => (h₂, .exn ex)
+            | .hole l => (h₂, .hole l)
+            | _       => (h₂, .hole "delIndex:immutable-containers")
+        | (h₂, .exn ex)    => (h₂, .exn ex)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` an interior-pointer VALUE --
   -- requires the pointer operand to evaluate to `Val.iref r sel` and delegates,
   -- unconditionally, to the unchanged `Heap.setField`.
@@ -1505,7 +2787,14 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       match evalExpr ctx n h ρ p with
       | (h₁, .val (.iref r sel)) =>
         match evalExpr ctx n h₁ ρ v with
-        | (h₂, .val vv)    => (h₂.setField r sel.key vv, .normal ρ)
+        -- The C address model: a write outside the array is undefined behaviour --
+        -- it used to ADD a key, silently growing the block (and breaking the
+        -- contiguity `Heap.extent` relies on).
+        | (h₂, .val vv)    =>
+            match sel with
+            | .idx i => if h₂.idxPos r i == .inside then (h₂.setField r sel.key vv, .normal ρ)
+                        else (h₂, .hole "ub:ptr-store-out-of-bounds")
+            | .fld _ => (h₂.setField r sel.key vv, .normal ρ)
         | (h₂, .exn e)     => (h₂, .exn e)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
@@ -1519,7 +2808,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, r)          => (h₁, r)
   | n+1, h, ρ, .ifte c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v)     => if v.truthy then execStmt ctx n h₁ ρ t
+      | (h₁, .val v)     => if (h₁.view v).truthy then execStmt ctx n h₁ ρ t
                             else execStmt ctx n h₁ ρ e
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
@@ -1543,7 +2832,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
       | (h₁, .val v) =>
-          if v.truthy then
+          if (h₁.view v).truthy then
             match execStmt ctx n h₁ ρ body with
             | (h₂, .normal ρ') => execStmt ctx n h₂ ρ' (.loop c body)
             | (h₂, .cont ρ')   => execStmt ctx n h₂ ρ' (.loop c body)
@@ -1565,8 +2854,21 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .forIn x e body =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
-        | some vs => execFor ctx n h₁ ρ x vs body
+        match (h₁.view v).iterable with
+        | some vs =>
+          match v with
+          -- A boxed container is iterated over a SNAPSHOT, and the snapshot is only
+          -- faithful if nothing wrote to the object meanwhile: CPython's list iterator
+          -- would have seen the write, and its dict iterator raises `RuntimeError`. So a
+          -- moved `version` turns the outcome into a hole rather than an answer.
+          | .ref r =>
+            let ver := h₁.version r
+            match execFor ctx n h₁ ρ x vs body with
+            | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+            | (h₂, c) =>
+              if h₂.version r == ver then (h₂, c)
+              else (h₂, .hole "forIn:container-mutated-during-iteration")
+          | _ => execFor ctx n h₁ ρ x vs body
         | none    => (h₁, .hole "forIn:non-iterable")
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
@@ -1609,7 +2911,8 @@ for a self-contained function, and keeping it stable keeps the refinement layer'
 theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases,
+                     pyClasses := p.pyClasses }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args []).2
@@ -1623,7 +2926,8 @@ globals frame instead of the empty heap. Fresh objects must be allocated at indi
 def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases,
+                     pyClasses := p.pyClasses }
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
@@ -1645,7 +2949,8 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     (args : List Val) : EResult :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases,
+                     pyClasses := p.pyClasses }
   let rec runInits : Nat → Heap → List Func → Heap × Option String
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)

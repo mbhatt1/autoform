@@ -156,11 +156,28 @@ def expr_shape(n):
     # avoiding the elaboration-recursion-depth wall a literal list of this
     # shape hits at real buffer sizes (confirmed: `ArrayRepExperiment.lean`).
     if k == "boxFieldsRange":
-        n = f('n')
-        if not isinstance(n, int) or n < 0:
-            raise ValueError(f"boxFieldsRange node has invalid n: {n!r}")
-        atom = (f"((List.range {n}).map (fun i => "
+        cnt = f('n')
+        if not isinstance(cnt, int) or cnt < 0:
+            raise ValueError(f"boxFieldsRange node has invalid n: {cnt!r}")
+        atom = (f"((List.range {cnt}).map (fun i => "
                 f"(Expr.lit (Lit.str s!\"{{i}}\"), Expr.lit Lit.unit)))")
+        # The C address model: an optional element size in bytes, recorded in-band
+        # under the `$esz` key (`Heap.elemSize`) so typed pointer arithmetic can
+        # check its stride. Not a decimal key, so the array's extent is unchanged.
+        esz = n.get("esz")
+        if esz is not None:
+            if not isinstance(esz, int) or isinstance(esz, bool) or esz <= 0:
+                raise ValueError(f"boxFieldsRange node has invalid esz: {esz!r}")
+            atom = (f"({atom} ++ [(Expr.lit (Lit.str \"$esz\"), "
+                    f"Expr.lit (Lit.int {esz}))])")
+        # An array MEMBER of a boxed struct, boxed separately: its address coincides
+        # with a member address of the enclosing block (`Heap.isMemberBox`).
+        member = n.get("member", False)
+        if not isinstance(member, bool):
+            raise ValueError(f"boxFieldsRange node has invalid member flag: {member!r}")
+        if member:
+            atom = (f"({atom} ++ [(Expr.lit (Lit.str \"$member\"), "
+                    f"Expr.lit (Lit.bool true))])")
         return ".boxFields", [("atom", atom)]
     # `010-reach-90pct-hole-free`: `boxFieldsRange` above needs `n` known at EXPORT
     # time (it bakes the literal into the generated source text) -- no help for a
@@ -190,6 +207,14 @@ def expr_shape(n):
     # `lake env lean` fixtures and the exporter's own JSON output, never
     # actually run through this renderer until a real corpus function used it.
     if k == "strFrom": return ".strFrom", [("e", f('a')), ("e", f('b'))]
+    # The C address model (`Autoform/Lang/Core/Address.lean`): a heap-aware pointer
+    # comparison / arithmetic. `esz` is the static pointee size in bytes (0 for the
+    # stride-free relations); see `Expr.ptrOp`'s doc comment.
+    if k == "ptrOp":
+        esz = f('esz')
+        if not isinstance(esz, int) or isinstance(esz, bool) or esz < 0:
+            raise ValueError(f"ptrOp node has invalid esz: {esz!r}")
+        return ".ptrOp", [("atom", lean_str(f('op'))), ("atom", str(esz)), ("e", f('a')), ("e", f('b'))]
     # --- objects, containers, control ---
     if k == "field":  return ".field", [("e", f('a')), ("atom", lean_str(f('f')))]
     if k == "mcall":  return ".mcall", [("e", f('recv')), ("atom", lean_str(f('m'))), ("es", f('args'))]
@@ -205,6 +230,11 @@ def expr_shape(n):
     if k == "listE":  return ".listE", [("es", f('items'))]
     if k == "tupleE": return ".tupleE", [("es", f('items'))]
     if k == "dictE":  return ".dictE", [("ps", f('pairs'))]
+    # `docs/boxed-containers.md` step 3: a Python list/dict DISPLAY is a fresh heap
+    # object. The exporter wraps the `listE`/`dictE` it would have emitted; see
+    # `Expr.boxContainer` (`Syntax.lean`) for why this is a wrapper and not a change to
+    # `listE`/`dictE`, which C aggregate initializers also use.
+    if k == "boxContainer": return ".boxContainer", [("e", f('e'))]
     if k == "cond":   return ".cond", [("e", f('c')), ("e", f('t')), ("e", f('e'))]
     if k == "isOp":   return ".isOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
     if k == "inOp":   return ".inOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
@@ -239,6 +269,8 @@ def stmt_shape(n):
     # --- objects, iteration, exceptions ---
     if k == "setField": return ".setField", [("e", f('r')), ("atom", lean_str(f('f'))), ("e", f('v'))]
     if k == "setIndex": return ".setIndex", [("e", f('r')), ("e", f('i')), ("e", f('v'))]
+    # `del e[i]` (Python only; every other language keeps `op:delete-index`).
+    if k == "delIndex": return ".delIndex", [("e", f('r')), ("e", f('i'))]
     if k == "setDerefIref": return ".setDerefIref", [("e", f('p')), ("e", f('v'))]
     if k == "forIn":    return ".forIn", [("atom", lean_str(f('x'))), ("e", f('e')), ("s", f('body'))]
     if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]
@@ -547,6 +579,16 @@ def render_func(f, nm) -> list:
         variadic.append(f"  , vararg := some {lean_str(f['vararg'])}")
     if f.get("kwarg") is not None:
         variadic.append(f"  , kwarg := some {lean_str(f['kwarg'])}")
+    # Keyword-only / positional-only parameters and default values: emitted only when the
+    # AST records them, for the same byte-identity reason. `defaults` is an ordered list of
+    # `[param, expr]` pairs (a JSON object would make the order a property of the parser).
+    if f.get("kwonly"):
+        variadic.append("  , kwonly := [" + ", ".join(lean_str(p) for p in f["kwonly"]) + "]")
+    if f.get("posonly"):
+        variadic.append("  , posonly := [" + ", ".join(lean_str(p) for p in f["posonly"]) + "]")
+    if f.get("defaults"):
+        pairs = ", ".join(f"({lean_str(p)}, {render(e, 'e', 14)})" for p, e in f["defaults"])
+        variadic.append(f"  , defaults := [{pairs}]")
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",
         f"def {nm} : Func :=",
@@ -664,16 +706,41 @@ def _run_main():
     bb = ", ".join("({}, {})".format(lean_str(c), base_ctor[bases[c]])
                    for c in sorted(bases))
 
+    # The Python class table (STRATEGY.md §62), recorded by the exporter on every Python
+    # module initializer -- present, possibly empty, exactly when the export knows classes.
+    # Its presence is what selects Python's lookup rules in Core (`Program.pyClasses`), so
+    # an AST without the key renders exactly as before. A short name recorded twice is
+    # dropped (Core keys classes by short name), which makes it unknown: a hole, not a guess.
+    py_tables = [f["pyClasses"] for f in funcs if "pyClasses" in f]
+    py_classes = None
+    if py_tables:
+        rows, seen = {}, {}
+        for t in py_tables:
+            for cls, row in sorted(t.items()):
+                seen[cls] = seen.get(cls, 0) + 1
+                rows[cls] = row
+        py_classes = ", ".join(
+            "{{ name := {}, bases := [{}], attrs := [{}] }}".format(
+                lean_str(c), ", ".join(lean_str(b) for b in rows[c].get("bases", [])),
+                ", ".join(lean_str(a) for a in rows[c].get("attrs", [])))
+            for c in sorted(rows) if seen[c] == 1)
+    fields = "dialect := " + dialect
     if bb:
-        out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention).")
+        fields += ", builtinBases := [" + bb + "]"
+    if py_classes is not None:
+        fields += ", pyClasses := some [" + py_classes + "]"
+    out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention)."
+               + ("" if bb or py_classes is not None else " -/"))
+    if bb or py_classes is not None:
         out.append("")
+    if bb:
         out.append("`builtinBases` lists the classes whose base is a builtin type, so that")
-        out.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`. -/")
-        out.append("def program : Program := { dialect := " + dialect
-                   + ", builtinBases := [" + bb + "], funcs := [")
-    else:
-        out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
-        out.append("def program : Program := { dialect := " + dialect + ", funcs := [")
+        out.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`."
+                   + ("" if py_classes is not None else " -/"))
+    if py_classes is not None:
+        out.append("`pyClasses` is the class table: methods resolve along the C3 MRO, and bare")
+        out.append("names by Python scoping (STRATEGY.md §62). -/")
+    out.append("def program : Program := { " + fields + ", funcs := [")
     out.append(",\n".join("  " + n for n in names))
     out.append("] }")
     out.append("")

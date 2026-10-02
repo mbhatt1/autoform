@@ -10,6 +10,12 @@ import Autoform.Refine
 import Autoform.Overflow
 import Autoform.FuelMono
 import Autoform.CallingConvention
+import Autoform.PyScoping
+import Autoform.PyMro
+import Autoform.CBoolInt
+import Autoform.CIntWidth
+import Autoform.JavaIntWidth
+import Autoform.BoxedContainers
 
 -- The synthesised specification modules. These were NOT in the build until this merge,
 -- and the omission was not cosmetic: `lake build` was green, `audit_all.py` printed PASS,
@@ -40,6 +46,7 @@ import Autoform.SpecsGen.Basis
 -- in ONE build, kernel-checked together, replayed together by `leanchecker --fresh`.
 import Autoform.BuiltinBase
 import Autoform.Contracts
+import Autoform.HoleContracts
 import Autoform.Specs.CachetoolsSpec
 import Autoform.SpecsGen.Cachetools
 import Autoform.Specs.V8Spec
@@ -56,6 +63,7 @@ import Autoform.Specs.CppCastSpec
 -- 73/73 in about ten minutes.
 import Autoform.SpecsGen.V8Base
 import Autoform.Specs.DoWhileSpec
+import Autoform.Specs.AddressSpec
 
 -- ---------------------------------------------------------------------------
 -- The one module still outside this graph, and why.

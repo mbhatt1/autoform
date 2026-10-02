@@ -20,7 +20,9 @@ substitutes for either.
 ## What is tracked, and why (policy decided 2026-08-19)
 
 > **The AST is the tracked source of truth. `Autoform/Generated/<M>.lean` is a build
-> product and is not tracked.** The one exception is `Cachetools.lean`; see below.
+> product and is not tracked.** The exceptions are `Cachetools.lean`, `SC.lean`, and the
+> three small modules `CMath.lean`, `V8BaseSample.lean` and `LinuxLibSample.lean`; see
+> below and `.gitignore`.
 
 This reverses the earlier policy, and the reversal is the point of the section.
 
@@ -56,16 +58,22 @@ now has to enter through `ast-<M>.json`, where it is a small, reviewable JSON di
 
 **The cost, stated honestly.** A clean clone can no longer `lake build
 Autoform.Generated.<M>` without running the renderer first (`autoform.sh` and
-`scripts/check_render.py --typecheck` both do). `Autoform.lean` imports no generated
-module, so the root build is unaffected. For the four large corpora — Ansible, LinuxLib,
-LinuxCrypto, V8Base — the AST is itself 15–55 MB, *larger* than the module it renders to,
-so tracking the AST by bytes would trade one blob for a bigger one. Those four are tracked
-by **sha256 + provenance** in `artifact-manifest.json` and are otherwise reproducible only
+`scripts/check_render.py --typecheck` both do). *Correction (2026-10-02, at `46c65fc`):*
+an earlier revision said `Autoform.lean` imports no generated module. It does, transitively:
+the specs it imports pull in `Generated.Cachetools`, `CMath`, `V8BaseSample`,
+`LinuxLibSample` (all tracked) and `Generated.V8Base` (untracked), so a clean clone must
+render `ast-V8Base.json` before the root `lake build`. For the large corpora — Ansible,
+LinuxLib, LinuxCrypto — the AST is itself 15–55 MB, *larger* than the module it renders to,
+so tracking the AST by bytes would trade one blob for a bigger one. Those three are tracked
+by **sha256 + provenance** in `artifact-manifest.json` (V8Base was in this group; its
+3.2 MB AST is now tracked by bytes, see `.gitignore`) and are otherwise reproducible only
 by re-exporting from the corpus CPG. That is a real reduction in what a clean clone can
 check on its own, and it is recorded here rather than papered over.
 
 **The exception.** `Autoform/Generated/Cachetools.lean` stays tracked. Two conditions make
-tracking a render worth its drift risk, and only Cachetools meets both: hand-written
+tracking a render worth its drift risk, and of the large renders only Cachetools meets both
+(`CMath`, `V8BaseSample` and `LinuxLibSample` are tracked because they are 4–7 functions
+and on the root import graph): hand-written
 theorems refer to it by name (all 108 of them), and at 300 KB its diff is still something
 a person can read. `check_render.py` diffs it against a fresh render on every run — the
 original check, kept exactly where it has teeth.
@@ -114,6 +122,23 @@ Exit codes: `0` all verified, `1` a mismatch, `2` nothing checkable at all, `3` 
 verified and some **UNVERIFIABLE**. A missing AST, a missing manifest entry or a failed
 render is reported with a reason and a non-zero exit — this check must never pass by
 having stopped looking.
+
+**Not tracked by policy (2026-10-02, STRATEGY §59).** `Ansible`, `LinuxCrypto` and
+`LinuxLib` are pinned in the manifest but their ASTs exist in no clone, and cannot be
+regenerated to the pinned hash: neither the corpus commit nor the exporter version that
+produced them was recorded, no copy survives on the build machine, and Ansible's 136.6 MB
+exceeds GitHub's per-file limit. Reporting them UNVERIFIABLE made `check_render` exit 3 on
+every CI run, and a gate that is always red says nothing. They are now listed in
+`artifact-manifest.json`'s hand-edited `untracked_by_policy` (a `reason` and a `reviewed`
+field each) and reported with a fourth verdict, **NOT-TRACKED**: named on every run, counted
+separately in the summary, never counted as verified, and exit 0. The allowlist is
+checked, not trusted — an entry only applies if `git check-ignore` confirms the AST is
+ignored, `git ls-files` that it is untracked, the manifest says `ast_tracked: false`, and
+**no spec module is pinned to that corpus** (tracked theorems about an absent corpus stay
+UNVERIFIABLE whatever the allowlist says, per §55). An absent AST that is not on the list is
+UNVERIFIABLE exactly as before; an allowlisted AST that *is* on disk is fully checked;
+`--strict` ignores the list. `--record` never writes it. The cost is unchanged and stated in
+each entry: the evidence figures for those three corpora cannot be re-derived from a clone.
 
 **Open finding, recorded rather than laundered.** On the first run under the new policy,
 `Cachetools` came back MISMATCH: the tracked module was rendered by an older

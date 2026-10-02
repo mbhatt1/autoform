@@ -133,6 +133,8 @@ def substE (σ : Impl) : Expr → Expr
   | .derefIref a   => .derefIref (substE σ a)
   | .strByte a b   => .strByte (substE σ a) (substE σ b)
   | .strFrom a b   => .strFrom (substE σ a) (substE σ b)
+  | .ptrOp o z a b => .ptrOp o z (substE σ a) (substE σ b)
+  | .boxContainer a => .boxContainer (substE σ a)
   | .lit l         => .lit l
   | .name x        => .name x
   | .fnref f       => .fnref f
@@ -160,6 +162,7 @@ def substS (σ : Impl) : Stmt → Stmt
   | .assign x e      => .assign x (substE σ e)
   | .setField r f v  => .setField (substE σ r) f (substE σ v)
   | .setIndex r i v  => .setIndex (substE σ r) (substE σ i) (substE σ v)
+  | .delIndex r i    => .delIndex (substE σ r) (substE σ i)
   | .setDerefIref p v => .setDerefIref (substE σ p) (substE σ v)
   | .seq a b         => .seq (substS σ a) (substS σ b)
   | .ifte c a b      => .ifte (substE σ c) (substS σ a) (substS σ b)
@@ -223,6 +226,8 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .derefIref a   => by rw [substE, substE_nil a]
   | .strByte a b   => by rw [substE, substE_nil a, substE_nil b]
   | .strFrom a b   => by rw [substE, substE_nil a, substE_nil b]
+  | .ptrOp o z a b => by rw [substE, substE_nil a, substE_nil b]
+  | .boxContainer a => by rw [substE, substE_nil a]
 
 theorem substEL_nil : ∀ es : List Expr, substEL [] es = es
   | []      => rfl
@@ -239,6 +244,7 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .assign x e      => by rw [substS, substE_nil e]
   | .setField r f v  => by rw [substS, substE_nil r, substE_nil v]
   | .setIndex r i v  => by rw [substS, substE_nil r, substE_nil i, substE_nil v]
+  | .delIndex r i    => by rw [substS, substE_nil r, substE_nil i]
   | .setDerefIref p v => by rw [substS, substE_nil p, substE_nil v]
   | .seq a b         => by rw [substS, substS_nil a, substS_nil b]
   | .ifte c a b      => by rw [substS, substE_nil c, substS_nil a, substS_nil b]
@@ -624,6 +630,9 @@ theorem onProgram_keysProgramHoled {σ : Impl} {e : Expr}
   simp [Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith, keysProgramWith, methodkeyWith,
     substS, substE, substEL, he, f_cachetools_keys_py__module__hashkey]
 
+/-- Exported before the exporter recorded classes: the legacy lookup rules apply. -/
+theorem pyClasses_keysProgramWith (e : Expr) : (keysProgramWith e).pyClasses = none := rfl
+
 theorem table_keysProgramWith (e : Expr) : (keysProgramWith e).table =
     [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
     , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] := by
@@ -662,7 +671,9 @@ reference without running one — and the unpacked arguments are therefore not o
 `methodkey`'s result. -/
 theorem resolveMethod_hashedTuple_init (e : Expr) :
     (ctxOf (keysProgramWith e)).resolveMethod "_HashedTuple" "__init__" = none := by
-  simp only [Ctx.resolveMethod, ctxOf, table_keysProgramWith, methodkeyWith,
+  simp only [Ctx.resolveMethod, Ctx.pyStrict, Ctx.resolveMethodLegacy, ctxOf,
+    pyClasses_keysProgramWith, Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false,
+    table_keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
   rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__" from by rfl]
   simp +decide [List.filter_cons, String.endsWith]
@@ -674,7 +685,15 @@ theorem resolveMethod_hashedTuple_init (e : Expr) :
 /-- `runFunc` builds its context inline; folding it back to `ctxOf` is what lets the
 resolution lemmas above apply. -/
 private theorem ctx_fold (p : Program) :
-    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases } : Ctx) = ctxOf p := rfl
+    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
+       pyClasses := p.pyClasses } : Ctx) = ctxOf p := rfl
+
+/-- The same fold once `simp` has already reduced a class-table-free program's `pyClasses`
+to `none` inside the literal. -/
+private theorem ctx_fold_none (p : Program) (hp : p.pyClasses = none) :
+    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases } : Ctx)
+      = ctxOf p := by
+  simp [ctxOf, hp]
 
 /-! ### Satisfiability first
 
@@ -793,10 +812,11 @@ theorem methodkey_refinesUnder_value :
         show (k+7)+1 = k+8 from rfl, hvf (k+8) h ρ (by omega)]
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, ctx_fold_none, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
-    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
+    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf, Val.closParts?,
+    pyClasses_keysProgramWith]
 
 set_option maxHeartbeats 2000000 in
 /-- **A different contract proves a different theorem.**
@@ -854,6 +874,8 @@ theorem methodkey_raise_result :
 
 /-- The same resolution facts, for the *current* program rather than the holed one.
 `_HashedTuple` has no translated `__init__` here either. -/
+theorem pyClasses_keysProgram : keysProgram.pyClasses = none := rfl
+
 theorem table_keysProgram : keysProgram.table =
     [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
     , ("cachetools/keys.py:<module>.methodkey", f_cachetools_keys_py__module__methodkey) ] := by
@@ -876,7 +898,9 @@ theorem resolve_hashkey' :
 
 theorem resolveMethod_hashedTuple_init' :
     (ctxOf keysProgram).resolveMethod "_HashedTuple" "__init__" = none := by
-  simp only [Ctx.resolveMethod, ctxOf, table_keysProgram,
+  simp only [Ctx.resolveMethod, Ctx.pyStrict, Ctx.resolveMethodLegacy, ctxOf,
+    pyClasses_keysProgram, Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false,
+    table_keysProgram,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
   rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__" from by rfl]
   simp +decide [List.filter_cons, String.endsWith]
@@ -912,11 +936,14 @@ theorem methodkey_refines :
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
+  -- `Expr.call` now looks for a closure-valued local first (STRATEGY.md §58); with the
+  -- argument list symbolic, the environment `["self"].zip args` is only concrete per case.
+  rcases args with _ | ⟨a, args⟩ <;>
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold, ctx_fold_none,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
-    Val.iterable, strKeyed, Heap.get, Heap.alloc]
+    Val.iterable, strKeyed, Heap.get, Heap.alloc, Val.closParts?, pyClasses_keysProgram]
 
 /-- The unconditional theorem needs no satisfiability obligation — there is nothing to
 satisfy. Recorded as a declaration so the contrast with `methodkey_value_result` is

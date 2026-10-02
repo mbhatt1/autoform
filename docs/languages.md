@@ -30,7 +30,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 209 | 86% | 101 (48%) | 0.8% | **yes** (CPython) |
+| Python | yes | yes | yes | `.python` ✅ | 209 | 80% | 99 (47%) | 0.8% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | **none** |
 | Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | **none** |
@@ -47,6 +47,19 @@ to within the ledger's slightly different node-counting.
 
 ⚠️ = the dialect *is* in `render_lean.py`'s `DIALECT` map, but every non-Python language
 maps to the single `.cLike` constructor, which is 32-bit truncating C. See below.
+
+> **Dated correction (2026-10-02, at `46c65fc`).** The non-Python rows were measured at or
+> before `16f7c88` (2026-08-20) and have not been re-run. The *Dialect inferred* column no
+> longer describes the renderer for JS/TS: `Dialect` now has a third constructor,
+> `.javascript`, and `render_lean.py` maps `.js .ts .tsx .jsx .mjs .cjs` to it. `.java`,
+> `.kt` and `.go` still map to `.cLike`. An unknown extension is now a hard error
+> (`infer_dialect` raises), not a silent `.python`. The Python row was regenerated from
+> `ast-Cachetools.json` + `Autoform/Generated/Cachetools.lean` with
+> `scripts/ledger.lean.tmpl` (26 holes over 5,574 nodes at `46c65fc`; 46 over 5,661 after
+> the item-L re-export of `ast-Cachetools.json`, which is what the row now shows). Note that
+> `scripts/lang_matrix.py` carries its own copy of the extension table, which still says
+> `.js`/`.ts` → `cLike` and does not know `.cc`, so its *dialect* column is stale even
+> though its counts are recomputed.
 
 ### Failures observed, verbatim
 
@@ -108,6 +121,29 @@ Java object creation, which is untranslated.
 These are the §12 failure mode: a construct that looks the same across languages and means
 something different, producing a **wrong answer rather than a hole**. Each was measured —
 Lean output from the generated module, real output from the real runtime.
+
+**Current status (2026-10-02, at `46c65fc`).** The items below are the original
+measurements and are kept as recorded. Since then the semantics changed under several of
+them. Each "Core now" entry is `#eval applyBinop <dialect> …` against the built
+`Autoform.Lang.Core.Semantics` at that commit; the runtime column is copied from the
+original measurement, not re-run.
+
+| item | input | runtime | Core now | status |
+|---|---|---|---|---|
+| 1 | Python `0 or 5` | `5` | `int 5` | **fixed** (`Dialect.boolOpsAreValues`) |
+| 1 | JS `2 && 3` | `3` | `int 3` | **fixed** |
+| 2 | `.tsx`/`.jsx` dialect | — | `.javascript`; unknown extension is an error | **fixed** |
+| 3 | JS `2147483647 + 1` | `2147483648` | `int 2147483648` | **fixed** (`.javascript` uses `NumConfig.python`) |
+| 3 | JS `7 / 2` | `3.5` | `float 3.5` | **fixed** (`jsIntDiv`: inexact quotients go to IEEE binary64) |
+| 3 | JS `5 / 0` | `Infinity` | `float +inf` | **fixed** (`jsIntDiv`; `5 % 0` is `NaN`) |
+| 3 | JS `-7 % 3` | `-1` | `int (-1)` | **fixed** (`jsIntMod` truncates) |
+| 3 | JS `-5.5 % 2.0` | `-1.5` (JS `%` truncates) | `-1.5` | **fixed** under `.javascript` (truncated `fmod`); `.cLike` float `%` still uses Python's floored `pyMod` |
+| 4 | JS `1 == "1"` | `true` | `hole "js:==:cross-type-coercion"` | **hole** (was `bool false`): JS `==` is now loose equality, exact on same-type operands, a hole across types except `null`/`undefined` |
+| 4 | JS `1 === "1"` | `false` | `bool false` | **fixed** — `===`/`!==` are Core operators of their own, recovered by the exporter from source text (jssrc2cpg erases them) |
+| 4 | JS `null == 0` | `false` | `bool false` | **fixed** (was `true` by reading the exporter, not measured on a JS CPG: `pointerNullTest` keys on `cLikeFile`, which includes `.js`/`.ts`, and rewrote `x == null` to `x in (None, 0)`) |
+| 7 | JS `1 << 32`, `-1 >>> 0`, `~2147483648` | `1`, `4294967295`, `2147483647` | same | **fixed** (`jsBitwise`/`jsBitNot`: ToInt32/ToUint32; operands beyond 2^53 are a hole). Was `4294967296`, a `ub` hole, `-2147483649` |
+| 5 | Java `long` / Go `int` | 64-bit | 32-bit `.cLike` | **still wrong** — `.java`/`.go` still map to `.cLike` |
+| 6 | JS `"a" + "b"` | `"ab"` | `str "ab"` | **fixed** (`Dialect.stringsAreValues`) |
 
 ### 1. `and` / `or` return an operand, not a boolean (Python, JS, TS) — NEW, and it hits the flagship corpus
 
@@ -175,6 +211,31 @@ Both compile to `<operator>.equals` in jssrc2cpg and to Core `binop "=="`, evalu
 principle, because the distinction is erased before Core sees it. Verdict: **wrong**, and
 not fixable inside the semantics; it needs an exporter change.
 
+**Status (2026-10-02): fixed or holed, in both halves.** jssrc2cpg v4.0.606 still maps
+`==`/`===` to `<operator>.equals` and `!=`/`!==` to `<operator>.notEquals` (and, worse,
+`>>`/`>>>` both to `<operator>.arithmeticShiftRight`; read from
+`AstForExpressionsCreator.astForBinaryExpression` at tag `v4.0.606`). The exporter now
+recovers the token from the call's source span (`jsAmbiguousBinop` in
+`cartographer/export_ast.sc`) and emits `"==="`/`"!=="`/`"=="`/`"!="`/`">>"`/`">>>"`; a
+span it cannot parse is the hole `op:js-token-unrecovered:<op>`. In Core (`jsEqE` in
+`Semantics.lean`), under `.javascript`:
+
+| input | Node | Core |
+|---|---|---|
+| `1 === "1"` / `1 !== "1"` | `false` / `true` | `false` / `true` ✅ |
+| `1 == "1"`, `0 == false`, `[1] == 1` | `true` | hole `js:==:cross-type-coercion` |
+| `null == undefined`, `null == 0` | `true`, `false` | `true`, `false` ✅ (`.unit` is both) |
+| `null === undefined` | `false` | hole `js:===:null-vs-undefined` (Core has one `.unit`) |
+| `NaN === NaN`, `-0 === 0`, `1 === 1.0` | `false`, `true`, `true` | same ✅ |
+| `o == o`, `[1] == [1]` (heap objects) | `true`, `false` | same ✅ (identity, not Python's `__eq__`) |
+
+Every row is an `example … := rfl` or `#eval` in `Semantics.lean`; the Node column is
+from `node -e` (v22). **Not verified end to end:** jssrc2cpg is not installed on the
+machine this was done on, so the exporter change is checked on synthetic source spans
+(not a JS CPG), and the tracked `ast-LangJS.json` was not re-exported — its 21 `"=="`
+nodes are therefore read as LOOSE equality, which is exact on same-type operands and a
+hole otherwise, never a wrong answer.
+
 ### 5. Java `long` and Go `int` are 64-bit; Core models them as 32-bit
 
 `.java`/`.go` → `.cLike` → `c32Wrapv`. `Numeric.lean` *already defines* `java32`,
@@ -226,7 +287,11 @@ inverse of the C case, and it shows that `.cLike` is not one dialect.
   logical shift; `NumConfig.java32` models both correctly but is unreachable. As shipped
   these are holes, which is safe. **hole**.
 * Go integer overflow is *defined* to wrap; Core wraps, but at the wrong width (item 5).
-* JS `<<` coerces to int32 first; Core holes it. **hole**.
+* JS `<<` coerces to int32 first. *Correction (2026-10-02):* this line said Core holes
+  it; it did not — `.javascript` used `NumConfig.python`, so `1 << 32` was `4294967296`
+  (Node: `1`) and `-1 >>> 0` a `ub` hole (Node: `4294967295`). Now `jsBitwise`
+  applies ToInt32/ToUint32 and masks the count to 5 bits; `~` likewise (`jsBitNot`).
+  Float operands (`1.5 | 0`) and integers beyond 2^53 are holes. **fixed**.
 
 ### 8. Predicted, unverified
 
@@ -259,7 +324,9 @@ inverse of the C case, and it shows that `.cLike` is not one dialect.
    silence) and JavaScript at scale (renderer `RecursionError`).
 5. **A file-extension typo is a semantics change.** `.tsx` gets Python's floored modulo.
    The dialect is inferred from a lookup table with a silent default; a language not in
-   the table does not fail, it gets Python.
+   the table does not fail, it gets Python. *(Fixed since: see the status table above.
+   Item 2 of this verdict now applies to Java and Go, and JS integer `/` and `%` are wrong
+   in a different way; items 3 and 4 have not been re-measured.)*
 
 The accurate claim today: *"Python is supported and checked. C is supported and partially
 checked. Java, Go, JavaScript and TypeScript parse, translate and type-check — their

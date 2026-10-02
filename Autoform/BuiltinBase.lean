@@ -74,8 +74,12 @@ def cachetoolsWithBases : Program :=
 `Autoform/Generated/Cachetools.lean` has since been re-rendered *with* the `_HashedTuple`
 base in it, so `Generated.program` is no longer the "before" picture and this fixture has
 to clear the field explicitly. Reading it as the before-state again would make every
-divergence guard below vacuous. -/
-def cachetoolsBefore : Program := { Autoform.Generated.Cachetools.program with builtinBases := [] }
+divergence guard below vacuous. The class table (STRATEGY.md §62) is cleared for the same
+reason: the before-state measured here predates it, and under Python's lookup rules a
+`_HashedTuple` with no builtin base is not an opaque object but a lookup that reaches its
+external base `tuple` (`mro:external-base`). -/
+def cachetoolsBefore : Program :=
+  { Autoform.Generated.Cachetools.program with builtinBases := [], pyClasses := none }
 
 /-- `hashkey` applied to a varargs tuple, then compared with a plain `Val`. -/
 private def hashkeyEq (p : Program) (args : List Val) (res : Val) : Bool :=
@@ -391,11 +395,12 @@ theorem excluded_add :
 #guard holeOf (allocBuiltin { dialect := .python, table := [] } "A" .tuple
                  [.tuple [], .tuple []]) = "alloc:builtin-base:A:multiple-args"
 
-/-- **`len` of a builtin-based instance is a hole**, and it is the one arbitrary exclusion
-here: adding the case to `Stdlib.builtinCore` defeats the branch enumeration in
-`Stdlib.builtin_heap_unchanged` (a `whnf` timeout that raising the heartbeat budget does
-not fix). CPython: `len(A((0,)))` is `1`. -/
-theorem excluded_len :
+/-- `Stdlib.builtin` itself still has no `bobj` case for `len`: adding one to
+`Stdlib.builtinCore` defeats the branch enumeration in `Stdlib.builtin_heap_unchanged`
+(a `whnf` timeout that raising the heartbeat budget does not fix). The see-through is
+done one level up, at the interpreter's builtin call site (`builtinSeeThrough`), and is
+tested end to end in §4.1 below. This pins that the library function is unchanged. -/
+theorem stdlib_len_has_no_bobj_case :
     Stdlib.builtin .python [] "len" [.bobj "A" (.tuple [.int 0])] = none := by rfl
 
 /-- `list`, `tuple`, `sorted`, `sum`, `min` and `max` all reach the base through
@@ -404,6 +409,142 @@ theorem excluded_len :
 theorem included_tuple_of_bobj :
     Stdlib.builtin .python [] "tuple" [.bobj "A" (.tuple [.int 0])]
       = some ([], .val (.tuple [.int 0])) := by rfl
+
+/-! ### 4.1 `len`, and the overrides a `bobj` would bypass
+
+`len(A((0,)))` is `1` in CPython. Core answers it through `builtinSeeThrough`, which is
+faithful only because `allocBuiltin` refuses every class that overrides `__len__` -- and,
+likewise, `__getitem__`, `__iter__`, `__contains__`, `__bool__`, `__ne__`, `__new__`
+and `__getattribute__`, each of which names an operation Core performs on the payload
+directly. Before this, only `__init__`/`__eq__` were refused, so `class A(tuple)` with
+its own `__getitem__` indexed as a plain tuple: a silent wrong answer. -/
+
+private def lenCtx : Ctx := { dialect := .python, table := [] }
+
+/-- Evaluate `e` with `a` bound to the given value. -/
+private def evalIn (a : Val) (e : Expr) : EResult :=
+  (evalExpr lenCtx 10 [] [("a", a)] e).2
+
+/-- The integer an `EResult` carries, if it is one. -/
+private def intOf : EResult -> Option Int
+  | .val (.int i) => some i
+  | _             => none
+
+-- CPython: `len(A((0,)))` is `1`; `len(A(()))` is `0`; `len(S('abc'))` is `3`.
+#guard intOf (evalIn (.bobj "A" (.tuple [.int 0])) (.call "len" [.name "a"])) = some 1
+#guard intOf (evalIn (.bobj "A" (.tuple [])) (.call "len" [.name "a"])) = some 0
+#guard intOf (evalIn (.bobj "S" (.str "abc")) (.call "len" [.name "a"])) = some 3
+-- CPython: `len(D({1: 2}))` is `1`; `len(L([1, 2]))` is `2`.
+#guard intOf (evalIn (.bobj "D" (.dict [(.int 1, .int 2)])) (.call "len" [.name "a"]))
+         = some 1
+#guard intOf (evalIn (.bobj "L" (.list [.int 1, .int 2])) (.call "len" [.name "a"]))
+         = some 2
+-- NON-VACUITY: `len` of a `bobj` is its payload's length, not a constant.
+#guard intOf (evalIn (.bobj "A" (.tuple [.int 0, .int 1])) (.call "len" [.name "a"]))
+         = some 2
+
+-- The see-through is `len`-only: `abs` of a `bobj` is still a hole, so no other builtin
+-- is quietly told that a `bobj` is its payload.
+#guard holeOf (evalIn (.bobj "A" (.tuple [.int 0])) (.call "abs" [.name "a"])) = "call:abs"
+
+/-- The committed `cachetools` program plus `lenkey(x, y) = len(hashkey(x, y))`. -/
+private def lenOfHashkey : Program :=
+  { cachetoolsWithBases with funcs := cachetoolsWithBases.funcs ++
+      [{ name := "t.py:<module>.lenkey", params := ["x", "y"],
+         body := .ret (.call "len" [.call "cachetools/keys.py:<module>.hashkey"
+                                      [.name "x", .name "y"]]) }] }
+
+-- End to end through the committed `hashkey`: CPython `len(hashkey(1, 2))` is `2`.
+#guard intOf (runFunc lenOfHashkey 400 "lenkey" [.int 1, .int 2]) = some 2
+
+/-! ### 4.2 `_HashedTuple.__add__` / `__radd__`, the committed bodies
+
+`def __add__(self, other, add=tuple.__add__): return _HashedTuple(add(self, other))`.
+`add` is the unbound builtin `tuple.__add__`, answered by `unboundBuiltinMethod` on two
+tuples only. The class must survive: CPython `type(hashkey(0) + (1,))` is `_HashedTuple`. -/
+
+/-- The committed program plus `addk(k, t, a) = k.__add__(t, a)` and the `__radd__` twin.
+
+The default `add=tuple.__add__` is passed **explicitly** as `a`: Core does not fill in
+omitted default arguments (the committed `__add__` called with one argument holes as
+`call:add`). The differential harness passes it the same way, because CPython's frame
+holds `add` as an ordinary local and the tracer records it. -/
+private def addProg : Program :=
+  { cachetoolsWithBases with funcs := cachetoolsWithBases.funcs ++
+      [{ name := "t.py:<module>.addk", params := ["k", "t", "a"],
+         body := .ret (.mcall (.name "k") "__add__" [.name "t", .name "a"]) },
+       { name := "t.py:<module>.raddk", params := ["k", "t", "a"],
+         body := .ret (.mcall (.name "k") "__radd__" [.name "t", .name "a"]) }] }
+
+private def tupleAdd : Val := .fn "tuple.__add__"
+
+/-- Is the result a `_HashedTuple` -- the CLASS, not just equal contents -- over `xs`? -/
+private def isHashedTuple (r : EResult) (xs : List Val) : Bool :=
+  match r with
+  | .val (.bobj c (.tuple ys)) => c == "_HashedTuple" && Val.beqL ys xs
+  | _ => false
+
+private def hk (xs : List Val) : Val := .bobj "_HashedTuple" (.tuple xs)
+
+/-- Is the result a plain (class-less) `tuple` over `xs`? -/
+private def isPlainTuple (r : Option EResult) (xs : List Val) : Bool :=
+  match r with
+  | some (.val (.tuple ys)) => Val.beqL ys xs
+  | _ => false
+
+-- CPython: `_HashedTuple((0,)) + (1,)` is `_HashedTuple((0, 1))`.
+#guard isHashedTuple (runFunc addProg 400 "addk" [hk [.int 0], .tuple [.int 1], tupleAdd])
+         [.int 0, .int 1]
+-- CPython: `(1,) + _HashedTuple((0,))` dispatches `__radd__`: `_HashedTuple((1, 0))`.
+#guard isHashedTuple (runFunc addProg 400 "raddk" [hk [.int 0], .tuple [.int 1], tupleAdd])
+         [.int 1, .int 0]
+-- NON-VACUITY: order matters, and the class is checked, not only the contents.
+#guard isHashedTuple (runFunc addProg 400 "addk" [hk [.int 0], .tuple [.int 1], tupleAdd])
+         [.int 1, .int 0] = false
+#guard isHashedTuple (.val (.tuple [.int 0, .int 1])) [.int 0, .int 1] = false
+-- CPython: `tuple.__add__(t, [1])` is `NotImplemented`, which Core has no value for: a hole.
+#guard holeOf (runFunc addProg 400 "addk" [hk [.int 0], .list [.int 1], tupleAdd])
+         = "call:tuple.__add__"
+-- The unbound builtin returns a PLAIN tuple; only the caller's `_HashedTuple(...)` re-wraps.
+#guard isPlainTuple (unboundBuiltinMethod .python "tuple.__add__"
+         [hk [.int 0], .tuple [.int 1]]) [.int 0, .int 1]
+-- Without the default supplied, the committed body holes: the gap is visible, not filled.
+#guard holeOf (runFunc addProg 400 "addk" [hk [.int 0], .tuple [.int 1], .unit])
+         = "call:add"
+#guard (unboundBuiltinMethod .cLike "tuple.__add__" [.tuple [], .tuple []]).isNone
+
+/-- A context whose class `A` defines `meth`, for the refusal guards. -/
+private def ctxDefining (meth : String) : Ctx :=
+  { dialect := .python,
+    table := [("m.py:<module>.A." ++ meth,
+               { name := "m.py:<module>.A." ++ meth, params := [], body := .skip })] }
+
+-- Every override Core would bypass is refused, each with its own label.
+#guard holeOf (allocBuiltin (ctxDefining "__getitem__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__getitem__"
+#guard holeOf (allocBuiltin (ctxDefining "__len__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__len__"
+#guard holeOf (allocBuiltin (ctxDefining "__iter__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__iter__"
+#guard holeOf (allocBuiltin (ctxDefining "__contains__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__contains__"
+#guard holeOf (allocBuiltin (ctxDefining "__bool__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__bool__"
+#guard holeOf (allocBuiltin (ctxDefining "__ne__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__ne__"
+#guard holeOf (allocBuiltin (ctxDefining "__new__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__new__"
+#guard holeOf (allocBuiltin (ctxDefining "__getattribute__") "A" .tuple [])
+         = "alloc:builtin-base:A:own-__getattribute__"
+
+-- NON-VACUITY: `_HashedTuple`'s own overrides are `__hash__`, `__add__`, `__radd__` and
+-- `__getstate__`, none of which Core bypasses (`+` on a `bobj` is already `binop:+`, and
+-- `dict` lookup by `Val.beq` agrees with any `__hash__` that keeps `a == b -> hash a =
+-- hash b`). Each is accepted, so the refusal list is not "refuse everything".
+#guard holeOf (allocBuiltin (ctxDefining "__hash__") "A" .tuple []) = ""
+#guard holeOf (allocBuiltin (ctxDefining "__add__") "A" .tuple []) = ""
+#guard holeOf (allocBuiltin (ctxDefining "__radd__") "A" .tuple []) = ""
+#guard holeOf (allocBuiltin (ctxDefining "__getstate__") "A" .tuple []) = ""
 
 /-! ### Bases that are out of reach entirely
 
@@ -442,7 +583,7 @@ theorem included_tuple_of_bobj :
 #print axioms isInstance_own_class_is_a_hole
 #print axioms excluded_field_access
 #print axioms excluded_add
-#print axioms excluded_len
+#print axioms stdlib_len_has_no_bobj_case
 #print axioms included_tuple_of_bobj
 
 end Autoform.Core.BuiltinBaseTest

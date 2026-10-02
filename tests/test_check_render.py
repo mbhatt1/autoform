@@ -153,3 +153,81 @@ class TestRoundTrip:
         repo, _, _ = make_repo(tmp_path, "U", funcs)
         rc, out = check(repo)
         assert rc == 0, out
+
+
+def _policy_repo(tmp_path, *, ignore=True, allow=None, specs=None, ast_tracked=False):
+    """A verified module `M` plus a manifest-only corpus `Big` whose AST is absent.
+
+    `Big` is the shape of Ansible/LinuxCrypto/LinuxLib: hashes pinned, AST gitignored."""
+    repo, _, _ = make_repo(tmp_path, "M", FUNCS)
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    if ignore:
+        with open(os.path.join(repo, ".gitignore"), "w") as fh:
+            fh.write("ast-Big.json\n")
+    man_path = os.path.join(repo, "artifact-manifest.json")
+    man = json.load(open(man_path))
+    man["modules"]["Big"] = {"ast_sha256": "0" * 64, "ast_tracked": ast_tracked,
+                             "render_sha256": "1" * 64}
+    if allow is not False:
+        man["untracked_by_policy"] = {"Big": allow or {
+            "reason": "too large; source commit not recorded", "reviewed": "test"}}
+    if specs:
+        man["specs"] = specs
+    json.dump(man, open(man_path, "w"))
+    return repo
+
+
+class TestUntrackedByPolicy:
+    """An absent AST is NOT-TRACKED only under a reviewed allowlist entry that the tree
+    itself confirms. Every other absence stays UNVERIFIABLE (exit 3)."""
+
+    def test_allowlisted_and_gitignored_is_reported_not_failed(self, tmp_path):
+        repo = _policy_repo(tmp_path)
+        rc, out = check(repo)
+        assert rc == 0, out
+        assert "NOT-TRACKED Big" in out
+        assert "1 verified" in out            # NOT-TRACKED is never counted as verified
+        assert "1 NOT checked" in out
+
+    def test_without_an_allowlist_entry_it_is_still_unverifiable(self, tmp_path):
+        repo = _policy_repo(tmp_path, allow=False)
+        rc, out = check(repo)
+        assert rc == 3, out
+        assert "UNVERIFIABLE Big" in out
+
+    def test_allowlist_without_review_is_refused(self, tmp_path):
+        repo = _policy_repo(tmp_path, allow={"reason": "trust me", "reviewed": ""})
+        rc, out = check(repo)
+        assert rc == 3, out
+        assert "reviewed" in out
+
+    def test_allowlist_the_tree_does_not_confirm_is_refused(self, tmp_path):
+        """The manifest may not merely assert the policy: .gitignore must enforce it."""
+        repo = _policy_repo(tmp_path, ignore=False)
+        rc, out = check(repo)
+        assert rc == 3, out
+        assert "git does not confirm" in out
+
+    def test_manifest_claiming_tracked_contradicts_allowlist(self, tmp_path):
+        repo = _policy_repo(tmp_path, ast_tracked=True)
+        rc, out = check(repo)
+        assert rc == 3, out
+
+    def test_pinned_specs_cannot_be_allowlisted(self, tmp_path):
+        """STRATEGY 55: tracked theorems about an absent corpus are unverifiable."""
+        repo = _policy_repo(tmp_path, specs={"SpecsGen/Big": {"corpus": "Big"}})
+        rc, out = check(repo)
+        assert rc == 3, out
+        assert "SpecsGen/Big" in out
+
+    def test_strict_ignores_the_allowlist(self, tmp_path):
+        repo = _policy_repo(tmp_path)
+        rc, out = run_script(os.path.join(repo, "scripts", "check_render.py"),
+                             "--strict", cwd=repo)
+        assert rc == 3, out
+        assert "UNVERIFIABLE Big" in out
+
+    def test_only_policy_modules_is_still_nothing_checked(self, tmp_path):
+        repo = _policy_repo(tmp_path)
+        rc, out = check(repo, "Big")
+        assert rc == 2, out

@@ -76,6 +76,9 @@ SPEC_KINDS = {"inductive", "structure", "class"}
 class Decl:
     def __init__(self, kind, name, start):
         self.kind, self.name, self.start, self.end = kind, name, start, start
+        # line of the declaration keyword; `start` may be earlier (doc comment,
+        # attributes). Mutation operators walk from `kw`: comments are not code.
+        self.kw = start
 
     def __repr__(self):
         return f"<{self.kind} {self.name} {self.start}-{self.end}>"
@@ -88,6 +91,30 @@ def parse_decls(lines):
         m = DECL_RE.match(line)
         if m:
             decls.append(Decl(m.group(1), m.group(2) or f"<anon@{i}>", i))
+    # A declaration's syntax begins at its doc comment / attribute lines, not at the
+    # keyword, and Lean 4.30 reports declaration-level errors there: a `@[simp]` `rfl`
+    # lemma that stops being definitional is reported at the `/--` line ABOVE the
+    # `theorem` keyword. Without this, that line belonged to the PREVIOUS declaration and
+    # the kill was credited to the wrong theorem (observed on Autoform/Lang/Imp: the
+    # `&&`->`||` mutant broke `evalBExpr_and` but was attributed to `evalBExpr_not`).
+    floor = 1
+    for d in decls:
+        i = d.start
+        while i - 1 >= floor:
+            prev = lines[i - 2].strip()
+            if re.fullmatch(r'@\[[^\]]*\]', prev):
+                i -= 1
+                continue
+            if prev.endswith("-/"):
+                k = i - 1
+                while k >= floor and "/-" not in lines[k - 1]:
+                    k -= 1
+                if k >= floor and lines[k - 1].lstrip().startswith("/--"):
+                    i = k
+                    continue
+            break
+        floor = d.start + 1
+        d.start = i
     for j, d in enumerate(decls):
         d.end = (decls[j + 1].start - 1) if j + 1 < len(decls) else len(lines)
     return decls
@@ -160,14 +187,14 @@ def gen_mutants(lines, decls):
     # per-definition "default" RHS used by the match-arm-deletion operator
     default_rhs = {}
     for d in defs:
-        for ln in range(d.start, d.end + 1):
+        for ln in range(d.kw, d.end + 1):
             m = ARM.match(lines[ln - 1])
             if m and "=>" not in m.group(3):
                 default_rhs.setdefault(d.name, m.group(3).strip())
                 break
 
     for d in defs:
-        for ln in range(d.start, d.end + 1):
+        for ln in range(d.kw, d.end + 1):
             raw = lines[ln - 1]
             code = raw.split("--")[0]
             if not code.strip() or code.lstrip().startswith(("/-", "-/", "*")):
@@ -295,7 +322,7 @@ def _balanced(text):
 def _decl_strings(lines, d, pat, group=2):
     """Every distinct value of capture `group` of `pat` inside declaration `d`."""
     seen = []
-    for ln in range(d.start, d.end + 1):
+    for ln in range(d.kw, d.end + 1):
         for m in pat.finditer(lines[ln - 1]):
             v = m.group(group)
             if v not in seen:
@@ -312,14 +339,14 @@ def gen_mutants_generated(lines, decls):
         # alternative names available for the name/field-swap operators, taken from the
         # same declaration so the mutant stays plausible rather than obviously broken.
         params = []
-        for ln in range(d.start, d.end + 1):
+        for ln in range(d.kw, d.end + 1):
             m = re.search(r'params := \[(.*?)\]', lines[ln - 1])
             if m:
                 params = re.findall(r'"([^"]*)"', m.group(1))
         fields = _decl_strings(lines, d, AST_FIELD) + _decl_strings(lines, d, AST_SETFIELD)
         names = _decl_strings(lines, d, AST_NAME)
 
-        for ln in range(d.start, d.end + 1):
+        for ln in range(d.kw, d.end + 1):
             raw = lines[ln - 1]
             if raw.lstrip().startswith("--") or raw.lstrip().startswith("/-"):
                 continue
@@ -336,9 +363,9 @@ def gen_mutants_generated(lines, decls):
             m = AST_OP_ALONE.match(raw.rstrip("\n"))
             if m:
                 prev = ln - 1
-                while prev >= d.start and not lines[prev - 1].strip():
+                while prev >= d.kw and not lines[prev - 1].strip():
                     prev -= 1
-                head = AST_OP_HEAD.search(lines[prev - 1].rstrip()) if prev >= d.start else None
+                head = AST_OP_HEAD.search(lines[prev - 1].rstrip()) if prev >= d.kw else None
                 if head:
                     swaps = AST_BINOP_SWAPS if head.group(1) == "binop" else AST_UNOP_SWAPS
                     nw = swaps.get(m.group(2))
@@ -646,9 +673,16 @@ def main():
                 print(f"[{i}/{len(mutants)}] INCONCL. {mut.op:22s} L{mut.line} ({mut.decl}) "
                       f"— build broke in {', '.join(sorted({f for f, _ in foreign}))}, "
                       f"nothing to attribute")
-            elif rc != 0 and hit_defs and not hit_thms:
-                # the mutation broke the definition itself: not a behavioural bug
+            elif rc != 0 and hit_defs and (mut.decl in hit_defs or not hit_thms):
+                # the mutation broke the definition itself: not a behavioural bug.
+                # If the MUTATED definition fails to elaborate, theorem errors are mere
+                # consequences of that (they mention a constant that no longer exists in
+                # the intended form), so they must not be scored as kills. Observed on
+                # Autoform/Lang/Imp: `| .sub a b => n` (unbound `n`) and `n+1` -> `n+0`
+                # (no longer structurally recursive) were credited as kills to every
+                # theorem that unfolds the definition.
                 rec["verdict"] = "invalid"
+                rec["downstream_theorem_errors"] = sorted(hit_thms)
                 invalid += 1
                 print(f"[{i}/{len(mutants)}] INVALID  {mut.op:22s} L{mut.line} ({mut.decl}) "
                       f"— mutant does not typecheck")

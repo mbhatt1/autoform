@@ -103,8 +103,11 @@
        "k": "assign",
        "x": "tmp0",
        "e": {
-        "k": "dictE",
-        "pairs": []
+        "k": "boxContainer",
+        "e": {
+         "k": "dictE",
+         "pairs": []
+        }
        }
       },
       "b": {
@@ -132,8 +135,11 @@
        "k": "assign",
        "x": "tmp1",
        "e": {
-        "k": "dictE",
-        "pairs": []
+        "k": "boxContainer",
+        "e": {
+         "k": "dictE",
+         "pairs": []
+        }
        }
       },
       "b": {
@@ -196,7 +202,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.Cache.__repr__",
@@ -748,8 +762,19 @@
     "b": {
      "k": "seq",
      "a": {
-      "k": "holeS",
-      "label": "op:delete-index"
+      "k": "delIndex",
+      "r": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "_Cache__data"
+      },
+      "i": {
+       "k": "name",
+       "v": "key"
+      }
      },
      "b": {
       "k": "seq",
@@ -935,7 +960,15 @@
      "v": "default"
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "default",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.Cache.pop",
@@ -978,8 +1011,15 @@
       }
      },
      "b": {
-      "k": "holeS",
-      "label": "op:delete-index"
+      "k": "delIndex",
+      "r": {
+       "k": "name",
+       "v": "self"
+      },
+      "i": {
+       "k": "name",
+       "v": "key"
+      }
      }
     },
     "e": {
@@ -1042,7 +1082,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "default",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.Cache.setdefault",
@@ -1139,7 +1188,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "default",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.Cache.clear",
@@ -1365,7 +1422,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.FIFOCache.__setitem__",
@@ -1473,7 +1538,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_setitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.FIFOCache.__delitem__",
@@ -1502,10 +1576,30 @@
     }
    },
    "b": {
-    "k": "holeS",
-    "label": "op:delete-index"
+    "k": "delIndex",
+    "r": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "_FIFOCache__order"
+    },
+    "i": {
+     "k": "name",
+     "v": "key"
+    }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_delitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.FIFOCache.popitem",
@@ -1531,7 +1625,7 @@
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "__else_ok1",
+       "x": "__else_ok23",
        "e": {
         "k": "bool",
         "v": true
@@ -1570,7 +1664,7 @@
          "k": "seq",
          "a": {
           "k": "assign",
-          "x": "__else_ok1",
+          "x": "__else_ok23",
           "e": {
            "k": "bool",
            "v": false
@@ -1613,7 +1707,7 @@
         "k": "ifte",
         "c": {
          "k": "name",
-         "v": "__else_ok1"
+         "v": "__else_ok23"
         },
         "t": {
          "k": "ret",
@@ -1984,8 +2078,11 @@
          "k": "assign",
          "x": "tmp2",
          "e": {
-          "k": "dictE",
-          "pairs": []
+          "k": "boxContainer",
+          "e": {
+           "k": "dictE",
+           "pairs": []
+          }
          }
         },
         "b": {
@@ -2032,7 +2129,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LFUCache.__getitem__",
@@ -2112,7 +2217,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_getitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LFUCache.__setitem__",
@@ -2432,7 +2546,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_setitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LFUCache.__delitem__",
@@ -2579,7 +2702,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_delitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LFUCache.popitem",
@@ -3392,7 +3524,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LRUCache.__getitem__",
@@ -3472,7 +3612,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_getitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LRUCache.__setitem__",
@@ -3522,7 +3671,16 @@
      ]
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_setitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LRUCache.__delitem__",
@@ -3551,10 +3709,30 @@
     }
    },
    "b": {
-    "k": "holeS",
-    "label": "op:delete-index"
+    "k": "delIndex",
+    "r": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "_LRUCache__order"
+    },
+    "i": {
+     "k": "name",
+     "v": "key"
+    }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_delitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.LRUCache.popitem",
@@ -3580,7 +3758,7 @@
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "__else_ok2",
+       "x": "__else_ok24",
        "e": {
         "k": "bool",
         "v": true
@@ -3619,7 +3797,7 @@
          "k": "seq",
          "a": {
           "k": "assign",
-          "x": "__else_ok2",
+          "x": "__else_ok24",
           "e": {
            "k": "bool",
            "v": false
@@ -3662,7 +3840,7 @@
         "k": "ifte",
         "c": {
          "k": "name",
-         "v": "__else_ok2"
+         "v": "__else_ok24"
         },
         "t": {
          "k": "ret",
@@ -3919,8 +4097,11 @@
        "k": "assign",
        "x": "tmp0",
        "e": {
-        "k": "dictE",
-        "pairs": []
+        "k": "boxContainer",
+        "e": {
+         "k": "dictE",
+         "pairs": []
+        }
        }
       },
       "b": {
@@ -3946,8 +4127,11 @@
        },
        "f": "_RRCache__keys",
        "v": {
-        "k": "listE",
-        "items": []
+        "k": "boxContainer",
+        "e": {
+         "k": "listE",
+         "items": []
+        }
        }
       },
       "b": {
@@ -3962,7 +4146,22 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "choice",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ],
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.RRCache.choice",
@@ -4119,7 +4318,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_setitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.RRCache.__delitem__",
@@ -4346,7 +4554,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_delitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.RRCache.popitem",
@@ -4372,7 +4589,7 @@
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "__else_ok3",
+       "x": "__else_ok25",
        "e": {
         "k": "bool",
         "v": true
@@ -4409,7 +4626,7 @@
          "k": "seq",
          "a": {
           "k": "assign",
-          "x": "__else_ok3",
+          "x": "__else_ok25",
           "e": {
            "k": "bool",
            "v": false
@@ -4452,7 +4669,7 @@
         "k": "ifte",
         "c": {
          "k": "name",
-         "v": "__else_ok3"
+         "v": "__else_ok25"
         },
         "t": {
          "k": "ret",
@@ -4946,7 +5163,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.__repr__",
@@ -5109,7 +5334,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_repr",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.__len__",
@@ -5272,7 +5506,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_len",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.currsize",
@@ -5375,7 +5618,16 @@
             "a": {
              "k": "call",
              "f": "super",
-             "args": []
+             "args": [
+              {
+               "k": "str",
+               "v": "_TimedCache"
+              },
+              {
+               "k": "name",
+               "v": "self"
+              }
+             ]
             },
             "f": "currsize"
            }
@@ -5971,7 +6223,15 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "defaults": [
+   [
+    "time",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TTLCache._Link.__init__",
@@ -6006,7 +6266,21 @@
      "v": "expires"
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "key",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "expires",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TTLCache._Link.__reduce__",
@@ -6313,7 +6587,22 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "timer",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ],
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TTLCache.__contains__",
@@ -6327,7 +6616,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "__else_ok4",
+     "x": "__else_ok26",
      "e": {
       "k": "bool",
       "v": true
@@ -6361,7 +6650,7 @@
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "__else_ok4",
+        "x": "__else_ok26",
         "e": {
          "k": "bool",
          "v": false
@@ -6380,7 +6669,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "__else_ok4"
+       "v": "__else_ok26"
       },
       "t": {
        "k": "ret",
@@ -6430,7 +6719,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "__else_ok5",
+     "x": "__else_ok27",
      "e": {
       "k": "bool",
       "v": true
@@ -6463,7 +6752,7 @@
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "__else_ok5",
+        "x": "__else_ok27",
         "e": {
          "k": "bool",
          "v": false
@@ -6483,7 +6772,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "__else_ok5"
+       "v": "__else_ok27"
       },
       "t": {
        "k": "assign",
@@ -6573,7 +6862,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_getitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
@@ -6719,7 +7017,7 @@
      "k": "seq",
      "a": {
       "k": "assign",
-      "x": "__else_ok6",
+      "x": "__else_ok28",
       "e": {
        "k": "bool",
        "v": true
@@ -6752,7 +7050,7 @@
         "k": "seq",
         "a": {
          "k": "assign",
-         "x": "__else_ok6",
+         "x": "__else_ok28",
          "e": {
           "k": "bool",
           "v": false
@@ -6815,7 +7113,7 @@
        "k": "ifte",
        "c": {
         "k": "name",
-        "v": "__else_ok6"
+        "v": "__else_ok28"
        },
        "t": {
         "k": "exprS",
@@ -7067,7 +7365,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_setitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TTLCache.__delitem__",
@@ -7208,7 +7515,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_delitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TTLCache.__iter__",
@@ -7217,197 +7533,191 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "assign",
-    "x": "root",
-    "e": {
-     "k": "field",
-     "a": {
-      "k": "name",
-      "v": "self"
-     },
-     "f": "_TTLCache__root"
-    }
+    "k": "holeS",
+    "label": "gen:generator"
    },
    "b": {
     "k": "seq",
     "a": {
-     "k": "skip"
+     "k": "assign",
+     "x": "root",
+     "e": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "self"
+      },
+      "f": "_TTLCache__root"
+     }
     },
     "b": {
      "k": "seq",
      "a": {
-      "k": "assign",
-      "x": "curr",
-      "e": {
-       "k": "field",
-       "a": {
-        "k": "name",
-        "v": "root"
-       },
-       "f": "next"
-      }
+      "k": "skip"
      },
      "b": {
       "k": "seq",
       "a": {
-       "k": "skip"
+       "k": "assign",
+       "x": "curr",
+       "e": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "root"
+        },
+        "f": "next"
+       }
       },
       "b": {
        "k": "seq",
        "a": {
-        "k": "loop",
-        "c": {
-         "k": "isOp",
-         "neg": true,
-         "a": {
-          "k": "name",
-          "v": "curr"
-         },
-         "b": {
-          "k": "name",
-          "v": "root"
-         }
-        },
-        "body": {
-         "k": "seq",
-         "a": {
-          "k": "seq",
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "loop",
+         "c": {
+          "k": "isOp",
+          "neg": true,
           "a": {
-           "k": "assign",
-           "x": "manager_tmp0",
-           "e": {
-            "k": "field",
-            "a": {
-             "k": "name",
-             "v": "self"
-            },
-            "f": "timer"
-           }
+           "k": "name",
+           "v": "curr"
           },
           "b": {
+           "k": "name",
+           "v": "root"
+          }
+         },
+         "body": {
+          "k": "seq",
+          "a": {
            "k": "seq",
            "a": {
             "k": "assign",
-            "x": "enter_tmp0",
+            "x": "manager_tmp0",
             "e": {
              "k": "field",
              "a": {
               "k": "name",
-              "v": "manager_tmp0"
+              "v": "self"
              },
-             "f": "__enter__"
+             "f": "timer"
             }
            },
            "b": {
             "k": "seq",
             "a": {
              "k": "assign",
-             "x": "exit_tmp0",
+             "x": "enter_tmp0",
              "e": {
               "k": "field",
               "a": {
                "k": "name",
                "v": "manager_tmp0"
               },
-              "f": "__exit__"
+              "f": "__enter__"
              }
             },
             "b": {
              "k": "seq",
              "a": {
               "k": "assign",
-              "x": "value_tmp0",
+              "x": "exit_tmp0",
               "e": {
-               "k": "mcall",
-               "recv": {
+               "k": "field",
+               "a": {
                 "k": "name",
                 "v": "manager_tmp0"
                },
-               "m": "__enter__",
-               "args": []
+               "f": "__exit__"
               }
              },
              "b": {
-              "k": "tryFinally",
-              "body": {
-               "k": "seq",
-               "a": {
-                "k": "assign",
-                "x": "time",
-                "e": {
-                 "k": "name",
-                 "v": "value_tmp0"
-                }
-               },
-               "b": {
-                "k": "ifte",
-                "c": {
-                 "k": "binop",
-                 "op": "<",
-                 "a": {
-                  "k": "name",
-                  "v": "time"
-                 },
-                 "b": {
-                  "k": "field",
-                  "a": {
-                   "k": "name",
-                   "v": "curr"
-                  },
-                  "f": "expires"
-                 }
-                },
-                "t": {
-                 "k": "ret",
-                 "e": {
-                  "k": "field",
-                  "a": {
-                   "k": "name",
-                   "v": "curr"
-                  },
-                  "f": "key"
-                 }
-                },
-                "e": {
-                 "k": "skip"
-                }
-               }
-              },
-              "fin": {
-               "k": "exprS",
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "value_tmp0",
                "e": {
                 "k": "mcall",
                 "recv": {
                  "k": "name",
                  "v": "manager_tmp0"
                 },
-                "m": "__exit__",
+                "m": "__enter__",
                 "args": []
+               }
+              },
+              "b": {
+               "k": "tryFinally",
+               "body": {
+                "k": "seq",
+                "a": {
+                 "k": "assign",
+                 "x": "time",
+                 "e": {
+                  "k": "name",
+                  "v": "value_tmp0"
+                 }
+                },
+                "b": {
+                 "k": "ifte",
+                 "c": {
+                  "k": "binop",
+                  "op": "<",
+                  "a": {
+                   "k": "name",
+                   "v": "time"
+                  },
+                  "b": {
+                   "k": "field",
+                   "a": {
+                    "k": "name",
+                    "v": "curr"
+                   },
+                   "f": "expires"
+                  }
+                 },
+                 "t": {
+                  "k": "holeS",
+                  "label": "gen:yield"
+                 },
+                 "e": {
+                  "k": "skip"
+                 }
+                }
+               },
+               "fin": {
+                "k": "exprS",
+                "e": {
+                 "k": "mcall",
+                 "recv": {
+                  "k": "name",
+                  "v": "manager_tmp0"
+                 },
+                 "m": "__exit__",
+                 "args": []
+                }
                }
               }
              }
             }
            }
-          }
-         },
-         "b": {
-          "k": "assign",
-          "x": "curr",
-          "e": {
-           "k": "field",
-           "a": {
-            "k": "name",
-            "v": "curr"
-           },
-           "f": "next"
+          },
+          "b": {
+           "k": "assign",
+           "x": "curr",
+           "e": {
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "curr"
+            },
+            "f": "next"
+           }
           }
          }
-        }
-       },
-       "b": {
-        "k": "seq",
-        "a": {
-         "k": "skip"
         },
         "b": {
          "k": "seq",
@@ -7430,7 +7740,13 @@
              "k": "skip"
             },
             "b": {
-             "k": "skip"
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "skip"
+             }
             }
            }
           }
@@ -7932,8 +8248,11 @@
               "k": "assign",
               "x": "expired",
               "e": {
-               "k": "listE",
-               "items": []
+               "k": "boxContainer",
+               "e": {
+                "k": "listE",
+                "items": []
+               }
               }
              },
              "b": {
@@ -8083,8 +8402,19 @@
                       "b": {
                        "k": "seq",
                        "a": {
-                        "k": "holeS",
-                        "label": "op:delete-index"
+                        "k": "delIndex",
+                        "r": {
+                         "k": "name",
+                         "v": "links"
+                        },
+                        "i": {
+                         "k": "field",
+                         "a": {
+                          "k": "name",
+                          "v": "curr"
+                         },
+                         "f": "key"
+                        }
                        },
                        "b": {
                         "k": "seq",
@@ -8151,7 +8481,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "time",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TTLCache.popitem",
@@ -8265,7 +8603,7 @@
              "k": "seq",
              "a": {
               "k": "assign",
-              "x": "__else_ok7",
+              "x": "__else_ok29",
               "e": {
                "k": "bool",
                "v": true
@@ -8304,7 +8642,7 @@
                 "k": "seq",
                 "a": {
                  "k": "assign",
-                 "x": "__else_ok7",
+                 "x": "__else_ok29",
                  "e": {
                   "k": "bool",
                   "v": false
@@ -8347,7 +8685,7 @@
                "k": "ifte",
                "c": {
                 "k": "name",
-                "v": "__else_ok7"
+                "v": "__else_ok29"
                },
                "t": {
                 "k": "ret",
@@ -8724,7 +9062,21 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "key",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "expires",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__",
@@ -8821,8 +9173,11 @@
       },
       "f": "_TLRUCache__order",
       "v": {
-       "k": "listE",
-       "items": []
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": []
+       }
       }
      },
      "b": {
@@ -8851,7 +9206,22 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "timer",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ],
+   [
+    "getsizeof",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TLRUCache.__contains__",
@@ -8865,7 +9235,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "__else_ok8",
+     "x": "__else_ok30",
      "e": {
       "k": "bool",
       "v": true
@@ -8899,7 +9269,7 @@
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "__else_ok8",
+        "x": "__else_ok30",
         "e": {
          "k": "bool",
          "v": false
@@ -8918,7 +9288,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "__else_ok8"
+       "v": "__else_ok30"
       },
       "t": {
        "k": "ret",
@@ -8968,7 +9338,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "__else_ok9",
+     "x": "__else_ok31",
      "e": {
       "k": "bool",
       "v": true
@@ -9001,7 +9371,7 @@
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "__else_ok9",
+        "x": "__else_ok31",
         "e": {
          "k": "bool",
          "v": false
@@ -9021,7 +9391,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "__else_ok9"
+       "v": "__else_ok31"
       },
       "t": {
        "k": "assign",
@@ -9111,7 +9481,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_getitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
@@ -9503,7 +9882,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_setitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TLRUCache.__delitem__",
@@ -9762,7 +10150,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_delitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TLRUCache.__iter__",
@@ -9771,155 +10168,155 @@
   "body": {
    "k": "seq",
    "a": {
+    "k": "holeS",
+    "label": "gen:generator"
+   },
+   "b": {
     "k": "seq",
     "a": {
-     "k": "assign",
-     "x": "tmp1",
-     "e": {
-      "k": "field",
-      "a": {
-       "k": "name",
-       "v": "self"
-      },
-      "f": "_TLRUCache__order"
-     }
-    },
-    "b": {
-     "k": "forIn",
-     "x": "curr",
-     "e": {
-      "k": "name",
-      "v": "tmp1"
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "tmp1",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "_TLRUCache__order"
+      }
      },
-     "body": {
-      "k": "seq",
-      "a": {
-       "k": "assign",
-       "x": "manager_tmp0",
-       "e": {
-        "k": "field",
-        "a": {
-         "k": "name",
-         "v": "self"
-        },
-        "f": "timer"
-       }
+     "b": {
+      "k": "forIn",
+      "x": "curr",
+      "e": {
+       "k": "name",
+       "v": "tmp1"
       },
-      "b": {
+      "body": {
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "enter_tmp0",
+        "x": "manager_tmp0",
         "e": {
          "k": "field",
          "a": {
           "k": "name",
-          "v": "manager_tmp0"
+          "v": "self"
          },
-         "f": "__enter__"
+         "f": "timer"
         }
        },
        "b": {
         "k": "seq",
         "a": {
          "k": "assign",
-         "x": "exit_tmp0",
+         "x": "enter_tmp0",
          "e": {
           "k": "field",
           "a": {
            "k": "name",
            "v": "manager_tmp0"
           },
-          "f": "__exit__"
+          "f": "__enter__"
          }
         },
         "b": {
          "k": "seq",
          "a": {
           "k": "assign",
-          "x": "value_tmp0",
+          "x": "exit_tmp0",
           "e": {
-           "k": "mcall",
-           "recv": {
+           "k": "field",
+           "a": {
             "k": "name",
             "v": "manager_tmp0"
            },
-           "m": "__enter__",
-           "args": []
+           "f": "__exit__"
           }
          },
          "b": {
-          "k": "tryFinally",
-          "body": {
-           "k": "seq",
-           "a": {
-            "k": "assign",
-            "x": "time",
-            "e": {
-             "k": "name",
-             "v": "value_tmp0"
-            }
-           },
-           "b": {
-            "k": "ifte",
-            "c": {
-             "k": "binop",
-             "op": "&&",
-             "a": {
-              "k": "binop",
-              "op": "<",
-              "a": {
-               "k": "name",
-               "v": "time"
-              },
-              "b": {
-               "k": "field",
-               "a": {
-                "k": "name",
-                "v": "curr"
-               },
-               "f": "expires"
-              }
-             },
-             "b": {
-              "k": "unop",
-              "op": "!",
-              "a": {
-               "k": "field",
-               "a": {
-                "k": "name",
-                "v": "curr"
-               },
-               "f": "removed"
-              }
-             }
-            },
-            "t": {
-             "k": "ret",
-             "e": {
-              "k": "field",
-              "a": {
-               "k": "name",
-               "v": "curr"
-              },
-              "f": "key"
-             }
-            },
-            "e": {
-             "k": "skip"
-            }
-           }
-          },
-          "fin": {
-           "k": "exprS",
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "value_tmp0",
            "e": {
             "k": "mcall",
             "recv": {
              "k": "name",
              "v": "manager_tmp0"
             },
-            "m": "__exit__",
+            "m": "__enter__",
             "args": []
+           }
+          },
+          "b": {
+           "k": "tryFinally",
+           "body": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "time",
+             "e": {
+              "k": "name",
+              "v": "value_tmp0"
+             }
+            },
+            "b": {
+             "k": "ifte",
+             "c": {
+              "k": "binop",
+              "op": "&&",
+              "a": {
+               "k": "binop",
+               "op": "<",
+               "a": {
+                "k": "name",
+                "v": "time"
+               },
+               "b": {
+                "k": "field",
+                "a": {
+                 "k": "name",
+                 "v": "curr"
+                },
+                "f": "expires"
+               }
+              },
+              "b": {
+               "k": "unop",
+               "op": "!",
+               "a": {
+                "k": "field",
+                "a": {
+                 "k": "name",
+                 "v": "curr"
+                },
+                "f": "removed"
+               }
+              }
+             },
+             "t": {
+              "k": "holeS",
+              "label": "gen:yield"
+             },
+             "e": {
+              "k": "skip"
+             }
+            }
+           },
+           "fin": {
+            "k": "exprS",
+            "e": {
+             "k": "mcall",
+             "recv": {
+              "k": "name",
+              "v": "manager_tmp0"
+             },
+             "m": "__exit__",
+             "args": []
+            }
            }
           }
          }
@@ -9927,12 +10324,6 @@
        }
       }
      }
-    }
-   },
-   "b": {
-    "k": "seq",
-    "a": {
-     "k": "skip"
     },
     "b": {
      "k": "seq",
@@ -9970,7 +10361,13 @@
             "k": "skip"
            },
            "b": {
-            "k": "skip"
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "skip"
+            }
            }
           }
          }
@@ -10153,8 +10550,11 @@
                 "k": "assign",
                 "x": "tmp0",
                 "e": {
-                 "k": "listE",
-                 "items": []
+                 "k": "boxContainer",
+                 "e": {
+                  "k": "listE",
+                  "items": []
+                 }
                 }
                },
                "b": {
@@ -10285,8 +10685,11 @@
               "k": "assign",
               "x": "expired",
               "e": {
-               "k": "listE",
-               "items": []
+               "k": "boxContainer",
+               "e": {
+                "k": "listE",
+                "items": []
+               }
               }
              },
              "b": {
@@ -10486,8 +10889,19 @@
                          }
                         },
                         "b": {
-                         "k": "holeS",
-                         "label": "op:delete-index"
+                         "k": "delIndex",
+                         "r": {
+                          "k": "name",
+                          "v": "items"
+                         },
+                         "i": {
+                          "k": "field",
+                          "a": {
+                           "k": "name",
+                           "v": "item"
+                          },
+                          "f": "key"
+                         }
                         }
                        }
                       },
@@ -10544,7 +10958,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "time",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.TLRUCache.popitem",
@@ -10658,7 +11080,7 @@
              "k": "seq",
              "a": {
               "k": "assign",
-              "x": "__else_ok10",
+              "x": "__else_ok32",
               "e": {
                "k": "bool",
                "v": true
@@ -10697,7 +11119,7 @@
                 "k": "seq",
                 "a": {
                  "k": "assign",
-                 "x": "__else_ok10",
+                 "x": "__else_ok32",
                  "e": {
                   "k": "bool",
                   "v": false
@@ -10740,7 +11162,7 @@
                "k": "ifte",
                "c": {
                 "k": "name",
-                "v": "__else_ok10"
+                "v": "__else_ok32"
                },
                "t": {
                 "k": "ret",
@@ -11021,7 +11443,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "__else_ok11",
+     "x": "__else_ok33",
      "e": {
       "k": "bool",
       "v": true
@@ -11062,7 +11484,7 @@
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "__else_ok11",
+        "x": "__else_ok33",
         "e": {
          "k": "bool",
          "v": false
@@ -11077,7 +11499,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "__else_ok11"
+       "v": "__else_ok33"
       },
       "t": {
        "k": "exprS",
@@ -11105,7 +11527,16 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "defaults": [
+   [
+    "cache_delitem",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.cached",
@@ -11203,7 +11634,35 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "key",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ],
+   [
+    "lock",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "condition",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "info",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.cached.decorator",
@@ -11291,7 +11750,7 @@
       "k": "ret",
       "e": {
        "k": "call",
-       "f": "cachetools/_cachedmethod.py:<module>._wrapper",
+       "f": "_wrapper",
        "args": [
         {
          "k": "name",
@@ -11329,7 +11788,7 @@
      "k": "ret",
      "e": {
       "k": "call",
-      "f": "cachetools/_cachedmethod.py:<module>._wrapper",
+      "f": "_wrapper",
       "args": [
        {
         "k": "name",
@@ -11676,7 +12135,35 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "key",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ],
+   [
+    "lock",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "condition",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "info",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/__init__.py:<module>.cachedmethod.decorator",
@@ -11706,7 +12193,7 @@
       "k": "ret",
       "e": {
        "k": "call",
-       "f": "cachetools/_cachedmethod.py:<module>._wrapper",
+       "f": "_wrapper",
        "args": [
         {
          "k": "name",
@@ -11744,7 +12231,7 @@
      "k": "ret",
      "e": {
       "k": "call",
-      "f": "cachetools/_cachedmethod.py:<module>._wrapper",
+      "f": "_wrapper",
       "args": [
        {
         "k": "name",
@@ -12024,32 +12511,12 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "seq",
-    "a": {
-     "k": "assign",
-     "x": "tmp0",
+    "k": "assign",
+    "x": "hits",
+    "e": {
+     "k": "boxNew",
      "e": {
-      "k": "int",
-      "v": "0"
-     }
-    },
-    "b": {
-     "k": "seq",
-     "a": {
-      "k": "assign",
-      "x": "hits",
-      "e": {
-       "k": "name",
-       "v": "tmp0"
-      }
-     },
-     "b": {
-      "k": "assign",
-      "x": "misses",
-      "e": {
-       "k": "name",
-       "v": "tmp0"
-      }
+      "k": "unit"
      }
     }
    },
@@ -12057,83 +12524,121 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "pending",
+     "x": "misses",
      "e": {
-      "k": "call",
-      "f": "set",
-      "args": []
+      "k": "boxNew",
+      "e": {
+       "k": "unit"
+      }
      }
     },
     "b": {
      "k": "seq",
      "a": {
-      "k": "assign",
-      "x": "wrapper",
-      "e": {
-       "k": "closure",
-       "f": "cachetools/_cached.py:<module>._condition_info.wrapper"
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "tmp0",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "hits"
+        },
+        "f": "v",
+        "v": {
+         "k": "name",
+         "v": "tmp0"
+        }
+       },
+       "b": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "misses"
+        },
+        "f": "v",
+        "v": {
+         "k": "name",
+         "v": "tmp0"
+        }
+       }
       }
      },
      "b": {
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "cache_clear",
+       "x": "pending",
        "e": {
-        "k": "closure",
-        "f": "cachetools/_cached.py:<module>._condition_info.cache_clear"
+        "k": "call",
+        "f": "set",
+        "args": []
        }
       },
       "b": {
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "cache_info",
+        "x": "wrapper",
         "e": {
          "k": "closure",
-         "f": "cachetools/_cached.py:<module>._condition_info.cache_info"
+         "f": "cachetools/_cached.py:<module>._condition_info.wrapper"
         }
        },
        "b": {
         "k": "seq",
         "a": {
-         "k": "setField",
-         "r": {
-          "k": "name",
-          "v": "wrapper"
-         },
-         "f": "cache_clear",
-         "v": {
-          "k": "name",
-          "v": "cache_clear"
+         "k": "assign",
+         "x": "cache_clear",
+         "e": {
+          "k": "closure",
+          "f": "cachetools/_cached.py:<module>._condition_info.cache_clear"
          }
         },
         "b": {
          "k": "seq",
          "a": {
-          "k": "setField",
-          "r": {
-           "k": "name",
-           "v": "wrapper"
-          },
-          "f": "cache_info",
-          "v": {
-           "k": "name",
-           "v": "cache_info"
+          "k": "assign",
+          "x": "cache_info",
+          "e": {
+           "k": "closure",
+           "f": "cachetools/_cached.py:<module>._condition_info.cache_info"
           }
          },
          "b": {
           "k": "seq",
           "a": {
-           "k": "skip"
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "wrapper"
+           },
+           "f": "cache_clear",
+           "v": {
+            "k": "name",
+            "v": "cache_clear"
+           }
           },
           "b": {
            "k": "seq",
            "a": {
-            "k": "ret",
-            "e": {
+            "k": "setField",
+            "r": {
              "k": "name",
              "v": "wrapper"
+            },
+            "f": "cache_info",
+            "v": {
+             "k": "name",
+             "v": "cache_info"
             }
            },
            "b": {
@@ -12144,7 +12649,11 @@
             "b": {
              "k": "seq",
              "a": {
-              "k": "skip"
+              "k": "ret",
+              "e": {
+               "k": "name",
+               "v": "wrapper"
+              }
              },
              "b": {
               "k": "seq",
@@ -12172,7 +12681,19 @@
                    "k": "skip"
                   },
                   "b": {
-                   "k": "skip"
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "skip"
+                    },
+                    "b": {
+                     "k": "skip"
+                    }
+                   }
                   }
                  }
                 }
@@ -12201,8 +12722,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -12328,14 +12848,22 @@
              "b": {
               "k": "seq",
               "a": {
-               "k": "assign",
-               "x": "hits",
-               "e": {
+               "k": "setField",
+               "r": {
+                "k": "name",
+                "v": "hits"
+               },
+               "f": "v",
+               "v": {
                 "k": "binop",
                 "op": "+",
                 "a": {
-                 "k": "name",
-                 "v": "hits"
+                 "k": "field",
+                 "a": {
+                  "k": "name",
+                  "v": "hits"
+                 },
+                 "f": "v"
                 },
                 "b": {
                  "k": "int",
@@ -12373,14 +12901,22 @@
               }
              },
              "b": {
-              "k": "assign",
-              "x": "misses",
-              "e": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "misses"
+              },
+              "f": "v",
+              "v": {
                "k": "binop",
                "op": "+",
                "a": {
-                "k": "name",
-                "v": "misses"
+                "k": "field",
+                "a": {
+                 "k": "name",
+                 "v": "misses"
+                },
+                "f": "v"
                },
                "b": {
                 "k": "int",
@@ -12835,8 +13371,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -12927,17 +13462,25 @@
             "b": {
              "k": "seq",
              "a": {
-              "k": "assign",
-              "x": "hits",
-              "e": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "hits"
+              },
+              "f": "v",
+              "v": {
                "k": "name",
                "v": "tmp0"
               }
              },
              "b": {
-              "k": "assign",
-              "x": "misses",
-              "e": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "misses"
+              },
+              "f": "v",
+              "v": {
                "k": "name",
                "v": "tmp0"
               }
@@ -13085,12 +13628,20 @@
           "f": "info",
           "args": [
            {
-            "k": "name",
-            "v": "hits"
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "hits"
+            },
+            "f": "v"
            },
            {
-            "k": "name",
-            "v": "misses"
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "misses"
+            },
+            "f": "v"
            }
           ]
          }
@@ -13178,32 +13729,12 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "seq",
-    "a": {
-     "k": "assign",
-     "x": "tmp0",
+    "k": "assign",
+    "x": "hits",
+    "e": {
+     "k": "boxNew",
      "e": {
-      "k": "int",
-      "v": "0"
-     }
-    },
-    "b": {
-     "k": "seq",
-     "a": {
-      "k": "assign",
-      "x": "hits",
-      "e": {
-       "k": "name",
-       "v": "tmp0"
-      }
-     },
-     "b": {
-      "k": "assign",
-      "x": "misses",
-      "e": {
-       "k": "name",
-       "v": "tmp0"
-      }
+      "k": "unit"
      }
     }
    },
@@ -13211,30 +13742,24 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "wrapper",
+     "x": "misses",
      "e": {
-      "k": "closure",
-      "f": "cachetools/_cached.py:<module>._locked_info.wrapper"
+      "k": "boxNew",
+      "e": {
+       "k": "unit"
+      }
      }
     },
     "b": {
      "k": "seq",
      "a": {
-      "k": "assign",
-      "x": "cache_clear",
-      "e": {
-       "k": "closure",
-       "f": "cachetools/_cached.py:<module>._locked_info.cache_clear"
-      }
-     },
-     "b": {
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "cache_info",
+       "x": "tmp0",
        "e": {
-        "k": "closure",
-        "f": "cachetools/_cached.py:<module>._locked_info.cache_info"
+        "k": "int",
+        "v": "0"
        }
       },
       "b": {
@@ -13243,46 +13768,94 @@
         "k": "setField",
         "r": {
          "k": "name",
-         "v": "wrapper"
+         "v": "hits"
         },
-        "f": "cache_clear",
+        "f": "v",
         "v": {
          "k": "name",
-         "v": "cache_clear"
+         "v": "tmp0"
+        }
+       },
+       "b": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "misses"
+        },
+        "f": "v",
+        "v": {
+         "k": "name",
+         "v": "tmp0"
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "wrapper",
+       "e": {
+        "k": "closure",
+        "f": "cachetools/_cached.py:<module>._locked_info.wrapper"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "cache_clear",
+        "e": {
+         "k": "closure",
+         "f": "cachetools/_cached.py:<module>._locked_info.cache_clear"
         }
        },
        "b": {
         "k": "seq",
         "a": {
-         "k": "setField",
-         "r": {
-          "k": "name",
-          "v": "wrapper"
-         },
-         "f": "cache_info",
-         "v": {
-          "k": "name",
-          "v": "cache_info"
+         "k": "assign",
+         "x": "cache_info",
+         "e": {
+          "k": "closure",
+          "f": "cachetools/_cached.py:<module>._locked_info.cache_info"
          }
         },
         "b": {
          "k": "seq",
          "a": {
-          "k": "ret",
-          "e": {
+          "k": "setField",
+          "r": {
            "k": "name",
            "v": "wrapper"
+          },
+          "f": "cache_clear",
+          "v": {
+           "k": "name",
+           "v": "cache_clear"
           }
          },
          "b": {
           "k": "seq",
           "a": {
-           "k": "skip"
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "wrapper"
+           },
+           "f": "cache_info",
+           "v": {
+            "k": "name",
+            "v": "cache_info"
+           }
           },
           "b": {
            "k": "seq",
            "a": {
-            "k": "skip"
+            "k": "ret",
+            "e": {
+             "k": "name",
+             "v": "wrapper"
+            }
            },
            "b": {
             "k": "seq",
@@ -13305,7 +13878,19 @@
                 "k": "skip"
                },
                "b": {
-                "k": "skip"
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "skip"
+                 }
+                }
                }
               }
              }
@@ -13331,8 +13916,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -13449,14 +14033,22 @@
               "b": {
                "k": "seq",
                "a": {
-                "k": "assign",
-                "x": "hits",
-                "e": {
+                "k": "setField",
+                "r": {
+                 "k": "name",
+                 "v": "hits"
+                },
+                "f": "v",
+                "v": {
                  "k": "binop",
                  "op": "+",
                  "a": {
-                  "k": "name",
-                  "v": "hits"
+                  "k": "field",
+                  "a": {
+                   "k": "name",
+                   "v": "hits"
+                  },
+                  "f": "v"
                  },
                  "b": {
                   "k": "int",
@@ -13475,14 +14067,22 @@
              },
              "x": "__exc",
              "handler": {
-              "k": "assign",
-              "x": "misses",
-              "e": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "misses"
+              },
+              "f": "v",
+              "v": {
                "k": "binop",
                "op": "+",
                "a": {
-                "k": "name",
-                "v": "misses"
+                "k": "field",
+                "a": {
+                 "k": "name",
+                 "v": "misses"
+                },
+                "f": "v"
                },
                "b": {
                 "k": "int",
@@ -13750,8 +14350,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -13842,17 +14441,25 @@
             "b": {
              "k": "seq",
              "a": {
-              "k": "assign",
-              "x": "hits",
-              "e": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "hits"
+              },
+              "f": "v",
+              "v": {
                "k": "name",
                "v": "tmp0"
               }
              },
              "b": {
-              "k": "assign",
-              "x": "misses",
-              "e": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "misses"
+              },
+              "f": "v",
+              "v": {
                "k": "name",
                "v": "tmp0"
               }
@@ -14000,12 +14607,20 @@
           "f": "info",
           "args": [
            {
-            "k": "name",
-            "v": "hits"
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "hits"
+            },
+            "f": "v"
            },
            {
-            "k": "name",
-            "v": "misses"
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "misses"
+            },
+            "f": "v"
            }
           ]
          }
@@ -14092,32 +14707,12 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "seq",
-    "a": {
-     "k": "assign",
-     "x": "tmp0",
+    "k": "assign",
+    "x": "hits",
+    "e": {
+     "k": "boxNew",
      "e": {
-      "k": "int",
-      "v": "0"
-     }
-    },
-    "b": {
-     "k": "seq",
-     "a": {
-      "k": "assign",
-      "x": "hits",
-      "e": {
-       "k": "name",
-       "v": "tmp0"
-      }
-     },
-     "b": {
-      "k": "assign",
-      "x": "misses",
-      "e": {
-       "k": "name",
-       "v": "tmp0"
-      }
+      "k": "unit"
      }
     }
    },
@@ -14125,30 +14720,24 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "wrapper",
+     "x": "misses",
      "e": {
-      "k": "closure",
-      "f": "cachetools/_cached.py:<module>._unlocked_info.wrapper"
+      "k": "boxNew",
+      "e": {
+       "k": "unit"
+      }
      }
     },
     "b": {
      "k": "seq",
      "a": {
-      "k": "assign",
-      "x": "cache_clear",
-      "e": {
-       "k": "closure",
-       "f": "cachetools/_cached.py:<module>._unlocked_info.cache_clear"
-      }
-     },
-     "b": {
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "cache_info",
+       "x": "tmp0",
        "e": {
-        "k": "closure",
-        "f": "cachetools/_cached.py:<module>._unlocked_info.cache_info"
+        "k": "int",
+        "v": "0"
        }
       },
       "b": {
@@ -14157,46 +14746,94 @@
         "k": "setField",
         "r": {
          "k": "name",
-         "v": "wrapper"
+         "v": "hits"
         },
-        "f": "cache_clear",
+        "f": "v",
         "v": {
          "k": "name",
-         "v": "cache_clear"
+         "v": "tmp0"
+        }
+       },
+       "b": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "misses"
+        },
+        "f": "v",
+        "v": {
+         "k": "name",
+         "v": "tmp0"
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "wrapper",
+       "e": {
+        "k": "closure",
+        "f": "cachetools/_cached.py:<module>._unlocked_info.wrapper"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "cache_clear",
+        "e": {
+         "k": "closure",
+         "f": "cachetools/_cached.py:<module>._unlocked_info.cache_clear"
         }
        },
        "b": {
         "k": "seq",
         "a": {
-         "k": "setField",
-         "r": {
-          "k": "name",
-          "v": "wrapper"
-         },
-         "f": "cache_info",
-         "v": {
-          "k": "name",
-          "v": "cache_info"
+         "k": "assign",
+         "x": "cache_info",
+         "e": {
+          "k": "closure",
+          "f": "cachetools/_cached.py:<module>._unlocked_info.cache_info"
          }
         },
         "b": {
          "k": "seq",
          "a": {
-          "k": "ret",
-          "e": {
+          "k": "setField",
+          "r": {
            "k": "name",
            "v": "wrapper"
+          },
+          "f": "cache_clear",
+          "v": {
+           "k": "name",
+           "v": "cache_clear"
           }
          },
          "b": {
           "k": "seq",
           "a": {
-           "k": "skip"
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "wrapper"
+           },
+           "f": "cache_info",
+           "v": {
+            "k": "name",
+            "v": "cache_info"
+           }
           },
           "b": {
            "k": "seq",
            "a": {
-            "k": "skip"
+            "k": "ret",
+            "e": {
+             "k": "name",
+             "v": "wrapper"
+            }
            },
            "b": {
             "k": "seq",
@@ -14214,7 +14851,19 @@
                "k": "skip"
               },
               "b": {
-               "k": "skip"
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "skip"
+                }
+               }
               }
              }
             }
@@ -14239,8 +14888,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -14302,14 +14950,22 @@
          "b": {
           "k": "seq",
           "a": {
-           "k": "assign",
-           "x": "hits",
-           "e": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "hits"
+           },
+           "f": "v",
+           "v": {
             "k": "binop",
             "op": "+",
             "a": {
-             "k": "name",
-             "v": "hits"
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "hits"
+             },
+             "f": "v"
             },
             "b": {
              "k": "int",
@@ -14328,14 +14984,22 @@
         },
         "x": "__exc",
         "handler": {
-         "k": "assign",
-         "x": "misses",
-         "e": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "misses"
+         },
+         "f": "v",
+         "v": {
           "k": "binop",
           "op": "+",
           "a": {
-           "k": "name",
-           "v": "misses"
+           "k": "field",
+           "a": {
+            "k": "name",
+            "v": "misses"
+           },
+           "f": "v"
           },
           "b": {
            "k": "int",
@@ -14454,8 +15118,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -14496,17 +15159,25 @@
         "b": {
          "k": "seq",
          "a": {
-          "k": "assign",
-          "x": "hits",
-          "e": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "hits"
+          },
+          "f": "v",
+          "v": {
            "k": "name",
            "v": "tmp0"
           }
          },
          "b": {
-          "k": "assign",
-          "x": "misses",
-          "e": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "misses"
+          },
+          "f": "v",
+          "v": {
            "k": "name",
            "v": "tmp0"
           }
@@ -14541,12 +15212,20 @@
      "f": "info",
      "args": [
       {
-       "k": "name",
-       "v": "hits"
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "hits"
+       },
+       "f": "v"
       },
       {
-       "k": "name",
-       "v": "misses"
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "misses"
+       },
+       "f": "v"
       }
      ]
     }
@@ -14581,42 +15260,44 @@
     "k": "assign",
     "x": "misses",
     "e": {
-     "k": "int",
-     "v": "0"
+     "k": "boxNew",
+     "e": {
+      "k": "unit"
+     }
     }
    },
    "b": {
     "k": "seq",
     "a": {
-     "k": "assign",
-     "x": "wrapper",
-     "e": {
-      "k": "closure",
-      "f": "cachetools/_cached.py:<module>._uncached_info.wrapper"
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "misses"
+     },
+     "f": "v",
+     "v": {
+      "k": "int",
+      "v": "0"
      }
     },
     "b": {
      "k": "seq",
      "a": {
       "k": "assign",
-      "x": "cache_clear",
+      "x": "wrapper",
       "e": {
        "k": "closure",
-       "f": "cachetools/_cached.py:<module>._uncached_info.cache_clear"
+       "f": "cachetools/_cached.py:<module>._uncached_info.wrapper"
       }
      },
      "b": {
       "k": "seq",
       "a": {
-       "k": "setField",
-       "r": {
-        "k": "name",
-        "v": "wrapper"
-       },
-       "f": "cache_clear",
-       "v": {
-        "k": "name",
-        "v": "cache_clear"
+       "k": "assign",
+       "x": "cache_clear",
+       "e": {
+        "k": "closure",
+        "f": "cachetools/_cached.py:<module>._uncached_info.cache_clear"
        }
       },
       "b": {
@@ -14627,25 +15308,34 @@
          "k": "name",
          "v": "wrapper"
         },
-        "f": "cache_info",
+        "f": "cache_clear",
         "v": {
-         "k": "closure",
-         "f": "cachetools/_cached.py:<module>._uncached_info.<lambda>1"
+         "k": "name",
+         "v": "cache_clear"
         }
        },
        "b": {
         "k": "seq",
         "a": {
-         "k": "ret",
-         "e": {
+         "k": "setField",
+         "r": {
           "k": "name",
           "v": "wrapper"
+         },
+         "f": "cache_info",
+         "v": {
+          "k": "closure",
+          "f": "cachetools/_cached.py:<module>._uncached_info.<lambda>1"
          }
         },
         "b": {
          "k": "seq",
          "a": {
-          "k": "skip"
+          "k": "ret",
+          "e": {
+           "k": "name",
+           "v": "wrapper"
+          }
          },
          "b": {
           "k": "seq",
@@ -14653,7 +15343,13 @@
            "k": "skip"
           },
           "b": {
-           "k": "skip"
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "skip"
+           }
           }
          }
         }
@@ -14674,8 +15370,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -14685,14 +15380,22 @@
     "b": {
      "k": "seq",
      "a": {
-      "k": "assign",
-      "x": "misses",
-      "e": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "misses"
+      },
+      "f": "v",
+      "v": {
        "k": "binop",
        "op": "+",
        "a": {
-        "k": "name",
-        "v": "misses"
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "misses"
+        },
+        "f": "v"
        },
        "b": {
         "k": "int",
@@ -14742,8 +15445,7 @@
   "body": {
    "k": "seq",
    "a": {
-    "k": "holeS",
-    "label": "scope:nonlocal-write"
+    "k": "skip"
    },
    "b": {
     "k": "seq",
@@ -14751,9 +15453,13 @@
      "k": "skip"
     },
     "b": {
-     "k": "assign",
-     "x": "misses",
-     "e": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "misses"
+     },
+     "f": "v",
+     "v": {
       "k": "int",
       "v": "0"
      }
@@ -14778,8 +15484,12 @@
        "v": "0"
       },
       {
-       "k": "name",
-       "v": "misses"
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "misses"
+       },
+       "f": "v"
       }
      ]
     }
@@ -17083,7 +17793,27 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "lock",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "cond",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "info",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._warn_classmethod",
@@ -17421,7 +18151,21 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "lock",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "cond",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._WrapperBase.__call__",
@@ -17591,7 +18335,16 @@
      "v": "deprecated"
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "deprecated",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._DescriptorBase.__set_name__",
@@ -17822,7 +18575,15 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "objtype",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.__init__",
@@ -17841,7 +18602,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "_DeprecatedDescriptorBase"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -18101,7 +18871,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -19400,7 +20179,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -20394,7 +21182,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -21036,7 +21833,7 @@
     "x": "c",
     "e": {
      "k": "call",
-     "f": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache",
+     "f": "cache",
      "args": [
       {
        "k": "name",
@@ -21687,7 +22484,7 @@
     "x": "c",
     "e": {
      "k": "call",
-     "f": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache",
+     "f": "cache",
      "args": [
       {
        "k": "name",
@@ -21944,7 +22741,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -22139,7 +22945,15 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "defaults": [
+   [
+    "_objtype",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._locked",
@@ -22256,7 +23070,7 @@
     "x": "c",
     "e": {
      "k": "call",
-     "f": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache",
+     "f": "cache",
      "args": [
       {
        "k": "name",
@@ -22652,7 +23466,7 @@
     "x": "c",
     "e": {
      "k": "call",
-     "f": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache",
+     "f": "cache",
      "args": [
       {
        "k": "name",
@@ -22817,7 +23631,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -22972,7 +23795,15 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "defaults": [
+   [
+    "_objtype",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._unlocked",
@@ -23082,7 +23913,7 @@
     "x": "c",
     "e": {
      "k": "call",
-     "f": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache",
+     "f": "cache",
      "args": [
       {
        "k": "name",
@@ -23262,7 +24093,7 @@
     "x": "c",
     "e": {
      "k": "call",
-     "f": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache",
+     "f": "cache",
      "args": [
       {
        "k": "name",
@@ -23313,7 +24144,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -23454,7 +24294,15 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "defaults": [
+   [
+    "_objtype",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._wrapper",
@@ -23976,7 +24824,27 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "lock",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "cond",
+    {
+     "k": "unit"
+    }
+   ],
+   [
+    "info",
+    {
+     "k": "unit"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/func.py:<module>._UnboundTTLCache.__init__",
@@ -24215,8 +25083,11 @@
      "k": "assign",
      "x": "tmp0",
      "e": {
-      "k": "dictE",
-      "pairs": []
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
      }
     },
     "b": {
@@ -24323,8 +25194,11 @@
         "f": "cachetools/func.py:<module>._cache",
         "args": [
          {
-          "k": "dictE",
-          "pairs": []
+          "e": {
+           "k": "dictE",
+           "pairs": []
+          },
+          "k": "boxContainer"
          },
          {
           "k": "unit"
@@ -24401,7 +25275,23 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "maxsize",
+    {
+     "k": "int",
+     "v": "128"
+    }
+   ],
+   [
+    "typed",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/func.py:<module>.lfu_cache",
@@ -24446,8 +25336,11 @@
         "f": "cachetools/func.py:<module>._cache",
         "args": [
          {
-          "k": "dictE",
-          "pairs": []
+          "e": {
+           "k": "dictE",
+           "pairs": []
+          },
+          "k": "boxContainer"
          },
          {
           "k": "unit"
@@ -24524,7 +25417,23 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "maxsize",
+    {
+     "k": "int",
+     "v": "128"
+    }
+   ],
+   [
+    "typed",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/func.py:<module>.lru_cache",
@@ -24569,8 +25478,11 @@
         "f": "cachetools/func.py:<module>._cache",
         "args": [
          {
-          "k": "dictE",
-          "pairs": []
+          "e": {
+           "k": "dictE",
+           "pairs": []
+          },
+          "k": "boxContainer"
          },
          {
           "k": "unit"
@@ -24647,7 +25559,23 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "maxsize",
+    {
+     "k": "int",
+     "v": "128"
+    }
+   ],
+   [
+    "typed",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/func.py:<module>.rr_cache",
@@ -24693,8 +25621,11 @@
         "f": "cachetools/func.py:<module>._cache",
         "args": [
          {
-          "k": "dictE",
-          "pairs": []
+          "e": {
+           "k": "dictE",
+           "pairs": []
+          },
+          "k": "boxContainer"
          },
          {
           "k": "unit"
@@ -24775,7 +25706,30 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "maxsize",
+    {
+     "k": "int",
+     "v": "128"
+    }
+   ],
+   [
+    "choice",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ],
+   [
+    "typed",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/func.py:<module>.ttl_cache",
@@ -24918,7 +25872,37 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "maxsize",
+    {
+     "k": "int",
+     "v": "128"
+    }
+   ],
+   [
+    "ttl",
+    {
+     "k": "int",
+     "v": "600"
+    }
+   ],
+   [
+    "timer",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ],
+   [
+    "typed",
+    {
+     "k": "bool",
+     "v": false
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/keys.py:<module>._HashedTuple.__hash__",
@@ -25019,7 +26003,16 @@
      }
     }
    }
-  }
+  },
+  "defaults": [
+   [
+    "hash",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/keys.py:<module>._HashedTuple.__add__",
@@ -25056,7 +26049,16 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "defaults": [
+   [
+    "add",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/keys.py:<module>._HashedTuple.__radd__",
@@ -25093,7 +26095,16 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "defaults": [
+   [
+    "add",
+    {
+     "k": "hole",
+     "label": "param:default-nonliteral"
+    }
+   ]
+  ]
  },
  {
   "name": "cachetools/keys.py:<module>._HashedTuple.__getstate__",
@@ -25107,8 +26118,11 @@
      "k": "assign",
      "x": "tmp0",
      "e": {
-      "k": "dictE",
-      "pairs": []
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
      }
     },
     "b": {
@@ -26886,25 +27900,28 @@
                                                  "v": "CacheInfo"
                                                 },
                                                 {
-                                                 "k": "listE",
-                                                 "items": [
-                                                  {
-                                                   "k": "str",
-                                                   "v": "hits"
-                                                  },
-                                                  {
-                                                   "k": "str",
-                                                   "v": "misses"
-                                                  },
-                                                  {
-                                                   "k": "str",
-                                                   "v": "maxsize"
-                                                  },
-                                                  {
-                                                   "k": "str",
-                                                   "v": "currsize"
-                                                  }
-                                                 ]
+                                                 "k": "boxContainer",
+                                                 "e": {
+                                                  "k": "listE",
+                                                  "items": [
+                                                   {
+                                                    "k": "str",
+                                                    "v": "hits"
+                                                   },
+                                                   {
+                                                    "k": "str",
+                                                    "v": "misses"
+                                                   },
+                                                   {
+                                                    "k": "str",
+                                                    "v": "maxsize"
+                                                   },
+                                                   {
+                                                    "k": "str",
+                                                    "v": "currsize"
+                                                   }
+                                                  ]
+                                                 }
                                                 }
                                                ]
                                               }
@@ -27156,6 +28173,92 @@
      }
     }
    }
+  },
+  "pyClasses": {
+   "Cache": {
+    "bases": [
+     "<ext>collections.abc.MutableMapping"
+    ],
+    "attrs": [
+     "_Cache__marker",
+     "_Cache__size",
+     "currsize",
+     "maxsize"
+    ]
+   },
+   "FIFOCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": []
+   },
+   "LFUCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": [
+     "_Link"
+    ]
+   },
+   "LRUCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": []
+   },
+   "RRCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": [
+     "choice"
+    ]
+   },
+   "TLRUCache": {
+    "bases": [
+     "_TimedCache"
+    ],
+    "attrs": [
+     "_Item",
+     "_TLRUCache__HEAP_CLEANUP_FACTOR",
+     "ttu"
+    ]
+   },
+   "TTLCache": {
+    "bases": [
+     "_TimedCache"
+    ],
+    "attrs": [
+     "_Link",
+     "ttl"
+    ]
+   },
+   "_DefaultSize": {
+    "bases": [],
+    "attrs": [
+     "__slots__"
+    ]
+   },
+   "_Item": {
+    "bases": [],
+    "attrs": [
+     "__slots__"
+    ]
+   },
+   "_TimedCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": [
+     "_Timer",
+     "currsize",
+     "timer"
+    ]
+   },
+   "_Timer": {
+    "bases": [],
+    "attrs": []
+   }
   }
  },
  {
@@ -27384,7 +28487,8 @@
      }
     }
    }
-  }
+  },
+  "pyClasses": {}
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>",
@@ -27830,6 +28934,27 @@
      }
     }
    }
+  },
+  "pyClasses": {
+   "_DeprecatedDescriptorBase": {
+    "bases": [
+     "_DescriptorBase"
+    ],
+    "attrs": []
+   },
+   "_DescriptorBase": {
+    "bases": [],
+    "attrs": []
+   },
+   "_WrapperBase": {
+    "bases": [],
+    "attrs": [
+     "cache",
+     "cache_condition",
+     "cache_key",
+     "cache_lock"
+    ]
+   }
   }
  },
  {
@@ -28236,6 +29361,16 @@
      }
     }
    }
+  },
+  "pyClasses": {
+   "_UnboundTTLCache": {
+    "bases": [
+     "TTLCache"
+    ],
+    "attrs": [
+     "maxsize"
+    ]
+   }
   }
  },
  {
@@ -28470,6 +29605,16 @@
   },
   "classBases": {
    "_HashedTuple": "tuple"
+  },
+  "pyClasses": {
+   "_HashedTuple": {
+    "bases": [
+     "<ext>tuple"
+    ],
+    "attrs": [
+     "_HashedTuple__hashvalue"
+    ]
+   }
   }
  }
 ]

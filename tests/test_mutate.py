@@ -182,7 +182,10 @@ class TestScoringRules:
     def test_an_ill_typed_mutant_is_invalid_not_a_kill(self, mutate):
         src = open(mutate.__file__).read()
         assert 'rec["verdict"] = "invalid"' in src
-        assert "hit_defs and not hit_thms" in src
+        assert "hit_defs and (mut.decl in hit_defs or not hit_thms)" in src
+        # ...and an error in the MUTATED definition makes it invalid even when theorems
+        # downstream of it also fail: those failures are consequences, not detection.
+        assert "mut.decl in hit_defs" in src
 
     def test_the_coarse_fallback_is_counted_and_warned_about(self, mutate):
         """It must never be possible to report a kill rate without saying how much of

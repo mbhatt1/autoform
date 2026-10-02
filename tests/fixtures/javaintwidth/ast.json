@@ -1,0 +1,1723 @@
+[
+ {
+  "name": "JavaIntWidth.case_long_mul:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "100000"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:j64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_int_mul_wraps:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "100000"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:j32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_mixed_mul:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "3000000000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:j64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_long_accumulate:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "assign",
+        "x": "i",
+        "e": {
+         "k": "int",
+         "v": "0"
+        }
+       }
+      },
+      "b": {
+       "k": "loop",
+       "c": {
+        "k": "binop",
+        "op": "<",
+        "a": {
+         "k": "name",
+         "v": "i"
+        },
+        "b": {
+         "k": "int",
+         "v": "3"
+        }
+       },
+       "body": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "s",
+         "e": {
+          "k": "binop",
+          "op": "+:j64",
+          "a": {
+           "k": "name",
+           "v": "s"
+          },
+          "b": {
+           "k": "int",
+           "v": "2000000000"
+          }
+         }
+        },
+        "b": {
+         "k": "assign",
+         "x": "i",
+         "e": {
+          "k": "binop",
+          "op": "+:j32",
+          "a": {
+           "k": "name",
+           "v": "i"
+          },
+          "b": {
+           "k": "int",
+           "v": 1
+          }
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "s"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_int_add_wraps:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "2147483647"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:j32",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_ushr_int:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:j32",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>>:j32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "28"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_shr_int:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:j32",
+      "a": {
+       "k": "int",
+       "v": "16"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:j32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_ushr_long:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:j64",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>>:j64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "60"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_shr_long:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:j64",
+      "a": {
+       "k": "int",
+       "v": "4294967296"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:j64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "4"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_shr_assign:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:j32",
+      "a": {
+       "k": "int",
+       "v": "16"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": ">>:j32",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_shl_masked_int:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "<<:j32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "33"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_shl_long:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "<<:j64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "33"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_byte_compound:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "int",
+      "v": "127"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "unop",
+       "op": "cast:i8",
+       "a": {
+        "k": "binop",
+        "op": "+:j32",
+        "a": {
+         "k": "name",
+         "v": "b"
+        },
+        "b": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_byte_increment:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "int",
+      "v": "127"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "unop",
+       "op": "cast:i8",
+       "a": {
+        "k": "binop",
+        "op": "+:j32",
+        "a": {
+         "k": "name",
+         "v": "b"
+        },
+        "b": {
+         "k": "int",
+         "v": 1
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_char_increment:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "c",
+     "e": {
+      "k": "int",
+      "v": "65535"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "c",
+      "e": {
+       "k": "unop",
+       "op": "cast:u16",
+       "a": {
+        "k": "binop",
+        "op": "+:j32",
+        "a": {
+         "k": "name",
+         "v": "c"
+        },
+        "b": {
+         "k": "int",
+         "v": 1
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "c"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_int_compound_long:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "big",
+       "e": {
+        "k": "int",
+        "v": "4294967296"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "x",
+        "e": {
+         "k": "unop",
+         "op": "cast:i32",
+         "a": {
+          "k": "binop",
+          "op": "+:j64",
+          "a": {
+           "k": "name",
+           "v": "x"
+          },
+          "b": {
+           "k": "name",
+           "v": "big"
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "x"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_min_div:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "unop",
+      "op": "-:j32",
+      "a": {
+       "k": "int",
+       "v": "2147483648"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "/:j32",
+      "a": {
+       "k": "name",
+       "v": "m"
+      },
+      "b": {
+       "k": "unop",
+       "op": "-:j32",
+       "a": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_min_rem:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "unop",
+      "op": "-:j32",
+      "a": {
+       "k": "int",
+       "v": "2147483648"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "%:j32",
+      "a": {
+       "k": "name",
+       "v": "m"
+      },
+      "b": {
+       "k": "unop",
+       "op": "-:j32",
+       "a": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_long_div:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "unop",
+      "op": "-:j64",
+      "a": {
+       "k": "int",
+       "v": "7000000000"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "/:j64",
+      "a": {
+       "k": "name",
+       "v": "d"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_long_not:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "z",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "~:j64",
+      "a": {
+       "k": "name",
+       "v": "z"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_int_neg_min:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "y",
+     "e": {
+      "k": "unop",
+      "op": "-:j32",
+      "a": {
+       "k": "int",
+       "v": "2147483648"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "-:j32",
+      "a": {
+       "k": "name",
+       "v": "y"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.case_boxed_mul:long()",
+  "file": "JavaIntWidth.java",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "100000"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:j64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "JavaIntWidth.main:void(java.lang.String[])",
+  "file": "JavaIntWidth.java",
+  "params": [
+   "args"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "mcall",
+     "recv": {
+      "k": "name",
+      "v": "System"
+     },
+     "m": "out",
+     "args": [
+      {
+       "k": "binop",
+       "op": "+",
+       "a": {
+        "k": "str",
+        "v": "case_long_mul "
+       },
+       "b": {
+        "k": "call",
+        "f": "JavaIntWidth.case_long_mul:long()",
+        "args": []
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "exprS",
+     "e": {
+      "k": "mcall",
+      "recv": {
+       "k": "name",
+       "v": "System"
+      },
+      "m": "out",
+      "args": [
+       {
+        "k": "binop",
+        "op": "+",
+        "a": {
+         "k": "str",
+         "v": "case_int_mul_wraps "
+        },
+        "b": {
+         "k": "call",
+         "f": "JavaIntWidth.case_int_mul_wraps:long()",
+         "args": []
+        }
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "System"
+       },
+       "m": "out",
+       "args": [
+        {
+         "k": "binop",
+         "op": "+",
+         "a": {
+          "k": "str",
+          "v": "case_mixed_mul "
+         },
+         "b": {
+          "k": "call",
+          "f": "JavaIntWidth.case_mixed_mul:long()",
+          "args": []
+         }
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "exprS",
+       "e": {
+        "k": "mcall",
+        "recv": {
+         "k": "name",
+         "v": "System"
+        },
+        "m": "out",
+        "args": [
+         {
+          "k": "binop",
+          "op": "+",
+          "a": {
+           "k": "str",
+           "v": "case_long_accumulate "
+          },
+          "b": {
+           "k": "call",
+           "f": "JavaIntWidth.case_long_accumulate:long()",
+           "args": []
+          }
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "System"
+         },
+         "m": "out",
+         "args": [
+          {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "str",
+            "v": "case_int_add_wraps "
+           },
+           "b": {
+            "k": "call",
+            "f": "JavaIntWidth.case_int_add_wraps:long()",
+            "args": []
+           }
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "exprS",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "System"
+          },
+          "m": "out",
+          "args": [
+           {
+            "k": "binop",
+            "op": "+",
+            "a": {
+             "k": "str",
+             "v": "case_ushr_int "
+            },
+            "b": {
+             "k": "call",
+             "f": "JavaIntWidth.case_ushr_int:long()",
+             "args": []
+            }
+           }
+          ]
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "exprS",
+          "e": {
+           "k": "mcall",
+           "recv": {
+            "k": "name",
+            "v": "System"
+           },
+           "m": "out",
+           "args": [
+            {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "str",
+              "v": "case_shr_int "
+             },
+             "b": {
+              "k": "call",
+              "f": "JavaIntWidth.case_shr_int:long()",
+              "args": []
+             }
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "exprS",
+           "e": {
+            "k": "mcall",
+            "recv": {
+             "k": "name",
+             "v": "System"
+            },
+            "m": "out",
+            "args": [
+             {
+              "k": "binop",
+              "op": "+",
+              "a": {
+               "k": "str",
+               "v": "case_ushr_long "
+              },
+              "b": {
+               "k": "call",
+               "f": "JavaIntWidth.case_ushr_long:long()",
+               "args": []
+              }
+             }
+            ]
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "exprS",
+            "e": {
+             "k": "mcall",
+             "recv": {
+              "k": "name",
+              "v": "System"
+             },
+             "m": "out",
+             "args": [
+              {
+               "k": "binop",
+               "op": "+",
+               "a": {
+                "k": "str",
+                "v": "case_shr_long "
+               },
+               "b": {
+                "k": "call",
+                "f": "JavaIntWidth.case_shr_long:long()",
+                "args": []
+               }
+              }
+             ]
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "exprS",
+             "e": {
+              "k": "mcall",
+              "recv": {
+               "k": "name",
+               "v": "System"
+              },
+              "m": "out",
+              "args": [
+               {
+                "k": "binop",
+                "op": "+",
+                "a": {
+                 "k": "str",
+                 "v": "case_shr_assign "
+                },
+                "b": {
+                 "k": "call",
+                 "f": "JavaIntWidth.case_shr_assign:long()",
+                 "args": []
+                }
+               }
+              ]
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "exprS",
+              "e": {
+               "k": "mcall",
+               "recv": {
+                "k": "name",
+                "v": "System"
+               },
+               "m": "out",
+               "args": [
+                {
+                 "k": "binop",
+                 "op": "+",
+                 "a": {
+                  "k": "str",
+                  "v": "case_shl_masked_int "
+                 },
+                 "b": {
+                  "k": "call",
+                  "f": "JavaIntWidth.case_shl_masked_int:long()",
+                  "args": []
+                 }
+                }
+               ]
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "exprS",
+               "e": {
+                "k": "mcall",
+                "recv": {
+                 "k": "name",
+                 "v": "System"
+                },
+                "m": "out",
+                "args": [
+                 {
+                  "k": "binop",
+                  "op": "+",
+                  "a": {
+                   "k": "str",
+                   "v": "case_shl_long "
+                  },
+                  "b": {
+                   "k": "call",
+                   "f": "JavaIntWidth.case_shl_long:long()",
+                   "args": []
+                  }
+                 }
+                ]
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "exprS",
+                "e": {
+                 "k": "mcall",
+                 "recv": {
+                  "k": "name",
+                  "v": "System"
+                 },
+                 "m": "out",
+                 "args": [
+                  {
+                   "k": "binop",
+                   "op": "+",
+                   "a": {
+                    "k": "str",
+                    "v": "case_byte_compound "
+                   },
+                   "b": {
+                    "k": "call",
+                    "f": "JavaIntWidth.case_byte_compound:long()",
+                    "args": []
+                   }
+                  }
+                 ]
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "mcall",
+                  "recv": {
+                   "k": "name",
+                   "v": "System"
+                  },
+                  "m": "out",
+                  "args": [
+                   {
+                    "k": "binop",
+                    "op": "+",
+                    "a": {
+                     "k": "str",
+                     "v": "case_byte_increment "
+                    },
+                    "b": {
+                     "k": "call",
+                     "f": "JavaIntWidth.case_byte_increment:long()",
+                     "args": []
+                    }
+                   }
+                  ]
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "exprS",
+                  "e": {
+                   "k": "mcall",
+                   "recv": {
+                    "k": "name",
+                    "v": "System"
+                   },
+                   "m": "out",
+                   "args": [
+                    {
+                     "k": "binop",
+                     "op": "+",
+                     "a": {
+                      "k": "str",
+                      "v": "case_char_increment "
+                     },
+                     "b": {
+                      "k": "call",
+                      "f": "JavaIntWidth.case_char_increment:long()",
+                      "args": []
+                     }
+                    }
+                   ]
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "exprS",
+                   "e": {
+                    "k": "mcall",
+                    "recv": {
+                     "k": "name",
+                     "v": "System"
+                    },
+                    "m": "out",
+                    "args": [
+                     {
+                      "k": "binop",
+                      "op": "+",
+                      "a": {
+                       "k": "str",
+                       "v": "case_int_compound_long "
+                      },
+                      "b": {
+                       "k": "call",
+                       "f": "JavaIntWidth.case_int_compound_long:long()",
+                       "args": []
+                      }
+                     }
+                    ]
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "exprS",
+                    "e": {
+                     "k": "mcall",
+                     "recv": {
+                      "k": "name",
+                      "v": "System"
+                     },
+                     "m": "out",
+                     "args": [
+                      {
+                       "k": "binop",
+                       "op": "+",
+                       "a": {
+                        "k": "str",
+                        "v": "case_min_div "
+                       },
+                       "b": {
+                        "k": "call",
+                        "f": "JavaIntWidth.case_min_div:long()",
+                        "args": []
+                       }
+                      }
+                     ]
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "exprS",
+                     "e": {
+                      "k": "mcall",
+                      "recv": {
+                       "k": "name",
+                       "v": "System"
+                      },
+                      "m": "out",
+                      "args": [
+                       {
+                        "k": "binop",
+                        "op": "+",
+                        "a": {
+                         "k": "str",
+                         "v": "case_min_rem "
+                        },
+                        "b": {
+                         "k": "call",
+                         "f": "JavaIntWidth.case_min_rem:long()",
+                         "args": []
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "mcall",
+                       "recv": {
+                        "k": "name",
+                        "v": "System"
+                       },
+                       "m": "out",
+                       "args": [
+                        {
+                         "k": "binop",
+                         "op": "+",
+                         "a": {
+                          "k": "str",
+                          "v": "case_long_div "
+                         },
+                         "b": {
+                          "k": "call",
+                          "f": "JavaIntWidth.case_long_div:long()",
+                          "args": []
+                         }
+                        }
+                       ]
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "exprS",
+                       "e": {
+                        "k": "mcall",
+                        "recv": {
+                         "k": "name",
+                         "v": "System"
+                        },
+                        "m": "out",
+                        "args": [
+                         {
+                          "k": "binop",
+                          "op": "+",
+                          "a": {
+                           "k": "str",
+                           "v": "case_long_not "
+                          },
+                          "b": {
+                           "k": "call",
+                           "f": "JavaIntWidth.case_long_not:long()",
+                           "args": []
+                          }
+                         }
+                        ]
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "exprS",
+                        "e": {
+                         "k": "mcall",
+                         "recv": {
+                          "k": "name",
+                          "v": "System"
+                         },
+                         "m": "out",
+                         "args": [
+                          {
+                           "k": "binop",
+                           "op": "+",
+                           "a": {
+                            "k": "str",
+                            "v": "case_int_neg_min "
+                           },
+                           "b": {
+                            "k": "call",
+                            "f": "JavaIntWidth.case_int_neg_min:long()",
+                            "args": []
+                           }
+                          }
+                         ]
+                        }
+                       },
+                       "b": {
+                        "k": "exprS",
+                        "e": {
+                         "k": "mcall",
+                         "recv": {
+                          "k": "name",
+                          "v": "System"
+                         },
+                         "m": "out",
+                         "args": [
+                          {
+                           "k": "binop",
+                           "op": "+",
+                           "a": {
+                            "k": "str",
+                            "v": "case_boxed_mul "
+                           },
+                           "b": {
+                            "k": "call",
+                            "f": "JavaIntWidth.case_boxed_mul:long()",
+                            "args": []
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

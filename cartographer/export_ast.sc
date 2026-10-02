@@ -32,6 +32,40 @@ import scala.annotation.tailrec
   // decisions against the wrong configuration, so the pipeline passes it through.
   importCpg(cpgPath)
 
+  // Joern spells six compound-assignment operators with a PLURAL prefix:
+  // `<operators>.assignmentOr`, `.assignmentAnd`, `.assignmentXor`,
+  // `.assignmentShiftLeft`, `.assignmentArithmeticShiftRight`, `.assignmentModulo`
+  // (confirmed on c2cpg 4.0.606 with a one-function fixture: `x |= 1` has
+  // METHOD_FULL_NAME `<operators>.assignmentOr`, while `x += 1` is
+  // `<operator>.assignmentPlus`). Every operator test in this file is
+  // `startsWith("<operator>")` or an exact `<operator>.` key, and
+  // `"<operators>.x".startsWith("<operator>")` is FALSE -- so `x |= m` was exported as
+  // a CALL to a function named `<operators>.assignmentOr` with `x` passed by value:
+  // no hole, so the function counted as hole-free, while the write to `x` was lost
+  // (`boundOf`, `augOps` and the `>>=` signedness case all missed it). On the SQLite
+  // full tree 157 hole-free functions contained one. Renaming these calls to the
+  // singular spelling routes them through the existing `augOps` / `>>=` handling, i.e.
+  // exactly the translation `x = x | m` already gets, with the same single-evaluation
+  // guards (`assign:aug-impure-target`). C-family CPGs only: in Python `a |= b`
+  // mutates a set/list in place, which `a = a | b` does not, so other frontends keep
+  // their current (unresolved-call) behaviour until that is modelled.
+  //
+  // Item O: Java too (javasrc2cpg 4.0.606 uses the same plural spellings, e.g. `x >>= 2`
+  // is `<operators>.assignmentArithmeticShiftRight`). Java has no operator overloading:
+  // these operators exist only on primitives (and `boolean` for `&= |= ^=`), where
+  // `x op= e` is `x = (T)(x op e)` (JLS 15.26.2) -- which `assignTo` now emits, the
+  // narrowing cast included (`jArithStore`), and the shift token read from the source
+  // (`jTypedAug`) rather than from the swapped operator names.
+  if (cpg.metaData.language.l.exists(l => l == "NEWC" || l == "C" || l == "JAVASRC")) {
+    val diff = Cpg.newDiffGraphBuilder
+    cpg.call.filter(_.methodFullName.startsWith("<operators>.")).l.foreach { c =>
+      val n = "<operator>." + c.methodFullName.stripPrefix("<operators>.")
+      diff.setNodeProperty(c, "METHOD_FULL_NAME", n)
+      diff.setNodeProperty(c, "NAME", n)
+    }
+    flatgraph.DiffGraphApplier.applyDiff(cpg.graph, diff)
+  }
+
   // `seqOf` and `moduleObjectsInit` (below) both fold a flat statement list into a
   // right-nested `"seq"` chain; `maxSeqChainLen` tracks the longest one either producer
   // has built so far. Declared here (rather than next to `writeJson`, which uses it) so
@@ -198,6 +232,18 @@ import scala.annotation.tailrec
 
   def hole(label: String): ujson.Obj  = ujson.Obj("k" -> "hole", "label" -> label)
   def holeS(label: String): ujson.Obj = ujson.Obj("k" -> "holeS", "label" -> label)
+
+  /** A Python `yield` / `yield from`. pysrc2cpg has no YIELD node: it emits a RETURN
+    * whose code is the yield's own text (`yield curr.key`, `yield from xs`, `yield`),
+    * and a plain `return` never starts with that keyword. Callers check `.py` first. */
+  def isYield(r: Return): Boolean =
+    r.code.trim.stripPrefix("(").trim.matches("""(?s)yield\b.*""")
+
+  /** A Python generator function: one whose OWN body contains a `yield` (a yield inside a
+    * nested `def`/`lambda` makes that function the generator, not this one). */
+  def isGeneratorFunction(m: Method): Boolean =
+    m.filename.toLowerCase.endsWith(".py") &&
+      m.body.ast.isReturn.l.exists(r => isYield(r) && r.method.fullName == m.fullName)
   val skip = ujson.Obj("k" -> "skip")
 
   /** Kernel synchronisation primitives, which a SEQUENTIAL semantics cannot observe.
@@ -606,6 +652,208 @@ import scala.annotation.tailrec
     builtinBaseRows.filterNot(r => conflictingBaseNames.contains(r._2))
       .groupBy(_._1).map { case (f, rs) => f -> rs.map(r => r._2 -> r._3).toMap }
 
+  // ---- the Python class table (STRATEGY.md §62) ------------------------------
+  //
+  // Core resolves a method along `type(obj).__mro__` when the program carries a class
+  // table (`Program.pyClasses`); without one it falls back to a name-suffix rule that
+  // knows nothing of inheritance (docs/conformance.md finding 3). The table needs every
+  // class's bases IN SOURCE ORDER, and the CPG does not have them in a usable form:
+  // `inheritsFromTypeFullName` for `class Mid(Base)` is a list of eight mangled names
+  // (`pkg/m/py:<module>.py:<module>.Base`, `f/pkg/m/py:...`, `<fakeNew>/...`), duplicated
+  // for some bases and differently mangled for imported ones. So the bases are read back
+  // from the `class` header in the source text -- the same precondition `paramStars`
+  // already imposes -- and resolved by Python's own rules, conservatively:
+  //
+  //   * a bare name is a corpus class when one is visible under that name: declared in an
+  //     enclosing scope of the class statement (module level, the enclosing function, or
+  //     the class body it is nested in), or bound by a `from M import N [as A]` whose
+  //     module resolves to the file declaring it at module level;
+  //   * a bare or dotted name that matches no corpus class at all is EXTERNAL (`<ext>…`):
+  //     Core holes at it if lookup ever reaches it, so a wrong guess here costs reach,
+  //     never correctness;
+  //   * anything else -- a call (`namedtuple(...)`), a subscript (`Generic[T]`), an
+  //     attribute of a non-module (`self.Cache`), a corpus-class name that is not visible,
+  //     a keyword other than `metaclass=ABCMeta` -- makes the class UNKNOWN: it is left out
+  //     of the table, and every lookup through it holes.
+  //
+  // Core keys classes by SHORT name (that is what `Expr.alloc` and `Obj.cls` carry), so a
+  // short name declared twice anywhere in the corpus is dropped too; cachetools'
+  // `_cachedmethod.py` declares `Descriptor` and `Wrapper` six times each.
+  case class PyClassDecl(td: TypeDecl, full: String, short: String, file: String)
+  val pyClassDecls: List[PyClassDecl] =
+    cpg.typeDecl.isExternal(false).l
+      .filter(_.method.name.l.contains("<body>"))
+      .filterNot(_.name.contains("<"))
+      .filter(_.filename.toLowerCase.endsWith(".py"))
+      .map(td => PyClassDecl(td, td.fullName, td.name, td.filename))
+  val pyClassByFull: Map[String, PyClassDecl] = pyClassDecls.map(d => d.full -> d).toMap
+  val pyShortCount: Map[String, Int] = pyClassDecls.groupBy(_.short).map { case (k, v) => k -> v.size }
+
+  /** The scope a definition lives in: its full name minus the last segment. */
+  def parentScope(full: String): String = full.substring(0, math.max(full.lastIndexOf('.'), 0))
+
+  /** The text between the parentheses of a `class` header, `None` when the header has no
+    * parentheses, or `Some(None)`-style failure as `Left` when it cannot be read. */
+  def classHeaderArgs(d: PyClassDecl): Either[String, List[String]] = {
+    val txt = fileText(d.file).getOrElse(
+      sys.error(s"export_ast: cannot read source for ${d.file} (root='$srcRoot') to read the bases of class ${d.short}"))
+    val from = d.td.offset.getOrElse(-1)
+    if (from < 0) return Left("no-offset")
+    val hdr = ("""\bclass\s+""" + java.util.regex.Pattern.quote(d.short) + """\b""").r
+    hdr.findFirstMatchIn(txt.substring(math.min(from, txt.length))) match {
+      case None => Left("no-header")
+      case Some(mt) =>
+        var i = from + mt.end
+        while (i < txt.length && (txt.charAt(i) == ' ' || txt.charAt(i) == '\t')) i += 1
+        if (i < txt.length && txt.charAt(i) == ':') Right(Nil)
+        else if (i >= txt.length || txt.charAt(i) != '(') Left("header-shape")
+        else {
+          // Balanced scan to the matching `)`, splitting on top-level commas. Strings and
+          // comments inside a class header are not something this reads; seeing a quote or
+          // `#` makes the class unknown rather than mis-split.
+          var depth = 0; var j = i; val parts = collection.mutable.ListBuffer.empty[String]
+          var start = i + 1; var bad = false; var done = false
+          while (j < txt.length && !done && !bad) {
+            txt.charAt(j) match {
+              case '(' | '[' | '{' => depth += 1
+              case ')' | ']' | '}' =>
+                depth -= 1
+                if (depth == 0) { parts += txt.substring(start, j); done = true }
+              case ',' if depth == 1 => parts += txt.substring(start, j); start = j + 1
+              case '\'' | '"' | '#' => bad = true
+              case _ =>
+            }
+            j += 1
+          }
+          if (bad || !done) Left("header-unreadable")
+          else Right(parts.toList.map(_.replaceAll("\\s+", " ").trim).filter(_.nonEmpty))
+        }
+    }
+  }
+
+  /** `from M import a, b as c` bindings of one file: bound name -> (file of M, name). Only
+    * module files of this corpus are kept; anything else binds an external name. */
+  val pyImportsCache = collection.mutable.Map.empty[String, Map[String, (String, String)]]
+  def pyImports(file: String): Map[String, (String, String)] = pyImportsCache.getOrElseUpdate(file, {
+    val txt = fileText(file).getOrElse("")
+    val files = pyClassDecls.map(_.file).toSet ++ cpg.method.isExternal(false).filename.l.filter(_.endsWith(".py"))
+    val dir = file.split('/').dropRight(1).toList
+    val rx = """(?m)^[ \t]*from[ \t]+(\.*)([\w.]*)[ \t]+import[ \t]+(\([^)]*\)|[^\n#]*)""".r
+    rx.findAllMatchIn(txt).flatMap { mt =>
+      val dots = mt.group(1).length
+      val mod = mt.group(2)
+      val base: Option[List[String]] =
+        if (dots == 0) Some(Nil) else if (dots - 1 <= dir.length) Some(dir.dropRight(dots - 1)) else None
+      val path = base.map(b => (b ++ (if (mod.isEmpty) Nil else mod.split('.').toList)).mkString("/"))
+      val target = path.flatMap(p => List(p + ".py", p + "/__init__.py").find(files.contains))
+      val names = mt.group(3).stripPrefix("(").stripSuffix(")").split(',').toList.map(_.trim).filter(_.nonEmpty)
+      target.toList.flatMap { tf =>
+        names.flatMap { n =>
+          n.split("\\s+as\\s+").toList match {
+            case List(orig, alias) => Some(alias.trim -> (tf, orig.trim))
+            case List(orig)        => Some(orig -> (tf, orig))
+            case _                 => None
+          }
+        }
+      }
+    }.toMap
+  })
+
+  /** One base expression of class `d`, resolved: `Right(Some(entry))` for a table entry
+    * (a corpus short name or `<ext>dotted`), `Right(None)` for a base that adds nothing
+    * (`object`, `metaclass=ABCMeta`), `Left(reason)` when it makes the class unknown. */
+  def resolvePyBase(d: PyClassDecl, b: String): Either[String, Option[String]] = {
+    val ident  = """[A-Za-z_]\w*""".r
+    val dotted = """[A-Za-z_]\w*(\.[A-Za-z_]\w*)+""".r
+    val kw     = """([A-Za-z_]\w*)\s*=\s*(.+)""".r
+    val scope  = parentScope(d.full)
+    b match {
+      case "object" => Right(None)
+      // `abc.ABC` is `class ABC(metaclass=ABCMeta): __slots__ = ()`: it defines no
+      // attribute an instance lookup can find, so it adds nothing to the MRO walk. Only
+      // when the name is not also a corpus class (or imported from the corpus).
+      case "ABC" | "abc.ABC" if !pyShortCount.contains("ABC") && !pyImports(d.file).contains("ABC") =>
+        Right(None)
+      case kw(k, v) =>
+        if (k == "metaclass" && v.trim.split('.').last == "ABCMeta") Right(None)
+        else Left(s"keyword:$k")
+      case ident() =>
+        // Visible corpus classes of that short name, by Python scoping.
+        val local = pyClassDecls.filter { k =>
+          k.short == b && k.file == d.file && {
+            val ks = parentScope(k.full)
+            ks == scope || ks == d.file + ":<module>" ||
+              (scope.startsWith(ks + ".") && !pyClassByFull.contains(ks))
+          }
+        }
+        val imported = pyImports(d.file).get(b).toList.flatMap { case (tf, orig) =>
+          pyClassByFull.get(tf + ":<module>." + orig).toList
+        }
+        (local ++ imported).distinct match {
+          case List(k) => Right(Some(k.short))
+          case Nil =>
+            if (pyShortCount.contains(b) || pyImports(d.file).contains(b)) Left(s"base-not-visible:$b")
+            else Right(Some("<ext>" + b))
+          case _ => Left(s"base-ambiguous:$b")
+        }
+      case dotted(_) =>
+        if (pyShortCount.contains(b.split('.').last)) Left(s"dotted-corpus-base:$b")
+        else Right(Some("<ext>" + b))
+      case _ => Left("base-expression")
+    }
+  }
+
+  /** Names the class body binds to something other than a plain `def` of that name (or
+    * `staticmethod` of one, which Core already calls correctly through an instance: the
+    * receiver it binds is not a parameter of the function). */
+  def pyClassAttrs(d: PyClassDecl): List[String] = {
+    val own = (n: String) => d.full + "." + n
+    // Only the body's OWN statements: the AST of `<body>` also contains every method
+    // defined in it, whose locals (`tmp0 = super()`) are not class attributes.
+    d.td.method.name("<body>").l.flatMap { b =>
+      b.ast.isCall.name("<operator>.assignment").l.filter(_.method.fullName == b.fullName)
+    }.flatMap { a =>
+      val ks = kidsOf(a)
+      ks match {
+        case (i: Identifier) :: rhs :: Nil =>
+          val isDef = rhs match {
+            case r: MethodRef => r.methodFullName == own(i.name)
+            case c: Call if c.name == "staticmethod" =>
+              kidsOf(c).exists { case r: MethodRef => r.methodFullName == own(i.name); case _ => false }
+            case _ => false
+          }
+          // Stored under the name the attribute has at run time: `__size` in the body of
+          // `Cache` is `_Cache__size`, which is also how the exporter spells every method
+          // name and every `self.__x` access.
+          if (isDef) None else Some(mangleName(i.name, Some(d.short)))
+        case _ => None
+      }
+    }.distinct.sorted
+  }
+
+  /** Can a bare name in function `from` denote function `target` under Python scoping?
+    * Yes when `target` is module-level (in any module: an import binds the same object),
+    * defined in `from` itself or in an enclosing FUNCTION scope of it, or -- for the class
+    * body only -- defined in that class. A method of a class is never visible as a bare
+    * name from inside a method: class scopes do not enclose their methods' scopes. */
+  def pyBareNameReaches(target: String, from: String): Boolean = {
+    val p = parentScope(target)
+    p.endsWith(":<module>") || p == from || from == p + ".<body>" ||
+      (from.startsWith(p + ".") && !pyClassByFull.contains(p))
+  }
+
+  /** The table rows, by file: short name -> (bases, attrs). */
+  val pyClassTableByFile: Map[String, List[(String, List[String], List[String])]] =
+    pyClassDecls.filter(d => pyShortCount.getOrElse(d.short, 0) == 1).flatMap { d =>
+      classHeaderArgs(d) match {
+        case Left(_) => None
+        case Right(args) =>
+          val rs = args.map(a => resolvePyBase(d, a))
+          if (rs.exists(_.isLeft)) None
+          else Some((d.file, (d.short, rs.flatMap(_.toOption.flatten), pyClassAttrs(d))))
+      }
+    }.groupBy(_._1).map { case (f, rs) => f -> rs.map(_._2).sortBy(_._1) }
+
   // ---- lexical scope analysis ------------------------------------------------
   //
   // Joern's `fullName` *is* the lexical nesting path: `f.py:<module>.outer.inner`,
@@ -797,6 +1045,116 @@ import scala.annotation.tailrec
     if (captures) ujson.Obj("k" -> "classClosure", "c" -> target)
     else ujson.Obj("k" -> "fnref", "v" -> target)
   }
+
+  // ---- Python `nonlocal`: cell conversion --------------------------------------
+  //
+  // `Expr.closure` captures its environment BY VALUE, so a `nonlocal x; x += 1` in an
+  // inner function used to be the hole `scope:nonlocal-write`: emitting the plain
+  // assignment would update the closure's private copy and leave the enclosing frame --
+  // and every other closure over it -- reading the old value.
+  //
+  // CPython's own implementation is the fix: a variable that an inner function declares
+  // `nonlocal` lives in a CELL, a heap object shared by the owning frame and every
+  // closure over it. Core already has the pieces (`003-box-address-taken-locals`): the
+  // owning function allocates `x = boxNew(x)` in its prologue, every read of `x` becomes
+  // `x.v` and every write `x.v = e`, and an inner function, capturing `x` by value,
+  // captures the REFERENCE to the cell, not the integer in it. Reads and writes from
+  // anywhere then meet in one heap object, which is exactly cell semantics.
+  //
+  // Which names: the cells an owner allocates are exactly the names some function nested
+  // in it declares `nonlocal` and resolves to it (`bindingScopeOf`, Python's LEGB walk
+  // over enclosing FUNCTION scopes, skipping class bodies). Every function that reads or
+  // writes such a name freely -- whether or not it says `nonlocal` -- goes through the
+  // cell too, because a plain read of a variable another closure rebinds must see the
+  // rebinding. Variables nobody declares `nonlocal` are NOT converted: they keep the
+  // by-value capture, and the late-binding read that capture still gets wrong
+  // (`g = lambda: x; x = 2; g()`) is recorded in STRATEGY.md §57 rather than fixed here.
+
+  /** Names a method's OWN body declares with `kw` (`nonlocal` / `global`). */
+  def scopeDeclsOf(m: Method, kw: String): Set[String] =
+    m.body.ast.collect { case u: Unknown if u.code.trim.startsWith(kw + " ") => u }
+      .filter(u => scala.util.Try(u.method.fullName).toOption.forall(_ == m.fullName)).l
+      .flatMap(u => u.code.trim.stripPrefix(kw).takeWhile(_ != '#').split(",")
+                     .map(_.trim).filter(_.nonEmpty))
+      .toSet
+  val nonlocalOf: Map[String, Set[String]] =
+    allMethods.map(m => m.fullName -> scopeDeclsOf(m, "nonlocal")).toMap
+  val globalDeclOf: Map[String, Set[String]] =
+    allMethods.map(m => m.fullName -> scopeDeclsOf(m, "global")).toMap
+
+  /** A real `def` scope: not `<module>`, a class `<body>`, or a `<lambda>` (which cannot
+    * assign, so never owns a cell). */
+  def pyFunctionScope(fn: String): Boolean =
+    methodByName.get(fn).exists(p => !p.name.startsWith("<"))
+
+  /** The function scope a free `x` in `fn` refers to: the nearest enclosing `def` that
+    * binds it, skipping class bodies, stopping (with `None`) at one that declares it
+    * `global` -- Python's rule for `nonlocal x` and for a free read alike. */
+  def bindingScopeOf(fn: String, x: String): Option[String] = {
+    @annotation.tailrec def go(cur: String): Option[String] = {
+      val i = cur.lastIndexOf('.')
+      if (i < 0) None
+      else {
+        val parent = cur.substring(0, i)
+        if (pyFunctionScope(parent) && globalDeclOf.getOrElse(parent, Set.empty).contains(x)) None
+        else if (pyFunctionScope(parent) && boundOf.getOrElse(parent, Set.empty).contains(x)) Some(parent)
+        else go(parent)
+      }
+    }
+    go(fn)
+  }
+
+  /** Owner function -> the names it must allocate as cells. */
+  val cellsOwnedBy: Map[String, Set[String]] =
+    (for {
+      m <- allMethods
+      x <- nonlocalOf.getOrElse(m.fullName, Set.empty).toList
+      o <- bindingScopeOf(m.fullName, x).toList
+    } yield o -> x).groupBy(_._1).map { case (k, v) => k -> v.map(_._2).toSet }
+
+  /** The cells `fn` reaches without owning: free names that resolve to an owner's cell. */
+  def cellRefsOf(fn: String): Set[String] = {
+    val free = (usedOf.getOrElse(fn, Set.empty) ++ nonlocalOf.getOrElse(fn, Set.empty)) --
+               boundOf.getOrElse(fn, Set.empty)
+    free.filter(x => bindingScopeOf(fn, x).exists(o => cellsOwnedBy.getOrElse(o, Set.empty).contains(x)))
+  }
+
+  val bindingCountCache = scala.collection.mutable.Map.empty[(String, String), Int]
+
+  /** Python's scope rule for a bare name `x` read in function `fn`: the function scope
+    * that binds it -- `fn` itself, else the nearest enclosing FUNCTION (a lambda counts;
+    * class bodies and `<module>` do not, as in Python) -- or `None` when it is a global or
+    * a builtin. A `global x` in any scope on the way out ends the search at the globals. */
+  def pyBindingScope(fn: String, x: String): Option[String] = {
+    def isFnScope(f: String): Boolean =
+      methodByName.get(f).exists(p => !p.name.startsWith("<") || p.name.startsWith("<lambda>"))
+    // `boundOf` is not used here: `m.body.ast` reaches into nested definitions, so it
+    // also counts names a NESTED function assigns (and un-localises a name a nested
+    // function declares `nonlocal`). `bindingCount`, `globalDeclOf` and `nonlocalOf`
+    // (the cell-conversion section above) look at `cur`'s own body only; a
+    // `nonlocal x` in `cur` defers to the enclosing scopes, as in Python.
+    def go(cur: String): Option[String] =
+      if (globalDeclOf.getOrElse(cur, Set.empty).contains(x)) None
+      else if (isFnScope(cur) && bindingCount(cur, x) > 0 &&
+               !nonlocalOf.getOrElse(cur, Set.empty).contains(x)) Some(cur)
+      else {
+        val i = cur.lastIndexOf('.')
+        if (i < 0) None else go(cur.substring(0, i))
+      }
+    go(fn)
+  }
+
+  /** How many times scope `fn` binds `x`: once per parameter of that name and once per
+    * identifier assignment to it (a nested `def x` is one, an import `x` is one). */
+  def bindingCount(fn: String, x: String): Int = bindingCountCache.getOrElseUpdate((fn, x),
+    methodByName.get(fn).map { m =>
+      m.parameter.name.l.count(_ == x) +
+        m.body.ast.isCall.filter(c => c.methodFullName.startsWith("<operator>.assignment")).l
+          .count(c => kidsOf(c).headOption.exists {
+            case i: Identifier => i.name == x && i.method.fullName == fn
+            case _             => false
+          })
+    }.getOrElse(0))
 
   // ---- module objects ---------------------------------------------------------
   //
@@ -1050,6 +1408,10 @@ import scala.annotation.tailrec
     * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
     * implicit `this`, and stack object construction are C++ facts, not `cLike` facts. */
   var cppFile         = false
+  /** JavaScript/TypeScript (the extensions `render_lean.py` maps to `.javascript`). The
+    * jssrc2cpg frontend erases `==`/`===`, `!=`/`!==` and `>>`/`>>>`; see
+    * `jsAmbiguousBinop`. */
+  var jsFile          = false
   /** `010-reach-90pct-hole-free`: is a single-quoted literal in THIS file a numeric
     * character/rune constant (C/C++/Java/Kotlin/Go: `'x'` is an integer, its codepoint)
     * rather than an alternative string-quoting style (JS/TS: `'x'` and `"x"` are the
@@ -1135,6 +1497,17 @@ import scala.annotation.tailrec
     * binding (`expr`'s `Identifier`/`MethodParameterIn` cases, `assignTo`, `incrStmt`,
     * and the `<operator>.addressOf` case in `callExpr`). */
   var boxedLocals = Set.empty[String]
+
+  /** Python cells this method reaches but does not own (`cellRefsOf`): boxed like
+    * `boxedLocals`, so every read is `x.v` and every write `x.v = e`, but with NO prologue
+    * allocation -- the cell arrives in the captured environment, and allocating a fresh
+    * one here would disconnect this function from the owner's. */
+  var pyCellRefs = Set.empty[String]
+
+  /** `fullName` of the method `emit` is translating. */
+  var currentMethodFull = ""
+  // Item O: the declared return type of the method being emitted (`return e` converts).
+  var currentReturnType = ""
 
   /** `003-box-address-taken-locals`: `pointerLocalName -> boxedLocalName`, for a
     * pointer-typed local that is PROVABLY, syntactically, an alias of one specific
@@ -6258,6 +6631,40 @@ import scala.annotation.tailrec
   }
   def localName(n: String): String = if (cppFile && n == "this") "self" else n
 
+  /** The function `x = <function>` binds in scope `fn`'s own body, when that assignment
+    * (a nested `def x`, or `x = lambda ...`) has a bare function reference as its value. */
+  def singleFunctionBinding(fn: String, x: String): Option[String] =
+    methodByName.get(fn).toList.flatMap { m =>
+      m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+        .flatMap(c => kidsOf(c) match {
+          case (i: Identifier) :: (r: MethodRef) :: Nil
+              if i.name == x && i.method.fullName == fn => Some(r.methodFullName)
+          case _ => None
+        })
+    } match {
+      case List(one) => Some(one)
+      case _         => None
+    }
+
+  /** The callee of a Python call, when it must be called THROUGH a local or captured
+    * variable rather than by the function Joern resolved: `Some(name)` when the callee is
+    * a bare identifier that some function scope binds (`pyBindingScope`) and Joern's
+    * `mfn` is not provably that binding. `mfn` is accepted only when the binding scope
+    * binds the name exactly once, and that one binding assigns `mfn` itself (a nested
+    * `def`, or `x = lambda ...`); then the existing paths (full name, or the variable for a
+    * capturing closure) are already right, and `None` leaves them in charge. A global or
+    * builtin name is `None` too: those resolve by module, which is a different question.
+    * Reads the per-method `currentMethodFull`, so it is only meaningful inside `emit`. */
+  def pyLocalCallee(callee: Option[AstNode], mfn: String): Option[String] = callee match {
+    case Some(i: Identifier) =>
+      pyBindingScope(currentMethodFull, i.name).flatMap { scope =>
+        val isItsOwnDef = methodByName.contains(mfn) && bindingCount(scope, i.name) == 1 &&
+          singleFunctionBinding(scope, i.name).contains(mfn)
+        if (isItsOwnDef) None else Some(i.name)
+      }
+    case _ => None
+  }
+
   // ---- expressions ----------------------------------------------------------
   /** Parse a C/C++/Java integer literal.
     *
@@ -6301,6 +6708,248 @@ import scala.annotation.tailrec
   def intLit(v: BigInt): ujson.Obj =
     if (v.abs <= BigInt(2).pow(53)) ujson.Obj("k" -> "int", "v" -> v.toLong)
     else ujson.Obj("k" -> "int", "v" -> v.toString)
+
+  // ---- Python signatures: defaults, keyword-only, positional-only ---------------
+  //
+  // `pysrc2cpg` keeps a parameter's NAME and OFFSET and drops everything else about the
+  // signature: the default expression (`def f(b=1)` and `def f(b)` produce identical
+  // CPGs -- checked on Joern 4.0.606 with a probe file, the `METHOD_PARAMETER_IN` has no
+  // children and the `def` site no evaluation of `1`), the bare `*` that makes the
+  // following parameters keyword-only, and the `/` that makes the preceding ones
+  // positional-only. Treating all three as plain positional parameters was silently
+  // wrong: `def f(*args, key=None)` bound `f(1, 2)` as `key = 2`.
+  //
+  // So, exactly as `paramStars` does for `*args`/`**kwargs`, the signature is read back
+  // from the source text at the parameters' offsets. Only the TEXT of a default is
+  // available, never a CPG node for it, so a default is translated only when it is a
+  // literal (`pyDefaultLiteral`); anything else -- `[]`, `Cache.__setitem__`,
+  // `time.monotonic` -- becomes `param:default-nonliteral`, which Core raises only on a
+  // call that actually needs the default. A signature this cannot parse is the hole
+  // `param:signature-unparsed` on the whole function: unknown defaults mean every
+  // under-supplied call could be wrong.
+
+  case class PySig(kwonly: List[String], posonly: List[String], defaults: List[(String, String)])
+
+  /** Index of the first character at bracket depth 0, from `from`, satisfying `stop`,
+    * skipping string literals and comments; -1 when there is none before an unbalanced
+    * closing bracket or the end of the text. */
+  def pyScanTop(txt: String, from: Int, stop: Char => Boolean): Int = {
+    var i = from
+    var depth = 0
+    while (i < txt.length) {
+      val c = txt.charAt(i)
+      if (c == '#') {
+        while (i < txt.length && txt.charAt(i) != '\n') i += 1
+      } else if (c == '"' || c == '\'') {
+        val q = if (txt.startsWith(s"$c$c$c", i)) s"$c$c$c" else c.toString
+        i += q.length
+        var closed = false
+        while (!closed && i < txt.length) {
+          if (txt.charAt(i) == '\\') i += 2
+          else if (txt.startsWith(q, i)) { i += q.length; closed = true }
+          else if (q.length == 1 && txt.charAt(i) == '\n') return -1
+          else i += 1
+        }
+        if (!closed) return -1
+        i -= 1
+      } else if (depth == 0 && stop(c)) {
+        return i
+      } else if ("([{".indexOf(c) >= 0) {
+        depth += 1
+      } else if (")]}".indexOf(c) >= 0) {
+        if (depth == 0) return -1
+        depth -= 1
+      }
+      i += 1
+    }
+    -1
+  }
+
+  /** `txt` with `#` comments removed (outside string literals). */
+  def pyStripComments(txt: String): String = {
+    val sb = new StringBuilder
+    var i = 0
+    while (i < txt.length) {
+      val c = txt.charAt(i)
+      if (c == '#') {
+        while (i < txt.length && txt.charAt(i) != '\n') i += 1
+      } else if (c == '"' || c == '\'') {
+        val q = if (txt.startsWith(s"$c$c$c", i)) s"$c$c$c" else c.toString
+        var k = i + q.length
+        var closed = false
+        while (!closed && k < txt.length) {
+          if (txt.charAt(k) == '\\') k += 2
+          else if (txt.startsWith(q, k)) { k += q.length; closed = true }
+          else k += 1
+        }
+        val end = math.min(k, txt.length)
+        sb.append(txt.substring(i, end))
+        i = end
+      } else {
+        sb.append(c)
+        i += 1
+      }
+    }
+    sb.toString
+  }
+
+  /** The signature facts of a Python `def` or `lambda`, read from its source; `None` when
+    * the text does not parse into exactly the parameters the CPG has, in order. */
+  def pySig(m: Method): Option[PySig] = {
+    val ps = m.parameter.l.sortBy(_.index)
+    if (ps.isEmpty) return Some(PySig(Nil, Nil, Nil))
+    if (!ps.forall(_.offset.isDefined)) return None
+    val txt = fileText(m.filename).getOrElse(return None)
+    val first = ps.map(_.offset.get).min
+    if (first > txt.length) return None
+    var j = first - 1
+    while (j >= 0 && " \t\r\n*,/\\".indexOf(txt.charAt(j)) >= 0) j -= 1
+    if (j < 0) return None
+    val (start, term) =
+      if (txt.charAt(j) == '(') (j + 1, ')')
+      else if (j >= 5 && txt.substring(j - 5, j + 1) == "lambda") (j + 1, ':')
+      else return None
+    var segs = List.empty[String]
+    var pos = start
+    var done = false
+    while (!done) {
+      val e = pyScanTop(txt, pos, c => c == ',' || c == term)
+      if (e < 0) return None
+      segs = segs :+ pyStripComments(txt.substring(pos, e)).trim
+      if (txt.charAt(e) == term) done = true else pos = e + 1
+    }
+    def ident(s: String): String = s.takeWhile(ch => Character.isUnicodeIdentifierPart(ch))
+    var names    = List.empty[String]
+    var kwonly   = List.empty[String]
+    var posonly  = List.empty[String]
+    var defaults = List.empty[(String, String)]
+    var kwMode   = false
+    for (s <- segs if s.nonEmpty) {
+      if (s == "*") kwMode = true
+      else if (s == "/") posonly = names
+      else if (s.startsWith("**")) names = names :+ ident(s.drop(2).trim)
+      else if (s.startsWith("*")) { names = names :+ ident(s.drop(1).trim); kwMode = true }
+      else {
+        val nm = ident(s)
+        if (nm.isEmpty || !(nm.head == '_' || Character.isUnicodeIdentifierStart(nm.head))) return None
+        val rest = s.drop(nm.length).trim
+        val dflt =
+          if (rest.isEmpty) None
+          else if (rest.startsWith("=")) Some(rest.drop(1).trim)
+          else if (rest.startsWith(":")) {
+            val eq = pyScanTop(rest, 1, _ == '=')
+            if (eq < 0) None else Some(rest.substring(eq + 1).trim)
+          } else return None
+        names = names :+ nm
+        if (kwMode) kwonly = kwonly :+ nm
+        dflt.foreach(d => defaults = defaults :+ (nm -> d))
+      }
+    }
+    if (names != ps.map(_.name)) None
+    else Some(PySig(kwonly, posonly, defaults))
+  }
+
+  /** A default's source text as a Core literal, when it is one whose value cannot depend
+    * on WHEN it is evaluated: `None`, `True`/`False`, an integer, a float, a plain string
+    * without escapes, or `()`. Everything else is `None` (and the caller holes it). */
+  def pyDefaultLiteral(t0: String): Option[ujson.Obj] = {
+    val t = t0.trim
+    val floatRe = """[-+]?(\d+\.\d*|\.\d+|\d+)([eE][-+]?\d+)?"""
+    if (t == "None") Some(ujson.Obj("k" -> "unit"))
+    else if (t == "True")  Some(ujson.Obj("k" -> "bool", "v" -> true))
+    else if (t == "False") Some(ujson.Obj("k" -> "bool", "v" -> false))
+    else if (t.matches("""[-+]?(0|[1-9][0-9]*)""")) Some(intLit(BigInt(t.stripPrefix("+"))))
+    else if (t.matches(floatRe) && t.exists(ch => ch == '.' || ch == 'e' || ch == 'E'))
+      Some(ujson.Obj("k" -> "float", "v" -> t))
+    else if (!t.contains('\\') && !t.contains('\n') && pyStringLit(t).isDefined &&
+             !t.head.isLetter)
+      Some(ujson.Obj("k" -> "str", "v" -> pyStringLit(t).get))
+    else if (t.replace(" ", "") == "()") Some(ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr()))
+    else None
+  }
+
+  // ---- Python starred assignment: `a, *b, c = xs` --------------------------------
+  //
+  // `pysrc2cpg` lowers it to `tmp = xs; a = tmp[0]; b = tmp[1:-1:1]; c = tmp[-1]`. That
+  // is not what CPython does in three ways: the starred name is always a LIST (a slice of
+  // a tuple is a tuple), any iterable is accepted (a slice needs a sequence), and too few
+  // elements is `ValueError` (the slice is silently empty and `tmp[0]` an `IndexError`).
+  // The slice used to make the whole statement `op:slice`. The lowering is recognised
+  // here and replaced by `tmp = <unpackEx>(xs, nb, na)` -- `Stdlib.unpackEx`, which does
+  // all three -- after which the fixed targets read `tmp[i]` / `tmp[-k]` exactly as
+  // before (both still index the right element of the returned tuple) and the starred
+  // target reads `tmp[nb]`.
+
+  /** Write a Python NAME, honouring the cell/global conversions `assignTo` applies. */
+  def pyNameWrite(nm: String, e: ujson.Obj): ujson.Obj =
+    if (boxedLocals.contains(nm)) ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> e)
+    else if (isGlobalWrite(nm)) ujson.Obj("k" -> "setGlobal", "x" -> nm, "e" -> e)
+    else ujson.Obj("k" -> "assign", "x" -> nm, "e" -> e)
+
+  def pyStarredUnpack(b: Block): Option[ujson.Obj] = {
+    def intLitOf(n: AstNode): Option[Int] = n match {
+      case l: Literal => l.code.trim.toIntOption
+      case _          => None
+    }
+    def isNoneLit(n: AstNode): Boolean = n match {
+      case l: Literal => l.code.trim == "None"
+      case _          => false
+    }
+    val kids = kidsOf(b).filterNot(_.isInstanceOf[Local])
+    kids match {
+      case (first: Call) :: targets if first.methodFullName == "<operator>.assignment" && targets.nonEmpty =>
+        kidsOf(first) match {
+          case List(tmp: Identifier, rhs) =>
+            // Each target: (assignment call, lhs, Left(index) | Right(slice start, stop))
+            val parsed = targets.map {
+              case a: Call if a.methodFullName == "<operator>.assignment" =>
+                kidsOf(a) match {
+                  case List(lhs, acc: Call) if acc.methodFullName == "<operator>.indexAccess" =>
+                    kidsOf(acc) match {
+                      case List(t: Identifier, i) if t.name == tmp.name => intLitOf(i).map(ix => (a, lhs, Left(ix)))
+                      case _ => None
+                    }
+                  case List(lhs, acc: Call) if acc.methodFullName == "<operator>.slice" =>
+                    kidsOf(acc) match {
+                      case List(t: Identifier, lo, hi, st) if t.name == tmp.name && intLitOf(st).contains(1) =>
+                        val hiV: Option[Int] = if (isNoneLit(hi)) Some(0) else intLitOf(hi).map(v => -v)
+                        (intLitOf(lo), hiV) match {
+                          case (Some(l), Some(na)) => Some((a, lhs, Right((l, na))))
+                          case _ => None
+                        }
+                      case _ => None
+                    }
+                  case _ => None
+                }
+              case _ => None
+            }
+            if (parsed.exists(_.isEmpty)) None
+            else {
+              val ts = parsed.flatten
+              val slices = ts.zipWithIndex.collect { case ((_, lhs, Right((lo, na))), k) => (lhs, lo, na, k) }
+              slices match {
+                case List((sLhs: Identifier, nb, na, k))
+                    if nb == k && na == ts.length - k - 1 && na >= 0 &&
+                       ts.take(k).zipWithIndex.forall { case ((_, _, ix), i) => ix == Left(i) } &&
+                       ts.drop(k + 1).zipWithIndex.forall { case ((_, _, ix), i) => ix == Left(i - na) } =>
+                  val (prelude, rhsE) = valueOf(rhs)
+                  val call = ujson.Obj("k" -> "call", "f" -> "<unpackEx>",
+                    "args" -> ujson.Arr(rhsE, intLit(nb), intLit(na)))
+                  val tmpNm = localName(tmp.name)
+                  val tmpRead = expr(tmp)
+                  val starW = pyNameWrite(localName(sLhs.name),
+                    ujson.Obj("k" -> "index", "a" -> tmpRead, "b" -> intLit(nb)))
+                  val fixed = ts.zipWithIndex.collect { case ((a, _, Left(_)), i) => (i, stmt(a)) }
+                  val body = fixed.filter(_._1 < k).map(_._2) ++ List(starW) ++ fixed.filter(_._1 > k).map(_._2)
+                  Some(seqOf(prelude ++ List(pyNameWrite(tmpNm, call)) ++ body))
+                case _ => None
+              }
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+  }
 
   /** `010-reach-90pct-hole-free`: the integer value of a C/C++/Java/Kotlin/Go character
     * (rune) literal's INNER text (already stripped of its surrounding `'...'`) -- see
@@ -6479,6 +7128,9 @@ import scala.annotation.tailrec
     // frontend fix (`DO`, a macro body) or a real language feature Core lacks, so the
     // label carries it instead of merging them all under one count.
     case cs: ControlStructure => controlStructureExpr(cs)
+    // `y = yield v`: a yield used as a value (what `send` delivers). Same reason as the
+    // statement case: Core has no suspension.
+    case r: Return if pyFile && isYield(r) => hole("gen:yield")
     case other                => hole("expr:" + other.label)
   }
 
@@ -6750,39 +7402,96 @@ import scala.annotation.tailrec
     * the missing *type* rather than pretending to a semantics.
     *
     * A `char*` operand cannot reach here (shifting a pointer is not C). */
-  def shiftRightOp(lhs: AstNode): Option[String] =
-    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, JS, Python: the token is unambiguous
+  /** JS/TS: the binary-operator token jssrc2cpg erased, recovered from source text.
+    *
+    * jssrc2cpg (`AstForExpressionsCreator.astForBinaryExpression`, Joern v4.0.606) maps
+    * `==` and `===` both to `<operator>.equals`, `!=` and `!==` both to
+    * `<operator>.notEquals`, and `>>` and `>>>` both to `<operator>.arithmeticShiftRight`.
+    * Those pairs differ in JS (`1 == "1"` is `true`, `1 === "1"` is `false`; `-1 >> 0` is
+    * `-1`, `-1 >>> 0` is `4294967295`), so the operator name alone cannot be translated.
+    * What survives is the call's CODE, Babel's source span of the whole expression, and
+    * each operand's span. The token is what lies between them: `full` = (parens) `left`
+    * (parens/space) TOKEN (space/parens) `right`. Anything that does not have exactly
+    * that shape -- a comment between operand and operator, truncated code, a span that
+    * does not start with the left operand -- yields `None`, and the caller emits a hole
+    * naming the lost token rather than guessing either operator.
+    *
+    * Returns `None` when the call is not one of the three ambiguous operators in a JS/TS
+    * file, else `Some(Right(coreOp))` or `Some(Left(holeLabel))`. */
+  def jsAmbiguousBinop(c: Call): Option[Either[String, String]] = {
+    val mfn = c.methodFullName
+    val allowed: Map[String, Set[String]] = Map(
+      "<operator>.equals"               -> Set("==", "==="),
+      "<operator>.notEquals"            -> Set("!=", "!=="),
+      "<operator>.arithmeticShiftRight" -> Set(">>", ">>>"))
+    val kids = kidsOf(c)
+    if (!jsFile || !allowed.contains(mfn) || kids.size != 2) None
     else {
-      val b = bareType(staticTypeOf(lhs))
-      if (signedTypeNames.contains(b)) Some(">>")
-      else if (unsignedTypeNames.contains(b)) Some(">>>")
-      // `casts-sizeof`: the name tables above only know a type by its spelling. What
-      // decides C's `>>` is the type of the *promoted left operand* (C11 6.5.7p3), and
-      // that is computable from resolved types whenever `cIntExprType` can compute it
-      // -- through typedef chains (`Bitmask` -> `u64`), casts, literals and the usual
-      // arithmetic conversions of an arithmetic sub-expression (`(c - 0x10000) >> 10`,
-      // `(i + 1) >> 3`, whose own CPG node is typed `ANY`). Tried only AFTER the
-      // tables, so no site that translated before changes operator.
-      //
-      // Only a promoted type of at most 32 bits is translated. Core's `.cLike`
-      // arithmetic is 32-bit (`Dialect.toNumConfig`), so a shift of a 64-bit operand
-      // would be computed at the wrong width -- that site gets the separate
-      // `op:shiftRight:64-bit-operand` label from `shiftRightHoleLabel` instead:
-      // its signedness IS known, what is missing is 64-bit arithmetic in Core.
-      else cIntExprType(lhs).map(cPromote) match {
-        case Some((signed, bits)) if bits <= 32 => Some(if (signed) ">>" else ">>>")
-        case _                                  => None
+      val tok = jsOperatorToken(c.code, kids(0).code, kids(1).code, allowed(mfn).toList)
+      Some(tok.toRight("op:js-token-unrecovered:" + mfn.stripPrefix("<operator>.")))
+    }
+  }
+
+  /** Which of `candidates` sits between two operand spans in a binary expression's
+    * source text. Longest candidate first (`===` before `==`), and a candidate only
+    * counts if the RIGHT operand's span follows it, so `a === !b` is `===`, not `===!`.
+    * Pure string function, so it can be checked without a CPG. */
+  def jsOperatorToken(full: String, left: String, right: String,
+                      candidates: List[String]): Option[String] = {
+    def skip(s: String, i: Int, cs: String): Int = {
+      var j = i
+      while (j < s.length && (cs.contains(s(j)) || s(j).isWhitespace)) j += 1
+      j
+    }
+    if (full == null || left == null || right == null || left.isEmpty || right.isEmpty) None
+    else {
+      // The left operand's span starts the expression, possibly after opening parens
+      // that belong to it (Babel spans exclude a parenthesised operand's parens).
+      val starts = (0 to skip(full, 0, "(")).filter(i => full.startsWith(left, i))
+      starts.headOption.flatMap { i =>
+        val t0 = skip(full, i + left.length, ")")
+        candidates.sortBy(-_.length).find { tok =>
+          full.startsWith(tok, t0) && {
+            val r = skip(full, t0 + tok.length, "(")
+            full.startsWith(right, r) &&
+              // the right operand must END the expression (modulo closing parens)
+              skip(full, r + right.length, ")") == full.length
+          }
+        }
+      }
+    }
+  }
+
+  def shiftRightOp(lhs: AstNode): Option[String] =
+    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, Python: the token is unambiguous; JS
+                                 // never reaches here (`jsAmbiguousBinop` runs first)
+    else {
+      // What decides C's `>>` is the type of the *promoted left operand* (C11 6.5.7p3):
+      // its signedness picks arithmetic or logical, its width the width. Item O: Core
+      // performs the shift AT that type (`">>:u64"`, `TypedInt.lean`), so the operator
+      // names it, and a 64-bit operand -- `op:shiftRight:64-bit-operand` before, when
+      // Core's `.cLike` arithmetic was 32-bit only -- now translates. `cIntExprType`
+      // resolves the type through typedef chains (`Bitmask` -> `u64`), casts, literals
+      // and the usual arithmetic conversions of a sub-expression (`(c - 0x10000) >> 10`,
+      // whose own CPG node is typed `ANY`). The spelling tables (`signedTypeNames` /
+      // `unsignedTypeNames`) are the fallback, and only for a name whose WIDTH
+      // `resolveIntType` also knows: a signedness without a width would be the 32-bit
+      // guess this replaces.
+      cIntExprType(lhs).map(cPromote).flatMap(cIntTag) match {
+        case Some(tag) => Some(">>:" + tag)
+        case None =>
+          val b = bareType(staticTypeOf(lhs))
+          if (signedTypeNames.contains(b) || unsignedTypeNames.contains(b))
+            resolveIntType(staticTypeOf(lhs))
+              .map(t => (t.head == 'i', t.drop(1).toInt)).map(cPromote).flatMap(cIntTag)
+              .map(">>:" + _)
+          else None
       }
     }
 
   /** The hole label for a `>>`/`>>=` that `shiftRightOp` could not translate: the
-    * signedness was not recovered, or it was and the promoted operand is wider than
-    * the 32-bit arithmetic Core's `.cLike` dialect performs. */
-  def shiftRightHoleLabel(lhs: AstNode): String =
-    cIntExprType(lhs).map(cPromote) match {
-      case Some((_, bits)) if bits > 32 => "op:shiftRight:64-bit-operand"
-      case _                            => "op:shiftRight:unknown-signedness"
-    }
+    * promoted left operand's type -- hence its signedness and width -- is unrecovered. */
+  def shiftRightHoleLabel(lhs: AstNode): String = "op:shiftRight:unknown-signedness"
 
   /** `casts-sizeof`: C integer-expression typing, from RESOLVED types only.
     *
@@ -6915,19 +7624,478 @@ import scala.annotation.tailrec
           else if (boolish.contains(mfn)) Some((true, 32))
           else if (mfn == "<operator>.conditional" && ks.size == 3)
             for (a <- rec(ks(1)); b <- rec(ks(2))) yield cUsualArith(a, b)
-          else if (fieldOps.contains(mfn))
-            asField(c) match {
-              case Some((_, f)) if !bitfieldMemberNames.contains(f) => cLeafIntType(staticTypeOf(c))
-              case _ => None
-            }
+          // Item O: a member's type through the typedef chain of its owner, with
+          // bit-fields typed by their promotion (`cFieldIntType`).
+          else if (fieldOps.contains(mfn)) cFieldIntType(c)
           else if (indexOps.contains(mfn) || mfn == "<operator>.indirection")
-            cLeafIntType(staticTypeOf(c))
-          // An ordinary call: its declared return type, as Joern recorded it.
-          else if (!mfn.startsWith("<operator>")) cLeafIntType(c.typeFullName)
+            cLeafIntType(cExprTypeName(c))
+          // Item O: `sizeof` is `size_t` (C11 6.5.3.4p5), whose width is the data model's.
+          else if (mfn == "<operator>.sizeOf") cLeafIntType("size_t")
+          // Item O: `p - q` on two pointers is `ptrdiff_t` (C11 6.5.6p9).
+          else if (mfn == "<operator>.subtraction" && ks.size == 2 &&
+                   ks.forall(k => { val t = cExprTypeName(k); bareType(t) != "ANY" && isPointerType(t) }))
+            cLeafIntType("ptrdiff_t")
+          // Item O: an assignment or `++`/`--` used as a value has the type of its target
+          // (C11 6.5.16p3, 6.5.2.4p2) -- unless the target is a bit-field, whose stored
+          // value is truncated in a way Core does not model.
+          else if ((mfn == "<operator>.assignment" || augOps.contains(mfn) ||
+                    mfn == "<operator>.assignmentArithmeticShiftRight") && ks.size == 2 && !cIsBitfield(ks(0)))
+            rec(ks(0))
+          else if (incrOps.contains(mfn) && ks.size == 1 && !cIsBitfield(ks(0))) rec(ks(0))
+          // An ordinary call: its declared return type, as Joern recorded it; for an
+          // unresolved call to one of a few ISO C library functions, the return type
+          // the standard fixes (`cLibcReturnTypes`).
+          else if (!mfn.startsWith("<operator>"))
+            cLeafIntType(c.typeFullName).orElse(
+              if (bareType(c.typeFullName) == "ANY" && !cDefinedMethodNames.contains(mfn))
+                cLibcReturnTypes.get(mfn).flatMap(cLeafIntType)
+              else None)
           else None
         case _ => None
       }
     }
+
+  /** Item O: every declaration of every member, keyed by (owner, member) as
+    * `memberTypes` is, but keeping ALL declarations (a struct declared twice with
+    * different member types must not answer with whichever came last) and each
+    * member's own text (bit-field widths live there). */
+  lazy val cMembers: Map[(String, String), List[(String, String)]] =
+    cpg.typeDecl.l.flatMap { td =>
+      td.member.l.map(mm => (stripDuplicateSuffix(bareType(td.fullName)), mm.name) -> (mm.typeFullName, mm.code))
+    }.groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).distinct }
+
+  /** The declared owner of member `f`, following the typedef chain from `owner0`
+    * (`Mem` -> `sqlite3_value`, `DbPage` -> `PgHdr`), or `None`. */
+  def cMemberOwner(owner0: String, f: String): Option[String] = {
+    @tailrec def go(t: String, seen: Set[String]): Option[String] =
+      if (cMembers.contains((t, f))) Some(t)
+      else if (seen.contains(t) || seen.size > 16 || t.isEmpty || t == "ANY") None
+      else typeAliases.get(t) match {
+        case Some(n) if bareType(n) != "ANY" => go(bareType(n), seen + t)
+        case _ => aliasCandidates.get(t).map(_.toList) match {
+          case Some(List(n)) if n != "ANY" => go(bareType(n), seen + t)
+          case _ => None
+        }
+      }
+    go(owner0, Set.empty)
+  }
+
+  /** Item O: the C type of an lvalue-shaped expression as a type NAME, through member
+    * chains whose owners are typedef'd (`p->pPager->pWal`), `a[i]` and `*p` -- the
+    * same derivations `staticTypeOf` makes, but with the owner looked up through
+    * `cMemberOwner` and every declaration of the member required to agree.
+    * Everything else is `staticTypeOf`. */
+  def cExprTypeName(n: AstNode, depth: Int = 0): String =
+    if (depth > 16) staticTypeOf(n)
+    else n match {
+      case c: Call if fieldOps.contains(c.methodFullName) =>
+        asField(c).flatMap { case (r, f) =>
+          val owner0 = bareType(cExprTypeName(r, depth + 1)).reverse.dropWhile(_ == '*').reverse
+          cMemberOwner(owner0, f).map(o => cMembers((o, f)).map(_._1).distinct)
+        } match {
+          case Some(List(t)) => t
+          case _             => staticTypeOf(n)
+        }
+      case c: Call if indexOps.contains(c.methodFullName) || c.methodFullName == "<operator>.indirection" =>
+        val direct = staticTypeOf(n)
+        if (bareType(direct) != "ANY" && direct.nonEmpty) direct
+        else {
+          val recv = if (indexOps.contains(c.methodFullName)) asIndex(c).map(_._1) else kidsOf(c).headOption
+          recv.map(r => bareType(cExprTypeName(r, depth + 1))) match {
+            case Some(t) if t.endsWith("*") => t.dropRight(1)
+            case Some(t) if indexOps.contains(c.methodFullName) =>
+              """^(.+)\[[^\[\]]*\]$""".r.findFirstMatchIn(t).map(_.group(1)).getOrElse(direct)
+            case _ => direct
+          }
+        }
+      case _ => staticTypeOf(n)
+    }
+
+  /** The owner type name of member access `c`'s receiver, pointer levels stripped. */
+  def cFieldOwner(r: AstNode): String =
+    bareType(cExprTypeName(r)).reverse.dropWhile(_ == '*').reverse
+
+  def cBitfieldWidth(code: String): Option[Int] =
+    """:\s*(\d+)\s*$""".r.findFirstMatchIn(code).map(_.group(1).toInt)
+
+  /** Is `n` a member access whose member is (or, with the owner unresolved, may be) a
+    * bit-field? */
+  def cIsBitfield(n: AstNode): Boolean = n match {
+    case c: Call if fieldOps.contains(c.methodFullName) =>
+      asField(c) match {
+        case Some((r, f)) =>
+          val owner0 = cFieldOwner(r)
+          cMemberOwner(owner0, f) match {
+            case Some(o) => cMembers((o, f)).exists(d => cBitfieldWidth(d._2).isDefined)
+            case None    => bitfieldMemberNames.contains(f)
+          }
+        case None => true
+      }
+    case _ => false
+  }
+
+  /** The C type of a member READ, before promotion -- except a bit-field, which is
+    * given its promoted type: narrower than `int` it promotes to `int` (C11 6.3.1.1p2),
+    * exactly `int`-wide it keeps its declared `int`/`unsigned int`; wider bit-fields are
+    * implementation-defined and refused. Every declaration of the member must agree. */
+  def cFieldIntType(c: Call): Option[(Boolean, Int)] = asField(c).flatMap { case (r, f) =>
+    val owner0 = cFieldOwner(r)
+    cMemberOwner(owner0, f) match {
+      case Some(owner) =>
+        val tys = cMembers((owner, f)).map { case (ty, code) =>
+          cBitfieldWidth(code) match {
+            case None => cLeafIntType(ty)
+            case Some(w) =>
+              cLeafIntType(ty).flatMap { case (s, b) =>
+                if (b > 32) None else if (w < 32) Some((true, 32)) else if (w == 32) Some((s, 32)) else None
+              }
+          }
+        }
+        if (tys.nonEmpty && tys.forall(_.isDefined) && tys.distinct.size == 1) tys.head else None
+      // Unchanged fallback: the node's own type, any bit-field of that NAME refused.
+      case None =>
+        if (!bitfieldMemberNames.contains(f)) cLeafIntType(staticTypeOf(c)) else None
+    }
+  }
+
+  /** Item O: return types the ISO C standard fixes for a few library functions
+    * (C11 7.24.4, 7.24.6.3, 7.24.5.6/7). Consulted only for a call Joern left `ANY`
+    * to a function the program does not define (`cDefinedMethodNames`). */
+  lazy val cLibcReturnTypes: Map[String, String] = Map(
+    "strcmp" -> "int", "strncmp" -> "int", "memcmp" -> "int", "strcoll" -> "int",
+    "strlen" -> "size_t", "strspn" -> "size_t", "strcspn" -> "size_t")
+
+  lazy val cDefinedMethodNames: Set[String] = cpg.method.isExternal(false).fullName.toSet
+
+  // ---- item O: width-typed integer arithmetic -----------------------------------
+  //
+  // Core's untyped `.cLike` integer operators compute at 32 bits (`Dialect.toNumConfig
+  // .cLike = c32Wrapv`), right for `int` and silently wrong for `long`, `i64`, `u64`,
+  // `size_t` and every `unsigned` comparison/division/shift. A `Val.int` carries no
+  // type, so the width has to be named here, where the static type is known: an
+  // integer operator on a C/C++ file is emitted as `"<op>:<tag>"` (`"*:i64"`,
+  // `">>:u32"`, `"<:u64"`; Core's `TypedInt.lean`), the tag being the type the
+  // operation is performed at (C11 6.3.1.8 usual arithmetic conversions; the promoted
+  // left operand for shifts and unary `-`/`~`), resolved by `cIntExprType` with the
+  // stated `dataModel`. When that type does not resolve and the operands are not
+  // provably floating or pointer-valued, the operator is the hole
+  // `op:int:unresolved-type` -- NOT the untyped 32-bit operator, which would be a
+  // guess at the width.
+  //
+  // Stores convert too: `x += e`, `x++` and `x = e` into an integer object of type `T`
+  // wrap the value to `T` (`cast:<T>`) whenever the value's own type is not known to
+  // fit, so `u8 c = 255; c++` is 0 and `unsigned u = -1` holds 4294967295 -- the
+  // invariant every typed operator relies on (each operand holds the mathematical
+  // value of its own C object). `return e` converts to the declared return type the
+  // same way. Plain `char` and `_Bool` targets are not converted by a cast (`char`'s
+  // signedness is implementation-defined; `_Bool` converts by `!= 0`, not by wrapping):
+  // an arithmetic store into one is the hole `op:int:store-char-or-bool`, a plain
+  // assignment is left as it was.
+
+  /** The Core type tag of a promoted C integer type, or `None` (a width Core does not
+    * model, e.g. `__int128`). Arithmetic is never performed below `int`. */
+  def cIntTag(t: (Boolean, Int)): Option[String] = t match {
+    case (true, 32)  => Some("i32")
+    case (true, 64)  => Some("i64")
+    case (false, 32) => Some("u32")
+    case (false, 64) => Some("u64")
+    case _           => None
+  }
+
+  lazy val cFloatTypeNames = Set("float", "double", "longdouble", "_Float32", "_Float64",
+    "_Float128", "__float128")
+
+  /** `n` is PROVABLY not an integer: floating, a pointer/array, or a string literal.
+    * An untyped operator is then the right one (Core's float or pointer arms decide). */
+  def cNonIntExpr(n: AstNode, depth: Int = 0): Boolean =
+    if (depth > 24) false
+    else {
+      val ty = cExprTypeName(n)
+      val b  = bareType(ty)
+      if (cFloatTypeNames.contains(b) || (b.nonEmpty && b != "ANY" && isPointerType(ty))) true
+      else n match {
+        case l: Literal =>
+          val code = l.code.trim
+          code.startsWith("\"") || code.startsWith("L\"") ||
+            (!code.startsWith("0x") && !code.startsWith("0X") &&
+             code.matches("""^-?[0-9]*\.?[0-9]*([eE][-+]?[0-9]+)?[fFlL]?$""") &&
+             (code.contains(".") || code.contains("e") || code.contains("E")))
+        case c: Call =>
+          val ks = kidsOf(c)
+          c.methodFullName match {
+            case "<operator>.cast" if ks.size == 2 =>
+              val tty = staticTypeOf(ks(0))
+              cFloatTypeNames.contains(bareType(tty)) || castTargetIsPointer(ks(0), tty)
+            // `p - q` on two pointers is an integer (`ptrdiff_t`), not a pointer.
+            case "<operator>.subtraction" if ks.size == 2 &&
+                   ks.forall(k => { val t = cExprTypeName(k); bareType(t) != "ANY" && isPointerType(t) }) => false
+            case "<operator>.addition" | "<operator>.subtraction" | "<operator>.multiplication" |
+                 "<operator>.division" =>
+              ks.exists(k => cNonIntExpr(k, depth + 1))
+            case "<operator>.minus" | "<operator>.plus" => ks.exists(k => cNonIntExpr(k, depth + 1))
+            case "<operator>.conditional" if ks.size == 3 =>
+              cNonIntExpr(ks(1), depth + 1) || cNonIntExpr(ks(2), depth + 1)
+            case "<operator>.addressOf" => true
+            // An assignment or `++`/`--` used as a value has its target's type.
+            case m if (m == "<operator>.assignment" || augOps.contains(m) || incrOps.contains(m)) &&
+                      ks.nonEmpty => cNonIntExpr(ks(0), depth + 1)
+            case _ => false
+          }
+        case _ => false
+      }
+    }
+
+  /** The operator a C binary operator is emitted as: `Right(op)` (typed, or untyped when
+    * an operand is provably floating/pointer, or outside C/C++), `Left(holeLabel)`. */
+  def cTypedBinop(c: Call, base: String): Either[String, String] =
+    if (javaFile) jTypedBinop(c, base)
+    else if (!cppFile || base == "&&" || base == "||") Right(base)
+    else {
+      val ks = kidsOf(c)
+      val t: Option[(Boolean, Int)] =
+        if (ks.size != 2) None
+        else base match {
+          case "<<" | ">>" | ">>>" => cIntExprType(ks(0)).map(cPromote)
+          case _ => for (a <- cIntExprType(ks(0)); b <- cIntExprType(ks(1))) yield cUsualArith(a, b)
+        }
+      typedOrHole(base, t, ks)
+    }
+
+  /** As `cTypedBinop`, for an operator whose operands are given separately (the
+    * augmented-assignment target and value). */
+  def cTypedAug(lhs: AstNode, rhs: AstNode, base: String): Either[String, String] =
+    if (javaFile) jTypedAug(lhs, rhs, base)
+    else if (!cppFile || base.contains(":")) Right(base)
+    else {
+      val t = base match {
+        case "<<" | ">>" | ">>>" => cIntExprType(lhs).map(cPromote)
+        case _ => for (a <- cIntExprType(lhs); b <- cIntExprType(rhs)) yield cUsualArith(a, b)
+      }
+      typedOrHole(base, t, List(lhs, rhs))
+    }
+
+  def typedOrHole(base: String, t: Option[(Boolean, Int)], ks: List[AstNode]): Either[String, String] =
+    t match {
+      case Some(tt) => cIntTag(tt).map(tag => base + ":" + tag).toRight("op:int:unsupported-width")
+      case None if ks.exists(k => cNonIntExpr(k)) => Right(base)
+      case None => Left("op:int:unresolved-type")
+    }
+
+  /** Unary `-`/`~` at the promoted operand type; `!` is not arithmetic. */
+  def cTypedUnop(c: Call, base: String): Either[String, String] =
+    if (javaFile && base != "!")
+      kidsOf(c) match {
+        case k :: Nil => jTyped(base, jExprType(k))
+        case _        => Left("op:int:unresolved-type")
+      }
+    else if (!cppFile || base == "!") Right(base)
+    else kidsOf(c) match {
+      case k :: Nil => typedOrHole(base, cIntExprType(k).map(cPromote), List(k))
+      case ks       => typedOrHole(base, None, ks)
+    }
+
+  def typedBinopObj(op: Either[String, String], a: ujson.Obj, b: ujson.Obj): ujson.Obj = op match {
+    case Right(o)    => ujson.Obj("k" -> "binop", "op" -> o, "a" -> a, "b" -> b)
+    case Left(label) => hole(label)
+  }
+
+  def typedUnopObj(op: Either[String, String], a: ujson.Obj): ujson.Obj = op match {
+    case Right(o)    => ujson.Obj("k" -> "unop", "op" -> o, "a" -> a)
+    case Left(label) => hole(label)
+  }
+
+  /** The type an operator tag names, back as (signed, bits). */
+  def tagType(op: String): Option[(Boolean, Int)] = op.split(":").toList match {
+    case List(_, t) if t.length == 3 && (t(0) == 'i' || t(0) == 'u') && t.drop(1).forall(_.isDigit) =>
+      Some((t(0) == 'i', t.drop(1).toInt))
+    case _ => None
+  }
+
+  /** Does every value of integer type `s` survive conversion to `t` unchanged? */
+  def cFits(s: (Boolean, Int), t: (Boolean, Int)): Boolean =
+    if (s._1 == t._1) s._2 <= t._2
+    else if (!s._1 && t._1) s._2 < t._2
+    else false
+
+  /** The C integer type of a store target: `Some(Right(t))` for a type Core converts to
+    * with a `cast:`, `Some(Left(()))` for `char`/`_Bool`, `None` when it is not a
+    * resolved integer type. */
+  def cStoreType(lhs: AstNode): Option[Either[Unit, (Boolean, Int)]] =
+    if (!cppFile || cIsBitfield(lhs)) None     // a bit-field store truncates: not modelled
+    else {
+      val b = bareType(cExprTypeName(lhs))
+      if (b == "char" || b == "_Bool" || b == "bool") Some(Left(()))
+      else cIntExprType(lhs).map(Right(_))
+    }
+
+  def castTag(t: (Boolean, Int)): String = (if (t._1) "i" else "u") + t._2
+
+  def castObj(t: (Boolean, Int), v: ujson.Obj): ujson.Obj =
+    ujson.Obj("k" -> "unop", "op" -> ("cast:" + castTag(t)), "a" -> v)
+
+  def isHoleObj(v: ujson.Obj): Boolean = v.value.get("k").exists(_.str == "hole")
+
+  /** `v`, an arithmetic result computed by typed operator `op`, as stored into `lhs`.
+    * Untyped `op` (floating/pointer arithmetic) is stored as it was. */
+  def cArithStore(lhs: AstNode, op: String, v: ujson.Obj): ujson.Obj =
+    if (javaFile && !isHoleObj(v)) jArithStore(lhs, op, v)
+    else if (!cppFile || isHoleObj(v)) v
+    else tagType(op) match {
+      case None => v
+      case Some(opType) =>
+        cStoreType(lhs) match {
+          case Some(Left(_))  => hole("op:int:store-char-or-bool")
+          case Some(Right(t)) => if (cFits(opType, t)) v else castObj(t, v)
+          case None           => hole("op:int:unresolved-type")
+        }
+    }
+
+  /** `v`, the value of `rhs`, converted as by assignment to an object of type `t`:
+    * a `cast:` exactly when `rhs`'s type is not known to fit. Floating/pointer values
+    * are left alone (no integer conversion applies, or it is not this one). */
+  def cConvertTo(t: Option[Either[Unit, (Boolean, Int)]], rhs: AstNode, v: ujson.Obj): ujson.Obj =
+    if (!cppFile || isHoleObj(v)) v
+    else t match {
+      case Some(Right(tt)) =>
+        cIntExprType(rhs) match {
+          case Some(s) if cFits(s, tt)  => v
+          case Some(_)                  => castObj(tt, v)
+          case None if cNonIntExpr(rhs) => v
+          case None                     => castObj(tt, v)
+        }
+      case _ => v
+    }
+
+  // ---- item O, Java: `int` and `long` ------------------------------------------
+  //
+  // Java's integer arithmetic is at `int` (32) or `long` (64) by binary numeric
+  // promotion (JLS 5.6.2): `long` if either operand is, else `int` (`byte`, `short`,
+  // `char` and the boxed types unbox and widen first). Core performs it with Java's
+  // rules (`"*:j64"`, `TypedInt.lean`: wraps, shift counts masked, `MIN / -1 = MIN`).
+  // The type is computed from the OPERANDS, not taken from the operator node:
+  // javasrc2cpg 4.0.606 types `Integer * Long` as `java.lang.Integer` (it is `long`).
+  //
+  // javasrc2cpg 4.0.606 also SWAPS the two right shifts: `x >>> 28` is a call to
+  // `<operator>.arithmeticShiftRight` and `x >> 1` to `<operator>.logicalShiftRight`
+  // (checked on a fixture). Both were translated by name, so each was the other --
+  // `-16 >> 1` computed `>>>`. The operator is now read from the source token
+  // (`javaShiftToken`), and a shift whose token cannot be read is a hole.
+
+  def javaFile: Boolean = currentFile.toLowerCase.endsWith(".java")
+
+  /** A Java type's category after unboxing and unary numeric promotion. */
+  def jPrim(t: String): Option[String] = t match {
+    case "int" | "short" | "byte" | "char" | "java.lang.Integer" | "java.lang.Short" |
+         "java.lang.Byte" | "java.lang.Character" => Some("int")
+    case "long" | "java.lang.Long" => Some("long")
+    case "float" | "double" | "java.lang.Float" | "java.lang.Double" => Some("float")
+    case "boolean" | "java.lang.Boolean" => Some("boolean")
+    case "java.lang.String" => Some("string")
+    case _ => None
+  }
+
+  /** Binary numeric promotion over `jPrim` categories (`+` with a String concatenates). */
+  def jBinaryPromote(a: String, b: String): Option[String] =
+    if (a == "string" || b == "string") Some("string")
+    else if (a == "float" || b == "float") Some("float")
+    else if (a == "boolean" || b == "boolean") (if (a == b) Some("boolean") else None)
+    else if (a == "long" || b == "long") Some("long")
+    else Some("int")
+
+  lazy val jArithOps = Set("<operator>.addition", "<operator>.subtraction",
+    "<operator>.multiplication", "<operator>.division", "<operator>.modulo",
+    "<operator>.and", "<operator>.or", "<operator>.xor")
+  lazy val jBoolOps = Set("<operator>.lessThan", "<operator>.lessEqualsThan",
+    "<operator>.greaterThan", "<operator>.greaterEqualsThan", "<operator>.equals",
+    "<operator>.notEquals", "<operator>.logicalNot", "<operator>.logicalAnd",
+    "<operator>.logicalOr", "<operator>.instanceOf")
+
+  /** The promoted category of a Java expression, or `None` when unresolved. */
+  def jExprType(n: AstNode, depth: Int = 0): Option[String] =
+    if (depth > 24) None
+    else n match {
+      case c: Call =>
+        val ks = kidsOf(c)
+        val mfn = c.methodFullName
+        if (jArithOps.contains(mfn) && ks.size == 2)
+          for (a <- jExprType(ks(0), depth + 1); b <- jExprType(ks(1), depth + 1);
+               r <- jBinaryPromote(a, b)) yield r
+        else if ((mfn == "<operator>.shiftLeft" || mfn == "<operator>.arithmeticShiftRight" ||
+                  mfn == "<operator>.logicalShiftRight") && ks.size == 2)
+          jExprType(ks(0), depth + 1)
+        else if ((mfn == "<operator>.minus" || mfn == "<operator>.plus" ||
+                  mfn == "<operator>.not") && ks.size == 1)
+          jExprType(ks(0), depth + 1)
+        else if (jBoolOps.contains(mfn)) Some("boolean")
+        else jPrim(c.typeFullName)
+      case other => jPrim(nodeType(other))
+    }
+
+  /** `>>` or `>>>`, read from the source text between the left operand and the right. */
+  def javaShiftToken(c: Call): Option[String] =
+    kidsOf(c).headOption.collect { case e: Expression => e.code }.flatMap { lc =>
+      val i = c.code.indexOf(lc)
+      if (lc.isEmpty || i < 0 || !c.code.substring(0, i).forall(ch => ch == '(' || ch.isWhitespace)) None
+      else {
+        val rest = c.code.substring(i + lc.length).dropWhile(ch => ch == ')' || ch.isWhitespace)
+        if (rest.startsWith(">>>")) Some(">>>") else if (rest.startsWith(">>")) Some(">>") else None
+      }
+    }
+
+  def jTyped(base: String, t: Option[String]): Either[String, String] = t match {
+    case Some("int")  => Right(base + ":j32")
+    case Some("long") => Right(base + ":j64")
+    case Some(_)      => Right(base)          // floating, boolean, String: not integer arithmetic
+    case None         => Left("op:int:unresolved-type")
+  }
+
+  def jTypedBinop(c: Call, base0: String): Either[String, String] = {
+    val ks = kidsOf(c)
+    val base =
+      if (base0 == ">>" || base0 == ">>>") javaShiftToken(c).getOrElse("?") else base0
+    if (base == "?") Left("op:shiftRight:unknown-token")
+    else if (ks.size != 2) Right(base)
+    else base match {
+      // Comparison needs no conversion in Java: every integer type is signed (or `char`,
+      // whose values `int` holds), so comparing the values is comparing the converted ones.
+      case "&&" | "||" | "<" | "<=" | ">" | ">=" | "==" | "!=" => Right(base)
+      case "<<" | ">>" | ">>>" => jTyped(base, jExprType(ks(0)))
+      case _ => jTyped(base, for (a <- jExprType(ks(0)); b <- jExprType(ks(1));
+                                  r <- jBinaryPromote(a, b)) yield r)
+    }
+  }
+
+  def jTypedAug(lhs: AstNode, rhs: AstNode, base0: String): Either[String, String] = {
+    val b0 = base0.takeWhile(_ != ':')
+    val base =
+      if (b0 == ">>" || b0 == ">>>")
+        (lhs match {
+          case e: Expression => e.astParent match { case p: Call => javaShiftToken(p); case _ => None }
+          case _ => None
+        }).getOrElse("?")
+      else b0
+    if (base == "?") Left("op:shiftRight:unknown-token")
+    else base match {
+      case "<<" | ">>" | ">>>" => jTyped(base, jExprType(lhs))
+      case _ => jTyped(base, for (a <- jExprType(lhs); b <- jExprType(rhs);
+                                  r <- jBinaryPromote(a, b)) yield r)
+    }
+  }
+
+  /** A compound assignment or increment narrows back to the target's type (JLS 15.26.2:
+    * `b += 1` is `b = (byte)(b + 1)`). */
+  def jArithStore(lhs: AstNode, op: String, v: ujson.Obj): ujson.Obj = {
+    val tag = op.split(":").lift(1)
+    if (!tag.exists(t => t == "j32" || t == "j64")) v
+    else staticTypeOf(lhs) match {
+      case "byte" | "java.lang.Byte"      => castObj((true, 8), v)
+      case "short" | "java.lang.Short"    => castObj((true, 16), v)
+      case "char" | "java.lang.Character" => castObj((false, 16), v)
+      case "int" | "java.lang.Integer"    => if (tag.contains("j32")) v else castObj((true, 32), v)
+      case "long" | "java.lang.Long"      => v
+      case _                              => hole("op:int:unresolved-type")
+    }
+  }
 
   /** One element of a brace initializer, classified.
     *
@@ -7327,6 +8495,188 @@ import scala.annotation.tailrec
     bareType(ty).matches("""(signed|unsigned)?char(\*|\[\d*\])""")
   def isSingleCharPointer(n: AstNode): Boolean = isSingleCharPointerType(staticTypeOf(n))
 
+  // ---- The C address model (`Autoform/Lang/Core/Address.lean`) -----------------
+  //
+  // `Expr.ptrOp` answers pointer comparison and arithmetic AT RUN TIME, from the heap:
+  // a pointer is a block plus an offset, the block knows its extent and element size,
+  // and every case ISO C leaves undefined or unspecified (cross-object ordering,
+  // one-past-the-end compared with another object, leaving the array, a stride that
+  // does not match the block) is a dynamic hole. So the exporter no longer has to PROVE
+  // where a pointer came from before translating an operation on it -- which is what
+  // `isIrefExpr`/`strCursorParams` exist to do, and why every pointer of unknown
+  // provenance (a parameter, a field load) was a static hole. It only has to state the
+  // operation and, for arithmetic, the static pointee size. All of this is gated on
+  // `cppFile` (C/C++): `cLikeFile` also covers Java/JS/Go/Kotlin, whose `T[]` would
+  // otherwise look like pointer evidence.
+
+  /** C address model: `n` is translated to a `Val.str` under the string model on EVERY
+    * execution -- a string literal, a `char` array that is not boxed (a `char[]`
+    * global or local bound to its literal), or a byte-cursor name (`strFrom z z$off`).
+    * A `Val.str` has no address, so a pointer comparison involving one is a dynamic
+    * hole on every run; such a site keeps its static `cstr:*` label instead of
+    * trading it for a guaranteed dynamic one (the rule `strFrom`'s `p - n` refusal
+    * already follows). */
+  def isStaticStringModel(n: AstNode): Boolean = unwrapMacro(n) match {
+    case l: Literal => l.code.trim.startsWith("\"")
+    case i: Identifier =>
+      val nm = localName(i.name)
+      val ty = staticTypeOf(i)
+      (isCStringType(ty) && bareType(ty).contains("[") && !boxedArrays.contains(nm)) ||
+      strCursorParams.contains(nm)
+    case _ => false
+  }
+
+  /** C address model: the relational/equality operators `ptrOp` answers. A `def`, not
+    * a `val`: a `val` here would be a forward-reference barrier for every earlier `def`
+    * that reaches `callExpr`. */
+  def ptrRelOps: Map[String, String] = Map(
+    "<operator>.lessThan" -> "<", "<operator>.lessEqualsThan" -> "<=",
+    "<operator>.greaterThan" -> ">", "<operator>.greaterEqualsThan" -> ">=",
+    "<operator>.equals" -> "==", "<operator>.notEquals" -> "!="
+  )
+
+  /** C address model: `a OP b` is a POINTER comparison -- C/C++, not a null test
+    * (`pointerNullTest` answers those, and handles both null spellings), and at least
+    * one operand has static pointer evidence. One side suffices: C allows a pointer to
+    * be compared only with a pointer or a null pointer constant (6.5.8p2, 6.5.9p2), so
+    * in a well-formed program the other side is one of those too -- and if the type
+    * evidence was wrong, `applyPtrOp` sees two integers and holes
+    * (`ptr:non-pointer-operand`) rather than comparing them as addresses. Excluded:
+    * an operand that is a `Val.str` on every run (`isStaticStringModel`). Returns the
+    * Core operator. */
+  def ptrRelOp(c: Call): Option[String] = {
+    val kids = kidsOf(c)
+    if (!cppFile || kids.size != 2 || !ptrRelOps.contains(c.methodFullName)) None
+    else if (pointerNullTest(c).isDefined) None
+    else if (!kids.exists(k => hasPointerEvidence(k) || isOp(k, "<operator>.addressOf"))) None
+    else if (kids.exists(isStaticStringModel)) None
+    else Some(ptrRelOps(c.methodFullName))
+  }
+
+  /** C address model: no static type evidence for `n` (see `addrKind`). */
+  def castOperandTypeUnknown(n: AstNode): Boolean = {
+    val k = addrKind(staticTypeOf(n))
+    k == "unknown-type" || k == "opaque-type"
+  }
+
+  /** C address model: an integer constant expression built from literals only
+    * (`8`, `-1`, `(T)0`, `1<<3`). */
+  def isIntConstantExpr(n: AstNode): Boolean = unwrapMacro(n) match {
+    case l: Literal => !l.code.trim.startsWith("\"")
+    case c: Call if c.methodFullName.startsWith("<operator>.") && c.methodFullName != "<operator>.cast" =>
+      kidsOf(c).nonEmpty && kidsOf(c).forall(isIntConstantExpr)
+    case c: Call if c.methodFullName == "<operator>.cast" =>
+      kidsOf(c) match { case List(_, o) => isIntConstantExpr(o); case _ => false }
+    case _ => false
+  }
+
+  /** C address model: the translated comparison -- unless an operand's TRANSLATION is
+    * a string-model value (`Expr.strFrom`, a string literal), which has no address on
+    * any run: then the site keeps the static `cstr:address-*` label it had before
+    * (`isStaticStringModel` catches the names; this catches the expressions, e.g.
+    * `&z[i]` on a byte cursor). */
+  def ptrStrModel(v: ujson.Value): Boolean = v match {
+    case o: ujson.Obj => o.value.get("k").exists(k => k == ujson.Str("strFrom") || k == ujson.Str("str"))
+    case _ => false
+  }
+
+  /** C address model: `p - q` (`"diff"`) or `p - n` (`"-"`) on a `char`-family pointer
+    * `p` -- the sites `cstr:pointer-arith` refuses -- with the pointee size. */
+  def ptrArithOp(c: Call): Option[(String, Int)] = {
+    val kids = kidsOf(c)
+    if (!cppFile || kids.size != 2 || c.methodFullName != "<operator>.subtraction") None
+    else {
+      val (a, b) = (kids(0), kids(1))
+      def ptrTyped(n: AstNode) = bareType(staticTypeOf(n)).endsWith("*")
+      if (!ptrTyped(a) || !isCString(a) || isStaticStringModel(a)) None
+      else if (ptrTyped(b) || isCString(b) || isOp(b, "<operator>.addressOf")) {
+        if (!ptrTyped(b) || isStaticStringModel(b)) None
+        else (pointeeBytes(a), pointeeBytes(b)) match {
+          case (Some(x), Some(y)) if x == y => Some(("diff", x))
+          case _ => None
+        }
+      }
+      else if (isPointerType(staticTypeOf(b)) || castOperandIsPointerShaped(b)) None
+      else pointeeBytes(a).map(sz => ("-", sz))
+    }
+  }
+
+  def ptrRelE(c: Call, op: String, a: ujson.Value, b: ujson.Value): ujson.Obj = {
+    val (a1, b1) = (strFromAsPtrAdd(a), strFromAsPtrAdd(b))
+    if (ptrStrModel(a1) || ptrStrModel(b1))
+      hole(cStringUnsafe.getOrElse(c.methodFullName, "cstr:address-compare"))
+    else ptrOpE(op, 0, a1, b1)
+  }
+
+  /** C address model: an operand the exporter translated as `strFrom p n` because `p`
+    * is an untracked single-level `char*` (`callExpr`'s `p + n` case) -- in a pointer
+    * COMPARISON that translation can only hole (a `Val.str` has no address, and a
+    * `strFrom` of an interior pointer is `strFrom:non-string-receiver`). Re-spelled as
+    * `ptrOp "+" 1 p n`, which on a `Val.str` yields the same suffix (or a hole where
+    * `strFrom`'s past-the-end clamp would have invented `""`) and on an interior pointer
+    * yields the element pointer the comparison needs. Not for a `strFrom` whose base is
+    * a string literal, a byte cursor or an unboxed `char[]`: those are `Val.str` on
+    * every run, and stay string-model (and so keep their static hole). */
+  def strFromAsPtrAdd(v: ujson.Value): ujson.Value = v match {
+    case o: ujson.Obj if o.value.get("k").contains(ujson.Str("strFrom")) =>
+      val base = o("a")
+      val stringOnly = base match {
+        case bo: ujson.Obj if bo.value.get("k").contains(ujson.Str("str")) => true
+        case bo: ujson.Obj if bo.value.get("k").contains(ujson.Str("name")) =>
+          val nm = bo("v").str
+          strCursorParams.contains(nm) ||
+          localTypes.get(nm).exists(t => isCStringType(t) && bareType(t).contains("[") && !boxedArrays.contains(nm))
+        case _ => false
+      }
+      if (stringOnly) v else ptrOpE("+", 1, base, o("b"))
+    case _ => v
+  }
+
+  def ptrOpE(op: String, esz: Int, a: ujson.Value, b: ujson.Value): ujson.Obj =
+    ujson.Obj("k" -> "ptrOp", "op" -> op, "esz" -> esz, "a" -> a, "b" -> b)
+
+  /** C address model: the byte size of what a pointer-typed expression points to, for
+    * pointer ARITHMETIC (`u8*` -> 1, `u32*` -> 4, `char**` -> the pointer width). `None`
+    * for `void*`, an unresolved type, a non-pointer -- and for an AGGREGATE pointee
+    * (`Mem*`, `WhereTerm*`): Core has no block whose elements are structs (a struct is
+    * its own object, `Val.ref`), so stepping a struct pointer could only ever produce a
+    * pointer whose every `p->f` is a dynamic hole, and the static
+    * `op:postIncrement:pointer` / `op:addressOf:element:object` label says that more
+    * honestly than a translation that holes on every run. */
+  def pointeeBytes(n: AstNode): Option[Int] = {
+    val b = bareType(staticTypeOf(n))
+    if (!b.endsWith("*")) None
+    else {
+      val pt = b.dropRight(1)
+      val kind = addrKind(pt)
+      if (pt.isEmpty || pt == "void" || pt == "ANY" || !(kind == "scalar" || kind == "pointer")) None
+      else memberSizeofBytes(pt).filter(_ > 0)
+    }
+  }
+
+  /** C address model: the element byte size of an array type (`u8[32]` -> 1), for the
+    * `$esz` tag on the block a boxed array is allocated as. */
+  def arrayElemBytes(ty: String): Option[Int] =
+    """^(.+)\[[^\[\]]*\]$""".r.findFirstMatchIn(bareType(ty))
+      .flatMap(m => memberSizeofBytes(m.group(1))).filter(_ > 0)
+
+  /** C address model: `&p[i]` -- `p` a POINTER (not an array) of any provenance whose
+    * pointee size is known, `i` not pointer-typed. C defines `&p[i]` as `p + i`
+    * (6.5.3.2p3, 6.5.2.1p2), and `ptrOp "+" esz p i` is that addition with the stride
+    * and bounds checked against the block `p` points into at run time. A `Val.str`
+    * receiver steps under the string model (byte strides only, never past the
+    * terminator). Not for a receiver whose value is a `Val.str` on every run
+    * (`isStaticStringModel`), nor for the `&((T*)0)[k]` integer-smuggling idiom
+    * (`addressOfResidueLabel`), which stay holes. */
+  def ptrElementAddrOf(operand: AstNode): Option[ujson.Obj] =
+    if (!cppFile) None
+    else asIndex(operand).flatMap { case (recv, idx) =>
+      val rty = bareType(staticTypeOf(recv))
+      if (!rty.endsWith("*") || isPointerType(staticTypeOf(idx)) || isStaticStringModel(recv) ||
+          addressOfResidueLabel(operand).isDefined) None
+      else pointeeBytes(recv).map(sz => ptrOpE("+", sz, expr(recv), expr(idx)))
+    }
+
   /** Pointer-arith family: static evidence that `n` is a POINTER (so that a `0`
     * compared against it is the null-pointer constant, not the integer zero). */
   def hasPointerEvidence(n: AstNode): Boolean =
@@ -7417,7 +8767,16 @@ import scala.annotation.tailrec
     // evidence for a bare `0` (so `n == 0` on an integer is untouched); a
     // `NULL`/`nullptr`/`(T*)0` operand is its own evidence. Only the non-null
     // side is evaluated, once, so no purity condition is needed.
-    if (pointerNullTest(c).isDefined) {
+    // JS/TS `==`/`===`/`!=`/`!==`/`>>`/`>>>`: FIRST, before the C-family null test
+    // below, which would turn `x == null` into `x in (None, 0)` -- `0 == null` is
+    // `false` in JS. See `jsAmbiguousBinop`; Core's `.javascript` arms decide `null`.
+    if (jsAmbiguousBinop(c).isDefined)
+      jsAmbiguousBinop(c).get match {
+        case Right(op) => ujson.Obj("k" -> "binop", "op" -> op,
+                                    "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+        case Left(lbl) => hole(lbl)
+      }
+    else if (pointerNullTest(c).isDefined) {
       val (other, neg) = pointerNullTest(c).get
       nullTestExpr(expr(other), neg)
     }
@@ -7473,8 +8832,16 @@ import scala.annotation.tailrec
              // Pointer-arith family: `isIrefOperand`, so a decayed boxed-array
              // name (`p - buf`, `p == buf`, `p < aBuf`) counts too -- `expr()`
              // renders it as `irefIndex buf 0`, a `Val.iref` like any other.
-             isIrefOperand(kids(0)) && isIrefOperand(kids(1)))
-      ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+             isIrefOperand(kids(0)) && isIrefOperand(kids(1))) {
+      // C address model: the comparisons go through `ptrOp`, whose answer consults the
+      // blocks -- `applyBinop`'s heap-free `iref` arms answer `false` for a
+      // one-past-the-end pointer compared with another object's start, where C leaves
+      // the result unspecified, and order out-of-bounds offsets C never allows to
+      // exist. The difference keeps `binop "-"`: its stride is proven statically here.
+      if (mfn == "<operator>.subtraction")
+        ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+      else ptrOpE(binops(mfn), 0, expr(kids(0)), expr(kids(1)))
+    }
     // `010-reach-90pct-hole-free` US4: `p < end` / `p == q` / ... -- TWO tracked
     // byte cursors, compared. Sound exactly when both provably measure offsets
     // into the SAME underlying string (`strCursorBase`'s own doc comment has the
@@ -7562,11 +8929,32 @@ import scala.annotation.tailrec
       val (p, n) = if (isSingleCharPointer(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
       ujson.Obj("k" -> "strFrom", "a" -> expr(p), "b" -> expr(n))
     }
+    // C address model: a pointer comparison of any provenance -- see `ptrRelOp`.
+    // After every proven-provenance case above (same-base byte cursors compare their
+    // `$off`s), before the `cstr:address-*` refusal and the generic `binop`, whose
+    // `Val.beq`/`applyBinop` answer is not C's for pointers.
+    else if (ptrRelOp(c).isDefined)
+      ptrRelE(c, ptrRelOp(c).get, expr(kids(0)), expr(kids(1)))
+    // C address model: `p - q` and `p - n` on a `char`-family pointer the cases above
+    // could not place (the residue of `cstr:pointer-arith`). `ptrOp "diff"` / `"-"` with
+    // the static pointee size: same-block, same-stride, in-bounds only, everything else
+    // a dynamic hole. A difference needs both pointees to have the SAME size, which is
+    // what makes the element count C defines (6.5.6p9) the block's element count.
+    else if (ptrArithOp(c).isDefined) {
+      val (op, esz) = ptrArithOp(c).get
+      val a = expr(kids(0)); val b = expr(kids(1))
+      if (ptrStrModel(a) || (op == "diff" && ptrStrModel(b))) hole("cstr:pointer-arith")
+      else ptrOpE(op, esz, a, b)
+    }
     else if (cLikeFile && kids.size == 2 && kids.exists(isCString) &&
         cStringUnsafe.contains(mfn) && !isNullCheck)
       hole(cStringUnsafe(mfn))
+    // Item O: typed at the operation's C type (`cTypedBinop`), or a hole.
     else if (binops.contains(mfn) && kids.size == 2)
-      ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+      typedBinopObj(cTypedBinop(c, binops(mfn)), expr(kids(0)), expr(kids(1)))
+    // Item O: Java reads `>>`/`>>>` from the source token (see `javaShiftToken`).
+    else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2 && javaFile)
+      typedBinopObj(jTypedBinop(c, ">>"), expr(kids(0)), expr(kids(1)))
     else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2)
       shiftRightOp(kids(0)) match {
         case Some(op) => ujson.Obj("k" -> "binop", "op" -> op,
@@ -7577,7 +8965,7 @@ import scala.annotation.tailrec
     else if (isPointerNot(c))
       nullTestExpr(expr(kids(0)), neg = false)
     else if (unops.contains(mfn) && kids.size == 1)
-      ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
+      typedUnopObj(cTypedUnop(c, unops(mfn)), expr(kids(0)))
     // `011-control-flow-holes`: unary `+e` (`<operator>.plus`, one child) is `e`.
     // C11 6.5.3.3p1/p2: the operand must have ARITHMETIC type (never a pointer), and
     // the result is "the value of its (promoted) operand" -- integer promotion is
@@ -7672,14 +9060,20 @@ import scala.annotation.tailrec
                 "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (mfn == "<operator>.conditional" && kids.size == 3)
       ujson.Obj("k" -> "cond", "c" -> expr(kids(0)), "t" -> expr(kids(1)), "e" -> expr(kids(2)))
+    // A Python list/dict display is a fresh OBJECT (`Expr.boxContainer`,
+    // `docs/boxed-containers.md`): `b = a` then shares it, so `b[0] = 1` is visible
+    // through `a`. Other front ends that reach these operators keep value semantics.
     else if (mfn == "<operator>.listLiteral")
-      ujson.Obj("k" -> "listE", "items" -> exprs(kids))
+      (if (pyFile) ujson.Obj("k" -> "boxContainer", "e" -> ujson.Obj("k" -> "listE", "items" -> exprs(kids)))
+       else ujson.Obj("k" -> "listE", "items" -> exprs(kids)))
     else if (mfn == "<operator>.tupleLiteral")
       ujson.Obj("k" -> "tupleE", "items" -> exprs(kids))
     else if (mfn == "<operator>.dictLiteral")
       // The Python frontend emits `{}` here and fills it with indexed stores; a
       // dictLiteral with children would be a shape we have not seen and must not guess at.
-      (if (kids.isEmpty) ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
+      (if (kids.isEmpty && pyFile)
+         ujson.Obj("k" -> "boxContainer", "e" -> ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr()))
+       else if (kids.isEmpty) ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
        else hole("op:dictLiteral-nonempty"))
     // `static_cast<uint8_t>(e)` — a **width conversion**, which Core does model.
     //
@@ -7823,6 +9217,18 @@ import scala.annotation.tailrec
             if (isNullLiteral(kids(1))) ujson.Obj("k" -> "unit")
             else if (castOperandIsPointerShaped(kids(1)) || castFieldOperandPointerShaped(kids(1)))
               expr(kids(1))
+            // C address model: the operand's static type did not resolve, so the
+            // exporter cannot tell a pointer-to-pointer cast (the identity, as just
+            // above) from an int-to-pointer conversion (a hole). `unop "cast:ptr"`
+            // (`Address.lean`'s `ptrCast`) makes the same split at RUN TIME, on the
+            // value: every pointer value passes unchanged, a non-zero integer is the
+            // `op:cast:pointer:int-to-pointer` hole. Only for an operand with no type
+            // evidence at all (`unknown-type`/`opaque-type`); one known to be an integer
+            // keeps the static hole, and so does an integer CONSTANT whatever its
+            // reported type (`(sqlite3_destructor_type)-1`), whose dynamic outcome is
+            // already certain.
+            else if (cppFile && castOperandTypeUnknown(kids(1)) && !isIntConstantExpr(kids(1)))
+              ujson.Obj("k" -> "unop", "op" -> "cast:ptr", "a" -> expr(kids(1)))
             else hole("op:cast:pointer:int-to-pointer")
           }
           else resolveIntType(tty) match {
@@ -7961,6 +9367,9 @@ import scala.annotation.tailrec
       // translated `&` site can change shape.
       lazy val irefElemAddr = irefElementAddrOf(kids(0))
       lazy val literalElemAddr = literalElementAddrOf(kids(0))
+      // C address model: `&p[i]` on a pointer of any provenance, tried LAST so that no
+      // site an earlier case translates changes shape. See `ptrElementAddrOf`.
+      lazy val ptrElemAddr = ptrElementAddrOf(kids(0))
       if (cursorAddrOf.isDefined) {
         cursorAddrOf.get
       } else if (arrIref.isDefined) {
@@ -7994,6 +9403,7 @@ import scala.annotation.tailrec
       else if (fnIdentity) expr(kids(0))
       else if (irefElemAddr.isDefined) irefElemAddr.get
       else if (literalElemAddr.isDefined) literalElemAddr.get
+      else if (ptrElemAddr.isDefined) ptrElemAddr.get
       else {
         val k = if (kind == "unknown-type" && nm.exists(ptrReceivers.contains)) "pointer"
                 else kind
@@ -8310,6 +9720,21 @@ import scala.annotation.tailrec
             // Only a call the frontend left *unnamed* can be one of these; a named call
             // already says what it invokes, and rerouting it on a name coincidence would
             // be a guess.
+            // Zero-argument `super()` directly in a method of class `C` whose receiver is
+            // `self` IS `super(C, self)`: the compiler supplies `__class__` and the first
+            // argument. Core has no `__class__` cell, so the exporter writes the class in
+            // (`Ctx.makeSuper`, STRATEGY.md §62). Anywhere else -- a nested function, a
+            // `classmethod` whose first parameter is `cls` -- it stays `super()`, which Core
+            // holes as `call:super`.
+            case None if pyFile && c.name == "super" && mfn == "__builtin.super" &&
+                         args.isEmpty && kwArgs.isEmpty &&
+                         pyClassByFull.contains(parentScope(currentMethodFull)) &&
+                         methodByName.get(currentMethodFull).exists(
+                           _.parameter.l.sortBy(_.index).headOption.exists(_.name == "self")) =>
+              ujson.Obj("k" -> "call", "f" -> "super",
+                        "args" -> ujson.Arr(
+                          ujson.Obj("k" -> "str", "v" -> pyClassByFull(parentScope(currentMethodFull)).short),
+                          ujson.Obj("k" -> "name", "v" -> "self")))
             case None => (if (c.name.isEmpty) boundMethodCall(c, callee, args) else None)
               .getOrElse {
               // A call with no callee name is not a call we can emit. `Expr.call` is *by
@@ -8326,6 +9751,44 @@ import scala.annotation.tailrec
               // `_cached.py` distinguishable from `_wrapper` in `_cachedmethod.py`:
               // `Ctx.resolve` matches the full name exactly, where its short-name fallback
               // needs a *unique* suffix and so resolved neither.
+              // A CLOSURE called through the local variable that holds it (`inc()` after
+              // `def inc(): nonlocal n ...`) is called by that variable's name, so that
+              // Core's `Expr.call` finds the `Val.clos` in the environment and applies it
+              // WITH its captured frame. Calling it by its full name reached the right
+              // `Func` with no environment at all: every captured read unbound, every
+              // `nonlocal` write a hole. Non-capturing targets keep the full name.
+              // A call through a LOCAL or CAPTURED Python name (`cache(self)` where `cache`
+              // is a parameter of `_locked`; `_wrapper(...)` after a function-local
+              // `from ._cached import _wrapper`). Python resolves the name in the scope
+              // that binds it; pysrc2cpg resolves it by NAME, to whatever function has
+              // that short name -- `_WrapperBase.cache`, a property of another class, or
+              // `_cachedmethod.py`'s `_wrapper` for an import from `_cached.py`
+              // (docs/conformance.md, finding 2). Its `methodFullName` is trusted only
+              // when it is the one `def` that binds the name in that very scope; anything
+              // else is called through the variable, whose value is what Python calls.
+              // A `nonlocal` cell holds the function one field down, and `Expr.call` takes
+              // a name, not a value: that shape is a hole rather than a call of the cell.
+              else if (pyFile && !moduleScope && pyLocalCallee(callee, mfn).isDefined) {
+                val v = pyLocalCallee(callee, mfn).get
+                if (boxedLocals.contains(v) || pyCellRefs.contains(v)) hole("call:through-cell")
+                else ujson.Obj("k" -> "call", "f" -> v, "args" -> argExprs(args, kwArgs))
+              }
+              else if (methodByName.contains(mfn) && pyFile && capturesEnv.getOrElse(mfn, false) &&
+                       callee.exists { case i: Identifier => true; case _ => false })
+                ujson.Obj("k" -> "call", "f" -> callee.collect { case i: Identifier => i.name }.get,
+                          "args" -> argExprs(args, kwArgs))
+              // A BARE name cannot denote a function Python scoping does not make visible
+              // from here. Joern resolves `orphan()` to `Holder.orphan` -- a METHOD, which no
+              // bare name outside the class body can reach -- and `cache(self)` in
+              // `_cachedmethod.py` to the property `_WrapperBase.cache` rather than the
+              // enclosing function's parameter (docs/conformance.md finding 2). Such a target
+              // is dropped and the call is emitted by its NAME, which Core then resolves the
+              // way CPython does (local, global, builtin; STRATEGY.md §62).
+              else if (pyFile && methodByName.contains(mfn) &&
+                       callee.exists(_.isInstanceOf[Identifier]) &&
+                       !pyBareNameReaches(mfn, currentMethodFull))
+                ujson.Obj("k" -> "call", "f" -> callee.collect { case i: Identifier => i.name }.get,
+                          "args" -> argExprs(args, kwArgs))
               else if (methodByName.contains(mfn))
                 ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn),
                           "args" -> argExprs(args, kwArgs))
@@ -9233,9 +10696,18 @@ import scala.annotation.tailrec
     // produces the FINAL statement, and this needs to reach the function's own
     // trailing `seqOf(prelude :+ core)`.
     var indexPrelude = List.empty[ujson.Obj]
+    // Item O: the arithmetic of `x op= e` is performed at the usual-arithmetic type of
+    // `x` and `e` and the result converted back to `x`'s type (C11 6.5.16.2p3);
+    // `x = e` converts `e` to `x`'s type (6.5.16.1p2). See `cTypedAug`/`cArithStore`/
+    // `cConvertTo`.
     def combine(cur: => ujson.Obj): ujson.Obj = aug match {
-      case None     => rhsE
-      case Some(op) => ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> rhsE)
+      case None     => cConvertTo(cStoreType(lhs), rhs, rhsE)
+      case Some(op) =>
+        cTypedAug(lhs, rhs, op) match {
+          case Left(label) => hole(label)
+          case Right(top)  =>
+            cArithStore(lhs, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> rhsE))
+        }
     }
     // `010-reach-90pct-hole-free`: is `r` a nested `<operator>.assignment` Call
     // (a C chained assignment's inner half) whose OWN LHS name is a
@@ -9338,6 +10810,24 @@ import scala.annotation.tailrec
         val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
         ujson.Obj("k" -> k, "x" -> nm,
                   "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> rhsE))
+      // C address model: `p += n` / `p -= n` on any other unboxed `char`-family pointer
+      // local of unknown provenance -- `p = ptrOp "±" esz p n`, the stride-checked,
+      // bounds-checked pointer step (`Address.lean`'s `ptrAdd`): an interior pointer
+      // steps within its block, a `Val.str` steps forward under the string model, and
+      // anything C leaves undefined (leaving the array, stepping before a string's
+      // start, a block of another element size) is a dynamic hole. Only the sites the
+      // refusal just below would otherwise hole; other pointer types keep their
+      // existing translation.
+      case i: Identifier if cppFile && (aug.contains("+") || aug.contains("-")) &&
+                             isCString(i) && bareType(staticTypeOf(i)).endsWith("*") &&
+                             !boxedLocals.contains(localName(i.name)) &&
+                             !boxedArrays.contains(localName(i.name)) &&
+                             !isPointerType(staticTypeOf(rhs)) && !isCString(rhs) &&
+                             pointeeBytes(i).isDefined =>
+        val nm = localName(i.name)
+        val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> nm,
+                  "e" -> ptrOpE(aug.get, pointeeBytes(i).get, ujson.Obj("k" -> "name", "v" -> nm), rhsE))
       // `s += n` on a `char*` advances a pointer; see `cStringUnsafe`. The augmented form
       // never reaches `callExpr`, so it is guarded here too.
       case _ if cLikeFile && aug.isDefined && (isCString(lhs) || isCString(rhs)) =>
@@ -9596,7 +11086,7 @@ import scala.annotation.tailrec
         val (pa, ae) = exprV(a)
         val (pb, be) = exprV(b)
         indexPrelude = pa ++ pb
-        ujson.Obj("k" -> "setIndex", "r" -> ae, "i" -> be, "v" -> rhsE)
+        ujson.Obj("k" -> "setIndex", "r" -> ae, "i" -> be, "v" -> cConvertTo(cStoreType(lhs), rhs, rhsE))
       case c: Call if c.methodFullName.startsWith("<operator>") =>
         holeS("assign:lhs:" + c.methodFullName.stripPrefix("<operator>."))
       case other => holeS("assign:lhs:" + other.label)
@@ -9624,6 +11114,22 @@ import scala.annotation.tailrec
     val one = ujson.Obj("k" -> "int", "v" -> ujson.Num(1.0))
     def bump(cur: ujson.Obj): ujson.Obj =
       ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> one)
+    // Item O: `x++` on an integer object is `x = (T)(x + 1)`, the `+` at the usual
+    // arithmetic type of `x` and `int` -- so `u8 c = 255; c++` stores 0 and `i64 n`
+    // counts past 2^31. Used for every NON-pointer target below; the pointer cases
+    // keep `bump`, whose `+` is Core's element-indexed pointer arithmetic.
+    def ibump(cur: ujson.Obj): ujson.Obj =
+      if (javaFile) jTyped(op, jExprType(tgt).flatMap(t => jBinaryPromote(t, "int"))) match {
+        case Left(label) => hole(label)
+        case Right(top)  =>
+          cArithStore(tgt, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> one))
+      }
+      else if (!cppFile) bump(cur)
+      else typedOrHole(op, cIntExprType(tgt).map(a => cUsualArith(a, (true, 32))), List(tgt)) match {
+        case Left(label) => hole(label)
+        case Right(top)  =>
+          cArithStore(tgt, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> one))
+      }
     // `006-reduce-remaining-holes`, Story 5: `p++`/`p--`, `p` PROVABLY holding an
     // interior pointer VALUE for its whole lifetime (`ptrIrefNames`) -- checked
     // BEFORE the general pointer-target guard just below, which exists precisely
@@ -9659,6 +11165,26 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> k, "x" -> nm,
                 "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> one))
     }
+    // C address model: `p++`/`p--` on an unboxed pointer local or parameter of
+    // unknown provenance, or on a pointer-typed field of a pure receiver -- `p = ptrOp
+    // "±" esz p 1`: C's own scaling by `sizeof(*p)` is exactly the stride `ptrOp`
+    // checks against the block, so the objection above (Core cannot scale `+1`) no
+    // longer applies. A pointee whose size does not resolve keeps the hole.
+    else if (cppFile && bareType(staticTypeOf(tgt)).endsWith("*") && pointeeBytes(tgt).isDefined &&
+             (tgt match { case _: Identifier => true; case _ => false }) &&
+             rawLocalOrParamName(tgt).map(localName).exists(nm =>
+               !boxedLocals.contains(nm) && !boxedArrays.contains(nm))) {
+      val nm = rawLocalOrParamName(tgt).map(localName).get
+      val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+      ujson.Obj("k" -> k, "x" -> nm,
+                "e" -> ptrOpE(op, pointeeBytes(tgt).get, ujson.Obj("k" -> "name", "v" -> nm), one))
+    }
+    else if (cppFile && bareType(staticTypeOf(tgt)).endsWith("*") && pointeeBytes(tgt).isDefined &&
+             asField(tgt).exists { case (r, _) => pureNode(r) }) {
+      val (r, f) = asField(tgt).get
+      ujson.Obj("k" -> "setField", "r" -> expr(r), "f" -> f,
+                "v" -> ptrOpE(op, pointeeBytes(tgt).get, ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f), one))
+    }
     else if (isPointerType(staticTypeOf(tgt)) || isCString(tgt)) holeS("op:" + opName + ":pointer")
     else tgt match {
       // `003-box-address-taken-locals`: `x++`/`x--` on a boxed local, same rewrite as
@@ -9666,21 +11192,21 @@ import scala.annotation.tailrec
       // not the value, so the bump has to go through the box's field.
       case i: Identifier if boxedLocals.contains(localName(i.name)) =>
         val nm = localName(i.name)
-        ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> bump(boxField(nm)))
+        ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> ibump(boxField(nm)))
       case i: Identifier =>
         val k = if (isGlobalWrite(i.name)) "setGlobal" else "assign"
         ujson.Obj("k" -> k, "x" -> localName(i.name),
-                  "e" -> bump(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
+                  "e" -> ibump(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
         if (!pureNode(r)) holeS("op:" + opName + ":impure-receiver")
         else ujson.Obj("k" -> "setField", "r" -> expr(r), "f" -> f,
-                       "v" -> bump(ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)))
+                       "v" -> ibump(ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)))
       case ia if asIndex(ia).isDefined =>
         val (a, b) = asIndex(ia).get
         if (!(pureNode(a) && pureNode(b))) holeS("op:" + opName + ":impure-target")
         else ujson.Obj("k" -> "setIndex", "r" -> expr(a), "i" -> expr(b),
-                       "v" -> bump(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
+                       "v" -> ibump(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
       // `(*p)++` / `++*p` / `(*p)--` / `--*p` in statement position, for exactly the
       // pointers `assignTo`'s own `*p = v` write cases already trust: this is
       // `*p = *p ± 1` with `p` read twice, so it is admitted under the SAME two
@@ -9704,12 +11230,12 @@ import scala.annotation.tailrec
       case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
                       isIrefExpr(kidsOf(c).head) =>
         val pRef = expr(kidsOf(c).head)
-        ujson.Obj("k" -> "setDerefIref", "p" -> pRef, "v" -> bump(ujson.Obj("k" -> "derefIref", "p" -> pRef)))
+        ujson.Obj("k" -> "setDerefIref", "p" -> pRef, "v" -> ibump(ujson.Obj("k" -> "derefIref", "p" -> pRef)))
       case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
                       rawLocalOrParamName(kidsOf(c).head).map(localName)
                         .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n)) =>
         val nm = rawLocalOrParamName(kidsOf(c).head).map(localName).get
-        aliasOrOutParamWrite(nm, bump(aliasOrOutParamRead(nm)))
+        aliasOrOutParamWrite(nm, ibump(aliasOrOutParamRead(nm)))
       // `++*p` on any other pointer — the location model Core lacks.
       case _ => holeS("op:" + opName + ":unsupported-target")
     }
@@ -10048,9 +11574,18 @@ import scala.annotation.tailrec
       exprV(macroCommaBlock(c).get)
     // Compound-expression pass-through (research.md §3, point 2): thread and
     // concatenate sub-preludes left-to-right, matching source evaluation order.
+    // JS/TS: the erased token, recovered (see `callExpr`'s matching branch).
+    case c: Call if jsAmbiguousBinop(c).isDefined =>
+      val List(a, b) = kidsOf(c)
+      jsAmbiguousBinop(c).get match {
+        case Right(op) =>
+          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+          (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+        case Left(lbl) => (Nil, hole(lbl))
+      }
     case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
-      shiftRightOp(a) match {
+      (if (javaFile) jTypedBinop(c, ">>").toOption else shiftRightOp(a)) match {
         case Some(op) =>
           val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
           (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
@@ -10063,18 +11598,32 @@ import scala.annotation.tailrec
       val (other, neg) = pointerNullTest(c).get
       val (po, oe) = exprV(other)
       (po, nullTestExpr(oe, neg))
+    // C address model: a pointer comparison, prelude-aware -- `callExpr`'s `ptrRelOp`
+    // case, which must agree with this one.
+    case c: Call if ptrRelOp(c).isDefined =>
+      val List(a, b) = kidsOf(c)
+      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+      (pa ++ pb, ptrRelE(c, ptrRelOp(c).get, ae, be))
     case c: Call if binops.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(c.methodFullName)) =>
       val List(a, b) = kidsOf(c)
-      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
-      (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> binops(c.methodFullName), "a" -> ae, "b" -> be))
+      cTypedBinop(c, binops(c.methodFullName)) match {
+        case Left(label) => (Nil, hole(label))
+        case Right(op) =>
+          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+          (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+      }
     // Pointer-arith family: `!p` on a pointer is `p == 0` (see `callExpr`).
     case c: Call if isPointerNot(c) =>
       val (pa, ae) = exprV(kidsOf(c).head)
       (pa, nullTestExpr(ae, neg = false))
     case c: Call if unops.contains(c.methodFullName) && kidsOf(c).size == 1 =>
-      val (pa, ae) = exprV(kidsOf(c).head)
-      (pa, ujson.Obj("k" -> "unop", "op" -> unops(c.methodFullName), "a" -> ae))
+      cTypedUnop(c, unops(c.methodFullName)) match {
+        case Left(label) => (Nil, hole(label))
+        case Right(op) =>
+          val (pa, ae) = exprV(kidsOf(c).head)
+          (pa, ujson.Obj("k" -> "unop", "op" -> op, "a" -> ae))
+      }
     // `006-reduce-remaining-holes`, Story 5: `a[i]`, `a` a recognized boxed array
     // -- mirrors `callExpr`'s own matching case exactly (this file's `exprV`
     // never routes an `indexOps` call through `callExpr`, so without this the
@@ -10360,6 +11909,7 @@ import scala.annotation.tailrec
   }
 
   def stmt(n: AstNode): ujson.Obj = unwrapMacro(n) match {
+    case b: Block if pyFile && pyStarredUnpack(b).isDefined => pyStarredUnpack(b).get
     case b: Block =>
       val kids = kidsOf(b)
       // An empty `kidsOf` is ambiguous by itself: it is the correct shape for a real
@@ -10408,11 +11958,26 @@ import scala.annotation.tailrec
     // ANY(1)`), checked BEFORE any other Call case so the synthetic expansion
     // Block is never even looked at.
     case c: Call if c.name == "UNUSED_PARAMETER" || c.name == "UNUSED_PARAMETER2" => skip
+    // `yield` / `yield from`. pysrc2cpg lowers each to a RETURN node whose code is the
+    // `yield` text, and the case below translated it as `return` -- "return the first
+    // element" for `TTLCache.__iter__`, which agreed with an equally wrong recorder and
+    // so read as conformance (docs/conformance.md, finding 1). A generator suspends;
+    // Core has no suspension. Each yield is a hole, and `emit` holes the whole function
+    // (`gen:generator`), because calling a generator runs none of its body at all.
+    case r: Return if pyFile && isYield(r) => holeS("gen:yield")
     case r: Return =>
       kidsOf(r).headOption match {
         case Some(e) =>
           val (prelude, ev) = valueOf(e)
-          seqOf(prelude :+ ujson.Obj("k" -> "ret", "e" -> ev))
+          // Item O: `return e` converts `e` to the declared return type (C11 6.8.6.4p3).
+          val retTy: Option[Either[Unit, (Boolean, Int)]] =
+            if (!cppFile) None
+            else {
+              val b = bareType(currentReturnType)
+              if (b == "char" || b == "_Bool" || b == "bool") Some(Left(()))
+              else cLeafIntType(currentReturnType).map(Right(_))
+            }
+          seqOf(prelude :+ ujson.Obj("k" -> "ret", "e" -> cConvertTo(retTy, e, ev)))
         case None => ujson.Obj("k" -> "ret", "e" -> ujson.Obj("k" -> "unit"))
       }
     case c: Call if c.methodFullName == "<operator>.assignment" =>
@@ -10453,9 +12018,21 @@ import scala.annotation.tailrec
       }
     case c: Call if c.methodFullName == "<operator>.delete" =>
       kidsOf(c) match {
+        // `del x` on a Python cell unbinds the CELL's contents, visibly to every closure;
+        // Core's `del` would drop this frame's reference to the cell instead, so a later
+        // read would hole on the box rather than raise `NameError`. Named, not guessed.
+        case (i: Identifier) :: Nil if pyFile && boxedLocals.contains(localName(i.name)) =>
+          holeS("scope:del-cell")
         case (i: Identifier) :: Nil => ujson.Obj("k" -> "del", "x" -> i.name)
         // `del d[k]` / `del o.f` remove a binding from a container or object; Core's
         // `del` only unbinds a variable, so translating them would be a lie.
+        // Python only: `del e[i]` is `Stmt.delIndex`, which removes the key / position from
+        // a BOXED container (`docs/boxed-containers.md`) and runs a class's own
+        // `__delitem__`. Every other language keeps the hole.
+        case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") && pyFile &&
+                                    kidsOf(x).size == 2 =>
+          val ks = kidsOf(x)
+          ujson.Obj("k" -> "delIndex", "r" -> expr(ks(0)), "i" -> expr(ks(1)))
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
         case (x: Call) :: Nil if x.methodFullName.startsWith("<operator>") =>
@@ -10668,8 +12245,17 @@ import scala.annotation.tailrec
     // answer, which is the one outcome worse than a hole.
     case u: Unknown if u.code.trim.startsWith("global ") =>
       seqOf(globalDeclNames(u).map(x => ujson.Obj("k" -> "declGlobal", "x" -> x)))
+    //
+    // `nonlocal` now IS representable, by cell conversion (`cellsOwnedBy`): every
+    // reference to the name, in the owner and in every closure, already goes through the
+    // shared cell, so the declaration itself has nothing left to do. It stays a hole only
+    // when the name resolves to no enclosing function binding -- a `SyntaxError` in
+    // CPython, and nothing this exporter should invent a target for.
     case u: Unknown if u.code.trim.startsWith("nonlocal ") =>
-      holeS("scope:nonlocal-write")
+      val names = u.code.trim.stripPrefix("nonlocal").takeWhile(_ != '#').split(",")
+                    .map(_.trim).filter(_.nonEmpty).toList
+      if (names.nonEmpty && names.forall(x => bindingScopeOf(currentMethodFull, x).isDefined)) skip
+      else holeS("scope:nonlocal-write")
     // The label carries the frontend's PARSER NODE TYPE, not the source text.
     //
     // It used to be the first word of the code, which made the label space unbounded:
@@ -10787,6 +12373,7 @@ import scala.annotation.tailrec
   // below as initializers, so they never inflate the function count either.
   lazy val cLikeExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".js", ".ts", ".kt", ".go")
   lazy val cppExts   = List(".c", ".h", ".cpp", ".cc", ".hpp")
+  lazy val jsExts    = List(".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs")
   // `010-reach-90pct-hole-free`: `cLikeExts` minus `.js`/`.ts` -- see
   // `charLiteralIsNumeric`'s own doc comment for why those two are excluded.
   lazy val charLiteralExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".kt", ".go")
@@ -11266,9 +12853,12 @@ import scala.annotation.tailrec
     * the file-level pseudo-method, where every identifier assignment is a global write. */
   def emit(m: Method, isModule: Boolean): ujson.Obj = {
     moduleScope  = isModule
+    currentMethodFull = m.fullName
+    currentReturnType = m.methodReturn.typeFullName
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
     cppFile      = cppExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    jsFile       = jsExts.exists(e => m.filename.toLowerCase.endsWith(e))
     charLiteralIsNumeric = charLiteralExts.exists(e => m.filename.toLowerCase.endsWith(e))
     def fieldReceiverNames(op: String): Set[String] =
       m.body.ast.isCall.filter(_.methodFullName == op).l.flatMap { c =>
@@ -11333,6 +12923,13 @@ import scala.annotation.tailrec
         case _       => None
       }).groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2) }
     boxedLocals = candidates.keySet
+    // Python cells (see `cellsOwnedBy`): owned ones get the prologue allocation below,
+    // reached ones (`pyCellRefs`) only the boxed reads and writes.
+    if (m.filename.toLowerCase.endsWith(".py")) {
+      val owned = cellsOwnedBy.getOrElse(m.fullName, Set.empty)
+      pyCellRefs = cellRefsOf(m.fullName) -- owned
+      boxedLocals = boxedLocals ++ owned ++ pyCellRefs
+    }
     // `p -> n`: every pointer-typed local provably aliasing exactly one boxed local
     // for its whole lifetime -- `p = &n` is the ONLY assignment to `p` anywhere in
     // this method (see `ptrAliases`'s own doc comment for why this must be stricter
@@ -11615,8 +13212,15 @@ import scala.annotation.tailrec
     // reused by BOTH `boxedStructs` below and `boxedStructArrayMembers` just
     // after it, so a struct's member list is only ever read from the CPG once
     // per candidate name.
+    // NOT for Python. A Python local whose static type is a CLASS -- `LFUCache` read as a
+    // value inside `LFUCache.__setitem__` -- is a reference to that class, not a struct
+    // held by value, and boxing it rebinds the name to a fresh `<local>` object: the
+    // class value disappears (`LFUCache._Link(1)` then dispatches on the box). Measured on
+    // cachetools 7.1.7: 43 of 209 methods gained such a prologue. Value-typed aggregates
+    // are a C/C++ notion; Python has none.
+    val pyMethod = m.filename.toLowerCase.endsWith(".py")
     val structCandidateDecls: Map[String, TypeDecl] =
-      if (moduleScope) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
+      if (moduleScope || pyMethod) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
         val (name, isParam, ty) = l match {
           case ll: Local             => (ll.name, false, localTypes.get(ll.name))
           case pp: MethodParameterIn => (pp.name, true, localTypes.get(pp.name))
@@ -11641,7 +13245,12 @@ import scala.annotation.tailrec
           (localName(name), hasArrayMember, td)
         }
       }.filterNot(_._2).map { case (nm, _, td) => nm -> td }.toMap
-    boxedStructs = if (moduleScope) Map.empty else {
+    // NOT for Python. A C struct local is a VALUE that boxing gives an address; a Python
+    // local holding an instance is already a reference. Without this gate `x = Cls()`
+    // in a Python function whose class has methods made `x` (and `Cls` itself) a boxed
+    // "struct" of unit fields and holed the assignment `op:arrayDecl:boxed-initializer`
+    // -- found by the `tests/fixtures/pyscoping` fixture (`case_method_default`).
+    boxedStructs = if (moduleScope || m.filename.toLowerCase.endsWith(".py")) Map.empty else {
       val candidates = structCandidateDecls.map { case (nm, td) => nm -> td.member.l.map(_.name) }
       candidates.filter { case (nm, _) => nameSafelyBoxable(nm, wholeObjectAddressOk = true) }
     }
@@ -12211,7 +13820,7 @@ import scala.annotation.tailrec
     // prologue sidesteps the question entirely: the box exists before ANY branch of
     // the body can run, for every control-flow shape, not just the straight-line one.
     val boxedParamNames = m.parameter.l.map(_.name).filter(boxedLocals.contains).toSet
-    val prologues: List[ujson.Obj] = boxedLocals.toList.sorted.map { nm =>
+    val prologues: List[ujson.Obj] = boxedLocals.toList.sorted.filterNot(pyCellRefs.contains).map { nm =>
       val init = if (boxedParamNames.contains(nm)) boxRef(nm) else ujson.Obj("k" -> "unit")
       ujson.Obj("k" -> "assign", "x" -> nm, "e" -> ujson.Obj("k" -> "boxNew", "e" -> init))
     }
@@ -12256,14 +13865,28 @@ import scala.annotation.tailrec
     // semantics/proof consuming it (`evalPairs`, `sizeP`, `holesP`), is
     // completely unchanged; only how the ARGUMENT is spelled as Lean source
     // text differs. */
-    def boxRangeExpr(n: Int): ujson.Obj = ujson.Obj("k" -> "boxFieldsRange", "n" -> n)
+    // C address model: `esz`, the element byte size, when the declared element type's
+    // size resolves -- recorded on the block as `$esz` (`Heap.elemSize`), so `ptrOp`'s
+    // typed arithmetic can check its stride against it. Absent: the block is untyped,
+    // and stride-dependent `ptrOp` arithmetic on it is a hole (comparisons still work).
+    // `member`: the block is an array MEMBER of a boxed struct, boxed separately --
+    // recorded as `$member` (`Heap.isMemberBox`), because its address coincides with a
+    // member address of the enclosing struct's block, so `ptrOp` must not answer
+    // "different blocks, different addresses" for it.
+    def boxRangeExpr(n: Int, esz: Option[Int] = None, member: Boolean = false): ujson.Obj = {
+      val o = ujson.Obj("k" -> "boxFieldsRange", "n" -> n)
+      esz.foreach(sz => o("esz") = ujson.Num(sz))
+      if (member) o("member") = ujson.Bool(true)
+      o
+    }
 
     def boxFieldsExpr(keys: List[String], seedFrom: Option[String] = None,
-                       arrayMembers: Map[String, Int] = Map.empty): ujson.Obj =
+                       arrayMembers: Map[String, Int] = Map.empty,
+                       memberElemBytes: Map[String, Int] = Map.empty): ujson.Obj =
       ujson.Obj("k" -> "boxFields", "fields" -> ujson.Arr.from(
         keys.map { k =>
           val v: ujson.Value = arrayMembers.get(k) match {
-            case Some(n) => boxRangeExpr(n)
+            case Some(n) => boxRangeExpr(n, memberElemBytes.get(k), member = true)
             case None =>
               seedFrom.map(nm => ujson.Obj("k" -> "field", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "f" -> k))
                 .getOrElse(ujson.Obj("k" -> "unit"))
@@ -12273,12 +13896,19 @@ import scala.annotation.tailrec
     val boxedStructParamNames = m.parameter.l.map(_.name).map(localName).filter(boxedStructs.contains).toSet
     val aggPrologues: List[ujson.Obj] =
       boxedArrays.toList.sortBy(_._1).map { case (nm, n) =>
-        ujson.Obj("k" -> "assign", "x" -> nm, "e" -> boxRangeExpr(n))
+        ujson.Obj("k" -> "assign", "x" -> nm,
+                  "e" -> boxRangeExpr(n, localTypes.get(nm).flatMap(arrayElemBytes)))
       } ++
       boxedStructs.toList.sortBy(_._1).map { case (nm, members) =>
         val seedFrom = if (boxedStructParamNames.contains(nm)) Some(nm) else None
         val arrayMembers = boxedStructArrayMembers.getOrElse(nm, Map.empty)
-        ujson.Obj("k" -> "assign", "x" -> nm, "e" -> boxFieldsExpr(members, seedFrom, arrayMembers))
+        // C address model: each array member's element size, from the member's
+        // declared type on the struct's own declaration (`memberTypes`).
+        val owner = localTypes.get(nm).map(t => bareType(t).reverse.dropWhile(_ == '*').reverse)
+        val memberElemBytes = arrayMembers.keys.flatMap { mem =>
+          owner.flatMap(o => memberTypes.get((o, mem))).flatMap(arrayElemBytes).map(mem -> _)
+        }.toMap
+        ujson.Obj("k" -> "assign", "x" -> nm, "e" -> boxFieldsExpr(members, seedFrom, arrayMembers, memberElemBytes))
       }
     // `009-reduce-remaining-holes-4`: every byte-cursor parameter's own offset local
     // starts at `0` -- `z` itself is the incoming parameter binding already, needing
@@ -12287,7 +13917,16 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "assign", "x" -> (nm + "$off"), "e" -> ujson.Obj("k" -> "int", "v" -> 0))
     }
     val allPrologues = prologues ++ aggPrologues ++ strCursorPrologues
-    val body = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    val body1 = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    // Calling a generator function runs NONE of its body: it returns a generator object,
+    // and the body runs lazily, one `next()` at a time, interleaved with the consumer.
+    // Core has no suspension and no generator value, so the call itself is a hole. The
+    // translated body is kept after it (its yields are `gen:yield` holes) so the shape
+    // stays readable, exactly as `param:signature-unparsed` keeps it; nothing past the
+    // leading hole ever runs. Eagerly materialising the yields into a list was rejected:
+    // it is wrong for an infinite generator, for one whose consumer stops early, and for
+    // `TTLCache.__iter__`, which reads the timer and the linked list between yields.
+    val body = if (isGeneratorFunction(m)) seqOf(List(holeS("gen:generator"), body1)) else body1
     moduleScope = false
     localTypes = Map.empty
     genuineLocalNames = Set.empty
@@ -12298,6 +13937,7 @@ import scala.annotation.tailrec
     boundMethods = Map.empty
     attrsOf = Map.empty
     boxedLocals = Set.empty
+    pyCellRefs = Set.empty
     ptrAliases = Map.empty
     closedOutParams = Set.empty
     fnPtrVars = Map.empty
@@ -12348,6 +13988,17 @@ import scala.annotation.tailrec
           k -> (ujson.Str(v): ujson.Value)
         })
     }
+    // The Python class table (`pyClassTableByFile`) rides on the module initializer for the
+    // same reason. It is emitted for EVERY Python module, empty or not: its presence is what
+    // tells `render_lean.py` that this export recorded classes, which switches Core to
+    // Python's lookup rules for the whole program (`Program.pyClasses`).
+    if (isModule && m.filename.toLowerCase.endsWith(".py")) {
+      val rows = pyClassTableByFile.getOrElse(m.filename, Nil)
+      obj("pyClasses") = ujson.Obj.from(rows.map { case (n, bs, as) =>
+        n -> (ujson.Obj("bases" -> ujson.Arr.from(bs.map(b => ujson.Str(b): ujson.Value)),
+                        "attrs" -> ujson.Arr.from(as.map(a => ujson.Str(a): ujson.Value))): ujson.Value)
+      })
+    }
     // Emitted only when present, so an AST with no variadic parameters renders exactly
     // as it did before this existed.
     //
@@ -12362,6 +14013,24 @@ import scala.annotation.tailrec
       ps.find(p => stars(p.name) == 1 || (stars(p.name) == 0 && p.isVariadic))
         .foreach(p => obj("vararg") = p.name)
       ps.find(p => stars(p.name) == 2).foreach(p => obj("kwarg") = p.name)
+      // Keyword-only / positional-only parameters and defaults (`pySig`). Emitted only
+      // when present, so a function with a plain signature renders exactly as before.
+      // `self` is filtered as it is from `params`: `applyFunc` binds the receiver itself.
+      pySig(m) match {
+        case Some(sig) =>
+          val keep = ps.map(_.name).toSet
+          val ko = sig.kwonly.filter(keep)
+          val po = sig.posonly.filter(keep)
+          val ds = sig.defaults.filter(d => keep(d._1))
+          if (ko.nonEmpty) obj("kwonly") = ujson.Arr.from(ko.map(ujson.Str(_)))
+          if (po.nonEmpty) obj("posonly") = ujson.Arr.from(po.map(ujson.Str(_)))
+          if (ds.nonEmpty)
+            obj("defaults") = ujson.Arr.from(ds.map { case (p, t) =>
+              ujson.Arr(ujson.Str(p), pyDefaultLiteral(t).getOrElse(hole("param:default-nonliteral")))
+            })
+        case None =>
+          obj("body") = seqOf(List(holeS("param:signature-unparsed"), body))
+      }
     }
     obj
   }

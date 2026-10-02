@@ -135,6 +135,16 @@ jobs:
       # byte-for-byte with the committed module. This is the check that
       # caught a mutation-gate mutant which had survived four commits with
       # every proof still passing (STRATEGY.md 17/30/31).
+      #
+      # Ansible, LinuxCrypto and LinuxLib have pinned hashes but no AST in git (gitignored
+      # by policy; no source commit or exporter version was recorded, so they cannot be
+      # re-exported to the pinned hash). This step was red on EVERY run because of them
+      # (exit 3), which made exit 3 meaningless. They are now reported NOT-TRACKED --
+      # printed and named in the summary, never counted as verified -- but only because
+      # `untracked_by_policy` in artifact-manifest.json lists each with a reason and a
+      # review, `git check-ignore` confirms the ignore, and no spec is pinned to them.
+      # Any OTHER absent AST is still UNVERIFIABLE, exit 3. `--strict` ignores the
+      # allowlist (run it locally to see the full gap). See STRATEGY.md 59.
       - name: check_render — committed modules are renders of committed ASTs
         run: python3 scripts/check_render.py
 
@@ -209,15 +219,10 @@ jobs:
       - name: check_docs — documented figures match the artifacts
         run: python3 scripts/check_docs.py
 
-      # The Python tooling is ~8,000 lines that gate every downstream claim; until
-      # tests/ existed none of it was tested. Each of the five regression classes in
-      # tests/test_regressions.py reconstructs a *silent* failure that once shipped,
-      # so a green run here is evidence the checkers still fail when they should.
-      - name: pytest — the Python tooling
-        run: |
-          set -euo pipefail
-          python3 -m pip install --quiet pytest
-          python3 -m pytest tests/ -q
+      # pytest used to run HERE, as step ~15 of this job, so any earlier red step (a
+      # `lake build` OOM, check_render's exit 3 on an untracked AST) skipped it and the
+      # Python suite gated nothing. It needs neither Lean nor Joern, so it is now its
+      # own job, `python-tests`, below.
 
       # Cheap, deterministic guard on the one invariant this repo has an
       # explicit rule about: the fuel-monotonicity exclusion list. Widening
@@ -249,11 +254,15 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          check() {  # name file floor
-            n=$(grep -c '^ *theorem ' "$2")
-            echo "$1: $n theorems (floor $3)"
-            if [ "$n" -lt "$3" ]; then
-              echo "REGRESSION: $2 lost proofs ($n < $3)"; fail=1
+          check() {  # name floor file...   (counts across every file given)
+            name=$1; floor=$2; shift 2
+            for f in "$@"; do
+              test -f "$f" || { echo "MISSING: $f -- this floor stopped counting"; fail=1; }
+            done
+            n=$(cat "$@" 2>/dev/null | grep -c '^ *theorem ' || true)
+            echo "$name: $n theorems (floor $floor)"
+            if [ "$n" -lt "$floor" ]; then
+              echo "REGRESSION: $name lost proofs ($n < $floor)"; fail=1
             fi
           }
           # A floor here is a floor on TEXT. SpecsGen/V8Base still does not elaborate --
@@ -264,11 +273,16 @@ jobs:
           # are now Prop-valued open obligations (the fuel transport is refuted, not
           # assumed) with their FUEL-instantiated content kept as *_at_FUEL theorems, so
           # its text count is higher than the old floor and the floor stays where it was.
-          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
-          check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229   # DOES NOT PROVE
-          check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
-          check SpecsGen-LinuxLib   Autoform/SpecsGen/LinuxLib.lean   12
-          check Refine              Autoform/Refine.lean             113
+          #
+          # SpecsGen/V8Base.lean has been an import-only umbrella since e36b8f1 split it
+          # into Autoform/SpecsGen/V8Base/Part*.lean, so grepping the umbrella alone
+          # counted 0 and failed this step on every fresh checkout; the floor now counts
+          # the umbrella plus its parts (285 theorems at 86a161b).
+          check SpecsGen-Cachetools 79  Autoform/SpecsGen/Cachetools.lean
+          check SpecsGen-V8Base     229 Autoform/SpecsGen/V8Base.lean Autoform/SpecsGen/V8Base/*.lean
+          check SpecsGen-Basis      21  Autoform/SpecsGen/Basis.lean
+          check SpecsGen-LinuxLib   12  Autoform/SpecsGen/LinuxLib.lean
+          check Refine              113 Autoform/Refine.lean
           exit $fail
 
       # ...and the count is only meaningful for a module that proves. This is the
@@ -311,10 +325,12 @@ jobs:
       # render a build product. check_render verifies both halves against
       # artifact-manifest.json and reports UNVERIFIABLE (non-zero) when an AST is
       # absent rather than passing on an empty comparison.
+      # --strict: the same check with the untracked_by_policy allowlist ignored, so the
+      # log always shows exactly which pinned corpora a clone cannot verify.
       - name: check_specs / check_render report, for the log
         if: always()
         run: |
-          python3 scripts/check_render.py || true
+          python3 scripts/check_render.py --strict || true
 
       # Demo.lean deliberately contains a `sorry`-admitted theorem and two
       # deliberately-failing audits, to demonstrate that the audit catches them.
@@ -326,6 +342,45 @@ jobs:
           lake env lean Demo.lean 2>&1 | tee demo.out || true
           grep -q "TRUSTED-CODE LEAK" demo.out
           grep -q "VACUOUS" demo.out
+
+  # ------------------------------------------------------------------ #
+  # The Python tooling is ~8,000 lines that gate every downstream claim; until
+  # tests/ existed none of it was tested. Each regression class in
+  # tests/test_regressions.py reconstructs a *silent* failure that once shipped,
+  # so a green run here is evidence the checkers still fail when they should.
+  #
+  # Its own job, with no Lean and no Joern: every test runs the shipped scripts
+  # against tracked ASTs and synthetic fixtures only (checked: nothing in tests/
+  # invokes lake, lean or joern). That keeps it a real gate -- it reports even when
+  # the Lean job is red -- and gives a verdict in about two minutes.
+  # ------------------------------------------------------------------ #
+  python-tests:
+    name: pytest (Python tooling)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: pytest — the Python tooling
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/ -q
+
+      # Every tracked ast-*.json carries a provenance record or a NAMED baseline entry
+      # (provenance/unattributed.json) whose digest still matches. It needs only git and
+      # the tracked bytes -- no Joern, no Lean -- so it lives in this job. It was red at
+      # 1de0ed9 with 3 violations nothing ran (ast-CAddr.json unrecorded, ast-V8Base.json
+      # unrecorded, ast-V8Numbers.json's baseline expired); STRATEGY.md 62, item P.
+      # The baseline entries are printed by name on every run: green here is "attributed
+      # or explicitly excused", not "attributed". `--strict` would refuse the excuses.
+      - name: check_provenance — every tracked AST is attributed or named
+        run: python3 scripts/check_provenance.py
 
   # ------------------------------------------------------------------ #
   # OPTIONAL / MANUAL ONLY.

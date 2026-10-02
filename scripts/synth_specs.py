@@ -814,7 +814,7 @@ def h0 : Heap := %s
 /-- Address of the globals frame. -/
 def gref : Ref := %s
 def base : Nat := h0.length
-def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
+def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref, pyClasses := P.pyClasses }
 def FUEL : Nat := %d
 open Autoform.Generated.%s
 
@@ -1094,7 +1094,8 @@ PROOF_CONST = """theorem %(id)s :
 PROOF_PROJ = """theorem %(id)s :
     MRefines P %(name)s 4
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false ∧
+          o.payload.toVal = none)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
@@ -1104,13 +1105,14 @@ PROOF_PROJ = """theorem %(id)s :
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r [] rfl
-      hmod
+      (fun o ho => (hmod o ho).1) (Or.inr fun o ho => (hmod o ho).2)
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
     MRefines P %(name)s 5
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false ∧
+          o.payload.toVal = none)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
@@ -1120,7 +1122,7 @@ PROOF_PROJ_DOC = """theorem %(id)s :
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
-      [] rfl hmod
+      [] rfl (fun o ho => (hmod o ho).1) (Or.inr fun o ho => (hmod o ho).2)
 """
 
 FUEL_THM = """/-- Holds at **every** fuel budget at or above `FUEL`.

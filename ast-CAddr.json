@@ -1,0 +1,2204 @@
+[
+ {
+  "name": "sum_until",
+  "file": "addr.c",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 8,
+     "esz": 4
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "s",
+         "e": {
+          "k": "int",
+          "v": "0"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "i",
+             "e": {
+              "k": "int",
+              "v": "0"
+             }
+            },
+            "b": {
+             "k": "loop",
+             "c": {
+              "k": "binop",
+              "op": "<:i32",
+              "a": {
+               "k": "name",
+               "v": "i"
+              },
+              "b": {
+               "k": "int",
+               "v": "8"
+              }
+             },
+             "body": {
+              "k": "seq",
+              "a": {
+               "k": "setDerefIref",
+               "p": {
+                "k": "irefIndex",
+                "a": {
+                 "k": "name",
+                 "v": "a"
+                },
+                "i": {
+                 "k": "name",
+                 "v": "i"
+                }
+               },
+               "v": {
+                "k": "binop",
+                "op": "+:i32",
+                "a": {
+                 "k": "name",
+                 "v": "i"
+                },
+                "b": {
+                 "k": "int",
+                 "v": "1"
+                }
+               }
+              },
+              "b": {
+               "k": "assign",
+               "x": "i",
+               "e": {
+                "k": "binop",
+                "op": "+:i32",
+                "a": {
+                 "k": "name",
+                 "v": "i"
+                },
+                "b": {
+                 "k": "int",
+                 "v": 1
+                }
+               }
+              }
+             }
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "ifte",
+             "c": {
+              "k": "binop",
+              "op": "||",
+              "a": {
+               "k": "binop",
+               "op": "<:i32",
+               "a": {
+                "k": "name",
+                "v": "n"
+               },
+               "b": {
+                "k": "int",
+                "v": "0"
+               }
+              },
+              "b": {
+               "k": "binop",
+               "op": ">:i32",
+               "a": {
+                "k": "name",
+                "v": "n"
+               },
+               "b": {
+                "k": "int",
+                "v": "8"
+               }
+              }
+             },
+             "t": {
+              "k": "ret",
+              "e": {
+               "k": "unop",
+               "op": "-:i32",
+               "a": {
+                "k": "int",
+                "v": "1"
+               }
+              }
+             },
+             "e": {
+              "k": "skip"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "p",
+              "e": {
+               "k": "irefIndex",
+               "a": {
+                "k": "name",
+                "v": "a"
+               },
+               "i": {
+                "k": "int",
+                "v": "0"
+               }
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "end",
+               "e": {
+                "k": "irefIndex",
+                "a": {
+                 "k": "name",
+                 "v": "a"
+                },
+                "i": {
+                 "k": "name",
+                 "v": "n"
+                }
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "loop",
+                "c": {
+                 "k": "ptrOp",
+                 "op": "<",
+                 "esz": 0,
+                 "a": {
+                  "k": "name",
+                  "v": "p"
+                 },
+                 "b": {
+                  "k": "name",
+                  "v": "end"
+                 }
+                },
+                "body": {
+                 "k": "seq",
+                 "a": {
+                  "k": "assign",
+                  "x": "s",
+                  "e": {
+                   "k": "binop",
+                   "op": "+:i32",
+                   "a": {
+                    "k": "name",
+                    "v": "s"
+                   },
+                   "b": {
+                    "k": "derefIref",
+                    "p": {
+                     "k": "name",
+                     "v": "p"
+                    }
+                   }
+                  }
+                 },
+                 "b": {
+                  "k": "assign",
+                  "x": "p",
+                  "e": {
+                   "k": "binop",
+                   "op": "+",
+                   "a": {
+                    "k": "name",
+                    "v": "p"
+                   },
+                   "b": {
+                    "k": "int",
+                    "v": 1
+                   }
+                  }
+                 }
+                }
+               },
+               "b": {
+                "k": "ret",
+                "e": {
+                 "k": "name",
+                 "v": "s"
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cmp_ptrs",
+  "file": "addr.c",
+  "params": [
+   "x",
+   "y"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "ptrOp",
+     "op": "==",
+     "esz": 0,
+     "a": {
+      "k": "name",
+      "v": "x"
+     },
+     "b": {
+      "k": "name",
+      "v": "y"
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "ptrOp",
+      "op": "<",
+      "esz": 0,
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "name",
+       "v": "y"
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "unop",
+       "op": "-:i32",
+       "a": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cmp_field_elems",
+  "file": "addr.c",
+  "params": [
+   "b",
+   "i",
+   "j"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "cmp_ptrs",
+    "args": [
+     {
+      "k": "ptrOp",
+      "op": "+",
+      "esz": 1,
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "b"
+       },
+       "f": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "i"
+      }
+     },
+     {
+      "k": "ptrOp",
+      "op": "+",
+      "esz": 1,
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "b"
+       },
+       "f": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "j"
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "field_order",
+  "file": "addr.c",
+  "params": [
+   "i",
+   "j"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "buf",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 8,
+     "esz": 1
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "boxFields",
+      "fields": [
+       [
+        "a",
+        {
+         "k": "unit"
+        }
+       ],
+       [
+        "n",
+        {
+         "k": "unit"
+        }
+       ]
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "||",
+          "a": {
+           "k": "binop",
+           "op": "||",
+           "a": {
+            "k": "binop",
+            "op": "||",
+            "a": {
+             "k": "binop",
+             "op": "<:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "0"
+             }
+            },
+            "b": {
+             "k": "binop",
+             "op": ">:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "8"
+             }
+            }
+           },
+           "b": {
+            "k": "binop",
+            "op": "<:i32",
+            "a": {
+             "k": "name",
+             "v": "j"
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           }
+          },
+          "b": {
+           "k": "binop",
+           "op": ">:i32",
+           "a": {
+            "k": "name",
+            "v": "j"
+           },
+           "b": {
+            "k": "int",
+            "v": "8"
+           }
+          }
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "int",
+           "v": "9"
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "b"
+          },
+          "f": "a",
+          "v": {
+           "k": "irefIndex",
+           "a": {
+            "k": "name",
+            "v": "buf"
+           },
+           "i": {
+            "k": "int",
+            "v": "0"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "b"
+           },
+           "f": "n",
+           "v": {
+            "k": "int",
+            "v": "8"
+           }
+          },
+          "b": {
+           "k": "ret",
+           "e": {
+            "k": "call",
+            "f": "cmp_field_elems",
+            "args": [
+             {
+              "k": "name",
+              "v": "b"
+             },
+             {
+              "k": "name",
+              "v": "i"
+             },
+             {
+              "k": "name",
+              "v": "j"
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "eq_field_elems",
+  "file": "addr.c",
+  "params": [
+   "b",
+   "i",
+   "j"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "cond",
+    "c": {
+     "k": "ptrOp",
+     "op": "==",
+     "esz": 0,
+     "a": {
+      "k": "ptrOp",
+      "op": "+",
+      "esz": 1,
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "b"
+       },
+       "f": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "i"
+      }
+     },
+     "b": {
+      "k": "ptrOp",
+      "op": "+",
+      "esz": 1,
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "b"
+       },
+       "f": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "j"
+      }
+     }
+    },
+    "t": {
+     "k": "int",
+     "v": "1"
+    },
+    "e": {
+     "k": "int",
+     "v": "0"
+    }
+   }
+  }
+ },
+ {
+  "name": "field_eq",
+  "file": "addr.c",
+  "params": [
+   "i",
+   "j"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "buf",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 8,
+     "esz": 1
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "boxFields",
+      "fields": [
+       [
+        "a",
+        {
+         "k": "unit"
+        }
+       ],
+       [
+        "n",
+        {
+         "k": "unit"
+        }
+       ]
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "||",
+          "a": {
+           "k": "binop",
+           "op": "||",
+           "a": {
+            "k": "binop",
+            "op": "||",
+            "a": {
+             "k": "binop",
+             "op": "<:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "0"
+             }
+            },
+            "b": {
+             "k": "binop",
+             "op": ">:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "8"
+             }
+            }
+           },
+           "b": {
+            "k": "binop",
+            "op": "<:i32",
+            "a": {
+             "k": "name",
+             "v": "j"
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           }
+          },
+          "b": {
+           "k": "binop",
+           "op": ">:i32",
+           "a": {
+            "k": "name",
+            "v": "j"
+           },
+           "b": {
+            "k": "int",
+            "v": "8"
+           }
+          }
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "int",
+           "v": "9"
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "b"
+          },
+          "f": "a",
+          "v": {
+           "k": "irefIndex",
+           "a": {
+            "k": "name",
+            "v": "buf"
+           },
+           "i": {
+            "k": "int",
+            "v": "0"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "b"
+           },
+           "f": "n",
+           "v": {
+            "k": "int",
+            "v": "8"
+           }
+          },
+          "b": {
+           "k": "ret",
+           "e": {
+            "k": "call",
+            "f": "eq_field_elems",
+            "args": [
+             {
+              "k": "name",
+              "v": "b"
+             },
+             {
+              "k": "name",
+              "v": "i"
+             },
+             {
+              "k": "name",
+              "v": "j"
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "span",
+  "file": "addr.c",
+  "params": [
+   "from",
+   "to"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "k",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "loop",
+      "c": {
+       "k": "ptrOp",
+       "op": "<",
+       "esz": 0,
+       "a": {
+        "k": "name",
+        "v": "from"
+       },
+       "b": {
+        "k": "name",
+        "v": "to"
+       }
+      },
+      "body": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "from",
+        "e": {
+         "k": "ptrOp",
+         "op": "+",
+         "esz": 1,
+         "a": {
+          "k": "name",
+          "v": "from"
+         },
+         "b": {
+          "k": "int",
+          "v": 1
+         }
+        }
+       },
+       "b": {
+        "k": "assign",
+        "x": "k",
+        "e": {
+         "k": "binop",
+         "op": "+:i32",
+         "a": {
+          "k": "name",
+          "v": "k"
+         },
+         "b": {
+          "k": "int",
+          "v": 1
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "k"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "walk_span",
+  "file": "addr.c",
+  "params": [
+   "i",
+   "j"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "buf",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 8,
+     "esz": 1
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "boxFields",
+      "fields": [
+       [
+        "a",
+        {
+         "k": "unit"
+        }
+       ],
+       [
+        "n",
+        {
+         "k": "unit"
+        }
+       ]
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "||",
+          "a": {
+           "k": "binop",
+           "op": "||",
+           "a": {
+            "k": "binop",
+            "op": "||",
+            "a": {
+             "k": "binop",
+             "op": "<:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "0"
+             }
+            },
+            "b": {
+             "k": "binop",
+             "op": ">:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "8"
+             }
+            }
+           },
+           "b": {
+            "k": "binop",
+            "op": "<:i32",
+            "a": {
+             "k": "name",
+             "v": "j"
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           }
+          },
+          "b": {
+           "k": "binop",
+           "op": ">:i32",
+           "a": {
+            "k": "name",
+            "v": "j"
+           },
+           "b": {
+            "k": "int",
+            "v": "8"
+           }
+          }
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "unop",
+           "op": "-:i32",
+           "a": {
+            "k": "int",
+            "v": "1"
+           }
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "b"
+          },
+          "f": "a",
+          "v": {
+           "k": "irefIndex",
+           "a": {
+            "k": "name",
+            "v": "buf"
+           },
+           "i": {
+            "k": "int",
+            "v": "0"
+           }
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "call",
+           "f": "span",
+           "args": [
+            {
+             "k": "ptrOp",
+             "op": "+",
+             "esz": 1,
+             "a": {
+              "k": "field",
+              "a": {
+               "k": "name",
+               "v": "b"
+              },
+              "f": "a"
+             },
+             "b": {
+              "k": "name",
+              "v": "i"
+             }
+            },
+            {
+             "k": "ptrOp",
+             "op": "+",
+             "esz": 1,
+             "a": {
+              "k": "field",
+              "a": {
+               "k": "name",
+               "v": "b"
+              },
+              "f": "a"
+             },
+             "b": {
+              "k": "name",
+              "v": "j"
+             }
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "oob_order",
+  "file": "addr.c",
+  "params": [
+   "i"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "buf",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 4,
+     "esz": 1
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "boxFields",
+      "fields": [
+       [
+        "a",
+        {
+         "k": "unit"
+        }
+       ],
+       [
+        "n",
+        {
+         "k": "unit"
+        }
+       ]
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "b"
+         },
+         "f": "a",
+         "v": {
+          "k": "irefIndex",
+          "a": {
+           "k": "name",
+           "v": "buf"
+          },
+          "i": {
+           "k": "int",
+           "v": "0"
+          }
+         }
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "call",
+          "f": "cmp_ptrs",
+          "args": [
+           {
+            "k": "ptrOp",
+            "op": "+",
+            "esz": 1,
+            "a": {
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "b"
+             },
+             "f": "a"
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           },
+           {
+            "k": "ptrOp",
+            "op": "+",
+            "esz": 1,
+            "a": {
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "b"
+             },
+             "f": "a"
+            },
+            "b": {
+             "k": "name",
+             "v": "i"
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "past_end",
+  "file": "addr.c",
+  "params": [
+   "k"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "x",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 4,
+     "esz": 1
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "y",
+     "e": {
+      "k": "boxFieldsRange",
+      "n": 4,
+      "esz": 1
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "bx",
+      "e": {
+       "k": "boxFields",
+       "fields": [
+        [
+         "a",
+         {
+          "k": "unit"
+         }
+        ],
+        [
+         "n",
+         {
+          "k": "unit"
+         }
+        ]
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "by",
+       "e": {
+        "k": "boxFields",
+        "fields": [
+         [
+          "a",
+          {
+           "k": "unit"
+          }
+         ],
+         [
+          "n",
+          {
+           "k": "unit"
+          }
+         ]
+        ]
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "bx"
+              },
+              "f": "a",
+              "v": {
+               "k": "irefIndex",
+               "a": {
+                "k": "name",
+                "v": "x"
+               },
+               "i": {
+                "k": "int",
+                "v": "0"
+               }
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setField",
+               "r": {
+                "k": "name",
+                "v": "by"
+               },
+               "f": "a",
+               "v": {
+                "k": "irefIndex",
+                "a": {
+                 "k": "name",
+                 "v": "y"
+                },
+                "i": {
+                 "k": "int",
+                 "v": "0"
+                }
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "ifte",
+                "c": {
+                 "k": "binop",
+                 "op": "==:i32",
+                 "a": {
+                  "k": "name",
+                  "v": "k"
+                 },
+                 "b": {
+                  "k": "int",
+                  "v": "0"
+                 }
+                },
+                "t": {
+                 "k": "ret",
+                 "e": {
+                  "k": "cond",
+                  "c": {
+                   "k": "ptrOp",
+                   "op": "==",
+                   "esz": 0,
+                   "a": {
+                    "k": "ptrOp",
+                    "op": "+",
+                    "esz": 1,
+                    "a": {
+                     "k": "field",
+                     "a": {
+                      "k": "name",
+                      "v": "bx"
+                     },
+                     "f": "a"
+                    },
+                    "b": {
+                     "k": "int",
+                     "v": "4"
+                    }
+                   },
+                   "b": {
+                    "k": "ptrOp",
+                    "op": "+",
+                    "esz": 1,
+                    "a": {
+                     "k": "field",
+                     "a": {
+                      "k": "name",
+                      "v": "by"
+                     },
+                     "f": "a"
+                    },
+                    "b": {
+                     "k": "int",
+                     "v": "0"
+                    }
+                   }
+                  },
+                  "t": {
+                   "k": "int",
+                   "v": "1"
+                  },
+                  "e": {
+                   "k": "int",
+                   "v": "0"
+                  }
+                 }
+                },
+                "e": {
+                 "k": "skip"
+                }
+               },
+               "b": {
+                "k": "ret",
+                "e": {
+                 "k": "cond",
+                 "c": {
+                  "k": "ptrOp",
+                  "op": "==",
+                  "esz": 0,
+                  "a": {
+                   "k": "ptrOp",
+                   "op": "+",
+                   "esz": 1,
+                   "a": {
+                    "k": "field",
+                    "a": {
+                     "k": "name",
+                     "v": "bx"
+                    },
+                    "f": "a"
+                   },
+                   "b": {
+                    "k": "int",
+                    "v": "4"
+                   }
+                  },
+                  "b": {
+                   "k": "ptrOp",
+                   "op": "+",
+                   "esz": 1,
+                   "a": {
+                    "k": "field",
+                    "a": {
+                     "k": "name",
+                     "v": "bx"
+                    },
+                    "f": "a"
+                   },
+                   "b": {
+                    "k": "int",
+                    "v": "0"
+                   }
+                  }
+                 },
+                 "t": {
+                  "k": "int",
+                  "v": "1"
+                 },
+                 "e": {
+                  "k": "int",
+                  "v": "0"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "char_gap",
+  "file": "addr.c",
+  "params": [
+   "b",
+   "i",
+   "j"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "from",
+     "e": {
+      "k": "ptrOp",
+      "op": "+",
+      "esz": 1,
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "b"
+       },
+       "f": "c"
+      },
+      "b": {
+       "k": "name",
+       "v": "i"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "to",
+       "e": {
+        "k": "ptrOp",
+        "op": "+",
+        "esz": 1,
+        "a": {
+         "k": "field",
+         "a": {
+          "k": "name",
+          "v": "b"
+         },
+         "f": "c"
+        },
+        "b": {
+         "k": "name",
+         "v": "j"
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "unop",
+        "op": "cast:i32",
+        "a": {
+         "k": "ptrOp",
+         "op": "diff",
+         "esz": 1,
+         "a": {
+          "k": "name",
+          "v": "to"
+         },
+         "b": {
+          "k": "name",
+          "v": "from"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "gap",
+  "file": "addr.c",
+  "params": [
+   "i",
+   "j"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "buf",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 8,
+     "esz": 1
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "boxFields",
+      "fields": [
+       [
+        "c",
+        {
+         "k": "unit"
+        }
+       ]
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "||",
+          "a": {
+           "k": "binop",
+           "op": "||",
+           "a": {
+            "k": "binop",
+            "op": "||",
+            "a": {
+             "k": "binop",
+             "op": "<:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "0"
+             }
+            },
+            "b": {
+             "k": "binop",
+             "op": ">:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "8"
+             }
+            }
+           },
+           "b": {
+            "k": "binop",
+            "op": "<:i32",
+            "a": {
+             "k": "name",
+             "v": "j"
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           }
+          },
+          "b": {
+           "k": "binop",
+           "op": ">:i32",
+           "a": {
+            "k": "name",
+            "v": "j"
+           },
+           "b": {
+            "k": "int",
+            "v": "8"
+           }
+          }
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "unop",
+           "op": "-:i32",
+           "a": {
+            "k": "int",
+            "v": "99"
+           }
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "b"
+          },
+          "f": "c",
+          "v": {
+           "k": "irefIndex",
+           "a": {
+            "k": "name",
+            "v": "buf"
+           },
+           "i": {
+            "k": "int",
+            "v": "0"
+           }
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "call",
+           "f": "char_gap",
+           "args": [
+            {
+             "k": "name",
+             "v": "b"
+            },
+            {
+             "k": "name",
+             "v": "i"
+            },
+            {
+             "k": "name",
+             "v": "j"
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "back",
+  "file": "addr.c",
+  "params": [
+   "p",
+   "n"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "ptrOp",
+    "op": "-",
+    "esz": 1,
+    "a": {
+     "k": "name",
+     "v": "p"
+    },
+    "b": {
+     "k": "name",
+     "v": "n"
+    }
+   }
+  }
+ },
+ {
+  "name": "back_eq",
+  "file": "addr.c",
+  "params": [
+   "i",
+   "n"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "buf",
+    "e": {
+     "k": "boxFieldsRange",
+     "n": 8,
+     "esz": 1
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "boxFields",
+      "fields": [
+       [
+        "c",
+        {
+         "k": "unit"
+        }
+       ]
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "||",
+          "a": {
+           "k": "binop",
+           "op": "||",
+           "a": {
+            "k": "binop",
+            "op": "||",
+            "a": {
+             "k": "binop",
+             "op": "<:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "0"
+             }
+            },
+            "b": {
+             "k": "binop",
+             "op": ">:i32",
+             "a": {
+              "k": "name",
+              "v": "i"
+             },
+             "b": {
+              "k": "int",
+              "v": "8"
+             }
+            }
+           },
+           "b": {
+            "k": "binop",
+            "op": "<:i32",
+            "a": {
+             "k": "name",
+             "v": "n"
+            },
+            "b": {
+             "k": "int",
+             "v": "0"
+            }
+           }
+          },
+          "b": {
+           "k": "binop",
+           "op": ">:i32",
+           "a": {
+            "k": "name",
+            "v": "n"
+           },
+           "b": {
+            "k": "name",
+            "v": "i"
+           }
+          }
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "unop",
+           "op": "-:i32",
+           "a": {
+            "k": "int",
+            "v": "1"
+           }
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "b"
+          },
+          "f": "c",
+          "v": {
+           "k": "irefIndex",
+           "a": {
+            "k": "name",
+            "v": "buf"
+           },
+           "i": {
+            "k": "int",
+            "v": "0"
+           }
+          }
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "cond",
+           "c": {
+            "k": "ptrOp",
+            "op": "==",
+            "esz": 0,
+            "a": {
+             "k": "call",
+             "f": "back",
+             "args": [
+              {
+               "k": "ptrOp",
+               "op": "+",
+               "esz": 1,
+               "a": {
+                "k": "field",
+                "a": {
+                 "k": "name",
+                 "v": "b"
+                },
+                "f": "c"
+               },
+               "b": {
+                "k": "name",
+                "v": "i"
+               }
+              },
+              {
+               "k": "name",
+               "v": "n"
+              }
+             ]
+            },
+            "b": {
+             "k": "ptrOp",
+             "op": "+",
+             "esz": 1,
+             "a": {
+              "k": "field",
+              "a": {
+               "k": "name",
+               "v": "b"
+              },
+              "f": "c"
+             },
+             "b": {
+              "k": "binop",
+              "op": "-:i32",
+              "a": {
+               "k": "name",
+               "v": "i"
+              },
+              "b": {
+               "k": "name",
+               "v": "n"
+              }
+             }
+            }
+           },
+           "t": {
+            "k": "int",
+            "v": "1"
+           },
+           "e": {
+            "k": "int",
+            "v": "0"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "addr.c:<global>",
+  "file": "addr.c",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "skip"
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

@@ -1,0 +1,20 @@
+{
+ "_": [
+  "How tests/fixtures/pymro/ast.json was produced. `tests/test_pymro_cpython.py`",
+  "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
+  "exporter_sha256 is informational: an exporter change does not invalidate this fixture",
+  "automatically; re-running the command and diffing ast.json is how to find out."
+ ],
+ "source": "tests/fixtures/pymro/pymro_cases.py",
+ "source_sha256": "0e10445b1fa2bc340cb0ab1b4ffce1588298429c089b51f168300097c02b0399",
+ "ast_sha256": "07be4f6382045f3f9827a12a0f501daf72819ab8aee1e154f92a6c67c56db88e",
+ "joern_version": "4.0.606",
+ "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "c024b0ea6d062f7990871baa128f00324b265d31a3c3c458c52809edc51f62c7",
+ "command": [
+  "joern-parse tests/fixtures/pymro --language pythonsrc --output pymro.cpg",
+  "joern --script cartographer/export_ast.sc --param cpgPath=pymro.cpg --param out=tests/fixtures/pymro/ast.json",
+  "python3 cartographer/render_lean.py tests/fixtures/pymro/ast.json Autoform/PyMroProgram.lean PyMro"
+ ]
+}

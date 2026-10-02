@@ -59,6 +59,12 @@ at `-O0`/`-fwrapv` actually do and therefore what the differential oracle observ
 `Dialect.toNumConfig .cLike` picks the wrapping variant so the interpreter agrees with
 the measured runtime; switch it to `c32` to *find* UB reliance instead of matching it.
 
+That config is the meaning of an UNTYPED `.cLike` operator only. Width-typed operators
+(`"*:i64"`, `"<:u32"`, `"+:j64"`; `TypedInt.lean`) take their width and signedness from
+the tag and, for C, their overflow policy from this same `Dialect.toNumConfig .cLike`, so
+switching it to `c32` switches every C width at once. `java32`/`java64` below are what
+the Java tags use.
+
 ## Discipline
 
 Total functions only: no `partial`, no `sorry`, no `unsafe`, no `native_decide`.

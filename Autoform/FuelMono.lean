@@ -65,6 +65,21 @@ def TFFreeCtx (ctx : Ctx) : Prop :=
   (∀ n fn, ctx.resolve n = some fn → tfFreeS fn.body = true) ∧
   (∀ c m fn, ctx.resolveMethod c m = some fn → tfFreeS fn.body = true)
 
+/-- The statement a call runs is `tryFinally`-free when the body is: it is the body, or a
+hole (`Func.guardedBody`, which defaults add). -/
+theorem tfFreeS_guardedBody (fn : Func) (vs : List Val) (kws : List (String × Val))
+    (h : tfFreeS fn.body = true) : tfFreeS (fn.guardedBody vs kws) = true := by
+  unfold Func.guardedBody
+  split <;> simp_all [tfFreeS]
+
+/-- `resolveMethodOn` answers `holeFunc` or what `resolveMethod` answers. -/
+theorem tfFree_resolveMethodOn {ctx : Ctx} (hctx : TFFreeCtx ctx) {o : Obj} {m : String}
+    {fn : Func} (h : ctx.resolveMethodOn o m = some fn) : tfFreeS fn.body = true := by
+  unfold Ctx.resolveMethodOn at h
+  split at h
+  · cases h; rfl
+  · exact hctx.2 _ _ _ h
+
 /-- The seven-way simultaneous statement, at a fixed fuel `k`. -/
 private def FuelStep (k : Nat) : Prop :=
   (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (e : Expr) (h' : Heap)
@@ -159,6 +174,18 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         -- one recursive `evalExpr` call (for the length) with no further recursion;
         -- `List.range`/`Heap.alloc` afterwards are fuel-free, exactly like
         -- `Heap.alloc` after `boxNew`'s own single `evalExpr` call.
+        -- `Expr.boxContainer`: one recursive `evalExpr` call, then a fuel-free
+        -- allocation -- `boxNew`'s shape exactly.
+        | boxContainer a =>
+            simp only [evalExpr] at hy ⊢
+            by_cases hpy : (!ctx.dialect.isPython) = true
+            · rw [if_pos hpy] at hy ⊢; exact hy
+            rw [if_neg hpy] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ <;> first
+              | (cases hy; exact absurd rfl hne)
+              | (rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy)
         | boxArray a =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
@@ -261,10 +288,10 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | val x =>
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                by_cases hc1 : (op == "&&" && !x.truthy) = true
+                by_cases hc1 : (op == "&&" && !(h₁.view x).truthy) = true
                 · rw [if_pos hc1] at hy ⊢; exact hy
                 · rw [if_neg hc1] at hy ⊢
-                  by_cases hc2 : (op == "||" && x.truthy) = true
+                  by_cases hc2 : (op == "||" && (h₁.view x).truthy) = true
                   · rw [if_pos hc2] at hy ⊢; exact hy
                   · rw [if_neg hc2] at hy ⊢
                     rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
@@ -283,7 +310,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | val v =>
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                by_cases hv : v.truthy = true
+                by_cases hv : (h₁.view v).truthy = true
                 · rw [if_pos hv] at hy ⊢; exact ihE _ hctx _ _ _ _ _ hy hne
                 · rw [if_neg hv] at hy ⊢; exact ihE _ hctx _ _ _ _ _ hy hne
         | isOp neg a b =>
@@ -303,6 +330,24 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                   | (cases hy; exact absurd rfl hne)
                   | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
         | inOp neg a b =>
+            simp only [evalExpr] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val x =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
+                rw [hB] at hy
+                cases r₂ <;> first
+                  | (cases hy; exact absurd rfl hne)
+                  | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+        -- The C address model: `ptrOp` -- same shape as `index`, two sequential
+        -- `evalExpr` calls and then the fuel-free `applyPtrOp`.
+        | ptrOp op esz a b =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
             rw [hA] at hy
@@ -383,12 +428,26 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | inr vs =>
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                cases hres : Ctx.resolve ctx f with
-                | some fn => rw [hres] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                -- A closure-valued local is applied before the table is consulted.
+                cases hcl : (Ctx.calleeVal ctx h₁ ρ f).closParts? with
+                | some gc =>
+                    obtain ⟨g, cap⟩ := gc
+                    rw [hcl] at hy
+                    dsimp only at hy ⊢
+                    cases hres0 : Ctx.resolve ctx g with
+                    | some fn => rw [hres0] at hy; exact ihC _ hctx _ _ (hctx.1 _ _ hres0) _ _ _ _ _ hy hne
+                    | none => rw [hres0] at hy; exact hy
+                | none =>
+                rw [hcl] at hy
+                dsimp only at hy ⊢
+                cases hres : Ctx.resolveCallee ctx f with
+                | some fn =>
+                    rw [hres] at hy
+                    exact ihF _ hctx _ _ (hctx.1 _ _ (Ctx.resolve_of_resolveCallee hres)) _ _ _ _ _ hy hne
                 | none =>
                     rw [hres] at hy
                     dsimp only at hy ⊢
-                    cases hg : Env.get ρ f
+                    cases hg : Ctx.calleeVal ctx h₁ ρ f
                     case fn g =>
                         rw [hg] at hy
                         dsimp only at hy ⊢
@@ -467,9 +526,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     | inr vs =>
                         rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
                         dsimp only at hy ⊢
-                        -- three nested branches now: the `classDefines` guard, the
+                        -- three nested branches now: the `classResponds` guard, the
                         -- method lookup, and splitting the receiver off the positionals.
-                        cases hcd : Ctx.classDefines ctx (classNameOfValue g) m with
+                        cases hcd : Ctx.classResponds ctx (classNameOfValue g) m with
                         | false => simp only [hcd, Bool.false_eq_true, if_false] at hy ⊢; exact hy
                         | true =>
                             simp only [hcd, if_true] at hy ⊢
@@ -499,61 +558,66 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         | some o =>
                             rw [hget] at hy
                             dsimp only at hy ⊢
-                            cases hrm : Ctx.resolveMethod ctx o.cls m with
-                            -- No method of that name. For a **module object** this is not
-                            -- the end: the name may be a *field* holding a function value,
-                            -- which is then applied with no receiver (`Semantics`, `.mcall`).
-                            -- That is a recursive call, so this branch — which used to be a
-                            -- bare hole — now needs the same induction hypotheses the
-                            -- resolved case does. Softening the statement instead was the
-                            -- alternative and is not one.
-                            | none =>
-                                rw [hrm] at hy
-                                dsimp only at hy ⊢
-                                by_cases hmod : String.startsWith o.cls "<module>" = true
-                                · rw [if_pos hmod] at hy ⊢
-                                  cases hf : List.find? (fun x => x.1 == m) o.fields with
-                                  | none => rw [hf] at hy; exact hy
-                                  | some p =>
-                                      obtain ⟨_, mv⟩ := p
-                                      rw [hf] at hy
-                                      cases mv with
-                                      | fn g =>
-                                          dsimp only at hy ⊢
-                                          cases hres2 : Ctx.resolve ctx g with
-                                          | some fn2 =>
-                                              rw [hres2] at hy
-                                              exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
-                                          | none => rw [hres2] at hy; exact hy
-                                      | clos g cap =>
-                                          dsimp only at hy ⊢
-                                          cases hres2 : Ctx.resolve ctx g with
-                                          | some fn2 =>
-                                              rw [hres2] at hy
-                                              exact ihC _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
-                                          | none => rw [hres2] at hy; exact hy
-                                      | int _ => exact hy
-                                      | str _ => exact hy
-                                      | bool _ => exact hy
-                                      | float _ => exact hy
-                                      | unit => exact hy
-                                      | list _ => exact hy
-                                      | tuple _ => exact hy
-                                      | dict _ => exact hy
-                                      | ref _ => exact hy
-                                      | clsClos _ _ => exact hy
-                                      | bobj _ _ => exact hy
-                                      | iref _ _ => exact hy
-                                · rw [if_neg hmod] at hy ⊢
-                                  exact hy
-                            | some fn =>
-                                rw [hrm] at hy
-                                dsimp only at hy ⊢
-                                by_cases hcap : o.captured.isEmpty = true
-                                · rw [if_pos hcap] at hy ⊢
-                                  exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
-                                · rw [if_neg hcap] at hy ⊢
-                                  exact ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
+                            cases hp : o.payload
+                            case list ps => simp only [hp] at hy ⊢; exact hy
+                            case dict ps => simp only [hp] at hy ⊢; exact hy
+                            all_goals simp only [hp] at hy ⊢
+                            all_goals
+                              cases hrm : Ctx.resolveMethodOn ctx o m with
+                              -- No method of that name. For a **module object** this is not
+                              -- the end: the name may be a *field* holding a function value,
+                              -- which is then applied with no receiver (`Semantics`, `.mcall`).
+                              -- That is a recursive call, so this branch — which used to be a
+                              -- bare hole — now needs the same induction hypotheses the
+                              -- resolved case does. Softening the statement instead was the
+                              -- alternative and is not one.
+                              | none =>
+                                  rw [hrm] at hy
+                                  dsimp only at hy ⊢
+                                  by_cases hmod : String.startsWith o.cls "<module>" = true
+                                  · rw [if_pos hmod] at hy ⊢
+                                    cases hf : List.find? (fun x => x.1 == m) o.fields with
+                                    | none => rw [hf] at hy; exact hy
+                                    | some p =>
+                                        obtain ⟨_, mv⟩ := p
+                                        rw [hf] at hy
+                                        cases mv with
+                                        | fn g =>
+                                            dsimp only at hy ⊢
+                                            cases hres2 : Ctx.resolve ctx g with
+                                            | some fn2 =>
+                                                rw [hres2] at hy
+                                                exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                                            | none => rw [hres2] at hy; exact hy
+                                        | clos g cap =>
+                                            dsimp only at hy ⊢
+                                            cases hres2 : Ctx.resolve ctx g with
+                                            | some fn2 =>
+                                                rw [hres2] at hy
+                                                exact ihC _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                                            | none => rw [hres2] at hy; exact hy
+                                        | int _ => exact hy
+                                        | str _ => exact hy
+                                        | bool _ => exact hy
+                                        | float _ => exact hy
+                                        | unit => exact hy
+                                        | list _ => exact hy
+                                        | tuple _ => exact hy
+                                        | dict _ => exact hy
+                                        | ref _ => exact hy
+                                        | clsClos _ _ => exact hy
+                                        | bobj _ _ => exact hy
+                                        | iref _ _ => exact hy
+                                  · rw [if_neg hmod] at hy ⊢
+                                    exact hy
+                              | some fn =>
+                                  rw [hrm] at hy
+                                  dsimp only at hy ⊢
+                                  by_cases hcap : o.captured.isEmpty = true
+                                  · rw [if_pos hcap] at hy ⊢
+                                    exact ihF _ hctx _ _ (tfFree_resolveMethodOn hctx hrm) _ _ _ _ _ hy hne
+                                  · rw [if_neg hcap] at hy ⊢
+                                    exact ihC _ hctx _ _ (tfFree_resolveMethodOn hctx hrm) _ _ _ _ _ hy hne
                 -- An instance of a class with a builtin base (`Val.bobj`) dispatches to
                 -- the class's own method when it has one, and otherwise to `Stdlib`.
                 -- Only the first branch is a recursive call, so only it needs an IH.
@@ -589,7 +653,20 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                          | (cases hy; exact absurd rfl hne)
                          | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
                    | inr vs =>
-                       rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                       -- Every other receiver: a `super()` proxy dispatches through
+                       -- `applyFunc` (the one recursive call), anything else is `Stdlib`.
+                       rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                       obtain ⟨vs, kws⟩ := vs
+                       dsimp only at hy ⊢
+                       revert hy
+                       split
+                       · split
+                         · split
+                           · intro hy
+                             exact ihF _ hctx _ _ (hctx.1 _ _ (by assumption)) _ _ _ _ _ hy hne
+                           · intro hy; exact hy
+                         · intro hy; exact hy
+                       · intro hy; exact hy)
         | alloc cls args =>
             simp only [evalExpr, Heap.alloc] at hy ⊢
             rcases hA : evalList ctx k h ρ args with ⟨h₁, s⟩
@@ -647,7 +724,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         rw [if_neg hk] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
-          | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
+          | (rw [ihS _ hctx _ _ _ (tfFreeS_guardedBody fn vs kws hfree) _ _ (by assumption)
                 (by first | assumption | simp | (cases hy; exact hne))]
              first | exact hy | (split <;> first | exact hy | simp_all))
       · intro ctx hctx h fn hfree cap vs kws h' r hy hne
@@ -657,7 +734,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         rw [if_neg hk] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
-          | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
+          | (rw [ihS _ hctx _ _ _ (tfFreeS_guardedBody fn vs kws hfree) _ _ (by assumption)
                 (by first | assumption | simp | (cases hy; exact hne))]
              first | exact hy | (split <;> first | exact hy | simp_all))
       · intro ctx hctx h ρ es h' r hy hne
@@ -680,7 +757,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 | val v =>
                     rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                     dsimp only at hy ⊢
-                    cases hit : Val.iterable v with
+                    cases hit : Val.iterable (h₁.view v) with
                     | none => rw [hit] at hy; exact hy
                     | some xs =>
                         rw [hit] at hy
@@ -704,7 +781,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 | val v =>
                     rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                     dsimp only at hy ⊢
-                    cases hit : strKeyed v with
+                    cases hit : strKeyed (h₁.view v) with
                     | none => rw [hit] at hy; exact hy
                     | some ks =>
                         rw [hit] at hy
@@ -795,7 +872,140 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         | hole l => exact hy
         | del x => exact hy
         | declGlobal x => exact hy
-        | setIndex a b c => exact hy
+        -- `docs/boxed-containers.md` step 4: three sequential `evalExpr` calls (`v`, `e`,
+        -- `i`, CPython's order), then either a fuel-free payload write or ONE call to the
+        -- class's own `__setitem__` -- the `mcall` shape, one `applyFunc`/`applyClosure`.
+        | setIndex e i v =>
+            simp only [execStmt] at hy ⊢
+            by_cases hpy : (!ctx.dialect.isPython) = true
+            · rw [if_pos hpy] at hy ⊢; exact hy
+            rw [if_neg hpy] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ v with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn _ => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole _ => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val x =>
+              rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+              dsimp only at hy ⊢
+              rcases hB : evalExpr ctx k h₁ ρ e with ⟨h₂, r₂⟩
+              rw [hB] at hy
+              cases r₂ with
+              | exn _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+              | hole _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+              | outOfFuel => cases hy; exact absurd rfl hne
+              | val cv =>
+                rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                dsimp only at hy ⊢
+                rcases hC : evalExpr ctx k h₂ ρ i with ⟨h₃, r₃⟩
+                rw [hC] at hy
+                cases r₃ with
+                | exn _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                | hole _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val kk =>
+                  rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                  dsimp only at hy ⊢
+                  cases cv with
+                  | ref r =>
+                    dsimp only at hy ⊢
+                    cases hget : Heap.get h₃ r with
+                    | none => rw [hget] at hy; exact hy
+                    | some o =>
+                      rw [hget] at hy
+                      dsimp only at hy ⊢
+                      cases hp : o.payload with
+                      | none =>
+                        simp only [hp] at hy ⊢
+                        by_cases hcd : Ctx.classResponds ctx o.cls "__setitem__" = true
+                        · rw [if_pos hcd] at hy ⊢
+                          cases hrm : Ctx.resolveMethod ctx o.cls "__setitem__" with
+                          | none => rw [hrm] at hy; exact hy
+                          | some fn =>
+                            rw [hrm] at hy
+                            dsimp only at hy ⊢
+                            by_cases hcap : o.captured.isEmpty = true
+                            · rw [if_pos hcap] at hy ⊢
+                              rcases hF : applyFunc ctx k h₃ fn (some (.ref r)) [kk, x] []
+                                with ⟨h₄, r₄⟩
+                              rw [hF] at hy
+                              cases r₄ <;> first
+                                | (cases hy; exact absurd rfl hne)
+                                | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                   exact hy)
+                            · rw [if_neg hcap] at hy ⊢
+                              rcases hF : applyClosure ctx k h₃ fn (("self", .ref r) :: o.captured)
+                                  [kk, x] [] with ⟨h₄, r₄⟩
+                              rw [hF] at hy
+                              cases r₄ <;> first
+                                | (cases hy; exact absurd rfl hne)
+                                | (rw [ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                   exact hy)
+                        · rw [if_neg hcd] at hy ⊢; exact hy
+                      | _ => (simp only [hp] at hy ⊢; exact hy)
+                  | _ => (dsimp only at hy ⊢; exact hy)
+        | delIndex e i =>
+            simp only [execStmt] at hy ⊢
+            by_cases hpy : (!ctx.dialect.isPython) = true
+            · rw [if_pos hpy] at hy ⊢; exact hy
+            rw [if_neg hpy] at hy ⊢
+            rcases hB : evalExpr ctx k h ρ e with ⟨h₂, r₂⟩
+            rw [hB] at hy
+            cases r₂ with
+            | exn _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+            | hole _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val cv =>
+              rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+              dsimp only at hy ⊢
+              rcases hC : evalExpr ctx k h₂ ρ i with ⟨h₃, r₃⟩
+              rw [hC] at hy
+              cases r₃ with
+              | exn _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+              | hole _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+              | outOfFuel => cases hy; exact absurd rfl hne
+              | val kk =>
+                rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                dsimp only at hy ⊢
+                cases cv with
+                | ref r =>
+                  dsimp only at hy ⊢
+                  cases hget : Heap.get h₃ r with
+                  | none => rw [hget] at hy; exact hy
+                  | some o =>
+                    rw [hget] at hy
+                    dsimp only at hy ⊢
+                    cases hp : o.payload with
+                    | none =>
+                      simp only [hp] at hy ⊢
+                      by_cases hcd : Ctx.classResponds ctx o.cls "__delitem__" = true
+                      · rw [if_pos hcd] at hy ⊢
+                        cases hrm : Ctx.resolveMethod ctx o.cls "__delitem__" with
+                        | none => rw [hrm] at hy; exact hy
+                        | some fn =>
+                          rw [hrm] at hy
+                          dsimp only at hy ⊢
+                          by_cases hcap : o.captured.isEmpty = true
+                          · rw [if_pos hcap] at hy ⊢
+                            rcases hF : applyFunc ctx k h₃ fn (some (.ref r)) [kk] []
+                              with ⟨h₄, r₄⟩
+                            rw [hF] at hy
+                            cases r₄ <;> first
+                              | (cases hy; exact absurd rfl hne)
+                              | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                 exact hy)
+                          · rw [if_neg hcap] at hy ⊢
+                            rcases hF : applyClosure ctx k h₃ fn (("self", .ref r) :: o.captured)
+                                [kk] [] with ⟨h₄, r₄⟩
+                            rw [hF] at hy
+                            cases r₄ <;> first
+                              | (cases hy; exact absurd rfl hne)
+                              | (rw [ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                 exact hy)
+                      · rw [if_neg hcd] at hy ⊢; exact hy
+                    | _ => (simp only [hp] at hy ⊢; exact hy)
+                | _ => (dsimp only at hy ⊢; exact hy)
         -- `006-reduce-remaining-holes`, Story 5: `*p = v` -- same shape as
         -- `setField`'s `ref`/non-object split, one constructor case instead of three.
         | setDerefIref p v =>
@@ -866,6 +1076,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 cases v
                 case ref addr =>
                     dsimp only at hy ⊢
+                    by_cases hbx : (Payload.toVal (Heap.payload h₁ addr)).isSome = true
+                    · rw [if_pos hbx] at hy ⊢; exact hy
+                    rw [if_neg hbx] at hy ⊢
                     rcases hB : evalExpr ctx k h₁ ρ ve with ⟨h₂, r₂⟩
                     rw [hB] at hy
                     cases r₂ <;> first
@@ -940,7 +1153,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | val v =>
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                by_cases hv : v.truthy = true
+                by_cases hv : (h₁.view v).truthy = true
                 · rw [if_pos hv] at hy ⊢
                   exact ihS _ hctx _ _ _ hfree.1 _ _ hy hne
                 · rw [if_neg hv] at hy ⊢
@@ -957,7 +1170,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | val v =>
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                by_cases hv : v.truthy = true
+                by_cases hv : (h₁.view v).truthy = true
                 · rw [if_pos hv] at hy ⊢
                   rcases hB : execStmt ctx k h₁ ρ bdy with ⟨h₂, c₂⟩
                   rw [hB] at hy
@@ -980,11 +1193,22 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | val v =>
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                cases hit : Val.iterable v with
+                cases hit : Val.iterable (h₁.view v) with
                 | none => rw [hit] at hy; exact hy
                 | some vs =>
                     rw [hit] at hy
-                    exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
+                    dsimp only at hy ⊢
+                    -- A boxed container: the loop result is checked against the object's
+                    -- `version` afterwards, a fuel-free test on the SAME heap at both fuels.
+                    cases v
+                    case ref r =>
+                      dsimp only at hy ⊢
+                      rcases hR : execFor ctx k h₁ ρ x vs bdy with ⟨h₂, c₂⟩
+                      rw [hR] at hy
+                      cases c₂
+                      case outOfFuel => cases hy; exact absurd rfl hne
+                      all_goals (rw [ihR _ hctx _ _ _ _ _ hb _ _ hR (by simp)]; exact hy)
+                    all_goals (dsimp only at hy ⊢; exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne)
       · intro ctx hctx h ρ x vs bdy hfree h' c hy hne
         cases vs with
         | nil => exact hy
@@ -1047,6 +1271,16 @@ theorem tfFree_of_table {ctx : Ctx}
   refine ⟨hres, ?_⟩
   intro c m fn hr
   rw [Ctx.resolveMethod] at hr
+  split at hr
+  · -- Python's rules: a table entry reached by its exact qualified name, or `holeFunc`.
+    rw [Ctx.resolveMethodPy] at hr
+    split at hr
+    · simp at hr
+    · split at hr
+      · exact hres _ _ hr
+      · simp at hr
+      · cases hr; rfl
+  rw [Ctx.resolveMethodLegacy] at hr
   split at hr
   · rename_i a f rest hfilt
     have hmem : (a, f) ∈ ctx.table.filter

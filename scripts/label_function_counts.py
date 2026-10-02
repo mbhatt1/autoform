@@ -68,7 +68,7 @@ def label_function_counts(ast):
     only_functions = {}
     for fn in ast:
         found = []
-        walk_holes(fn.get("body"), found)
+        walk_holes([fn.get("body"), fn.get("defaults")], found)  # a default is part of the function (Func.holes)
         for label in found:
             occurrences[label] = occurrences.get(label, 0) + 1
         distinct = set(found)
