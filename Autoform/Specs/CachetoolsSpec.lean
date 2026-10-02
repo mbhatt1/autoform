@@ -517,12 +517,23 @@ theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : Str
   repeat' split
   all_goals exact ⟨_, rfl⟩
 
-theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
-    ∃ v, runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t] = .exn v := by
+/-- **Restated under the class table (STRATEGY.md §62).** The statement this file used to
+prove, `∃ v, runFunc P fuel "…_TimedCache.expire" [t] = .exn v` (it raised `unit`), is
+now **false**, and `TimedCache_expire_raises_false` below says so. `ast-Cachetools.json`
+carries the class table, so a bare name follows Python's scoping: `NotImplementedError`
+is bound neither locally nor in a globals frame (`runFunc` runs no module initialisers),
+so the body reaches the hole `name:unbound:NotImplementedError` instead of raising a
+payload CPython never raises. -/
+theorem TimedCache_expire_holes (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
+    runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t]
+      = .hole "name:unbound:NotImplementedError" := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
-  obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError" rfl
-  refine ⟨v, ?_⟩
+  have hsn : (ctxOf P).scopedName "NotImplementedError" = true := by decide +kernel
+  have hv : ∀ ρ : Env, ρ.find? (·.1 == "NotImplementedError") = none →
+      evalExpr (ctxOf P) (k + 7) [] ρ (.name "NotImplementedError")
+        = ([], .hole "name:unbound:NotImplementedError") :=
+    fun ρ hx => evalExpr_name_unbound_py (ctxOf P) (k + 6) [] ρ "NotImplementedError" hx rfl hsn
   have hne : ((none : Option String) != some "time") = true := rfl
   -- `time=None` is a default now (the exporter records defaults); the call supplies `time`,
   -- so the default contributes no binding and the body runs unguarded.
@@ -536,8 +547,18 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
         reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self,
         List.contains_nil, Bool.not_false,
         List.nil_append]
-  rw [hv]
+  rw [hv _ (by simp)]
   simp +decide
+
+/-- The former statement, refuted: `_TimedCache.expire` does not raise under the class
+table's scoping rules (it holes; see `TimedCache_expire_holes`). -/
+theorem TimedCache_expire_raises_false :
+    ¬ ∀ (t : Val) (fuel : Nat), 10 ≤ fuel →
+      ∃ v, runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t] = .exn v := by
+  intro h
+  obtain ⟨v, hv⟩ := h .unit 10 (Nat.le_refl _)
+  rw [TimedCache_expire_holes _ _ (Nat.le_refl _)] at hv
+  cases hv
 
 /-! ### `_cachedmethod._none` — the sentinel is constant -/
 
@@ -653,9 +674,10 @@ Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
    `_Link.unlink` and the eviction loops, which are the functions whose specifications
    would actually be interesting to a `cachetools` user.
 
-3. **Exception payloads are unmodelled.** `TimedCache_expire_raises` pins the *fact* of a
-   raise but not its class, because `NotImplementedError` is an unbound builtin name that
-   the semantics evaluates to `unit`. Modelling builtin exception classes is a transpiler
+3. **Exception payloads are unmodelled.** `TimedCache_expire_raises` used to pin the
+   *fact* of a raise but not its class, because `NotImplementedError` was an unbound builtin
+   name that the semantics evaluated to `unit`; under the class table it is the hole
+   `name:unbound:NotImplementedError` (`TimedCache_expire_holes`). Modelling builtin exception classes is a transpiler
    and semantics change, not something this file can repair, and until it happens no
    statement in this file can distinguish `raise NotImplementedError` from `raise
    KeyError`.

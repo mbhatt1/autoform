@@ -12,7 +12,7 @@ whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is 
 other half.
 
 On `cachetools`, 168 of 209 functions are
-hole-free and 99 are call-closed. A single untranslated construct anywhere in a function
+hole-free and 98 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
@@ -298,8 +298,8 @@ never added to it**:
 
 On `cachetools` (`lake env lean` on `scripts/ledger.lean.tmpl` instantiated for
 `Cachetools`, then `scripts/emit_contracts.py Cachetools` and
-`scripts/sacm.py --module Cachetools`): 19 of 209 functions are conditionally
-verifiable, resting on 23 named hole assumptions; 1 is conditionally verified
+`scripts/sacm.py --module Cachetools`): 32 of 209 functions are conditionally
+verifiable, resting on 36 named hole assumptions; 1 is conditionally verified
 (`RRCache.clear`); 46 hole occurrences are named in all (30 of them in parameter
 defaults, which `Func.holeSites` includes so that `Func.holeSites_labels` — the inventory's
 labels *are* `Func.holes` — holds). The `methodkey` theorems are
@@ -374,8 +374,14 @@ What `scripts/sacm.py` should do with it:
 
 > **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
 > `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
-> fails on a mismatch. Current: 209 functions, 168 hole-free, 99 call-closed, 46 holes,
-> 19 conditionally verifiable.
+> fails on a mismatch. Current: 209 functions, 168 hole-free, 98 call-closed, 46 holes,
+> 32 conditionally verifiable.
+> The re-export with the class table (STRATEGY.md §62) moved two of these: a bare call name
+> is now a variable, so the ledger counts it resolvable when it is one of the caller's own
+> locals (`cache_getitem(self, key)` with `cache_getitem` a parameter: 13 more
+> conditionally verifiable functions, 19 → 32, the defaulted-parameter methods of the
+> cache classes and `_HashedTuple`), and not when it is only a captured name
+> (`_unlocked.cache_clear` calls the enclosing function's `cache`: core 99 → 98).
 > Historical figures elsewhere in this repository (238 functions, 208 functions, cores of
 > 45, 69, 74) are superseded snapshots taken before the exporter changes that removed
 > `<metaClassCallHandler>` synthetics and closed `op:starredUnpack`.

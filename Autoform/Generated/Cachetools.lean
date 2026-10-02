@@ -1128,7 +1128,10 @@ def f_cachetools___init___py__module___TimedCache_currsize : Func :=
                         (.assign "time" (.name "value_tmp0"))
                         (.seq
                           (.expr (.mcall (.name "self") "expire" [(.name "time")]))
-                          (.ret (.field (.call "super" []) "currsize"))))
+                          (.ret
+                            (.field
+                              (.call "super" [(.lit (.str "_TimedCache")), (.name "self")])
+                              "currsize"))))
                       (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
 
@@ -3648,7 +3651,9 @@ def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___init__ : 
   , params := ["wrapper", "cache_clear"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.call "super" []))
+              (.assign
+                "tmp0"
+                (.call "super" [(.lit (.str "_DeprecatedDescriptorBase")), (.name "self")]))
               (.expr
                 (.mcall (.name "tmp0") "__init__" [(.kwargE "deprecated" (.lit (.bool true)))])))
             (.seq
@@ -3714,7 +3719,7 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
   , params := ["obj"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.call "super" []))
+              (.assign "tmp0" (.call "super" [(.lit (.str "Wrapper")), (.name "self")]))
               (.expr
                 (.mcall
                   (.name "tmp0")
@@ -3961,7 +3966,7 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___ini
   , params := ["obj"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.call "super" []))
+              (.assign "tmp0" (.call "super" [(.lit (.str "Wrapper")), (.name "self")]))
               (.expr
                 (.mcall
                   (.name "tmp0")
@@ -4153,7 +4158,7 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___i
   , params := ["obj"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.call "super" []))
+              (.assign "tmp0" (.call "super" [(.lit (.str "Wrapper")), (.name "self")]))
               (.expr
                 (.mcall
                   (.name "tmp0")
@@ -4462,7 +4467,7 @@ def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___init_
   , params := ["obj"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.call "super" []))
+              (.assign "tmp0" (.call "super" [(.lit (.str "Wrapper")), (.name "self")]))
               (.expr
                 (.mcall
                   (.name "tmp0")
@@ -4629,7 +4634,7 @@ def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper___init__ :
   , params := ["obj"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.call "super" []))
+              (.assign "tmp0" (.call "super" [(.lit (.str "Wrapper")), (.name "self")]))
               (.expr
                 (.mcall
                   (.name "tmp0")
@@ -4741,7 +4746,7 @@ def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper___init__
   , params := ["obj"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.call "super" []))
+              (.assign "tmp0" (.call "super" [(.lit (.str "Wrapper")), (.name "self")]))
               (.expr
                 (.mcall
                   (.name "tmp0")
@@ -6152,8 +6157,10 @@ def moduleInits : List Func := [f__module_objects___module_, f_cachetools___init
 /-- Source dialect: `.python` (integer division/modulo convention).
 
 `builtinBases` lists the classes whose base is a builtin type, so that
-`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`. -/
-def program : Program := { dialect := .python, builtinBases := [("_HashedTuple", .tuple)], funcs := [
+`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`.
+`pyClasses` is the class table: methods resolve along the C3 MRO, and bare
+names by Python scoping (STRATEGY.md §62). -/
+def program : Program := { dialect := .python, builtinBases := [("_HashedTuple", .tuple)], pyClasses := some [{ name := "Cache", bases := ["<ext>collections.abc.MutableMapping"], attrs := ["_Cache__marker", "_Cache__size", "currsize", "maxsize"] }, { name := "FIFOCache", bases := ["Cache"], attrs := [] }, { name := "LFUCache", bases := ["Cache"], attrs := ["_Link"] }, { name := "LRUCache", bases := ["Cache"], attrs := [] }, { name := "RRCache", bases := ["Cache"], attrs := ["choice"] }, { name := "TLRUCache", bases := ["_TimedCache"], attrs := ["_Item", "_TLRUCache__HEAP_CLEANUP_FACTOR", "ttu"] }, { name := "TTLCache", bases := ["_TimedCache"], attrs := ["_Link", "ttl"] }, { name := "_DefaultSize", bases := [], attrs := ["__slots__"] }, { name := "_DeprecatedDescriptorBase", bases := ["_DescriptorBase"], attrs := [] }, { name := "_DescriptorBase", bases := [], attrs := [] }, { name := "_HashedTuple", bases := ["<ext>tuple"], attrs := ["_HashedTuple__hashvalue"] }, { name := "_Item", bases := [], attrs := ["__slots__"] }, { name := "_TimedCache", bases := ["Cache"], attrs := ["_Timer", "currsize", "timer"] }, { name := "_Timer", bases := [], attrs := [] }, { name := "_UnboundTTLCache", bases := ["TTLCache"], attrs := ["maxsize"] }, { name := "_WrapperBase", bases := [], attrs := ["cache", "cache_condition", "cache_key", "cache_lock"] }], funcs := [
   f_cachetools___init___py__module___DefaultSize___getitem__,
   f_cachetools___init___py__module___DefaultSize___setitem__,
   f_cachetools___init___py__module___DefaultSize_pop,

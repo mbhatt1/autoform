@@ -260,7 +260,7 @@ population (see `docs/languages.md`) and have not been re-run against it.
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **48 of 209** `cachetools` functions compared, **12 divergences**, all root-caused: 11 are calls through a captured name that Core's bare-name suffix rule resolves to an unrelated method (the exporter's misbinding is fixed; the Core half is not yet), 1 is Core method dispatch with no class hierarchy ([docs/conformance.md](docs/conformance.md)) |
+| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **41 of 209** `cachetools` functions compared, **215/215 cases agree, 0 divergences** since the re-export with the class table (STRATEGY.md §62); before it, 48 compared and 12 divergences, all root-caused to Core's name-suffix resolution and now named holes, not exclusions ([docs/conformance.md](docs/conformance.md)) |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
@@ -284,9 +284,11 @@ run's score as the other's.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
-It was wrong to say 100%, because the denominator is small. Only 48 of 209 `cachetools`
+It was wrong to say 100%, because the denominator is small. Only 41 of 209 `cachetools`
 functions are compared (60 before the item-L re-export of `ast-Cachetools.json`, whose
-honest parameter defaults hole 12 previously compared functions) (`python3.11 scripts/differential.py ast-Cachetools.json
+honest parameter defaults hole 12 previously compared functions; 48 before the item-M
+re-export with the class table, which turned the 12 remaining divergences and 10 legacy
+agreements on a fake `OrderedDict` into named holes) (`python3.11 scripts/differential.py ast-Cachetools.json
 <cachetools@01af8e5> Cachetools 5`). The rest are INCONCLUSIVE, and each one carries a
 counted reason in `conformance.json`: a value the harness cannot encode, a receiver it
 cannot build, or a hole. **The limit is reach, not agreement.** A conformance rate quoted
@@ -299,7 +301,9 @@ closures without their captured variables, and it refused, as parameter mismatch
 calls that would have exposed an exporter call misbinding. With the recorder fixed, the
 same corpus at the same commit gives 14 divergences. They are three findings, not noise.
 The exporter halves of findings 1 and 2 are now fixed (generators are holes; a call through
-a local name is emitted by that name); after the re-export the count is 12. See
+a local name is emitted by that name); after the re-export the count is 12. The Core
+halves (method lookup along the C3 MRO, bare names by Python scoping) and the re-export
+with the class table take it to 0, with 215 of 215 compared cases agreeing. See
 [docs/conformance.md](docs/conformance.md).
 
 It was then briefly wrong in the other direction: an intermediate run reported 5

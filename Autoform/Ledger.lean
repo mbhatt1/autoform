@@ -117,6 +117,20 @@ def sCalls : Stmt → List (Bool × String)
   | .raise e        => eCalls e
   | _               => []
 
+/-- Names a statement binds in the function's own scope: assignment targets, loop
+variables, exception names. Used only under Python's scoping rules (STRATEGY.md §62),
+where a bare call name is a variable rather than a function-table key. -/
+def sBinds : Stmt → List String
+  | .assign x _     => [x]
+  | .forIn x _ b    => x :: sBinds b
+  | .tryCatch b x h => x :: sBinds b ++ sBinds h
+  | .tryFinally b f => sBinds b ++ sBinds f
+  | .seq a b        => sBinds a ++ sBinds b
+  | .ifte _ a b     => sBinds a ++ sBinds b
+  | .loop _ a       => sBinds a
+  | .breakBlock a   => sBinds a
+  | _               => []
+
 /-- Runtime-hole risk of a statement. -/
 def sRisk : Stmt → Nat
   | .expr e         => eRisk e
@@ -140,6 +154,9 @@ take: `true` for a method call (`mcall`, resolved by `Ctx.resolveMethod`), `fals
 free call (`call`, resolved by `Ctx.resolve`). The tag is the whole point — the two paths
 have *different* resolution rules, and a flat `List String` cannot say which applies. -/
 def Func.calls (f : Func) : List (Bool × String) := Analysis.sCalls f.body
+
+/-- The function's own local names: parameters and what its body binds. -/
+def Func.localNames (f : Func) : List String := f.params ++ Analysis.sBinds f.body
 
 /-- How many constructs in this function could hole at runtime. -/
 def Func.risk (f : Func) : Nat := Analysis.sRisk f.body
@@ -182,6 +199,22 @@ def Ctx.resolvable (isMethod : Bool) (ctx : Ctx) (n : String) : Bool :=
     -- static ledger has no receiver. Its author measured the pure methods as worth +1
     -- function, so excluding them costs almost nothing and buys an honest number.
     || Stdlib.knowsFree ctx.dialect n
+
+/-- `Ctx.resolvable` for a call made from a function whose local names are `locals`.
+
+Under Python's scoping rules (`Ctx.scopedName`: a Python program with a class table, and
+an unqualified name) the interpreter never consults the function table for a free call:
+the callee is the local of that name, else a module global, else a builtin
+(`Ctx.calleeVal`). The ledger has no globals frame and no captured environment, so it
+counts such a call as resolvable only when the name is one of the caller's own locals or a
+modelled builtin. That is *stricter* than the interpreter (a captured or global binding
+also works there), which is the safe direction for a claimed core; the legacy suffix rule
+would be looser than it (a unique `….n` in the table is exactly what Python scoping
+ignores). Every other call keeps `Ctx.resolvable`. -/
+def Ctx.resolvableIn (ctx : Ctx) (locals : List String) (isMethod : Bool) (n : String) :
+    Bool :=
+  if !isMethod && ctx.scopedName n then locals.contains n || Stdlib.knowsFree ctx.dialect n
+  else ctx.resolvable isMethod n
 
 /-! ## Making call closure linear instead of quadratic
 
@@ -249,21 +282,31 @@ def ResolveIndex.resolvable (idx : ResolveIndex) (dialect : Dialect)
   else idx.exact.contains n || idx.suffixCount.getD n 0 == 1
        || Stdlib.knowsFree dialect n
 
+/-- The index's answer to `Ctx.resolvableIn`; `strict` is `Ctx.pyStrict` of the program. -/
+def ResolveIndex.resolvableIn (idx : ResolveIndex) (dialect : Dialect) (strict : Bool)
+    (locals : List String) (isMethod : Bool) (n : String) : Bool :=
+  if !isMethod && (strict && isPyIdent n) then locals.contains n || Stdlib.knowsFree dialect n
+  else idx.resolvable dialect isMethod n
+
+/-- Whether a program runs under Python's scoping rules (`Ctx.pyStrict` of its context). -/
+def Program.pyStrict (p : Program) : Bool := p.pyClasses.isSome && p.dialect == .python
+
 /-- Hole-free **and** every call target resolves inside the program.
 
 The reference definition: `Ctx.resolvable` per call site, quadratic. Kept because it is
 the one that obviously mirrors the interpreter, and because it is the thing
 `Program.callClosureAgrees` checks the index against. -/
 def Program.callClosedRef (p : Program) : List Func :=
-  let ctx : Ctx := { dialect := p.dialect, table := p.table }
-  p.verifiableCore.filter (fun f => f.calls.all (fun c => ctx.resolvable c.1 c.2))
+  let ctx : Ctx := { dialect := p.dialect, table := p.table, pyClasses := p.pyClasses }
+  p.verifiableCore.filter (fun f =>
+    f.calls.all (fun c => ctx.resolvableIn f.localNames c.1 c.2))
 
 /-- Hole-free **and** every call target resolves inside the program, via the index. This
 is what the ledger reports. -/
 def Program.callClosed (p : Program) : List Func :=
   let idx := ResolveIndex.build p.table
   p.verifiableCore.filter (fun f =>
-    f.calls.all (fun c => idx.resolvable p.dialect c.1 c.2))
+    f.calls.all (fun c => idx.resolvableIn p.dialect p.pyStrict f.localNames c.1 c.2))
 
 /-- Do the two agree, function for function? Compares the *names*, not just the counts:
 two lists of equal length can still be different lists, and it is the membership that the
@@ -334,7 +377,8 @@ assumed, and nothing else is missing. Disjoint from `callClosed` by construction
 def Program.conditionallyVerifiable (p : Program) : List Func :=
   let idx := ResolveIndex.build p.table
   p.funcs.filter (fun f =>
-    !f.total && f.calls.all (fun c => idx.resolvable p.dialect c.1 c.2))
+    !f.total && f.calls.all (fun c =>
+      idx.resolvableIn p.dialect p.pyStrict f.localNames c.1 c.2))
 
 /-- The name of the assumption for the `i`-th hole of `f`. -/
 def holeAssumptionId (fn : String) (i : Nat) (label : String) : String :=
@@ -503,6 +547,29 @@ private def condProg : Program :=
 #guard (condProg.funcs.flatMap Func.holeSites) == [(true, "op:delete-index"), (false, "expr:genExp")]
 #guard holeAssumptionId "m.py:<module>.holedOk" 0 "op:delete-index"
   == "H:m.py:<module>.holedOk#0:op:delete-index"
+
+-- Under Python's scoping rules a bare call name is a variable: a unique table suffix no
+-- longer makes it resolvable, a local of that name does, and a builtin still does.
+private def strictProg : Program :=
+  { pyClasses := some []
+  , funcs :=
+    [ { name := "m.py:<module>.Holder.helper", params := [], body := .skip }
+    , { name := "m.py:<module>.viaSuffix", params := [], body := .expr (.call "helper" []) }
+    , { name := "m.py:<module>.viaParam", params := ["helper"], body := .expr (.call "helper" []) }
+    , { name := "m.py:<module>.viaLocal", params := []
+      , body := .seq (.assign "cb" (.lit .unit)) (.expr (.call "cb" [])) }
+    , { name := "m.py:<module>.viaBuiltin", params := ["x"], body := .ret (.call "len" [.name "x"]) }
+    , { name := "m.py:<module>.viaQualified", params := []
+      , body := .expr (.call "m.py:<module>.Holder.helper" []) } ] }
+#guard strictProg.callClosureAgrees
+#guard strictProg.callClosed.map (·.name) ==
+  [ "m.py:<module>.Holder.helper", "m.py:<module>.viaParam", "m.py:<module>.viaLocal"
+  , "m.py:<module>.viaBuiltin", "m.py:<module>.viaQualified" ]
+-- The same program without a class table keeps the legacy suffix rule: `viaSuffix` is
+-- in (a unique `….helper`), `viaLocal` is out (no table entry `cb`).
+#guard ({ strictProg with pyClasses := none } : Program).callClosed.map (·.name) ==
+  [ "m.py:<module>.Holder.helper", "m.py:<module>.viaSuffix", "m.py:<module>.viaParam"
+  , "m.py:<module>.viaBuiltin", "m.py:<module>.viaQualified" ]
 
 end IndexCheck
 

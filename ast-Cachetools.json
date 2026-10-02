@@ -5618,7 +5618,16 @@
             "a": {
              "k": "call",
              "f": "super",
-             "args": []
+             "args": [
+              {
+               "k": "str",
+               "v": "_TimedCache"
+              },
+              {
+               "k": "name",
+               "v": "self"
+              }
+             ]
             },
             "f": "currsize"
            }
@@ -18593,7 +18602,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "_DeprecatedDescriptorBase"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -18853,7 +18871,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -20152,7 +20179,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -21146,7 +21182,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -22696,7 +22741,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -23577,7 +23631,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -24081,7 +24144,16 @@
      "e": {
       "k": "call",
       "f": "super",
-      "args": []
+      "args": [
+       {
+        "k": "str",
+        "v": "Wrapper"
+       },
+       {
+        "k": "name",
+        "v": "self"
+       }
+      ]
      }
     },
     "b": {
@@ -28101,6 +28173,92 @@
      }
     }
    }
+  },
+  "pyClasses": {
+   "Cache": {
+    "bases": [
+     "<ext>collections.abc.MutableMapping"
+    ],
+    "attrs": [
+     "_Cache__marker",
+     "_Cache__size",
+     "currsize",
+     "maxsize"
+    ]
+   },
+   "FIFOCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": []
+   },
+   "LFUCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": [
+     "_Link"
+    ]
+   },
+   "LRUCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": []
+   },
+   "RRCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": [
+     "choice"
+    ]
+   },
+   "TLRUCache": {
+    "bases": [
+     "_TimedCache"
+    ],
+    "attrs": [
+     "_Item",
+     "_TLRUCache__HEAP_CLEANUP_FACTOR",
+     "ttu"
+    ]
+   },
+   "TTLCache": {
+    "bases": [
+     "_TimedCache"
+    ],
+    "attrs": [
+     "_Link",
+     "ttl"
+    ]
+   },
+   "_DefaultSize": {
+    "bases": [],
+    "attrs": [
+     "__slots__"
+    ]
+   },
+   "_Item": {
+    "bases": [],
+    "attrs": [
+     "__slots__"
+    ]
+   },
+   "_TimedCache": {
+    "bases": [
+     "Cache"
+    ],
+    "attrs": [
+     "_Timer",
+     "currsize",
+     "timer"
+    ]
+   },
+   "_Timer": {
+    "bases": [],
+    "attrs": []
+   }
   }
  },
  {
@@ -28329,7 +28487,8 @@
      }
     }
    }
-  }
+  },
+  "pyClasses": {}
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>",
@@ -28775,6 +28934,27 @@
      }
     }
    }
+  },
+  "pyClasses": {
+   "_DeprecatedDescriptorBase": {
+    "bases": [
+     "_DescriptorBase"
+    ],
+    "attrs": []
+   },
+   "_DescriptorBase": {
+    "bases": [],
+    "attrs": []
+   },
+   "_WrapperBase": {
+    "bases": [],
+    "attrs": [
+     "cache",
+     "cache_condition",
+     "cache_key",
+     "cache_lock"
+    ]
+   }
   }
  },
  {
@@ -29181,6 +29361,16 @@
      }
     }
    }
+  },
+  "pyClasses": {
+   "_UnboundTTLCache": {
+    "bases": [
+     "TTLCache"
+    ],
+    "attrs": [
+     "maxsize"
+    ]
+   }
   }
  },
  {
@@ -29415,6 +29605,16 @@
   },
   "classBases": {
    "_HashedTuple": "tuple"
+  },
+  "pyClasses": {
+   "_HashedTuple": {
+    "bases": [
+     "<ext>tuple"
+    ],
+    "attrs": [
+     "_HashedTuple__hashvalue"
+    ]
+   }
   }
  }
 ]
