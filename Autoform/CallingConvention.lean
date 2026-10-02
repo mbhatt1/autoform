@@ -25,14 +25,15 @@ run under CPython 3.9.6. The five `Func`s below are those definitions written di
 
 Two modelling notes, stated rather than glossed:
 
-* **Core has no default values.** CPython's `def k(a=None, ...)` binds `a` to `None` when
-  no argument supplies it; Core leaves `a` unbound, and an unbound read is `Val.unit`.
-  `unit` is the closest thing Core has to `None`, so `k(**{'z': 9})` is compared against
-  `(None, {'z': 9})` with `None` read as `unit`. Defaults remain unmodelled.
+* **`None` is `Val.unit`.** `def k(a=None, ...)` now carries its default
+  (`Func.defaults`, `Autoform/PyScoping.lean`), so `k(**{'z': 9})` binds `a` to the
+  default rather than leaving it unbound. Before defaults were modelled this case passed
+  only because an *unbound* read is also `unit` -- the right answer for the wrong reason.
 * **Surplus positional arguments now raise, as CPython does.** `f(1, 2, 3)` on
   `def f(a, b)` used to truncate to `(1, 2)`; `posRejected` makes it a `TypeError`. What
   is still accepted where CPython raises is an *under*-supplied call, because Core does
-  not model default values and cannot tell a missing argument from a defaulted one. See
+  cannot tell a missing argument from a defaulted one in a function rendered before
+  defaults were recorded. See
   `surplusPositional_now_agrees_with_cpython`.
 -/
 
@@ -54,9 +55,10 @@ def f_h : Func :=
   { name := "h", params := ["a", "rest"], vararg := some "rest"
   , body := .ret (.tupleE [.name "a", .name "rest"]) }
 
-/-- `def k(a=None, **kw): return (a, kw)` — without the default. -/
+/-- `def k(a=None, **kw): return (a, kw)` -/
 def f_k : Func :=
   { name := "k", params := ["a", "kw"], kwarg := some "kw"
+  , defaults := [("a", .lit .unit)]
   , body := .ret (.tupleE [.name "a", .name "kw"]) }
 
 /-- `def m(*a, **kw): return (a, kw)` -/
@@ -212,12 +214,8 @@ theorem vararg_after_a_positional_param :
 theorem doubleStar_binds_a_named_param :
     runFunc prog 60 "c10" [] = .val (.tuple [.int 1, .dict []]) := by rfl
 
-set_option maxRecDepth 100000 in
 theorem doubleStar_overflow_lands_in_kwargs :
-    runFunc prog 60 "c11" [] = .val (.tuple [.unit, .dict [(.str "z", .int 9)]]) := by
-  simp +decide [runFunc, prog, caller, f_f, f_g, f_h, f_k, f_m, Program.table, Heap.get,
-    Ctx.resolve, Ctx.resolve.go, String.endsWith, applyFunc, bindParams, Func.posParams,
-    kwargsRejected, execStmt, evalExpr, evalList, evalPairs, strKeyed, Env.set, Env.get]
+    runFunc prog 60 "c11" [] = .val (.tuple [.unit, .dict [(.str "z", .int 9)]]) := by rfl
 
 theorem all_four_forms_together :
     runFunc prog 60 "c13" []

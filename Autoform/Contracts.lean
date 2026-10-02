@@ -796,7 +796,7 @@ theorem methodkey_refinesUnder_value :
   simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
-    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
+    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf, Val.closParts?]
 
 set_option maxHeartbeats 2000000 in
 /-- **A different contract proves a different theorem.**
@@ -912,11 +912,14 @@ theorem methodkey_refines :
   intro args _
   apply forall_ge_of_forall_add
   intro k
+  -- `Expr.call` now looks for a closure-valued local first (STRATEGY.md §57); with the
+  -- argument list symbolic, the environment `["self"].zip args` is only concrete per case.
+  rcases args with _ | ⟨a, args⟩ <;>
   simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
-    Val.iterable, strKeyed, Heap.get, Heap.alloc]
+    Val.iterable, strKeyed, Heap.get, Heap.alloc, Val.closParts?]
 
 /-- The unconditional theorem needs no satisfiability obligation — there is nothing to
 satisfy. Recorded as a declaration so the contrast with `methodkey_value_result` is

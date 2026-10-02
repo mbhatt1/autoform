@@ -575,6 +575,20 @@ structure Func where
   vararg : Option String := none
   /-- The `**kwargs` parameter's name, if the function has one. -/
   kwarg  : Option String := none
+  /-- Keyword-only parameters (`def f(a, *, b)`, or every named parameter after `*args`):
+  never filled positionally, still bound by keyword. A subset of `params`. -/
+  kwonly : List String := []
+  /-- Positional-only parameters (`def f(a, /, b)`): never bound by keyword. A subset of
+  `params`. A keyword argument naming one goes to `**kwargs`, or is rejected. -/
+  posonly : List String := []
+  /-- Default values, keyed by parameter name. Python evaluates a default **once, when the
+  `def` executes**, and every call that leaves the parameter unsupplied sees that one
+  value. Core does not run `def` statements, so only expressions for which evaluating once
+  and evaluating per call are indistinguishable are bound: literals and tuples of literals
+  (`Func.defaultVal?`). Any other expression is a hole that fires only on a call that
+  actually needs the default — a default the caller supplies is never consulted, exactly
+  as in CPython. See `param:default-nonliteral` in `docs/core-language.md`. -/
+  defaults : List (String × Expr) := []
   deriving Repr, Inhabited
 
 /-- Whether this `Func` is a method, by the exporter's naming convention: the segment after
@@ -739,8 +753,10 @@ def size : Stmt → Nat
 end Stmt
 
 namespace Func
-/-- Holes in a function. -/
-def holes (f : Func) : List String := f.body.holes
+/-- Holes in a function: its body's, plus those of any default it could need. A default
+that cannot be translated is a construct of the function, and a call that omits it reaches
+the hole, so it is counted exactly like a hole in the body. -/
+def holes (f : Func) : List String := f.body.holes ++ f.defaults.flatMap (·.2.holes)
 /-- Node count of a function. -/
 def size (f : Func) : Nat := f.body.size
 /-- A function is *fully translated* when it contains no holes. Only these are

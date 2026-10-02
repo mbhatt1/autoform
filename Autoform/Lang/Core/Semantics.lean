@@ -635,40 +635,126 @@ def strKeyed : Val → Option (List (String × Val))
   | _ => none
 
 /-- The parameters that receive positional arguments: every parameter except the
-variadic ones. -/
+variadic and the keyword-only ones. -/
 def Func.posParams (fn : Func) : List String :=
-  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p
+  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p && !fn.kwonly.contains p
+
+/-- The parameters a **keyword** argument may bind: the positional ones that are not
+positional-only, then the keyword-only ones. A keyword naming anything else goes to
+`**kwargs`, or is rejected (`kwargsRejected`). -/
+def Func.kwParams (fn : Func) : List String :=
+  fn.posParams.filter (fun p => !fn.posonly.contains p) ++ fn.kwonly
+
+/-- The value of a literal, exactly as `evalExpr` gives it. -/
+def Lit.toVal : Lit → Val
+  | .int i   => .int i
+  | .str s   => .str s
+  | .bool b  => .bool b
+  | .float f => .float f
+  | .unit    => .unit
+
+/-- The value of a default expression **when evaluating it once at `def` time and
+evaluating it again at every call cannot be told apart**: a literal, or a tuple of
+literals. Both denote immutable values with no identity Core can observe, so binding the
+value per call is exactly CPython's evaluate-once rule.
+
+Anything else is `none`, and deliberately so. `def f(x=[])` evaluates `[]` once and every
+call shares that one list — the mutable-default aliasing every Python programmer meets
+once — and `def f(t=time.monotonic)` reads `time` at definition time. Re-evaluating either
+per call is the silently-wrong translation; `Func.defaultHole` turns it into a hole on
+exactly the calls that need the default. -/
+def defaultVal? : Expr → Option Val
+  | .lit l     => some l.toVal
+  | .tupleE es => (es.mapM fun (e : Expr) => match e with
+                                    | .lit l => some l.toVal
+                                    | _      => none).map .tuple
+  | _          => none
+
+/-- Was parameter `p` given a value by this call — positionally, or by a keyword that is
+allowed to bind it? -/
+def Func.supplied (fn : Func) (vs : List Val) (kws : List (String × Val)) (p : String) :
+    Bool :=
+  (fn.posParams.take vs.length).contains p || (fn.kwParams.contains p && kws.any (·.1 == p))
+
+/-- Bindings for the parameters this call leaves unsupplied whose default is a
+`defaultVal?` constant. Empty — by its first branch, so that it reduces without looking at
+`params` — for every function with no recorded defaults, which is every function rendered
+before defaults were modelled. -/
+def Func.defaultEnv (fn : Func) (vs : List Val) (kws : List (String × Val)) : Env :=
+  if fn.defaults.isEmpty then [] else
+  fn.params.filterMap fun p =>
+    if fn.supplied vs kws p then none else
+    match fn.defaults.lookup p with
+    | some e => (defaultVal? e).map (p, ·)
+    | none   => none
+
+/-- The first unsupplied parameter whose default is **not** a constant, as a hole label —
+the default's own hole label if it is one (the exporter writes
+`param:default-nonliteral` there), else `param:default-unsupported`. `none` when every
+default this call needs is a constant. -/
+def Func.defaultHole (fn : Func) (vs : List Val) (kws : List (String × Val)) :
+    Option String :=
+  if fn.defaults.isEmpty then none else
+  fn.params.findSome? fun p =>
+    if fn.supplied vs kws p then none else
+    match fn.defaults.lookup p with
+    | some e => match defaultVal? e with
+                | some _ => none
+                | none   => some (e.holes.headD "param:default-unsupported")
+    | none   => none
+
+/-- The statement a call actually runs: the body, unless the call needs a default Core
+cannot evaluate, in which case it is that hole. Pure and fuel-free, so it adds nothing to
+the interpreter's mutual recursion. -/
+def Func.guardedBody (fn : Func) (vs : List Val) (kws : List (String × Val)) : Stmt :=
+  match fn.defaultHole vs kws with
+  | some l => .hole l
+  | none   => fn.body
+
+/-- The function name and captured environment of a closure value; `none` for anything
+else. Named so that `Expr.call` can test for a closure-valued local with a two-way match
+instead of a wildcard over every `Val` constructor. -/
+def Val.closParts? : Val → Option (String × List (String × Val))
+  | .clos g cap => some (g, cap)
+  | _           => none
 
 /-- Bind a call's arguments into the callee's environment.
 
-The rule is CPython's, minus default values (which Core does not model):
+The rule is CPython's:
 
-* positional arguments fill `posParams` left to right;
+* positional arguments fill `posParams` left to right (keyword-only parameters are not
+  among them);
 * leftovers go to `vararg` as a `tuple` — an empty one when there are none, which is
   why `def f(*a)` called with no arguments binds `a` to `()` rather than to `unit`;
-* a keyword argument naming a positional parameter binds that parameter;
-* every other keyword argument goes to `kwarg` as a `dict` with `str` keys.
+* a keyword argument naming a `kwParams` parameter binds that parameter (a
+  positional-only parameter is not among them);
+* every other keyword argument goes to `kwarg` as a `dict` with `str` keys;
+* an unsupplied parameter with a constant default sees that default
+  (`Func.defaultEnv`). The defaults sit *under* the call's own bindings, in the base
+  environment, so a supplied argument always shadows its default.
 
-Two deliberate departures, both recorded rather than hidden:
+Departures, recorded rather than hidden:
 
-* **Surplus positional arguments are dropped when there is no `*args`.** CPython raises
-  `TypeError`. This is the behaviour `applyFunc` already had (`params.zip vs` truncates),
-  and it is left alone here so that this change is about starred arguments only.
-* **A keyword argument matching no parameter is dropped here** when there is no
-  `**kwargs`. `bindParams` is only the binding half; `kwargsRejected` below detects that
-  case and `applyFunc` turns it into CPython's `TypeError` before the body ever runs, so
-  the drop is never observable. Nothing previously produced keyword arguments, so this
-  cannot change any existing behaviour. -/
+* **Surplus positional arguments** with no `*args` are rejected by `posRejected` before
+  the body runs, so the truncation here is never observable.
+* **A keyword argument matching no parameter** with no `**kwargs` is dropped here and
+  rejected by `kwargsRejected`, likewise never observable.
+* **An unsupplied parameter with no default** is still left unbound (it reads `unit`),
+  where CPython raises `TypeError: missing required argument`. A function rendered
+  before defaults were recorded cannot be told apart from one that has none, so raising
+  would reject calls CPython accepts. -/
 def bindParams (fn : Func) (base : Env) (vs : List Val)
     (kws : List (String × Val)) : Env :=
   let ps    := fn.posParams
-  let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
+  let kp    := fn.kwParams
+  let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v)
+                 (fn.defaultEnv vs kws ++ base)
   let rest  := vs.drop ps.length
   let ρ₁    := match fn.vararg with
                | some a => Env.set ρ₀ a (.tuple rest)
                | none   => ρ₀
-  let named := kws.filter (fun kv => ps.contains kv.1)
-  let extra := kws.filter (fun kv => !ps.contains kv.1)
+  let named := kws.filter (fun kv => kp.contains kv.1)
+  let extra := kws.filter (fun kv => !kp.contains kv.1)
   let ρ₂    := named.foldl (fun (e : Env) (x, v) => Env.set e x v) ρ₁
   match fn.kwarg with
   | some k => Env.set ρ₂ k (.dict (extra.map fun kv => (.str kv.1, kv.2)))
@@ -684,10 +770,10 @@ theorem `surplusPositional_is_a_known_divergence`, now
 direction: a call the real program rejects loudly runs to completion in Core and every
 theorem about it is a theorem about a program CPython never executes.
 
-Only a *surplus* is rejected. Too few arguments is still not an error here, because Core
-does not model default values: `def k(a=None)` renders as `params := ["a"]`, so raising
-on an under-supplied call would reject calls CPython accepts. That asymmetry is
-deliberate and is the reason this is not simply an arity equality test.
+Keyword-only parameters do not count: `def f(a, *, b)` called as `f(1, 2)` is a
+`TypeError` in CPython, and is here.
+
+Only a *surplus* is rejected; see `bindParams` for why a shortfall is not.
 
 A `*args` parameter absorbs any surplus, so a callee with `vararg` is never rejected. -/
 def posRejected (fn : Func) (vs : List Val) : Bool :=
@@ -700,12 +786,12 @@ corpus are. -/
   simp [posRejected]
 
 /-- `posRejected` on the shape a rendered corpus actually presents: a `Func` literal with
-both variadic fields at their `none` defaults. The companion of `bindParams_mk`, and
+every calling-convention field at its default. The companion of `bindParams_mk`, and
 needed for the same reason — a proof about a literal `Func` cannot fire a hypothesis-form
 lemma without first deciding which `fn` it is about. -/
 @[simp] theorem posRejected_mk (name : String) (params : List String) (body : Stmt)
     (vs : List Val) :
-    posRejected ⟨name, params, body, none, none⟩ vs
+    posRejected ⟨name, params, body, none, none, [], [], []⟩ vs
       = decide (params.length < vs.length) := by
   have : (List.filter (fun p => none != some p) params) = params := by
     simp [List.filter_eq_self]
@@ -714,35 +800,75 @@ lemma without first deciding which `fn` it is about. -/
 /-- Does this call pass a keyword argument the callee cannot accept? CPython raises
 `TypeError: f() got an unexpected keyword argument 'k'`; `bindParams` alone would silently
 drop it, which is the silently-wrong shape this project keeps catching, so the check is
-separate and `applyFunc` turns it into the exception. -/
+separate and `applyFunc` turns it into the exception. A keyword naming a positional-only
+parameter is one of these, as in CPython. -/
 def kwargsRejected (fn : Func) (kws : List (String × Val)) : Bool :=
-  fn.kwarg.isNone && kws.any (fun kv => !fn.posParams.contains kv.1)
+  fn.kwarg.isNone && kws.any (fun kv => !fn.kwParams.contains kv.1)
 
 /-- A call with no keyword arguments can never be rejected. -/
 @[simp] theorem kwargsRejected_nil (fn : Func) : kwargsRejected fn [] = false := by
   simp [kwargsRejected]
 
-/-- A function with no variadic parameters, called with no keyword arguments, binds
-exactly what `applyFunc` bound before the calling convention existed. This is the
-compatibility equation: every corpus rendered before starred arguments were modelled has
-`vararg = none` and `kwarg = none`, so nothing about it changed. -/
+/-- A function with no recorded defaults binds no defaults. -/
+@[simp] theorem Func.defaultEnv_nil {fn : Func} (vs : List Val) (kws : List (String × Val))
+    (hd : fn.defaults = []) : fn.defaultEnv vs kws = [] := by
+  simp [Func.defaultEnv, hd]
+
+/-- A function with no recorded defaults runs its body unchanged. -/
+@[simp] theorem Func.guardedBody_nil {fn : Func} (vs : List Val) (kws : List (String × Val))
+    (hd : fn.defaults = []) : fn.guardedBody vs kws = fn.body := by
+  simp [Func.guardedBody, Func.defaultHole, hd]
+
+/-- The literal form of `Func.guardedBody_nil`, for the same reason `bindParams_mk` exists. -/
+@[simp] theorem Func.guardedBody_mk (name : String) (params : List String) (body : Stmt)
+    (va kw : Option String) (ko po : List String) (vs : List Val)
+    (kws : List (String × Val)) :
+    Func.guardedBody ⟨name, params, body, va, kw, ko, po, []⟩ vs kws = body := rfl
+
+/-- The literal form of `Func.defaultEnv_nil`. -/
+@[simp] theorem Func.defaultEnv_mk (name : String) (params : List String) (body : Stmt)
+    (va kw : Option String) (ko po : List String) (vs : List Val)
+    (kws : List (String × Val)) :
+    Func.defaultEnv ⟨name, params, body, va, kw, ko, po, []⟩ vs kws = [] := rfl
+
+/-- A function with no variadic, keyword-only or defaulted parameters, called with no
+keyword arguments, binds exactly what `applyFunc` bound before the calling convention
+existed. This is the compatibility equation: every corpus rendered before starred
+arguments, keyword-only parameters and defaults were modelled has all of those fields at
+their defaults, so nothing about it changed. -/
 theorem bindParams_plain {fn : Func} (base : Env) (vs : List Val)
-    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) :
+    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) (h3 : fn.kwonly = [])
+    (h4 : fn.defaults = []) :
     bindParams fn base vs [] =
       (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base := by
   have : (List.filter (fun p => none != some p) fn.params) = fn.params := by
     simp [List.filter_eq_self]
-  simp [bindParams, Func.posParams, h1, h2, this]
+  simp [bindParams, Func.posParams, Func.defaultEnv, h1, h2, h3, h4, this]
+
+/-- A function with **no parameters at all**, called with no keyword arguments, binds
+nothing beyond `base` — whatever its other calling-convention fields say, because every
+one of them is keyed by a parameter name. This is the form the generated accessor
+theorems use (`SpecsGen/Basis.lean`): they already assume `fn.params = []`, so the fields
+added after them need no new hypothesis. -/
+theorem bindParams_noParams {fn : Func} (base : Env) (vs : List Val)
+    (hp : fn.params = []) (h1 : fn.vararg = none) (h2 : fn.kwarg = none) :
+    bindParams fn base vs [] = base := by
+  simp [bindParams, Func.posParams, Func.defaultEnv, hp, h1, h2]
+
+/-- The guard on a parameterless function is its body, for the same reason. -/
+theorem Func.guardedBody_noParams {fn : Func} (vs : List Val) (kws : List (String × Val))
+    (hp : fn.params = []) : fn.guardedBody vs kws = fn.body := by
+  simp [Func.guardedBody, Func.defaultHole, hp]
 
 /-- The same equation in the shape a rendered corpus actually presents: a `Func` literal
-with both variadic fields at their `none` defaults. Stated separately because the
+with every calling-convention field at its default. Stated separately because the
 hypothesis form of `bindParams_plain` cannot fire on a literal without first deciding
 which `fn` it is about. -/
 @[simp] theorem bindParams_mk (name : String) (params : List String) (body : Stmt)
     (base : Env) (vs : List Val) :
-    bindParams ⟨name, params, body, none, none⟩ base vs [] =
+    bindParams ⟨name, params, body, none, none, [], [], []⟩ base vs [] =
       (params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base :=
-  bindParams_plain base vs rfl rfl
+  bindParams_plain base vs rfl rfl rfl rfl
 
 /-- The short class name behind a class VALUE.
 
@@ -950,13 +1076,25 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
           -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
+          -- A NEGATIVE index counts from the end in Python (`xs[-1]` is the last
+          -- element). `Int.toNat` clamps it to `0`, so this used to answer the FIRST
+          -- element for `xs[-1]` -- a silently wrong value for one of the commonest
+          -- idioms in the language, found when `p, *q, r = "abcd"` (which Joern lowers to
+          -- `r = tmp[-1]`) gave `r == 'a'`. Python wraps; no other dialect has a
+          -- meaning Core models for it, so there it is a hole rather than a guess.
           match c.unbuiltin, k with
           | .list vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
-              else (h₂, .exn (.str "IndexError"))
+              if i < 0 && ctx.dialect != .python then (h₂, .hole "index:negative") else
+              match Stdlib.seqIndex vs.length i with
+              | some j => if hh : j < vs.length then (h₂, .val (vs[j]))
+                          else (h₂, .exn (.str "IndexError"))
+              | none   => (h₂, .exn (.str "IndexError"))
           | .tuple vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
-              else (h₂, .exn (.str "IndexError"))
+              if i < 0 && ctx.dialect != .python then (h₂, .hole "index:negative") else
+              match Stdlib.seqIndex vs.length i with
+              | some j => if hh : j < vs.length then (h₂, .val (vs[j]))
+                          else (h₂, .exn (.str "IndexError"))
+              | none   => (h₂, .exn (.str "IndexError"))
           | .dict kvs, key =>
               match kvs.find? (fun kv => Val.beq kv.1 key) with
               | some (_, v) => (h₂, .val v)
@@ -1060,6 +1198,21 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr (vs, kws)) =>
+        -- A name bound in the environment to a CLOSURE is that closure, before any
+        -- function of the same (suffix) name in the table: Python resolves `inc()` in
+        -- `def outer(): n = 0; def inc(): nonlocal n; ...; inc()` to the local variable
+        -- `inc`, and the exporter, seeing Joern resolve the callee to
+        -- `...outer.inc`, would otherwise reach that `Func` through `applyFunc` with NO
+        -- captured environment -- every captured read unbound, and every write through a
+        -- `nonlocal` cell a hole. Only `.clos` values take this path: a plain `.fn` held
+        -- in a variable keeps the existing resolution order, so no closure-free program
+        -- changes meaning.
+        match (ρ.get f).closParts? with
+        | some (g, cap) =>
+          match ctx.resolve g with
+          | some fn => applyClosure ctx n h₁ fn cap vs kws
+          | none    => (h₁, .hole s!"call:{g}")
+        | none =>
         match ctx.resolve f with
         | some fn => applyFunc ctx n h₁ fn none vs kws
         | none    =>
@@ -1326,7 +1479,7 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
                         | none   => []
       let ρ := bindParams fn base vs kws
       if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
-      match execStmt ctx n h ρ fn.body with
+      match execStmt ctx n h ρ (fn.guardedBody vs kws) with
       | (h₁, .ret v)    => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
       | (h₁, .exn v)    => (h₁, .exn v)
@@ -1338,8 +1491,11 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
 shadow them.
 
 Capture is by value. Reads of enclosing variables therefore work, which covers decorators
-and factory functions; a `nonlocal` **write** would need the binding to be a shared
-mutable cell, so the transpiler keeps it as an explicit hole rather than pretending. -/
+and factory functions. A `nonlocal` **write** needs the binding to be a shared mutable
+cell, and the exporter makes it one: every variable some inner function declares
+`nonlocal` is allocated by its owner as a heap cell (`Expr.boxNew`), so what is captured
+by value is the cell's reference, and a write through it is seen by the owner and every
+other closure (STRATEGY.md §57). -/
 def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) → List Val →
     List (String × Val) → Heap × EResult
   | 0,   h, _,  _,   _,  _   => (h, .outOfFuel)
@@ -1347,7 +1503,7 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
       let base : Env := cap
       let ρ : Env := bindParams fn base vs kws
       if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
-      match execStmt ctx n h ρ fn.body with
+      match execStmt ctx n h ρ (fn.guardedBody vs kws) with
       | (h₁, .ret v)     => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)
       | (h₁, .exn v)     => (h₁, .exn v)

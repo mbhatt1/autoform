@@ -65,6 +65,13 @@ def TFFreeCtx (ctx : Ctx) : Prop :=
   (∀ n fn, ctx.resolve n = some fn → tfFreeS fn.body = true) ∧
   (∀ c m fn, ctx.resolveMethod c m = some fn → tfFreeS fn.body = true)
 
+/-- The statement a call runs is `tryFinally`-free when the body is: it is the body, or a
+hole (`Func.guardedBody`, which defaults add). -/
+theorem tfFreeS_guardedBody (fn : Func) (vs : List Val) (kws : List (String × Val))
+    (h : tfFreeS fn.body = true) : tfFreeS (fn.guardedBody vs kws) = true := by
+  unfold Func.guardedBody
+  split <;> simp_all [tfFreeS]
+
 /-- The seven-way simultaneous statement, at a fixed fuel `k`. -/
 private def FuelStep (k : Nat) : Prop :=
   (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (e : Expr) (h' : Heap)
@@ -383,6 +390,18 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | inr vs =>
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
+                -- A closure-valued local is applied before the table is consulted.
+                cases hcl : (Env.get ρ f).closParts? with
+                | some gc =>
+                    obtain ⟨g, cap⟩ := gc
+                    rw [hcl] at hy
+                    dsimp only at hy ⊢
+                    cases hres0 : Ctx.resolve ctx g with
+                    | some fn => rw [hres0] at hy; exact ihC _ hctx _ _ (hctx.1 _ _ hres0) _ _ _ _ _ hy hne
+                    | none => rw [hres0] at hy; exact hy
+                | none =>
+                rw [hcl] at hy
+                dsimp only at hy ⊢
                 cases hres : Ctx.resolve ctx f with
                 | some fn => rw [hres] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
                 | none =>
@@ -647,7 +666,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         rw [if_neg hk] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
-          | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
+          | (rw [ihS _ hctx _ _ _ (tfFreeS_guardedBody fn vs kws hfree) _ _ (by assumption)
                 (by first | assumption | simp | (cases hy; exact hne))]
              first | exact hy | (split <;> first | exact hy | simp_all))
       · intro ctx hctx h fn hfree cap vs kws h' r hy hne
@@ -657,7 +676,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         rw [if_neg hk] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
-          | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
+          | (rw [ihS _ hctx _ _ _ (tfFreeS_guardedBody fn vs kws hfree) _ _ (by assumption)
                 (by first | assumption | simp | (cases hy; exact hne))]
              first | exact hy | (split <;> first | exact hy | simp_all))
       · intro ctx hctx h ρ es h' r hy hne

@@ -272,7 +272,10 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `control:TRY-finally-escaping` | `try/finally` whose body can `return`/`break`. The non-escaping case *is* translated; when control escapes, `ret` would bypass the trailing finalizer. | Design-limited; needs a richer `Ctl` interaction than one `tryCatch` can express. |
 | `control:TRY-else-without-except`, `control:TRY-multiCatch`, `control:TRY-multiFinally`, `control:TRY-shape` | `try/except/else` (the `else` must run only when nothing was raised, *and* its own exceptions must not be caught), multiple `except` clauses (the CPG discards exception types), and unrecognised `try` shapes. | Partly permanent (the CPG loses the exception types), partly not yet implemented. |
 | `control:WHILE-iterator` | A desugared iterator loop the exporter could not reconstruct into `forIn`. | Not yet implemented. |
-| `scope:nonlocal-write` | A write to an enclosing function's binding. Capture is by value, so a closure cannot mutate its enclosing frame. | **Permanent by design** until `Env` becomes shared mutable cells — see below. |
+| `scope:nonlocal-write` | A `nonlocal x` whose `x` resolves to no enclosing function binding (a `SyntaxError` in CPython). Every resolvable `nonlocal` is translated by **cell conversion** (STRATEGY.md §57): the owner allocates `x` as a one-field heap cell (`Expr.boxNew`) and every read/write of `x`, in the owner and in every closure, goes through it. | Residual only: 0 in a fresh export of `cachetools` v7.1.7 (8 before; the committed `ast-Cachetools.json` predates this). |
+| `scope:del-cell` | `del x` where `x` is such a cell. Core's `del` would drop this frame's reference to the cell rather than empty it for every closure. | Not yet implemented. |
+| `param:default-nonliteral` | A parameter default that is not a literal (`acc=[]`, `t=time.monotonic`, `f=Cache.__setitem__`). `pysrc2cpg` drops default expressions entirely; the exporter reads the default's *text* back from the source, and can translate only literals, for which evaluating once at `def` time and once per call cannot be told apart. Sits in `Func.defaults`, not the body: it is raised only by a call that omits the argument, and counted by `Func.holes`. | Needs `def` statements to execute in Core (a value captured when the function object is created) **and** a CPG node for the default expression, which Joern does not provide. |
+| `param:signature-unparsed` | The exporter could not read the function's parameter list back from the source into exactly the CPG's parameters, so its defaults / keyword-only / positional-only markers are unknown. Prefixed to the whole body. | Residual parser limits (0 in a fresh export of `cachetools` v7.1.7). |
 | `scope:class-closure` | A class defined inside a function whose methods read the enclosing scope, where `classClosure` does not apply. | Being closed; check the current AST. |
 | `assign:arity`, `assign:lhs:<shape>`, `assign:aug-impure-target`, `assign:aug-impure-receiver` | Multiple assignment targets, assignment to a shape Core has no statement for, and augmented assignment whose target or receiver would have to be evaluated twice. | Mostly not yet implemented; the "impure" ones are a correctness refusal, not a gap. |
 | `op:indirection:<kind>`, `assign:lhs:indirection`, `op:<incr>:unsupported-target` | `*p` read, `*p = v` / `*p op= v`, and `(*p)++` where `p` is not provably an interior pointer (`Val.iref`), an alias of one boxed local, or a closed out-parameter. `<kind>` is `addrKind` of `p`'s static type (`pointer`, `scalar`, `object`, `unknown-type`, `opaque-type`). What remains is mostly `p` a parameter of a function with an external or unclosable caller (the public C API), `p` a struct pointer dereferenced whole (`*pA = *pB` struct copy), and pointers loaded from fields/arrays. `&n` of a boxed scalar is `irefField n "v"`, so a scalar out-parameter and an `&s->f`/`&a[i]` out-parameter are the same runtime shape and a callee's `*p` is `derefIref`/`setDerefIref` for both. A cast that changes the pointee type of a scalar (`*(char*)&one`, `*(i64*)&u64Val`, `f((u32*)&intVal)`) is a reinterpretation of bits, so it is never seen through and the dereference stays one of these holes; pointer-to-pointer pointee changes (`(void**)&pData`) are allowed because Core pointer values carry no C type. | Needs a location model for pointers of unknown provenance, and a byte-level memory model for type punning; not yet implemented. |
@@ -307,6 +310,9 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `mcall:<m>:unboxed-container` | A *mutating* container method. Honouring it would update a temporary, because the CPG has already desugared `self.d.pop(k)` into `t = self.d; t.pop(k)`. |
 | `mcall:dangling-ref` | The receiver's ref is not in the heap. |
 | `index:unsupported` | Subscript of something that is not a list, tuple or dict. |
+| `index:negative` | A negative list/tuple index outside `.python` (Python counts from the end: `xs[-1]` is the last element; no other dialect has a meaning Core models). |
+| `param:default-nonliteral` | A call that omits an argument whose default is this static hole (see above). |
+| `call:<unpackEx>` | Starred assignment (`a, *b = obj`) from an object whose iterability depends on its class's `__iter__`. |
 | `in:non-container`, `in:non-str-in-str` | Membership on a value that cannot be searched. |
 | `forIn:non-iterable` | Iterating a non-iterable. |
 | `setIndex:immutable-containers` | *Any* `e[i] = v`. Containers are values, so a write cannot be observed by anything else holding the container. |
@@ -322,16 +328,15 @@ The distinction tells you whether a hole is work or a boundary.
 
 **Boundaries** (closing them means changing the design):
 
-* `scope:nonlocal-write` and global *rebinding*. Making these work requires every scope to
-  be a heap frame and `Env` to be references — a large refactor of the interpreter and a
-  re-repair of the entire refinement layer. Implementing writes by copying values back
-  would appear to work on simple cases and be silently wrong on aliased ones. Reads across
-  scopes work and are correct; writes are a hole.
+* Global *rebinding* from a function. (`nonlocal` writes are no longer here: they are
+  translated by converting exactly the variables some inner function declares `nonlocal`
+  into heap cells, which needs no change to `Env` — STRATEGY.md §57.)
 * `cstr:*` and `str:pointer-*`. Core has one `Val.str` for Python strings and C `char*`.
   Rather than model addresses, the operations that differ are refused.
-* `op:starred-outside-call`. A starred form outside an argument list (`a, *b = xs`) is
-  a *destructuring* pattern, not a call, and Core has no pattern binding. The calling
-  convention (§35) covers the call side only.
+* `op:starred-outside-call`. A starred form outside an argument list. Starred
+  *assignment* (`a, *b, c = xs`) no longer reaches it: the exporter recognises
+  `pysrc2cpg`'s lowering of it and emits `Stdlib.unpackEx` (STRATEGY.md §57). What is left
+  is starred forms in other positions (`for a, *b in ...`, nested targets).
 * `import:*` for genuinely external modules — the effect boundary itself, which the SACM
   case declares as an assumption.
 * `ub:*`. The semantics refusing to commit where the source language does not define an

@@ -310,7 +310,7 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
+  simp only [hb, bindParams_noParams _ _ hp hv hkw, Func.guardedBody_noParams _ _ hp, hp, kwargsRejected_nil, hpos,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
@@ -335,7 +335,7 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
+  simp only [hb, bindParams_noParams _ _ hp hv hkw, Func.guardedBody_noParams _ _ hp, hp, kwargsRejected_nil, hpos,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]

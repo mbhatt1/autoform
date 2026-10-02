@@ -278,7 +278,7 @@ def freeNames : List String :=
   excNames ++
   [ "len", "abs", "sum", "min", "max", "sorted", "bool", "str", "repr", "int"
   , "ord", "chr", "callable", "isinstance", "getattr", "hasattr"
-  , "list", "tuple", "dict" ]
+  , "list", "tuple", "dict", "<unpackEx>" ]
 
 /-- Does `builtin` model this free-function name under this dialect?
 
@@ -291,6 +291,41 @@ def knowsFree (d : Dialect) (name : String) : Bool :=
   match d with
   | .cLike | .javascript => false
   | .python => freeNames.contains name
+
+/-- Starred unpacking, `a, *b, c = xs`, as the builtin `<unpackEx>(xs, nb, na)` with
+`nb`/`na` the number of targets before/after the starred one. Not a Python name -- the `<`
+keeps it out of every program's namespace, so `Ctx.resolve` (consulted first) can never
+pick a user function instead. The exporter emits it for a target list with one starred
+name and reads the targets back by position from the tuple it returns.
+
+CPython materialises the iterable, raises `ValueError` when it has fewer than `nb + na`
+elements, and binds the starred name to a LIST whatever the iterable was
+(`a, *b = (1, 2, 3)` makes `b == [2, 3]`, not a tuple). A non-iterable scalar is a
+`TypeError`; an object (`.ref`) is not answered at all, because whether it is iterable
+depends on its class's `__iter__`, which `elems` cannot see. Kept out of `builtinCore`'s
+big match so that `builtin_heap_unchanged` keeps enumerating that match within budget. -/
+def unpackEx (h : Heap) : List Val → Option (Heap × EResult)
+  | [x, .int nb, .int na] =>
+    match x with
+    | .int _ | .bool _ | .unit | .float _ => some (h, raiseE "TypeError")
+    | _ =>
+      match elems x with
+      | none    => none
+      | some es =>
+        if nb < 0 || na < 0 then none
+        else if (es.length : Int) < nb + na then some (h, raiseE "ValueError")
+        else
+          let rest := es.drop nb.toNat
+          let k    := rest.length - na.toNat
+          some (h, .val (.tuple (es.take nb.toNat ++ [.list (rest.take k)] ++ rest.drop k)))
+  | _ => none
+
+/-- `unpackEx` never touches the heap. -/
+theorem unpackEx_heap {h h' : Heap} {as : List Val} {r : EResult}
+    (hb : unpackEx h as = some (h', r)) : h' = h := by
+  unfold unpackEx at hb
+  split at hb <;> (try split at hb) <;> (try split at hb) <;> (try split at hb) <;>
+    (try split at hb) <;> simp_all
 
 /-- The builtin bodies. Call `builtin`, not this: only `builtin` carries the `knowsFree`
 guard that keeps the ledger honest. -/
@@ -305,6 +340,7 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
       -- `KeyError(k)` — payload dropped, matching the interpreter's own representation.
       v (.str name)
     else
+    if name == "<unpackEx>" then unpackEx h args else
     match name, args with
     -- len: code points for `str`, exactly like CPython.
     | "len", [.list vs]  => v (.int vs.length)
@@ -674,6 +710,7 @@ private def freeWitness : String → List Val
   | "list"       => []
   | "tuple"      => []
   | "dict"       => []
+  | "<unpackEx>" => [.list [], .int 0, .int 0]
   | _            => []
 
 /-- Receiver and arguments on which each method name is answered. -/
@@ -732,6 +769,8 @@ theorem builtin_heap_unchanged {d : Dialect} {h h' : Heap} {n : String} {as : Li
     simp only at hb
     split at hb
     · simp_all
+    split at hb
+    · exact unpackEx_heap hb
     · split at hb <;> simp_all [Option.map_eq_some_iff, builtinCore.minMax] <;>
         (try split at hb) <;> (try simp_all) <;>
         (try (obtain ⟨_, h1, _⟩ := hb; exact h1.symm)) <;>

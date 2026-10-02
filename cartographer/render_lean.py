@@ -547,6 +547,16 @@ def render_func(f, nm) -> list:
         variadic.append(f"  , vararg := some {lean_str(f['vararg'])}")
     if f.get("kwarg") is not None:
         variadic.append(f"  , kwarg := some {lean_str(f['kwarg'])}")
+    # Keyword-only / positional-only parameters and default values: emitted only when the
+    # AST records them, for the same byte-identity reason. `defaults` is an ordered list of
+    # `[param, expr]` pairs (a JSON object would make the order a property of the parser).
+    if f.get("kwonly"):
+        variadic.append("  , kwonly := [" + ", ".join(lean_str(p) for p in f["kwonly"]) + "]")
+    if f.get("posonly"):
+        variadic.append("  , posonly := [" + ", ".join(lean_str(p) for p in f["posonly"]) + "]")
+    if f.get("defaults"):
+        pairs = ", ".join(f"({lean_str(p)}, {render(e, 'e', 14)})" for p, e in f["defaults"])
+        variadic.append(f"  , defaults := [{pairs}]")
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",
         f"def {nm} : Func :=",

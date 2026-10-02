@@ -498,7 +498,9 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
   simp +decide only [hne, applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
         Val.unbuiltin, execStmt, f_cachetools___init___py__module___TimedCache_expire,
         Env.set, List.filter, List.any, Option.isNone, bne_iff_ne, ne_eq,
-        reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self]
+        reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self,
+        Func.defaultEnv_mk, Func.guardedBody_mk, List.contains_nil, Bool.not_false,
+        List.nil_append]
   rw [hv]
   simp +decide
 
