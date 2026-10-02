@@ -245,6 +245,116 @@ def jsIntMod (x y : Int) : EResult :=
   if y != 0 && (Int.tmod x y != 0 || x >= 0) then .val (.int (Int.tmod x y))
   else flBinop .javascript "%" (.int x) (.int y)
 
+/-! ### JavaScript bitwise operators: ToInt32 / ToUint32
+
+Every JS bitwise operator converts its operands to 32-bit integers first (ECMA-262
+`ToInt32`/`ToUint32`, i.e. reduction modulo 2^32), and every one but `>>>` yields a
+signed 32-bit result; the shift count is `ToUint32(rhs) & 31`. `.javascript` borrows
+`NumConfig.python` (unbounded) for `+`/`-`/`*`, so routing `&`/`|`/`^`/`<<`/`>>`/`~`
+through it gave bignum answers: `1 << 32` was `4294967296` (Node: `1`), `1 << 31` was
+`2147483648` (Node: `-2147483648`), `~2147483648` was `-2147483649` (Node:
+`2147483647`), and `-1 >>> 0` was a `ub` hole (Node: `4294967295`).
+
+**Precision guard.** A Core `.int` under `.javascript` is exact past 2^53 where Node's
+double would already have rounded, so ToInt32 of such a value can disagree with Node.
+Operands with `|n| > 2^53` are a hole rather than an answer. Float operands (`1.5 | 0`)
+never reach here: `flBinop` holes every bitwise operator. -/
+
+/-- ECMA-262 `ToUint32` on an integer: reduction into `[0, 2^32)`. -/
+def jsToUint32 (n : Int) : Int := n % 4294967296
+
+/-- ECMA-262 `ToInt32` on an integer: reduction into `[-2^31, 2^31)`. -/
+def jsToInt32 (n : Int) : Int :=
+  let m := jsToUint32 n
+  if m ≥ 2147483648 then m - 4294967296 else m
+
+/-- `|n| ≤ 2^53`: every such integer is an exact binary64, so ToInt32 of the Core value
+is ToInt32 of the Node value. -/
+def jsExactInt (n : Int) : Bool := n.natAbs ≤ 9007199254740992
+
+/-- JS `x op y` for a bitwise operator on two `.int`s. -/
+def jsBitwise (op : String) (x y : Int) : EResult :=
+  if !(jsExactInt x && jsExactInt y) then .hole "js:bitwise:operand-beyond-2^53"
+  else
+    let ux := (jsToUint32 x).toNat
+    let uy := (jsToUint32 y).toNat
+    let s  := uy % 32
+    match op with
+    | "&"   => .val (.int (jsToInt32 (Nat.land ux uy)))
+    | "|"   => .val (.int (jsToInt32 (Nat.lor ux uy)))
+    | "^"   => .val (.int (jsToInt32 (Nat.xor ux uy)))
+    | "<<"  => .val (.int (jsToInt32 (jsToInt32 x * 2 ^ s)))
+    -- arithmetic (sign-propagating): floor division of the signed 32-bit value
+    | ">>"  => .val (.int (Int.fdiv (jsToInt32 x) (2 ^ s)))
+    -- zero-filling, and the result is UNSIGNED: `-1 >>> 0` is `4294967295`
+    | ">>>" => .val (.int ((ux / 2 ^ s : Nat) : Int))
+    | _     => .hole s!"binop:{op}"
+
+/-- JS `~x` on an `.int`: `-ToInt32(x) - 1`, always in int32 range. -/
+def jsBitNot (x : Int) : EResult :=
+  if jsExactInt x then .val (.int (-(jsToInt32 x) - 1))
+  else .hole "js:bitwise:operand-beyond-2^53"
+
+/-! ### JavaScript `===` and `==`
+
+`===` (IsStrictlyEqual) is `false` across JS types and value comparison within one,
+except that objects compare by identity. `==` (IsLooselyEqual) agrees with it on two
+operands of the same JS type; across types it coerces (`1 == "1"`, `0 == false`,
+`[1] == 1` are all `true`) through ToNumber/ToPrimitive, which this model does **not**
+implement -- those are holes. The one cross-type case that needs no coercion is decided:
+`null`/`undefined` are loosely equal to each other and to nothing else.
+
+Core's value representation limits what can be answered:
+
+* `.int` and `.float` are both a JS Number, compared numerically (`1 === 1.0`), with IEEE
+  rules via `flCmp` (`NaN !== NaN`, `0 === -0`).
+* `.unit` is **both** `null` and `undefined` -- Core does not distinguish them -- so
+  `.unit === .unit` is a hole (`null === undefined` is `false`), while `.unit == .unit` is
+  `true` in every combination and `.unit == <non-nullish>` is `false`.
+* Objects compare by identity. A `.ref` and a named `.fn` carry it; an unboxed
+  `.list`/`.tuple`/`.dict` or a closure value does not, so two of those are a hole. -/
+
+/-- The JS type of a Core value as far as equality needs it: 0 Number, 1 String,
+2 Boolean, 3 null/undefined, 4 Object. `none` for values that are not JS values. -/
+def jsEqTag : Val → Option Nat
+  | .int _ | .float _ => some 0
+  | .str _ => some 1
+  | .bool _ => some 2
+  | .unit => some 3
+  | .ref _ | .list _ | .tuple _ | .dict _ | .fn _ | .clos _ _ | .clsClos _ _
+  | .bobj _ _ => some 4
+  | .iref _ _ => none
+
+/-- Equality of two values of the same JS type (`jsEqTag x = jsEqTag y`), where Core can
+decide it. `.unit`/`.unit` is left to the caller (it differs between `==` and `===`). -/
+def jsSameTypeEq : Val → Val → Option Bool
+  | .int a,  .int b  => some (a == b)
+  | .str a,  .str b  => some (a == b)
+  | .bool a, .bool b => some (a == b)
+  | .ref a,  .ref b  => some (a == b)
+  | .fn a,   .fn b   => some (a == b)
+  | x, y =>
+      if x.kind == 3 || y.kind == 3 then some (flCmp .javascript x y == some .eq)
+      else none
+
+/-- JS `x === y` (`strict := true`) or `x == y` (`strict := false`), negated if `neg`. -/
+def jsEqE (strict neg : Bool) (x y : Val) : EResult :=
+  let r : Except String Bool :=
+    match jsEqTag x, jsEqTag y with
+    | some tx, some ty =>
+        if tx == ty then
+          if tx == 3 then
+            if strict then .error "js:===:null-vs-undefined" else .ok true
+          else match jsSameTypeEq x y with
+               | some b => .ok b
+               | none   => .error "js:eq:object-identity-unknown"
+        else if strict || tx == 3 || ty == 3 then .ok false
+        else .error "js:==:cross-type-coercion"
+    | _, _ => .error "js:eq:non-js-value"
+  match r with
+  | .ok b    => .val (.bool (if neg then !b else b))
+  | .error l => .hole l
+
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
 Only a REFERENCE forces it: two distinct objects with equal contents are `==` in Python, and
@@ -269,6 +379,17 @@ source dialect: Python gets bignums, C-like gets 32-bit two's-complement. -/
 def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
+  -- JavaScript strict equality. Its own operator string, emitted by the exporter only for
+  -- a JS `===`/`!==` source token (jssrc2cpg spells both `<operator>.equals`), and first
+  -- in the match so the float arms below cannot claim it. See `jsEqE`.
+  | "===", x, y =>
+      match d with
+      | .javascript => jsEqE true false x y
+      | _           => .hole "binop:===:non-javascript"
+  | "!==", x, y =>
+      match d with
+      | .javascript => jsEqE true true x y
+      | _           => .hole "binop:!==:non-javascript"
   | "+",  .int x,   .int y   => numToE (nc.add x y)
   -- Item 6: a C `char*` is not a Python `str`. In C, `+` on pointers is POINTER
   -- ARITHMETIC and `<`/`>`/`==` compare ADDRESSES, not contents. Core has one `Val.str`
@@ -316,12 +437,24 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- from the CPG's static type, which of the two it emits, and holes when the type is
   -- unknown. Collapsing them here would reintroduce exactly the `<operator>.and` mistake
   -- in a place where it is much harder to see.
-  | "&",  .int x, .int y => numToE (nc.band x y)
-  | "|",  .int x, .int y => numToE (nc.bor x y)
-  | "^",  .int x, .int y => numToE (nc.bxor x y)
-  | "<<", .int x, .int y => numToE (nc.shl x y)
-  | ">>", .int x, .int y => numToE (nc.shr x y)
-  | ">>>", .int x, .int y => numToE ({ nc with negRightShift := .logical }.shr x y)
+  --
+  -- JavaScript is the exception to "the arithmetic is `NumConfig`'s": its integers are
+  -- unbounded for `+`, but its bitwise operators work on ToInt32/ToUint32 of their
+  -- operands. See `jsBitwise`.
+  | "&",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "&" x y  | _ => numToE (nc.band x y)
+  | "|",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "|" x y  | _ => numToE (nc.bor x y)
+  | "^",  .int x, .int y =>
+      match d with | .javascript => jsBitwise "^" x y  | _ => numToE (nc.bxor x y)
+  | "<<", .int x, .int y =>
+      match d with | .javascript => jsBitwise "<<" x y | _ => numToE (nc.shl x y)
+  | ">>", .int x, .int y =>
+      match d with | .javascript => jsBitwise ">>" x y | _ => numToE (nc.shr x y)
+  | ">>>", .int x, .int y =>
+      match d with
+      | .javascript => jsBitwise ">>>" x y
+      | _           => numToE ({ nc with negRightShift := .logical }.shr x y)
   | "<",  .int x, .int y => .val (.bool (x < y))
   | "<=", .int x, .int y => .val (.bool (x ≤ y))
   | ">",  .int x, .int y => .val (.bool (x > y))
@@ -332,6 +465,11 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | ">",  .str x, .str y =>
       if d.stringsAreValues then .val (.bool (x > y))
       else .hole "str:pointer-compare-not-modelled"
+  -- `int == int` is the same in every dialect (JS: two Numbers). Its own arm so that it
+  -- does not depend on the dialect split in the generic `==` arm below, and
+  -- `Refine.applyBinop_int_eq` stays `rfl` for an arbitrary dialect.
+  | "==", .int x, .int y => .val (.bool (x == y))
+  | "!=", .int x, .int y => .val (.bool (!(x == y)))
   -- `==` on strings compares contents in Python and addresses in C. `Val.beq` is
   -- structural, so it is right for Python and wrong for C.
   | "==", .str _, .str _ =>
@@ -408,8 +546,17 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
            | _,      _      => .hole "iref:cmp-non-index"
   | "==", .iref r1 s1, .iref r2 s2 => .val (.bool (r1 == r2 && s1 == s2))
   | "!=", .iref r1 s1, .iref r2 s2 => .val (.bool !(r1 == r2 && s1 == s2))
-  | "==", x, y           => .val (.bool (Val.beq x y))
-  | "!=", x, y           => .val (.bool (!Val.beq x y))
+  -- JavaScript `==`/`!=` is LOOSE equality (`1 == "1"` is `true`), which `Val.beq`
+  -- answered `false`. Same-type operands are decided; cross-type coercion is a hole.
+  -- (`int`/`int`, `str`/`str` and the float arms above are already right for JS.)
+  | "==", x, y           =>
+      match d with
+      | .javascript => jsEqE false false x y
+      | _           => .val (.bool (Val.beq x y))
+  | "!=", x, y           =>
+      match d with
+      | .javascript => jsEqE false true x y
+      | _           => .val (.bool (!Val.beq x y))
   -- Reached only when the left operand did not decide the result, so the value
   -- of the expression is the RIGHT operand under value semantics.
   | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
@@ -480,6 +627,67 @@ example : applyBinop .javascript "/" (.int 6) (.int (-3)) = .val (.int (-2)) := 
 #eval applyBinop .javascript "||" (.float (Fl.ofBits (Float.toBits 0.0).toNat)) (.int 2)
   -- val (int 2), matches Node's `0.0 || 2` (was `bool true`)
 
+/-! `==` vs `===` (`docs/languages.md` §4). Every right-hand side below is Node's answer,
+from `node -e` (v22); a hole is written where Core declines to answer. -/
+example : applyBinop .javascript "===" (.int 1) (.str "1") = .val (.bool false) := rfl
+example : applyBinop .javascript "!==" (.int 1) (.str "1") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.int 1) (.int 1) = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.str "a") (.str "a") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" (.bool true) (.int 1) = .val (.bool false) := rfl
+example : applyBinop .javascript "===" .unit (.int 0) = .val (.bool false) := rfl
+-- `1 == "1"` and `0 == false` are `true` in Node; Core used to say `false`. Now a hole:
+example : applyBinop .javascript "==" (.int 1) (.str "1")
+    = .hole "js:==:cross-type-coercion" := rfl
+example : applyBinop .javascript "==" (.int 0) (.bool false)
+    = .hole "js:==:cross-type-coercion" := rfl
+-- `null == undefined` is `true`, `null == 0` is `false`, `null === undefined` is `false`
+-- (Core cannot tell null from undefined, so `===` on two of them is a hole).
+example : applyBinop .javascript "==" .unit .unit = .val (.bool true) := rfl
+example : applyBinop .javascript "==" .unit (.int 0) = .val (.bool false) := rfl
+example : applyBinop .javascript "!=" .unit (.str "") = .val (.bool true) := rfl
+example : applyBinop .javascript "===" .unit .unit = .hole "js:===:null-vs-undefined" := rfl
+-- same-type `==` is exact
+example : applyBinop .javascript "==" (.bool true) (.bool true) = .val (.bool true) := rfl
+example : applyBinop .javascript "==" (.int 2) (.int 3) = .val (.bool false) := rfl
+-- objects: identity (`[1] == [1]` is `false`; `o == o` is `true`)
+example : applyBinop .javascript "==" (.ref 0) (.ref 1) = .val (.bool false) := rfl
+example : applyBinop .javascript "===" (.ref 4) (.ref 4) = .val (.bool true) := rfl
+example : applyBinop .javascript "==" (.list [.int 1]) (.list [.int 1])
+    = .hole "js:eq:object-identity-unknown" := rfl
+-- `===` is not a JS-only spelling anywhere else: other dialects hole rather than guess.
+example : applyBinop .python "===" (.int 1) (.int 1) = .hole "binop:===:non-javascript" := rfl
+#eval applyBinop .javascript "===" (.int 1) (.float (Fl.ofBits (Float.toBits 1.0).toNat))
+  -- val (bool true), matches Node's `1 === 1.0`
+#eval applyBinop .javascript "===" (.float (Fl.ofBits (Float.toBits (0.0/0.0)).toNat))
+                                   (.float (Fl.ofBits (Float.toBits (0.0/0.0)).toNat))
+  -- val (bool false), matches Node's `NaN === NaN`
+#eval applyBinop .javascript "===" (.float (Fl.ofBits (Float.toBits (-0.0)).toNat)) (.int 0)
+  -- val (bool true), matches Node's `-0 === 0`
+
+/-! Bitwise operators: ToInt32/ToUint32 (`jsBitwise`). Right-hand sides from `node -e`. -/
+example : applyBinop .javascript "<<" (.int 1) (.int 31) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int 32) = .val (.int 1) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int 33) = .val (.int 2) := rfl
+example : applyBinop .javascript "<<" (.int 1) (.int (-1)) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "|" (.int 2147483648) (.int 0) = .val (.int (-2147483648)) := rfl
+example : applyBinop .javascript "|" (.int 4294967296) (.int 0) = .val (.int 0) := rfl
+example : applyBinop .javascript "^" (.int (-2147483649)) (.int 0) = .val (.int 2147483647) := rfl
+example : applyBinop .javascript "&" (.int 5) (.int (-1)) = .val (.int 5) := rfl
+example : applyBinop .javascript "&" (.int 4294967295) (.int 1) = .val (.int 1) := rfl
+example : applyBinop .javascript ">>" (.int (-8)) (.int 1) = .val (.int (-4)) := rfl
+example : applyBinop .javascript ">>" (.int 4294967295) (.int 0) = .val (.int (-1)) := rfl
+example : applyBinop .javascript ">>>" (.int (-1)) (.int 0) = .val (.int 4294967295) := rfl
+example : applyBinop .javascript ">>>" (.int (-1)) (.int 28) = .val (.int 15) := rfl
+example : applyBinop .javascript ">>>" (.int (-16)) (.int 2) = .val (.int 1073741820) := rfl
+example : applyBinop .javascript ">>>" (.int 3) (.int (-1)) = .val (.int 0) := rfl
+example : applyBinop .javascript "|" (.int 9007199254740992) (.int 0) = .val (.int 0) := rfl
+example : applyBinop .javascript "|" (.int 9007199254740994) (.int 0)
+    = .hole "js:bitwise:operand-beyond-2^53" := rfl
+-- C is untouched: `1 << 31` is still `INT_MIN` under `.cLike`, `~0` still `-1`.
+example : applyBinop .cLike "<<" (.int 1) (.int 31) = .val (.int (-2147483648)) := rfl
+#eval applyBinop .javascript ">>>" (.int (-1)) (.int 0)   -- val (int 4294967295), Node
+#eval applyBinop .javascript "<<" (.int 1) (.int 32)       -- val (int 1), Node
+
 /-! ### Float equations, and the two that must not regress
 
 `Val.beq` on floats is the place where a plausible-looking implementation is wrong. Both
@@ -546,7 +754,10 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- `<operator>.not` and `<operator>.logicalNot`; this exporter previously mapped *both*
   -- onto `"!"`, so `~0` translated to `false`. `bnot` is `-x-1` wrapped to the dialect's
   -- width, which is two's complement at every width and never overflows.
-  | "~", .int x => numToE ((d.toNumConfig).bnot x)
+  | "~", .int x =>
+      match d with
+      | .javascript => jsBitNot x            -- `~2147483648` is `2147483647` in Node
+      | _           => numToE ((d.toNumConfig).bnot x)
   -- **Width conversions.** `static_cast<uint8_t>(e)` in C++ is a unary operator whose
   -- meaning is completely determined: since C++20, conversion to any integer type is
   -- two's-complement reduction modulo `2^width`, which is exactly `IntType.wrap`. So it
@@ -601,6 +812,11 @@ example : applyUnop .cLike "cast:i8" (.int 200) = .val (.int (-56)) := by rfl
 
 /-- A cast of something that is not a number is a hole, not a guess. -/
 example : applyUnop .cLike "cast:u8" (.str "x") = .hole "unop:cast:u8" := by rfl
+
+/-- JS `~` is `-ToInt32(x) - 1` (`jsBitNot`); Node: `~2147483648` is `2147483647`, `~0`
+is `-1`. The unbounded `NumConfig.python` answer was `-2147483649`. -/
+example : applyUnop .javascript "~" (.int 2147483648) = .val (.int 2147483647) := rfl
+example : applyUnop .javascript "~" (.int 0) = .val (.int (-1)) := rfl
 
 /-- Negation is definitional under the unbounded (Python) config. -/
 @[simp] theorem applyUnop_py_neg (x : Int) :
@@ -1143,6 +1359,11 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- one `Refine.lean` needs reducible -- diverting here costs one call site
             -- instead of re-typing `applyBinop` and its 155 references.
             if binopNeedsHeap op x y then
+              match ctx.dialect with
+              -- JS `==` on objects is IDENTITY (`[1] == [1]` is `false`), never Python's
+              -- value equality; `applyBinop`'s `jsEqE` decides it or holes.
+              | .javascript => (h₂, applyBinop ctx.dialect op x y)
+              | _ =>
               match Val.eqPy h₂ (Val.eqFuel h₂) x y with
               | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
               | none   => (h₂, .outOfFuel)
