@@ -192,6 +192,10 @@ def pyRun (c : String) : String :=
 /-- info: "5" -/
 #guard_msgs in #eval pyRun "case_local_function_value_shadows_method"
 
+-- CPython: 'mine'
+/-- info: "'mine'" -/
+#guard_msgs in #eval pyRun "case_local_shadows_builtin_exception_name"
+
 -- CPython: 10
 /-- info: "10" -/
 #guard_msgs in #eval pyRun "case_module_global_read"
@@ -207,6 +211,22 @@ def pyRun (c : String) : String :=
 -- CPython: 3
 /-- info: "3" -/
 #guard_msgs in #eval pyRun "case_parameter_function_value"
+
+-- CPython: raise NotImplementedError
+/-- info: "raise NotImplementedError" -/
+#guard_msgs in #eval pyRun "case_raise_builtin_exception_class"
+
+-- CPython: raise KeyError
+/-- info: "raise KeyError" -/
+#guard_msgs in #eval pyRun "case_raise_builtin_exception_class_from_local"
+
+-- CPython: raise TypeError
+/-- info: "raise TypeError" -/
+#guard_msgs in #eval pyRun "case_raise_builtin_exception_instance"
+
+-- CPython: raise DeprecationWarning
+/-- info: "hole name:unbound:DeprecationWarning" -/
+#guard_msgs in #eval pyRun "case_raise_unmodelled_builtin_exception_class"
 
 -- CPython: ('make', 5)
 /-- info: "('make', 5)" -/

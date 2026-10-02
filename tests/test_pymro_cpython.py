@@ -62,6 +62,10 @@ EXPECTED_HOLES = {
     # `c.handler = lambda: ...` shadows the method in the instance dict. Core does not call
     # an instance attribute; it must not call the class's method in its place either.
     "case_instance_attribute_shadows_method": "mcall:Callbacks.handler:instance-attribute",
+    # `DeprecationWarning` is a builtin, but not one of the exception classes Core models
+    # (`Stdlib.excNames`). The modelled ones resolve through `builtins` (the
+    # `case_raise_builtin_exception_*` cases); this one stays a hole rather than a guess.
+    "case_raise_unmodelled_builtin_exception_class": "name:unbound:DeprecationWarning",
 }
 
 
@@ -115,7 +119,8 @@ def test_most_cases_are_values():
 def test_hole_labels_are_runtime_mro_labels():
     for label in EXPECTED_HOLES.values():
         assert re.match(r"^(mro:(class-attribute|external-base|unknown-class):|"
-                        r"mcall:[A-Za-z_]\w*\.|call:[A-Za-z_]\w*$)", label), label
+                        r"mcall:[A-Za-z_]\w*\.|call:[A-Za-z_]\w*$|"
+                        r"name:unbound:[A-Za-z_]\w*$)", label), label
 
 
 def test_ast_was_exported_from_this_source():
@@ -146,6 +151,15 @@ def test_program_is_the_render_of_the_ast(tmp_path):
     assert r.returncode == 0, r.stderr
     assert out.read_text() == open(PROGRAM).read(), (
         "Autoform/PyMroProgram.lean is not the render of tests/fixtures/pymro/ast.json")
+
+
+def test_builtin_exception_classes_resolve_through_builtins():
+    # STRATEGY.md §62 (item P): a modelled builtin exception class read as a bare name is
+    # found in `builtins` -- with or without a globals frame -- and `raise C` raises `C()`.
+    pins = pinned_results()
+    assert pins["case_raise_builtin_exception_class"] == "raise NotImplementedError"
+    assert pins["case_raise_builtin_exception_class_from_local"] == "raise KeyError"
+    assert pins["case_local_shadows_builtin_exception_name"] == "'mine'"
 
 
 @pytest.mark.parametrize("cls,base", [("DefaultStore", "Store"), ("StepCounter", "Counter")])

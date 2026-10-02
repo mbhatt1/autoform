@@ -69,19 +69,19 @@ def f_sum_until : Func :=
                             (.seq
                               (.assign "i" (.lit (.int 0)))
                               (.loop
-                                (.binop "<" (.name "i") (.lit (.int 8)))
+                                (.binop "<:i32" (.name "i") (.lit (.int 8)))
                                 (.seq
                                   (.setDerefIref
                                     (.irefIndex (.name "a") (.name "i"))
-                                    (.binop "+" (.name "i") (.lit (.int 1))))
-                                  (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                                    (.binop "+:i32" (.name "i") (.lit (.int 1))))
+                                  (.assign "i" (.binop "+:i32" (.name "i") (.lit (.int 1)))))))
                             (.seq
                               (.ifte
                                 (.binop
                                   "||"
-                                  (.binop "<" (.name "n") (.lit (.int 0)))
-                                  (.binop ">" (.name "n") (.lit (.int 8))))
-                                (.ret (.unop "-" (.lit (.int 1))))
+                                  (.binop "<:i32" (.name "n") (.lit (.int 0)))
+                                  (.binop ">:i32" (.name "n") (.lit (.int 8))))
+                                (.ret (.unop "-:i32" (.lit (.int 1))))
                                 .skip)
                               (.seq
                                 (.assign "p" (.irefIndex (.name "a") (.lit (.int 0))))
@@ -93,7 +93,7 @@ def f_sum_until : Func :=
                                       (.seq
                                         (.assign
                                         "s"
-                                        (.binop "+" (.name "s") (.derefIref (.name "p"))))
+                                        (.binop "+:i32" (.name "s") (.derefIref (.name "p"))))
                                         (.assign "p" (.binop "+" (.name "p") (.lit (.int 1))))))
                                     (.ret (.name "s"))))))))))))))) }
 
@@ -106,7 +106,7 @@ def f_cmp_ptrs : Func :=
             (.seq
               (.ifte
                 (.ptrOp "<" 0 (.name "x") (.name "y"))
-                (.ret (.unop "-" (.lit (.int 1))))
+                (.ret (.unop "-:i32" (.lit (.int 1))))
                 .skip)
               (.ret (.lit (.int 1))))) }
 
@@ -147,10 +147,10 @@ def f_field_order : Func :=
                             "||"
                             (.binop
                               "||"
-                              (.binop "<" (.name "i") (.lit (.int 0)))
-                              (.binop ">" (.name "i") (.lit (.int 8))))
-                            (.binop "<" (.name "j") (.lit (.int 0))))
-                          (.binop ">" (.name "j") (.lit (.int 8))))
+                              (.binop "<:i32" (.name "i") (.lit (.int 0)))
+                              (.binop ">:i32" (.name "i") (.lit (.int 8))))
+                            (.binop "<:i32" (.name "j") (.lit (.int 0))))
+                          (.binop ">:i32" (.name "j") (.lit (.int 8))))
                         (.ret (.lit (.int 9)))
                         .skip)
                       (.seq
@@ -200,10 +200,10 @@ def f_field_eq : Func :=
                             "||"
                             (.binop
                               "||"
-                              (.binop "<" (.name "i") (.lit (.int 0)))
-                              (.binop ">" (.name "i") (.lit (.int 8))))
-                            (.binop "<" (.name "j") (.lit (.int 0))))
-                          (.binop ">" (.name "j") (.lit (.int 8))))
+                              (.binop "<:i32" (.name "i") (.lit (.int 0)))
+                              (.binop ">:i32" (.name "i") (.lit (.int 8))))
+                            (.binop "<:i32" (.name "j") (.lit (.int 0))))
+                          (.binop ">:i32" (.name "j") (.lit (.int 8))))
                         (.ret (.lit (.int 9)))
                         .skip)
                       (.seq
@@ -225,7 +225,7 @@ def f_span : Func :=
                   (.ptrOp "<" 0 (.name "from") (.name "to"))
                   (.seq
                     (.assign "from" (.ptrOp "+" 1 (.name "from") (.lit (.int 1))))
-                    (.assign "k" (.binop "+" (.name "k") (.lit (.int 1))))))
+                    (.assign "k" (.binop "+:i32" (.name "k") (.lit (.int 1))))))
                 (.ret (.name "k"))))) }
 
 /-- `walk_span`  (from `addr.c`) -/
@@ -255,11 +255,11 @@ def f_walk_span : Func :=
                             "||"
                             (.binop
                               "||"
-                              (.binop "<" (.name "i") (.lit (.int 0)))
-                              (.binop ">" (.name "i") (.lit (.int 8))))
-                            (.binop "<" (.name "j") (.lit (.int 0))))
-                          (.binop ">" (.name "j") (.lit (.int 8))))
-                        (.ret (.unop "-" (.lit (.int 1))))
+                              (.binop "<:i32" (.name "i") (.lit (.int 0)))
+                              (.binop ">:i32" (.name "i") (.lit (.int 8))))
+                            (.binop "<:i32" (.name "j") (.lit (.int 0))))
+                          (.binop ">:i32" (.name "j") (.lit (.int 8))))
+                        (.ret (.unop "-:i32" (.lit (.int 1))))
                         .skip)
                       (.seq
                         (.setField (.name "b") "a" (.irefIndex (.name "buf") (.lit (.int 0))))
@@ -344,7 +344,7 @@ def f_past_end : Func :=
                                     (.irefIndex (.name "y") (.lit (.int 0))))
                                   (.seq
                                     (.ifte
-                                      (.binop "==" (.name "k") (.lit (.int 0)))
+                                      (.binop "==:i32" (.name "k") (.lit (.int 0)))
                                       (.ret
                                         (.cond
                                         (.ptrOp
@@ -404,11 +404,11 @@ def f_gap : Func :=
                             "||"
                             (.binop
                               "||"
-                              (.binop "<" (.name "i") (.lit (.int 0)))
-                              (.binop ">" (.name "i") (.lit (.int 8))))
-                            (.binop "<" (.name "j") (.lit (.int 0))))
-                          (.binop ">" (.name "j") (.lit (.int 8))))
-                        (.ret (.unop "-" (.lit (.int 99))))
+                              (.binop "<:i32" (.name "i") (.lit (.int 0)))
+                              (.binop ">:i32" (.name "i") (.lit (.int 8))))
+                            (.binop "<:i32" (.name "j") (.lit (.int 0))))
+                          (.binop ">:i32" (.name "j") (.lit (.int 8))))
+                        (.ret (.unop "-:i32" (.lit (.int 99))))
                         .skip)
                       (.seq
                         (.setField (.name "b") "c" (.irefIndex (.name "buf") (.lit (.int 0))))
@@ -445,11 +445,11 @@ def f_back_eq : Func :=
                             "||"
                             (.binop
                               "||"
-                              (.binop "<" (.name "i") (.lit (.int 0)))
-                              (.binop ">" (.name "i") (.lit (.int 8))))
-                            (.binop "<" (.name "n") (.lit (.int 0))))
-                          (.binop ">" (.name "n") (.name "i")))
-                        (.ret (.unop "-" (.lit (.int 1))))
+                              (.binop "<:i32" (.name "i") (.lit (.int 0)))
+                              (.binop ">:i32" (.name "i") (.lit (.int 8))))
+                            (.binop "<:i32" (.name "n") (.lit (.int 0))))
+                          (.binop ">:i32" (.name "n") (.name "i")))
+                        (.ret (.unop "-:i32" (.lit (.int 1))))
                         .skip)
                       (.seq
                         (.setField (.name "b") "c" (.irefIndex (.name "buf") (.lit (.int 0))))
@@ -465,7 +465,7 @@ def f_back_eq : Func :=
                                 "+"
                                 1
                                 (.field (.name "b") "c")
-                                (.binop "-" (.name "i") (.name "n"))))
+                                (.binop "-:i32" (.name "i") (.name "n"))))
                             (.lit (.int 1))
                             (.lit (.int 0))))))))))) }
 

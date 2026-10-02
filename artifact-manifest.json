@@ -10,11 +10,11 @@
    "render_sha256": "3a19a6b11619ae4d448f65e822e07d28f21e714c6bd3239c6de726b653bcf4e3"
   },
   "CAddr": {
-   "ast_bytes": 38914,
-   "ast_sha256": "7ab18d4ea271e5fb21c4060f4a4a4c6f526b72932809cd0a43574a9aadcaa77b",
+   "ast_bytes": 39050,
+   "ast_sha256": "0343dfe7d100334349403fd052748bb65737287efa65b3364bd8782816ca7803",
    "ast_tracked": true,
-   "render_bytes": 21172,
-   "render_sha256": "d3320a485ff9c0a288ce20839bfe8336bac2e069540302ef97e31287e264f79f"
+   "render_bytes": 21308,
+   "render_sha256": "a70baf1ec061ee279bf26c1d655fb2a6d55f109b9b8085750903be5bbf25be70"
   },
   "CMath": {
    "ast_bytes": 4564,

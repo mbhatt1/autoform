@@ -1,0 +1,14 @@
+{
+ "artifact": "ast-CAddr.json",
+ "artifact_bytes": 39050,
+ "artifact_sha256": "0343dfe7d100334349403fd052748bb65737287efa65b3364bd8782816ca7803",
+ "command": "joern-parse tests/c_address --output <cpg> && joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-CAddr.json. Joern 4.0.606 from Maven Central (io.joern:joern-cli_3:4.0.606, io.joern:c2cpg_3:4.0.606, codepropertygraph_3:1.7.70): joern-parse is io.joern.c2cpg.Main, joern is io.joern.joerncli.console.ReplBridge --script (run from /opt/joern/joern-cli with the exporter's absolute path); joern_version was detected from those jars. Re-export at 1de0ed9's exporter differs from the 498572a artifact only in C integer operators gaining width tags (\"<\" -> \"<:i32\", 34 operators), the exporter change of STRATEGY.md \u00a763.",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "c024b0ea6d062f7990871baa128f00324b265d31a3c3c458c52809edc51f62c7",
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/home/user/autoform/.claude/worktrees/agent-a041f4bcb47c97598/tests/c_address",
+ "source_revision": "git:1de0ed92a4c126169bbcb19c3204bc3be1fa24a6+dirty"
+}

@@ -1641,15 +1641,57 @@ def Ctx.calleeVal (ctx : Ctx) (h : Heap) (ρ : Env) (f : String) : Val :=
       | none         => .unit
   else ρ.get f
 
+/-- The builtin exception class a `__builtin.<E>` value names, if `E` is one Core models
+(`Stdlib.excNames`). -/
+def builtinExcClass? (g : String) : Option String :=
+  Stdlib.excNames.find? (fun e => "__builtin." ++ e == g)
+
 /-- A bare name that is neither local nor global. Legacy: any function of that suffix, or
-`unit`. Under Python's rules the honest answer is a hole: CPython would find a builtin or
-raise `NameError`, and Core can tell neither apart from a binding its globals frame did
-not receive (a module initialiser that holed, an import it does not model). -/
+`unit`. Under Python's rules, a builtin exception class Core models (`Stdlib.excNames`)
+is found in `builtins`, as CPython finds it whatever the module globals hold: it is
+`Val.fn "__builtin.<E>"`, the value a module initialiser binds for a builtin it names
+(`len = __builtin.len`), and the value `Ctx.calleeVal` already assumes for a *called*
+name absent from the globals frame. Any other unbound identifier is a hole: CPython would
+find some other builtin or raise `NameError`, and Core can tell neither apart from a
+binding its globals frame did not receive (a module initialiser that holed, an import it
+does not model). -/
 def Ctx.unboundName (ctx : Ctx) (x : String) : Val ⊕ String :=
-  if ctx.scopedName x then .inr s!"name:unbound:{x}" else
+  if ctx.scopedName x then
+    if Stdlib.excNames.contains x then .inl (.fn ("__builtin." ++ x))
+    else .inr s!"name:unbound:{x}"
+  else
   match ctx.resolve x with
   | some _ => .inl (.fn x)
   | none   => .inl .unit
+
+/-- The payload `raise v` raises. CPython's `raise C` with `C` an exception *class*
+instantiates it: `raise NotImplementedError` is `raise NotImplementedError()`. Core
+represents an instance of a builtin exception class as the string naming the class
+(`Stdlib.builtin "KeyError" _ = .str "KeyError"`), so under Python's rules a builtin
+exception class value raises that string. Every other value -- and every value in a
+legacy program -- is raised as it is. -/
+def Ctx.raisePayload (ctx : Ctx) : Val → Val
+  | .fn g =>
+    if ctx.pyStrict then
+      match builtinExcClass? g with
+      | some e => .str e
+      | none   => .fn g
+    else .fn g
+  | v => v
+
+@[simp] theorem Ctx.raisePayload_str (ctx : Ctx) (s : String) :
+    ctx.raisePayload (.str s) = .str s := rfl
+@[simp] theorem Ctx.raisePayload_int (ctx : Ctx) (i : Int) :
+    ctx.raisePayload (.int i) = .int i := rfl
+@[simp] theorem Ctx.raisePayload_unit (ctx : Ctx) :
+    ctx.raisePayload .unit = .unit := rfl
+@[simp] theorem Ctx.raisePayload_ref (ctx : Ctx) (r : Ref) :
+    ctx.raisePayload (.ref r) = .ref r := rfl
+
+/-- `raisePayload` only ever changes a `Val.fn`. -/
+theorem Ctx.raisePayload_of_not_fn (ctx : Ctx) (v : Val) (hv : ∀ g, v ≠ .fn g) :
+    ctx.raisePayload v = v := by
+  cases v <;> first | rfl | exact absurd rfl (hv _)
 
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
@@ -1804,6 +1846,10 @@ the new helpers without unfolding them. -/
                          | some _ => .inl (.fn x)
                          | none   => .inl .unit) := by
   simp [Ctx.unboundName, h]
+
+@[simp] theorem Ctx.raisePayload_of_none {ctx : Ctx} {v : Val} (h : ctx.pyClasses = none) :
+    ctx.raisePayload v = v := by
+  cases v <;> simp [Ctx.raisePayload, Ctx.pyStrict, h]
 
 @[simp] theorem Ctx.makeSuper_of_none {ctx : Ctx} {f : String} {vs : List Val}
     (h : ctx.pyClasses = none) : ctx.makeSuper f vs = none := by
@@ -2600,7 +2646,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .raise e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .exn v)
+      | (h₁, .val v)     => (h₁, .exn (ctx.raisePayload v))
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)

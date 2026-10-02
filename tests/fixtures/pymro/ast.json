@@ -2076,6 +2076,130 @@
   }
  },
  {
+  "name": "pymro_cases.py:<module>.case_raise_builtin_exception_class",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "raise",
+    "e": {
+     "k": "name",
+     "v": "NotImplementedError"
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_raise_builtin_exception_class_from_local",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "err",
+    "e": {
+     "k": "name",
+     "v": "KeyError"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "raise",
+      "e": {
+       "k": "name",
+       "v": "err"
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_raise_builtin_exception_instance",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "raise",
+    "e": {
+     "k": "call",
+     "f": "TypeError",
+     "args": [
+      {
+       "k": "str",
+       "v": "bad"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_local_shadows_builtin_exception_name",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "ValueError",
+    "e": {
+     "k": "str",
+     "v": "mine"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "ValueError"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pymro_cases.py:<module>.case_raise_unmodelled_builtin_exception_class",
+  "file": "pymro_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "raise",
+    "e": {
+     "k": "name",
+     "v": "DeprecationWarning"
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
   "name": "<module-objects>:<module>",
   "file": "",
   "params": [],
@@ -2294,10 +2418,10 @@
                     "k": "name",
                     "v": "<module>pymro_cases.py"
                    },
-                   "f": "case_module_global_read",
+                   "f": "case_local_shadows_builtin_exception_name",
                    "v": {
                     "k": "fnref",
-                    "v": "pymro_cases.py:<module>.case_module_global_read"
+                    "v": "pymro_cases.py:<module>.case_local_shadows_builtin_exception_name"
                    }
                   },
                   "b": {
@@ -2308,10 +2432,10 @@
                      "k": "name",
                      "v": "<module>pymro_cases.py"
                     },
-                    "f": "case_override_reached_from_base",
+                    "f": "case_module_global_read",
                     "v": {
                      "k": "fnref",
-                     "v": "pymro_cases.py:<module>.case_override_reached_from_base"
+                     "v": "pymro_cases.py:<module>.case_module_global_read"
                     }
                    },
                    "b": {
@@ -2322,10 +2446,10 @@
                       "k": "name",
                       "v": "<module>pymro_cases.py"
                      },
-                     "f": "case_own_method_before_external_base",
+                     "f": "case_override_reached_from_base",
                      "v": {
                       "k": "fnref",
-                      "v": "pymro_cases.py:<module>.case_own_method_before_external_base"
+                      "v": "pymro_cases.py:<module>.case_override_reached_from_base"
                      }
                     },
                     "b": {
@@ -2336,10 +2460,10 @@
                        "k": "name",
                        "v": "<module>pymro_cases.py"
                       },
-                      "f": "case_parameter_function_value",
+                      "f": "case_own_method_before_external_base",
                       "v": {
                        "k": "fnref",
-                       "v": "pymro_cases.py:<module>.case_parameter_function_value"
+                       "v": "pymro_cases.py:<module>.case_own_method_before_external_base"
                       }
                      },
                      "b": {
@@ -2350,10 +2474,10 @@
                         "k": "name",
                         "v": "<module>pymro_cases.py"
                        },
-                       "f": "case_staticmethod_through_instance",
+                       "f": "case_parameter_function_value",
                        "v": {
                         "k": "fnref",
-                        "v": "pymro_cases.py:<module>.case_staticmethod_through_instance"
+                        "v": "pymro_cases.py:<module>.case_parameter_function_value"
                        }
                       },
                       "b": {
@@ -2364,10 +2488,10 @@
                          "k": "name",
                          "v": "<module>pymro_cases.py"
                         },
-                        "f": "case_super_follows_instance_mro",
+                        "f": "case_raise_builtin_exception_class",
                         "v": {
                          "k": "fnref",
-                         "v": "pymro_cases.py:<module>.case_super_follows_instance_mro"
+                         "v": "pymro_cases.py:<module>.case_raise_builtin_exception_class"
                         }
                        },
                        "b": {
@@ -2378,10 +2502,10 @@
                           "k": "name",
                           "v": "<module>pymro_cases.py"
                          },
-                         "f": "case_super_init_with_args",
+                         "f": "case_raise_builtin_exception_class_from_local",
                          "v": {
                           "k": "fnref",
-                          "v": "pymro_cases.py:<module>.case_super_init_with_args"
+                          "v": "pymro_cases.py:<module>.case_raise_builtin_exception_class_from_local"
                          }
                         },
                         "b": {
@@ -2392,10 +2516,10 @@
                            "k": "name",
                            "v": "<module>pymro_cases.py"
                           },
-                          "f": "case_super_single",
+                          "f": "case_raise_builtin_exception_instance",
                           "v": {
                            "k": "fnref",
-                           "v": "pymro_cases.py:<module>.case_super_single"
+                           "v": "pymro_cases.py:<module>.case_raise_builtin_exception_instance"
                           }
                          },
                          "b": {
@@ -2406,10 +2530,10 @@
                             "k": "name",
                             "v": "<module>pymro_cases.py"
                            },
-                           "f": "case_unbound_name_is_not_a_method",
+                           "f": "case_raise_unmodelled_builtin_exception_class",
                            "v": {
                             "k": "fnref",
-                            "v": "pymro_cases.py:<module>.case_unbound_name_is_not_a_method"
+                            "v": "pymro_cases.py:<module>.case_raise_unmodelled_builtin_exception_class"
                            }
                           },
                           "b": {
@@ -2420,10 +2544,10 @@
                              "k": "name",
                              "v": "<module>pymro_cases.py"
                             },
-                            "f": "case_unresolvable_base",
+                            "f": "case_staticmethod_through_instance",
                             "v": {
                              "k": "fnref",
-                             "v": "pymro_cases.py:<module>.case_unresolvable_base"
+                             "v": "pymro_cases.py:<module>.case_staticmethod_through_instance"
                             }
                            },
                            "b": {
@@ -2434,10 +2558,10 @@
                               "k": "name",
                               "v": "<module>pymro_cases.py"
                              },
-                             "f": "make_base",
+                             "f": "case_super_follows_instance_mro",
                              "v": {
                               "k": "fnref",
-                              "v": "pymro_cases.py:<module>.make_base"
+                              "v": "pymro_cases.py:<module>.case_super_follows_instance_mro"
                              }
                             },
                             "b": {
@@ -2448,10 +2572,10 @@
                                "k": "name",
                                "v": "<module>pymro_cases.py"
                               },
-                              "f": "Bag",
+                              "f": "case_super_init_with_args",
                               "v": {
                                "k": "fnref",
-                               "v": "pymro_cases.py:<module>.Bag<meta>"
+                               "v": "pymro_cases.py:<module>.case_super_init_with_args"
                               }
                              },
                              "b": {
@@ -2462,10 +2586,10 @@
                                 "k": "name",
                                 "v": "<module>pymro_cases.py"
                                },
-                               "f": "Bottom",
+                               "f": "case_super_single",
                                "v": {
                                 "k": "fnref",
-                                "v": "pymro_cases.py:<module>.Bottom<meta>"
+                                "v": "pymro_cases.py:<module>.case_super_single"
                                }
                               },
                               "b": {
@@ -2476,10 +2600,10 @@
                                  "k": "name",
                                  "v": "<module>pymro_cases.py"
                                 },
-                                "f": "Callbacks",
+                                "f": "case_unbound_name_is_not_a_method",
                                 "v": {
                                  "k": "fnref",
-                                 "v": "pymro_cases.py:<module>.Callbacks<meta>"
+                                 "v": "pymro_cases.py:<module>.case_unbound_name_is_not_a_method"
                                 }
                                },
                                "b": {
@@ -2490,10 +2614,10 @@
                                   "k": "name",
                                   "v": "<module>pymro_cases.py"
                                  },
-                                 "f": "Counter",
+                                 "f": "case_unresolvable_base",
                                  "v": {
                                   "k": "fnref",
-                                  "v": "pymro_cases.py:<module>.Counter<meta>"
+                                  "v": "pymro_cases.py:<module>.case_unresolvable_base"
                                  }
                                 },
                                 "b": {
@@ -2504,10 +2628,10 @@
                                    "k": "name",
                                    "v": "<module>pymro_cases.py"
                                   },
-                                  "f": "DefaultStore",
+                                  "f": "make_base",
                                   "v": {
                                    "k": "fnref",
-                                   "v": "pymro_cases.py:<module>.DefaultStore<meta>"
+                                   "v": "pymro_cases.py:<module>.make_base"
                                   }
                                  },
                                  "b": {
@@ -2518,10 +2642,10 @@
                                     "k": "name",
                                     "v": "<module>pymro_cases.py"
                                    },
-                                   "f": "Dynamic",
+                                   "f": "Bag",
                                    "v": {
                                     "k": "fnref",
-                                    "v": "pymro_cases.py:<module>.Dynamic<meta>"
+                                    "v": "pymro_cases.py:<module>.Bag<meta>"
                                    }
                                   },
                                   "b": {
@@ -2532,10 +2656,10 @@
                                      "k": "name",
                                      "v": "<module>pymro_cases.py"
                                     },
-                                    "f": "Grid",
+                                    "f": "Bottom",
                                     "v": {
                                      "k": "fnref",
-                                     "v": "pymro_cases.py:<module>.Grid<meta>"
+                                     "v": "pymro_cases.py:<module>.Bottom<meta>"
                                     }
                                    },
                                    "b": {
@@ -2546,10 +2670,10 @@
                                       "k": "name",
                                       "v": "<module>pymro_cases.py"
                                      },
-                                     "f": "Holder",
+                                     "f": "Callbacks",
                                      "v": {
                                       "k": "fnref",
-                                      "v": "pymro_cases.py:<module>.Holder<meta>"
+                                      "v": "pymro_cases.py:<module>.Callbacks<meta>"
                                      }
                                     },
                                     "b": {
@@ -2560,10 +2684,10 @@
                                        "k": "name",
                                        "v": "<module>pymro_cases.py"
                                       },
-                                      "f": "Left",
+                                      "f": "Counter",
                                       "v": {
                                        "k": "fnref",
-                                       "v": "pymro_cases.py:<module>.Left<meta>"
+                                       "v": "pymro_cases.py:<module>.Counter<meta>"
                                       }
                                      },
                                      "b": {
@@ -2574,10 +2698,10 @@
                                         "k": "name",
                                         "v": "<module>pymro_cases.py"
                                        },
-                                       "f": "Right",
+                                       "f": "DefaultStore",
                                        "v": {
                                         "k": "fnref",
-                                        "v": "pymro_cases.py:<module>.Right<meta>"
+                                        "v": "pymro_cases.py:<module>.DefaultStore<meta>"
                                        }
                                       },
                                       "b": {
@@ -2588,10 +2712,10 @@
                                          "k": "name",
                                          "v": "<module>pymro_cases.py"
                                         },
-                                        "f": "Root",
+                                        "f": "Dynamic",
                                         "v": {
                                          "k": "fnref",
-                                         "v": "pymro_cases.py:<module>.Root<meta>"
+                                         "v": "pymro_cases.py:<module>.Dynamic<meta>"
                                         }
                                        },
                                        "b": {
@@ -2602,10 +2726,10 @@
                                           "k": "name",
                                           "v": "<module>pymro_cases.py"
                                          },
-                                         "f": "Shape",
+                                         "f": "Grid",
                                          "v": {
                                           "k": "fnref",
-                                          "v": "pymro_cases.py:<module>.Shape<meta>"
+                                          "v": "pymro_cases.py:<module>.Grid<meta>"
                                          }
                                         },
                                         "b": {
@@ -2616,10 +2740,10 @@
                                            "k": "name",
                                            "v": "<module>pymro_cases.py"
                                           },
-                                          "f": "Shelf",
+                                          "f": "Holder",
                                           "v": {
                                            "k": "fnref",
-                                           "v": "pymro_cases.py:<module>.Shelf<meta>"
+                                           "v": "pymro_cases.py:<module>.Holder<meta>"
                                           }
                                          },
                                          "b": {
@@ -2630,10 +2754,10 @@
                                             "k": "name",
                                             "v": "<module>pymro_cases.py"
                                            },
-                                           "f": "Square",
+                                           "f": "Left",
                                            "v": {
                                             "k": "fnref",
-                                            "v": "pymro_cases.py:<module>.Square<meta>"
+                                            "v": "pymro_cases.py:<module>.Left<meta>"
                                            }
                                           },
                                           "b": {
@@ -2644,10 +2768,10 @@
                                              "k": "name",
                                              "v": "<module>pymro_cases.py"
                                             },
-                                            "f": "StepCounter",
+                                            "f": "Right",
                                             "v": {
                                              "k": "fnref",
-                                             "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                                             "v": "pymro_cases.py:<module>.Right<meta>"
                                             }
                                            },
                                            "b": {
@@ -2658,10 +2782,10 @@
                                               "k": "name",
                                               "v": "<module>pymro_cases.py"
                                              },
-                                             "f": "Store",
+                                             "f": "Root",
                                              "v": {
                                               "k": "fnref",
-                                              "v": "pymro_cases.py:<module>.Store<meta>"
+                                              "v": "pymro_cases.py:<module>.Root<meta>"
                                              }
                                             },
                                             "b": {
@@ -2672,14 +2796,89 @@
                                                "k": "name",
                                                "v": "<module>pymro_cases.py"
                                               },
-                                              "f": "SubGrid",
+                                              "f": "Shape",
                                               "v": {
                                                "k": "fnref",
-                                               "v": "pymro_cases.py:<module>.SubGrid<meta>"
+                                               "v": "pymro_cases.py:<module>.Shape<meta>"
                                               }
                                              },
                                              "b": {
-                                              "k": "skip"
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "setField",
+                                               "r": {
+                                                "k": "name",
+                                                "v": "<module>pymro_cases.py"
+                                               },
+                                               "f": "Shelf",
+                                               "v": {
+                                                "k": "fnref",
+                                                "v": "pymro_cases.py:<module>.Shelf<meta>"
+                                               }
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "setField",
+                                                "r": {
+                                                 "k": "name",
+                                                 "v": "<module>pymro_cases.py"
+                                                },
+                                                "f": "Square",
+                                                "v": {
+                                                 "k": "fnref",
+                                                 "v": "pymro_cases.py:<module>.Square<meta>"
+                                                }
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "setField",
+                                                 "r": {
+                                                  "k": "name",
+                                                  "v": "<module>pymro_cases.py"
+                                                 },
+                                                 "f": "StepCounter",
+                                                 "v": {
+                                                  "k": "fnref",
+                                                  "v": "pymro_cases.py:<module>.StepCounter<meta>"
+                                                 }
+                                                },
+                                                "b": {
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "setField",
+                                                  "r": {
+                                                   "k": "name",
+                                                   "v": "<module>pymro_cases.py"
+                                                  },
+                                                  "f": "Store",
+                                                  "v": {
+                                                   "k": "fnref",
+                                                   "v": "pymro_cases.py:<module>.Store<meta>"
+                                                  }
+                                                 },
+                                                 "b": {
+                                                  "k": "seq",
+                                                  "a": {
+                                                   "k": "setField",
+                                                   "r": {
+                                                    "k": "name",
+                                                    "v": "<module>pymro_cases.py"
+                                                   },
+                                                   "f": "SubGrid",
+                                                   "v": {
+                                                    "k": "fnref",
+                                                    "v": "pymro_cases.py:<module>.SubGrid<meta>"
+                                                   }
+                                                  },
+                                                  "b": {
+                                                   "k": "skip"
+                                                  }
+                                                 }
+                                                }
+                                               }
+                                              }
                                              }
                                             }
                                            }
@@ -3401,27 +3600,52 @@
                                                     "b": {
                                                      "k": "seq",
                                                      "a": {
-                                                      "k": "skip"
+                                                      "k": "setGlobal",
+                                                      "x": "case_raise_builtin_exception_class",
+                                                      "e": {
+                                                       "k": "fnref",
+                                                       "v": "pymro_cases.py:<module>.case_raise_builtin_exception_class"
+                                                      }
                                                      },
                                                      "b": {
                                                       "k": "seq",
                                                       "a": {
-                                                       "k": "skip"
+                                                       "k": "setGlobal",
+                                                       "x": "case_raise_builtin_exception_class_from_local",
+                                                       "e": {
+                                                        "k": "fnref",
+                                                        "v": "pymro_cases.py:<module>.case_raise_builtin_exception_class_from_local"
+                                                       }
                                                       },
                                                       "b": {
                                                        "k": "seq",
                                                        "a": {
-                                                        "k": "skip"
+                                                        "k": "setGlobal",
+                                                        "x": "case_raise_builtin_exception_instance",
+                                                        "e": {
+                                                         "k": "fnref",
+                                                         "v": "pymro_cases.py:<module>.case_raise_builtin_exception_instance"
+                                                        }
                                                        },
                                                        "b": {
                                                         "k": "seq",
                                                         "a": {
-                                                         "k": "skip"
+                                                         "k": "setGlobal",
+                                                         "x": "case_local_shadows_builtin_exception_name",
+                                                         "e": {
+                                                          "k": "fnref",
+                                                          "v": "pymro_cases.py:<module>.case_local_shadows_builtin_exception_name"
+                                                         }
                                                         },
                                                         "b": {
                                                          "k": "seq",
                                                          "a": {
-                                                          "k": "skip"
+                                                          "k": "setGlobal",
+                                                          "x": "case_raise_unmodelled_builtin_exception_class",
+                                                          "e": {
+                                                           "k": "fnref",
+                                                           "v": "pymro_cases.py:<module>.case_raise_unmodelled_builtin_exception_class"
+                                                          }
                                                          },
                                                          "b": {
                                                           "k": "seq",
@@ -3659,7 +3883,85 @@
                                                                                                          "k": "skip"
                                                                                                         },
                                                                                                         "b": {
-                                                                                                         "k": "skip"
+                                                                                                         "k": "seq",
+                                                                                                         "a": {
+                                                                                                          "k": "skip"
+                                                                                                         },
+                                                                                                         "b": {
+                                                                                                          "k": "seq",
+                                                                                                          "a": {
+                                                                                                           "k": "skip"
+                                                                                                          },
+                                                                                                          "b": {
+                                                                                                           "k": "seq",
+                                                                                                           "a": {
+                                                                                                            "k": "skip"
+                                                                                                           },
+                                                                                                           "b": {
+                                                                                                            "k": "seq",
+                                                                                                            "a": {
+                                                                                                             "k": "skip"
+                                                                                                            },
+                                                                                                            "b": {
+                                                                                                             "k": "seq",
+                                                                                                             "a": {
+                                                                                                              "k": "skip"
+                                                                                                             },
+                                                                                                             "b": {
+                                                                                                              "k": "seq",
+                                                                                                              "a": {
+                                                                                                               "k": "skip"
+                                                                                                              },
+                                                                                                              "b": {
+                                                                                                               "k": "seq",
+                                                                                                               "a": {
+                                                                                                                "k": "skip"
+                                                                                                               },
+                                                                                                               "b": {
+                                                                                                                "k": "seq",
+                                                                                                                "a": {
+                                                                                                                 "k": "skip"
+                                                                                                                },
+                                                                                                                "b": {
+                                                                                                                 "k": "seq",
+                                                                                                                 "a": {
+                                                                                                                  "k": "skip"
+                                                                                                                 },
+                                                                                                                 "b": {
+                                                                                                                  "k": "seq",
+                                                                                                                  "a": {
+                                                                                                                   "k": "skip"
+                                                                                                                  },
+                                                                                                                  "b": {
+                                                                                                                   "k": "seq",
+                                                                                                                   "a": {
+                                                                                                                    "k": "skip"
+                                                                                                                   },
+                                                                                                                   "b": {
+                                                                                                                    "k": "seq",
+                                                                                                                    "a": {
+                                                                                                                     "k": "skip"
+                                                                                                                    },
+                                                                                                                    "b": {
+                                                                                                                     "k": "seq",
+                                                                                                                     "a": {
+                                                                                                                      "k": "skip"
+                                                                                                                     },
+                                                                                                                     "b": {
+                                                                                                                      "k": "skip"
+                                                                                                                     }
+                                                                                                                    }
+                                                                                                                   }
+                                                                                                                  }
+                                                                                                                 }
+                                                                                                                }
+                                                                                                               }
+                                                                                                              }
+                                                                                                             }
+                                                                                                            }
+                                                                                                           }
+                                                                                                          }
+                                                                                                         }
                                                                                                         }
                                                                                                        }
                                                                                                       }

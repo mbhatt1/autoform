@@ -26,6 +26,7 @@ Regenerating the AST (pinned Joern 4.0.606 with pysrc2cpg; see docs/running.md):
 """
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -39,6 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAMPLE = os.path.join(ROOT, "tests", "boxed_sample")
 AST = os.path.join(SAMPLE, "ast-BoxedSample.json")
 SRC = os.path.join(SAMPLE, "boxed.py")
+PROV = os.path.join(SAMPLE, "provenance.json")
 RENDER = os.path.join(ROOT, "cartographer", "render_lean.py")
 
 # name -> expected Core verdict. "agree" cases must match CPython exactly; "hole" cases
@@ -137,6 +139,16 @@ def cpython_results():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return {n: cpython_outcome(getattr(mod, n)) for n in AGREE}
+
+
+def test_ast_was_exported_from_this_source():
+    # The same source<->AST binding as the tests/fixtures/* differential fixtures.
+    prov = json.load(open(PROV))
+    digest = hashlib.sha256(open(SRC, "rb").read()).hexdigest()
+    assert prov["source_sha256"] == digest, (
+        "boxed.py changed since ast-BoxedSample.json was exported; re-run the command in "
+        "tests/boxed_sample/provenance.json")
+    assert prov["ast_sha256"] == hashlib.sha256(open(AST, "rb").read()).hexdigest()
 
 
 def test_the_ast_is_the_boxed_one():

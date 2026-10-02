@@ -314,3 +314,35 @@ def case_inherited_setitem():
     g[1] = 5
     g[2] = 7
     return g.total
+
+
+# Builtin exception classes resolve through `builtins` whatever the module globals hold,
+# and `raise C` with `C` a class raises `C()`. Core models the classes in
+# `Stdlib.excNames`; its payload for an instance is the class name.
+
+
+def case_raise_builtin_exception_class():
+    # The cachetools `_TimedCache.expire` idiom.
+    raise NotImplementedError
+
+
+def case_raise_builtin_exception_class_from_local():
+    # The class as a VALUE, held in a local, then raised: still instantiated.
+    err = KeyError
+    raise err
+
+
+def case_raise_builtin_exception_instance():
+    # The explicit call, for contrast: the same payload as raising the class.
+    raise TypeError("bad")
+
+
+def case_local_shadows_builtin_exception_name():
+    # A local binding wins over `builtins`.
+    ValueError = "mine"  # noqa: N806
+    return ValueError
+
+
+def case_raise_unmodelled_builtin_exception_class():
+    # `DeprecationWarning` is a builtin Core has no model of: still a hole, not a guess.
+    raise DeprecationWarning

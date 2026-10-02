@@ -209,6 +209,12 @@ INCONCLUSIVE reasons: STRATEGY.md §62. `ast-Cachetools.json` is now that re-exp
 same command on it gives the right-hand column again: 41 compared, 215/215, 0 divergences,
 369 INCONCLUSIVE.
 
+**Builtin exception classes (item P, STRATEGY.md §62).** A bare `NotImplementedError` read
+with no globals binding was `name:unbound`; it now resolves through `builtins`, and `raise C`
+of a builtin exception class raises `C()`. Same command, same AST: **42 compared, 220/220,
+0 divergences, 364 INCONCLUSIVE** — the new function is `_TimedCache.expire`, raising
+`NotImplementedError` on all 5 cases on both sides.
+
 ## Re-export (item L)
 
 `ast-Cachetools.json` was re-exported from cachetools `01af8e5` with the merged exporter

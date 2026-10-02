@@ -260,7 +260,7 @@ population (see `docs/languages.md`) and have not been re-run against it.
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **41 of 209** `cachetools` functions compared, **215/215 cases agree, 0 divergences** since the re-export with the class table (STRATEGY.md §62); before it, 48 compared and 12 divergences, all root-caused to Core's name-suffix resolution and now named holes, not exclusions ([docs/conformance.md](docs/conformance.md)) |
+| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **42 of 209** `cachetools` functions compared, **220/220 cases agree, 0 divergences** since the re-export with the class table and builtin exception classes resolving through `builtins` (STRATEGY.md §62); before it, 48 compared and 12 divergences, all root-caused to Core's name-suffix resolution and now named holes, not exclusions ([docs/conformance.md](docs/conformance.md)) |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
@@ -303,7 +303,8 @@ same corpus at the same commit gives 14 divergences. They are three findings, no
 The exporter halves of findings 1 and 2 are now fixed (generators are holes; a call through
 a local name is emitted by that name); after the re-export the count is 12. The Core
 halves (method lookup along the C3 MRO, bare names by Python scoping) and the re-export
-with the class table take it to 0, with 215 of 215 compared cases agreeing. See
+with the class table take it to 0, with 215 of 215 compared cases agreeing (220 of 220,
+42 functions, once builtin exception classes resolve through `builtins`). See
 [docs/conformance.md](docs/conformance.md).
 
 It was then briefly wrong in the other direction: an intermediate run reported 5

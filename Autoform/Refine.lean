@@ -268,13 +268,24 @@ theorem evalExpr_name_free (x : String)
     evalExpr ctx (k+1) h ρ (.name x) = (h, .val .unit) := by
   simp [evalExpr, hx, hf, hg, Ctx.unboundName, hs]
 
-/-- Under Python's rules an identifier bound neither locally nor globally is a hole, never
-a same-suffix function and never `unit` (STRATEGY.md §62). -/
+/-- Under Python's rules an identifier bound neither locally nor globally, and not a
+builtin exception class Core models, is a hole, never a same-suffix function and never
+`unit` (STRATEGY.md §62). -/
 theorem evalExpr_name_unbound_py (x : String)
     (hx : ρ.find? (·.1 == x) = none) (hg : h.get ctx.globals = none)
-    (hs : ctx.scopedName x = true) :
+    (hs : ctx.scopedName x = true) (he : Stdlib.excNames.contains x = false) :
     evalExpr ctx (k+1) h ρ (.name x) = (h, .hole s!"name:unbound:{x}") := by
-  simp [evalExpr, hx, hg, Ctx.unboundName, hs]
+  have hm : x ∉ Stdlib.excNames := by simpa using he
+  simp [evalExpr, hx, hg, Ctx.unboundName, hs, hm]
+
+/-- Under Python's rules a builtin exception class name bound neither locally nor
+globally is found in `builtins`: the class value `Val.fn "__builtin.<x>"`. -/
+theorem evalExpr_name_builtin_exc_py (x : String)
+    (hx : ρ.find? (·.1 == x) = none) (hg : h.get ctx.globals = none)
+    (hs : ctx.scopedName x = true) (he : Stdlib.excNames.contains x = true) :
+    evalExpr ctx (k+1) h ρ (.name x) = (h, .val (.fn ("__builtin." ++ x))) := by
+  have hm : x ∈ Stdlib.excNames := by simpa using he
+  simp [evalExpr, hx, hg, Ctx.unboundName, hs, hm]
 theorem evalExpr_fnref (f : String) :
     evalExpr ctx (k+1) h ρ (.fnref f) = (h, .val (.fn f)) := rfl
 theorem evalExpr_hole (l : String) :
@@ -380,9 +391,12 @@ theorem execStmt_expr_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
     execStmt ctx (k+1) h ρ (.expr e) = (h₁, .normal ρ) := by simp [execStmt, he]
 
+/-- `raise e` raises `e`'s value, except that a builtin exception *class* is instantiated
+(`Ctx.raisePayload`: `raise KeyError` is `raise KeyError()`). -/
 theorem execStmt_raise_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
-    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v) := by simp [execStmt, he]
+    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn (ctx.raisePayload v)) := by
+  simp [execStmt, he]
 
 theorem execStmt_seq_normal {a b : Stmt} {h₁ : Heap} {ρ' : Env}
     (ha : execStmt ctx k h ρ a = (h₁, .normal ρ')) :

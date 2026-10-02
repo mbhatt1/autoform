@@ -372,6 +372,16 @@ jobs:
           python3 -m pip install --quiet pytest
           python3 -m pytest tests/ -q
 
+      # Every tracked ast-*.json carries a provenance record or a NAMED baseline entry
+      # (provenance/unattributed.json) whose digest still matches. It needs only git and
+      # the tracked bytes -- no Joern, no Lean -- so it lives in this job. It was red at
+      # 1de0ed9 with 3 violations nothing ran (ast-CAddr.json unrecorded, ast-V8Base.json
+      # unrecorded, ast-V8Numbers.json's baseline expired); STRATEGY.md 62, item P.
+      # The baseline entries are printed by name on every run: green here is "attributed
+      # or explicitly excused", not "attributed". `--strict` would refuse the excuses.
+      - name: check_provenance — every tracked AST is attributed or named
+        run: python3 scripts/check_provenance.py
+
   # ------------------------------------------------------------------ #
   # OPTIONAL / MANUAL ONLY.
   #

@@ -3752,9 +3752,9 @@ What moved, and how it was repaired — no statement was weakened silently:
   (`_unlocked.cache_clear` calls the enclosing function's `cache`); conditionally verifiable
   19 → 32 and their named assumptions 23 → 36 (13 methods whose only holes are parameter
   defaults call that parameter, e.g. `cache_getitem(self, key)`).
-* **`Specs/CachetoolsSpec.TimedCache_expire_raises` is now false** and is refuted
-  (`TimedCache_expire_raises_false`); what holds is `TimedCache_expire_holes`: with no
-  globals frame, `raise NotImplementedError` reaches `name:unbound:NotImplementedError`.
+* **`Specs/CachetoolsSpec.TimedCache_expire_raises` became false** (with no globals
+  frame, `raise NotImplementedError` reached `name:unbound:NotImplementedError`) and was
+  refuted; item P (below) restored it, stronger: it now names the class.
 * **`HoleContracts`.** `DelShape`/`RRShape` gain "the `_DefaultSize` object has no instance
   attribute `pop`/`clear`": without it `delitem_refines` and `rrclear_under` are false
   under the new rules (an instance attribute shadows the method). The proofs take the MRO
@@ -3765,11 +3765,81 @@ What moved, and how it was repaired — no statement was weakened silently:
   exporter would.
 * **`SpecsGen/Cachetools`.** `C` (and `synth_specs.py`'s template) now carries
   `pyClasses := P.pyClasses`, so the mined laws are evaluated under the rules the program
-  runs under; all of them still elaborate. Its frozen globals heap `h0` is **stale, and was
+  runs under; all of them still elaborate. Its frozen globals heap `h0` was **stale, and
   already before this change**: `initGlobals` on the program gives 7 heap objects to `h0`'s
-  6 under the legacy rules too (checked with `#eval` on `reprStr`); re-freezing it is left
-  to a `synth_specs.py` regeneration, which L recorded cannot run as-is.
+  6 under the legacy rules too (checked with `#eval` on `reprStr`). Item P re-froze it
+  (below).
 * **Differential** on the committed AST: 41 compared, 215/215, 0 divergences.
+
+### Item P: builtin exception classes, the re-frozen `h0`, and three provenance gaps
+
+**Builtin exception classes resolve through `builtins`.** The rule above (local, else
+global, else builtin) was implemented for *calls* (`Ctx.calleeVal` sends a name absent from
+the globals frame to the builtins) but not for *reads*: a bare `NotImplementedError` with
+no globals binding was `name:unbound`, so `raise NotImplementedError` holed where CPython
+raises. `Ctx.unboundName` now answers a name in `Stdlib.excNames` (the 29 exception classes
+Core already constructs, `KeyError(k)` → `.str "KeyError"`) with `Val.fn
+"__builtin.<E>"` — the value module initialisers already bind for a builtin a module names —
+and `raise` of such a class value raises `C()` (`Ctx.raisePayload`: payload `.str "<E>"`,
+the same as the explicit call). Both are gated on `pyStrict`, so legacy programs are
+untouched (`Ctx.raisePayload_of_none`). A builtin outside the list (`DeprecationWarning`)
+is still `name:unbound`. Shadowing is unchanged: a local or global binding wins.
+
+Evidence: 5 new `case_*` functions in `tests/fixtures/pymro/pymro_cases.py` (re-exported:
+the head exporter reproduced the previous `ast.json` byte-for-byte first, and the new export
+differs only by the 5 functions and their module-initialiser writes), pinned in
+`Autoform/PyMro.lean` and checked against CPython by `tests/test_pymro_cpython.py`:
+`raise NotImplementedError` → `raise NotImplementedError`, `err = KeyError; raise err` →
+`raise KeyError`, `raise TypeError("bad")` → `raise TypeError`, a local `ValueError = "mine"`
+shadows the builtin → `'mine'`, and `raise DeprecationWarning` → the listed hole
+`name:unbound:DeprecationWarning`. `Specs/CachetoolsSpec.TimedCache_expire_raises` is
+restated as `runFunc P fuel "…_TimedCache.expire" [t] = .exn (.str "NotImplementedError")`
+for every `t` and `fuel ≥ 10` — stronger than the legacy "raises *something*"; the
+`_holes`/`_false` pair is gone. `Refine.evalExpr_name_unbound_py` gains the hypothesis
+`Stdlib.excNames.contains x = false`; `evalExpr_name_builtin_exc_py` is its counterpart, and
+`execStmt_raise_val` now states the payload as `ctx.raisePayload v`.
+
+Differential, `python3.11 scripts/differential.py ast-Cachetools.json <cachetools@01af8e5>
+Cachetools 5`: 41 → **42 compared, 215/215 → 220/220, 0 divergences**, INCONCLUSIVE 369 →
+364. The new function is `_TimedCache.expire` (all 5 cases raise `NotImplementedError` on
+both sides). `name:unbound:DeprecationWarning` (`_warn_instance_dict`, `_warn_classmethod`)
+remains.
+
+**`h0` re-frozen.** `Autoform/SpecsGen/Cachetools.lean`'s `def h0` was replaced by the
+output of `synth_specs.globals_literal("Cachetools")` — the generator's own function,
+`initGlobals P 5000 moduleInits` printed with `repr` — and nothing else in the module was
+touched (a full `synth_specs.py` regeneration would drop the hand-maintained `C_not_tfFree`
+refutation, §59). The fresh heap has 7 objects (the 7th is the boxed list
+`["hits", "misses", "maxsize", "currsize"]`), and the globals frame gains the bindings the
+initialisers now perform (imported names, `<absent:external>` module stand-ins, the
+per-module function aliases); the `Repr` output also spells the `payload`/`version` fields.
+`lake build Autoform.SpecsGen.Cachetools` elaborates with it, every law included.
+
+**Provenance.** `check_provenance` reported 3 violations at `1de0ed9`; it reports 0 now and
+runs in CI (`python-tests` job).
+* `ast-CAddr.json` was re-exported from `tests/c_address` with the head exporter (c2cpg
+  4.0.606). It was *not* byte-identical: the 34 integer operators gain width tags (`"<"` →
+  `"<:i32"`), the §63 exporter change that landed after it. The AST, `Generated/CAddr.lean`
+  and the manifest were updated; `Specs/AddressSpec` builds unchanged; the provenance record
+  names the exact commands.
+* `ast-V8Base.json` (tracked since `df77544`, never recorded) and `ast-V8Numbers.json`
+  (regenerated in `52a6987`, so its baseline had expired) cannot be reproduced: no V8 tree
+  or revision survives, and both predate §63 (no width-tagged integer operators), so a
+  re-export would be a different artifact. Both are baselined in
+  `provenance/unattributed.json` with that reason — named on every run, not attributed.
+* Fixture ASTs outside `check_provenance`'s `ast-*.json` glob are bound to their sources by
+  their own tests (`source_sha256`/`ast_sha256` in each `provenance.json`).
+  `tests/boxed_sample/ast-BoxedSample.json` had no such record and did not reproduce: the
+  head exporter adds `"pyClasses": {}`, which switches Core to Python's scoping rules. It was
+  re-exported (37/37 of its tests pass under the new rules) and given the same record and
+  test. `cboolint` and `cintwidth` reproduce byte-for-byte; `javaintwidth` was not checked
+  (no Java front end on this machine). **`tests/fixtures/pyscoping/ast.json` does not
+  reproduce, and was left as it is**: the head exporter boxes list literals (item G), and
+  2 of its 28 pins then change from CPython's value to the hole `call:<unpackEx>`
+  (`case_star_tail_empty`, `case_star_too_short`: starred unpacking of a boxed list —
+  `<unpackEx>` is not in `Boxed.viewedBuiltins`). A hole, not a wrong value, but a coverage
+  regression the stale fixture hides; adding `<unpackEx>` to the viewed builtins needs its
+  starred-list result checked against the boxing rules first.
 
 ## 63. Width-typed integer arithmetic: `long` is not `int`, and Java's `>>` was `>>>`
 

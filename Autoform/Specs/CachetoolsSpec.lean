@@ -494,11 +494,16 @@ theorem TTLSetstate_lambda_mrefines :
 legitimate refinement target (see `Refine.lean` §1), so "this method always raises" is a
 complete specification rather than a gap, and `.raise` → `.ret` is refuted by it.
 
-**Recorded caveat, not smoothed over:** the payload is `Val.unit`, not a
-`NotImplementedError` object. `Expr.name "NotImplementedError"` is a builtin the
-transpiler does not model, and the semantics evaluates an unbound name to `unit`. The
-statement therefore says "raises", not "raises `NotImplementedError`" — see obligation (3)
-in §4. -/
+**History, kept because each step was a correction.** Under the legacy rules the bare
+name `NotImplementedError` evaluated to `unit`, so this file proved only "raises
+*something*" (payload `unit`). Under the class table (STRATEGY.md §62) a bare name
+follows Python's scoping, and with no globals frame (`runFunc` runs no module
+initialisers) the name was the hole `name:unbound:NotImplementedError`, so even that
+statement became false. CPython resolves a builtin name through `builtins` whatever the
+module globals hold; Core now does the same for the exception classes it models
+(`Ctx.unboundName`, `Stdlib.excNames`), and `raise C` of a class instantiates it
+(`Ctx.raisePayload`). The statement below is therefore *stronger* than the legacy one: it
+names the class. -/
 
 /-- Evaluating a bare name never holes and never consumes the heap: every branch of the
 `Expr.name` case — local, global, function value, unbound — returns a value. Needed
@@ -517,23 +522,25 @@ theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : Str
   repeat' split
   all_goals exact ⟨_, rfl⟩
 
-/-- **Restated under the class table (STRATEGY.md §62).** The statement this file used to
-prove, `∃ v, runFunc P fuel "…_TimedCache.expire" [t] = .exn v` (it raised `unit`), is
-now **false**, and `TimedCache_expire_raises_false` below says so. `ast-Cachetools.json`
-carries the class table, so a bare name follows Python's scoping: `NotImplementedError`
-is bound neither locally nor in a globals frame (`runFunc` runs no module initialisers),
-so the body reaches the hole `name:unbound:NotImplementedError` instead of raising a
-payload CPython never raises. -/
-theorem TimedCache_expire_holes (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
+/-- **`_TimedCache.expire` raises `NotImplementedError`**, for every argument, with the
+class-table rules the program runs under. CPython: `raise NotImplementedError` with
+`NotImplementedError` unbound in the module raises `NotImplementedError()` from
+`builtins`; Core's payload for an instance of a builtin exception class is the class
+name, the same value `Stdlib.builtin "NotImplementedError" _` returns for the explicit
+`NotImplementedError()`. -/
+theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
     runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t]
-      = .hole "name:unbound:NotImplementedError" := by
+      = .exn (.str "NotImplementedError") := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
   have hsn : (ctxOf P).scopedName "NotImplementedError" = true := by decide +kernel
+  have hex : Stdlib.excNames.contains "NotImplementedError" = true := by decide
+  have hpy : (ctxOf P).pyStrict = true := by decide +kernel
   have hv : ∀ ρ : Env, ρ.find? (·.1 == "NotImplementedError") = none →
       evalExpr (ctxOf P) (k + 7) [] ρ (.name "NotImplementedError")
-        = ([], .hole "name:unbound:NotImplementedError") :=
-    fun ρ hx => evalExpr_name_unbound_py (ctxOf P) (k + 6) [] ρ "NotImplementedError" hx rfl hsn
+        = ([], .val (.fn "__builtin.NotImplementedError")) :=
+    fun ρ hx => evalExpr_name_builtin_exc_py (ctxOf P) (k + 6) [] ρ "NotImplementedError"
+      hx rfl hsn hex
   have hne : ((none : Option String) != some "time") = true := rfl
   -- `time=None` is a default now (the exporter records defaults); the call supplies `time`,
   -- so the default contributes no binding and the body runs unguarded.
@@ -548,17 +555,7 @@ theorem TimedCache_expire_holes (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
         List.contains_nil, Bool.not_false,
         List.nil_append]
   rw [hv _ (by simp)]
-  simp +decide
-
-/-- The former statement, refuted: `_TimedCache.expire` does not raise under the class
-table's scoping rules (it holes; see `TimedCache_expire_holes`). -/
-theorem TimedCache_expire_raises_false :
-    ¬ ∀ (t : Val) (fuel : Nat), 10 ≤ fuel →
-      ∃ v, runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t] = .exn v := by
-  intro h
-  obtain ⟨v, hv⟩ := h .unit 10 (Nat.le_refl _)
-  rw [TimedCache_expire_holes _ _ (Nat.le_refl _)] at hv
-  cases hv
+  simp +decide [Ctx.raisePayload, hpy, builtinExcClass?, Stdlib.excNames]
 
 /-! ### `_cachedmethod._none` — the sentinel is constant -/
 
@@ -674,13 +671,12 @@ Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
    `_Link.unlink` and the eviction loops, which are the functions whose specifications
    would actually be interesting to a `cachetools` user.
 
-3. **Exception payloads are unmodelled.** `TimedCache_expire_raises` used to pin the
-   *fact* of a raise but not its class, because `NotImplementedError` was an unbound builtin
-   name that the semantics evaluated to `unit`; under the class table it is the hole
-   `name:unbound:NotImplementedError` (`TimedCache_expire_holes`). Modelling builtin exception classes is a transpiler
-   and semantics change, not something this file can repair, and until it happens no
-   statement in this file can distinguish `raise NotImplementedError` from `raise
-   KeyError`.
+3. **Exception payloads are class names only.** `TimedCache_expire_raises` now pins the
+   class (`NotImplementedError`): a builtin exception class resolves through `builtins`
+   and `raise C` instantiates it (`Ctx.unboundName`, `Ctx.raisePayload`). What is still
+   unmodelled is the *argument*: `KeyError(k)` and `KeyError(j)` are the same payload
+   (`Stdlib`, assumption 1), and builtin exception classes outside `Stdlib.excNames`
+   (`DeprecationWarning`, the other `Warning`s) are still `name:unbound` holes.
 
 4. **`Cache.get` is not specified.** Its body is `if key in self: return self[key]`, and
    `Expr.inOp`/`Expr.index` applied to a `ref` receiver hole out (`in:non-container`)

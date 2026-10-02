@@ -142,7 +142,13 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
     the table — a test-suite subclass, an unresolvable base, an ambiguous short name, an
     inconsistent C3 order), `mro:external-base:<B>.<m>` (lookup reached a base outside the
     corpus), `mro:class-attribute:<C>.<m>` (an alias, `property`, `classmethod`, constant),
-    `name:unbound:<x>`.
+    `name:unbound:<x>`;
+  * a builtin exception class Core models (`Stdlib.excNames`: `KeyError`, `ValueError`,
+    `NotImplementedError`, …) bound neither locally nor globally is found in `builtins`, as
+    CPython finds it: the class value `Val.fn "__builtin.<E>"` (the value a module
+    initialiser binds for a builtin it names). `raise C` with `C` such a class raises
+    `C()`, whose Core payload is `Val.str "<E>"` (`Ctx.raisePayload`); any other builtin
+    name stays `name:unbound:<x>`.
 
   A program without a table — every non-Python corpus, every Python export made before
   §62 — keeps the legacy rules; `Ctx.resolveMethod_of_none` and its siblings state so.
@@ -276,7 +282,7 @@ traded for a guaranteed dynamic hole.
 | `ret` / `brk` / `cont` | Return, break, continue — each its own `Ctl` outcome. |
 | `tryCatch : Stmt → String → Stmt → Stmt` | `try/except as x`. Catches **exceptions only**: `ret`/`brk`/`cont` pass straight through, or every `try` containing a `return` would break. |
 | `tryFinally : Stmt → Stmt → Stmt` | The finalizer runs on *every* exit path, and an abnormal exit from the finalizer discards the body's pending outcome — Python's rule, so `try: return 1 finally: return 2` returns 2. |
-| `raise : Expr → Stmt` | Raise the evaluated value as an exception. |
+| `raise : Expr → Stmt` | Raise the evaluated value as an exception. Under Python's rules (a class table), a builtin exception *class* value is instantiated first: `raise KeyError` raises the same payload as `raise KeyError()` (`Ctx.raisePayload`). |
 | `del : String → Stmt` | Remove every binding of a local name. |
 | `setGlobal : String → Expr → Stmt` | Write a module-level binding directly. Module-scope assignment, including `def` and `class`, lowers to this. |
 | `declGlobal : String → Stmt` | `global x` — records a marker in `Env` that subsequent `assign`s to `x` consult. |
@@ -495,7 +501,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `mro:class-attribute:<C>.<m>` | Python with a class table: `m` is bound in `C`'s body by something other than a plain `def` (alias, `property`, `classmethod`, constant). |
 | `mro:ambiguous-method:<C>.<m>` | Two function-table entries end in `.C.m`. |
 | `super:<C>.<m>:absent`, `super:<C>:not-in-mro-of:<T>`, `super:<C>.<m>:receiver` | `super(C, self).m` finds nothing after `C`; `C` is not in `type(self).__mro__`; or `self` is not an instance Core can type (or carries captured bindings). |
-| `name:unbound:<x>` | Python with a class table: an identifier bound neither locally nor in the globals frame. CPython would find a builtin or raise `NameError`; Core cannot tell either from a binding its globals frame did not receive. |
+| `name:unbound:<x>` | Python with a class table: an identifier bound neither locally nor in the globals frame, and not a builtin exception class Core models (`Stdlib.excNames`, which resolve through `builtins`). CPython would find some other builtin (`DeprecationWarning`) or raise `NameError`; Core cannot tell either from a binding its globals frame did not receive. |
 | `index:unsupported` | Subscript of something that is not a list, tuple or dict. |
 | `index:negative` | A negative list/tuple index outside `.python` (Python counts from the end: `xs[-1]` is the last element; no other dialect has a meaning Core models). |
 | `param:default-nonliteral` | A call that omits an argument whose default is this static hole (see above). |

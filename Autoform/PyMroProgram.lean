@@ -12,7 +12,7 @@ import Autoform.Lang.Core.Semantics
 -- which elaborates as nested cons cells -- one frame or more per function, and
 -- Ansible has 5,546. So the limit has to scale with the module's function count,
 -- not with how deep its code happens to be.
-set_option maxRecDepth 8472
+set_option maxRecDepth 8512
 
 -- Lean's default `maxHeartbeats` (200000) budgets ONE declaration's own
 -- elaboration cost, separately from `maxRecDepth` above (which bounds nesting
@@ -523,6 +523,38 @@ def f_pymro_cases_py__module__case_inherited_setitem : Func :=
                     (.setIndex (.name "g") (.lit (.int 2)) (.lit (.int 7)))
                     (.ret (.field (.name "g") "total"))))))) }
 
+/-- `pymro_cases.py:<module>.case_raise_builtin_exception_class`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_raise_builtin_exception_class : Func :=
+  { name := "pymro_cases.py:<module>.case_raise_builtin_exception_class"
+  , params := []
+  , body := (.seq (.raise (.name "NotImplementedError")) .skip) }
+
+/-- `pymro_cases.py:<module>.case_raise_builtin_exception_class_from_local`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_raise_builtin_exception_class_from_local : Func :=
+  { name := "pymro_cases.py:<module>.case_raise_builtin_exception_class_from_local"
+  , params := []
+  , body := (.seq (.assign "err" (.name "KeyError")) (.seq .skip (.seq (.raise (.name "err")) .skip))) }
+
+/-- `pymro_cases.py:<module>.case_raise_builtin_exception_instance`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_raise_builtin_exception_instance : Func :=
+  { name := "pymro_cases.py:<module>.case_raise_builtin_exception_instance"
+  , params := []
+  , body := (.seq (.raise (.call "TypeError" [(.lit (.str "bad"))])) .skip) }
+
+/-- `pymro_cases.py:<module>.case_local_shadows_builtin_exception_name`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_local_shadows_builtin_exception_name : Func :=
+  { name := "pymro_cases.py:<module>.case_local_shadows_builtin_exception_name"
+  , params := []
+  , body := (.seq
+            (.assign "ValueError" (.lit (.str "mine")))
+            (.seq .skip (.ret (.name "ValueError")))) }
+
+/-- `pymro_cases.py:<module>.case_raise_unmodelled_builtin_exception_class`  (from `pymro_cases.py`) -/
+def f_pymro_cases_py__module__case_raise_unmodelled_builtin_exception_class : Func :=
+  { name := "pymro_cases.py:<module>.case_raise_unmodelled_builtin_exception_class"
+  , params := []
+  , body := (.seq (.raise (.name "DeprecationWarning")) .skip) }
+
 /-- `<module-objects>:<module>`  (from ``) -/
 def f__module_objects___module_ : Func :=
   { name := "<module-objects>:<module>"
@@ -604,6 +636,12 @@ def f__module_objects___module_ : Func :=
                                         (.seq
                                         (.setField
                                         (.name "<module>pymro_cases.py")
+                                        "case_local_shadows_builtin_exception_name"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_local_shadows_builtin_exception_name"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
                                         "case_module_global_read"
                                         (.fnref "pymro_cases.py:<module>.case_module_global_read"))
                                         (.seq
@@ -624,6 +662,30 @@ def f__module_objects___module_ : Func :=
                                         "case_parameter_function_value"
                                         (.fnref
                                         "pymro_cases.py:<module>.case_parameter_function_value"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "case_raise_builtin_exception_class"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_builtin_exception_class"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "case_raise_builtin_exception_class_from_local"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_builtin_exception_class_from_local"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "case_raise_builtin_exception_instance"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_builtin_exception_instance"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>pymro_cases.py")
+                                        "case_raise_unmodelled_builtin_exception_class"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_unmodelled_builtin_exception_class"))
                                         (.seq
                                         (.setField
                                         (.name "<module>pymro_cases.py")
@@ -747,7 +809,7 @@ def f__module_objects___module_ : Func :=
                                         (.name "<module>pymro_cases.py")
                                         "SubGrid"
                                         (.fnref "pymro_cases.py:<module>.SubGrid<meta>"))
-                                        .skip))))))))))))))))))))))))))))))))))))))))))) }
+                                        .skip)))))))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- `pymro_cases.py:<module>`  (from `pymro_cases.py`) -/
 def f_pymro_cases_py__module_ : Func :=
@@ -982,7 +1044,30 @@ def f_pymro_cases_py__module_ : Func :=
                                         "case_inherited_setitem"
                                         (.fnref "pymro_cases.py:<module>.case_inherited_setitem"))
                                         (.seq
-                                        .skip
+                                        (.setGlobal
+                                        "case_raise_builtin_exception_class"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_builtin_exception_class"))
+                                        (.seq
+                                        (.setGlobal
+                                        "case_raise_builtin_exception_class_from_local"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_builtin_exception_class_from_local"))
+                                        (.seq
+                                        (.setGlobal
+                                        "case_raise_builtin_exception_instance"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_builtin_exception_instance"))
+                                        (.seq
+                                        (.setGlobal
+                                        "case_local_shadows_builtin_exception_name"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_local_shadows_builtin_exception_name"))
+                                        (.seq
+                                        (.setGlobal
+                                        "case_raise_unmodelled_builtin_exception_class"
+                                        (.fnref
+                                        "pymro_cases.py:<module>.case_raise_unmodelled_builtin_exception_class"))
                                         (.seq
                                         .skip
                                         (.seq
@@ -1077,7 +1162,25 @@ def f_pymro_cases_py__module_ : Func :=
                                         .skip
                                         (.seq
                                         .skip
-                                        (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- Module-level initializers: run these to populate the globals frame
 before calling any entry point. -/
@@ -1145,6 +1248,11 @@ def program : Program := { dialect := .python, pyClasses := some [{ name := "Bag
   f_pymro_cases_py__module__Grid___init__,
   f_pymro_cases_py__module__Grid___setitem__,
   f_pymro_cases_py__module__case_inherited_setitem,
+  f_pymro_cases_py__module__case_raise_builtin_exception_class,
+  f_pymro_cases_py__module__case_raise_builtin_exception_class_from_local,
+  f_pymro_cases_py__module__case_raise_builtin_exception_instance,
+  f_pymro_cases_py__module__case_local_shadows_builtin_exception_name,
+  f_pymro_cases_py__module__case_raise_unmodelled_builtin_exception_class,
   f__module_objects___module_,
   f_pymro_cases_py__module_
 ] }

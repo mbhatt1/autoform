@@ -20,7 +20,12 @@
   "untracked corpus AST (verified entry-by-entry against ast-LinuxLib.json and",
   "ast-V8Base.json), and no extraction script is committed, so there is no `command`",
   "that regenerates them and a record naming export_ast.sc + a source tree would be",
-  "false. Committing the extractor is what closes these, not a re-export."
+  "false. Committing the extractor is what closes these, not a re-export.",
+  "",
+  "ast-V8Base.json (tracked since df77544) and ast-V8Numbers.json (whose 16f7c88 entry",
+  "expired when 52a6987 regenerated it) were baselined on 2026-10-02 (STRATEGY.md section 62,",
+  "item P) because neither can be reproduced: no V8 tree or revision survives, and both predate",
+  "the current exporter. Their reasons say so; a re-export from a known revision closes them."
  ],
  "artifacts": {
   "ast-CMath.json": {
@@ -93,17 +98,24 @@
    "reproduction_attempted": true,
    "reproduced": false
   },
+  "ast-V8Base.json": {
+   "artifact_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
+   "source_hint": "a V8 checkout's src/base (paths in the AST are relative to it: platform/platform-posix.cc, cpu/cpu.h, ...); revision not recorded at export time. The manifest's ast_hint /tmp/final-V8Base.json is a scratch path, not a source.",
+   "reason": "Tracked since df77544 (STRATEGY.md section 55) at 3aee4390e020 -- the corpus the 74 spec files under Autoform/SpecsGen/V8Base/ were generated from -- and never given a provenance record. Not reproduced: the V8 revision and the Joern/exporter versions that produced it were not recorded, no V8 source tree survives on any machine this project has used (df77544: the scratch directories are empty), and it predates the current exporter (it carries no width-tagged integer operators, STRATEGY.md section 63, only cast:* tags), so even a re-export of the right revision with the committed export_ast.sc would not produce these bytes. Recording a command here would claim a regeneration path that does not exist. Attribution requires re-exporting from a known V8 revision, which also changes the corpus the V8Base specs are pinned to (scripts/check_specs_fresh.py) and so means regenerating them.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
   "ast-V8BaseSample.json": {
    "artifact_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
-   "source_hint": "extracted from ast-V8Base.json (untracked; .gitignore names it a local build product)",
-   "reason": "Not a Joern export: an EXTRACTION. All 4 entries were verified byte-identical to their (name, file) counterparts in ast-V8Base.json, which is gitignored and local-only. Commit 5fd17ae describes it as the call-closure of the functions Autoform/SpecsGen/V8BaseSample.lean names. No extraction script is committed, so there is no exact command to record, and naming cartographer/export_ast.sc plus a V8 source tree would claim a regeneration path that does not produce this file. Attribution requires committing the extractor (and recording the parent AST it selects from).",
+   "source_hint": "extracted from ast-V8Base.json (tracked since df77544)",
+   "reason": "Not a Joern export: an EXTRACTION. All 4 entries are equal, as JSON values, to their (name, file) counterparts in ast-V8Base.json (re-checked 2026-10-02 against the tracked ast-V8Base.json, which was local-only when this entry was written). Commit 5fd17ae describes it as the call-closure of the functions Autoform/SpecsGen/V8BaseSample.lean names. No extraction script is committed, so there is no exact command to record, and naming cartographer/export_ast.sc plus a V8 source tree would claim a regeneration path that does not produce this file. Attribution requires committing the extractor (and recording the parent AST it selects from).",
    "reproduction_attempted": true,
    "reproduced": false
   },
   "ast-V8Numbers.json": {
-   "artifact_sha256": "9742832f6f8eeff1b64102635129f4fe70926d0b724c0cc54fc6ae865a38564e",
+   "artifact_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
    "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/v8/src/numbers (a git checkout; revision not recorded at export time)",
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reason": "Re-baselined, not attributed. The baseline entry (16f7c88, digest 9742832f6f8e) expired when 52a6987 regenerated this file with the float-literal exporter (digest bcd83966f4ae); that commit recorded neither the V8 revision nor the exact command, and the source_hint directory no longer has files in it (df77544). Not reproducible now: no V8 tree is available, and the committed exporter has moved on since 52a6987 (this AST has no width-tagged integer operators, STRATEGY.md section 63), so a re-export would be a different artifact, not a reproduction of this one. Re-baselined at bcd83966f4ae on 2026-10-02 (STRATEGY.md section 62, item P) so the gate names the gap instead of failing on it; artifact-manifest.json pins the same digest. Attribution requires re-exporting from a known V8 revision.",
    "reproduction_attempted": false,
    "reproduced": false
   }
