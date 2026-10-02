@@ -6,12 +6,12 @@
   "automatically; re-running the command and diffing ast.json is how to find out."
  ],
  "source": "tests/fixtures/pyscoping/pyscoping_cases.py",
- "source_sha256": "d71f0ff5c4ff06df6017a05b0b6da8122a0991311087672741dc810658d82748",
- "ast_sha256": "ee45f8e48e6853232faf1ebc2ede0a4df56cd5c659d889f18b5713203a30b3f6",
+ "source_sha256": "4f0d9aaa5f6ca3dadf01e860c1e5cfa0da7ee28d1f02ec5002494e094c9e24cc",
+ "ast_sha256": "9b5278de042a6e8245b70f88c3f268500a6c17737cf35b85919aabb1b1cc2cb7",
  "joern_version": "4.0.606",
  "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "d024416b47d5ec4f4e98a9c1c1343955cee5b8be1b11cd8eed2b302357ebf489",
+ "exporter_sha256": "1227f616a23c7b893d67199df8d6388711129777f0d6423c2dd07d538984d329",
  "command": [
   "joern-parse tests/fixtures/pyscoping --language pythonsrc --output pyscoping.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=pyscoping.cpg --param out=tests/fixtures/pyscoping/ast.json",

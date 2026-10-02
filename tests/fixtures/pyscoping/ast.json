@@ -3055,7 +3055,7 @@
     "k": "exprS",
     "e": {
      "k": "str",
-     "v": "Differential fixture for Python calling convention and scoping (STRATEGY.md §57).\n\nEvery `case_*` function takes no arguments. `tests/test_pyscoping_cpython.py` runs each one\nunder CPython and compares the result with the value Core computes for the SAME source\nafter the whole pipeline -- `pysrc2cpg` -> `cartographer/export_ast.sc` ->\n`cartographer/render_lean.py` -> `Autoform/PyScopingProgram.lean` -- pinned by\n`#guard_msgs` in `Autoform/PyScoping.lean`.\n\nNames are deliberately distinctive: `Expr.call` resolves a bare name against the whole\nfunction table by suffix before it looks at local variables, so a local called `f` could\nreach an unrelated function `...x.f`. That is a separate, recorded Core rule; this fixture\ndoes not try to test it.\n"
+     "v": "Differential fixture for Python calling convention and scoping (STRATEGY.md §58).\n\nEvery `case_*` function takes no arguments. `tests/test_pyscoping_cpython.py` runs each one\nunder CPython and compares the result with the value Core computes for the SAME source\nafter the whole pipeline -- `pysrc2cpg` -> `cartographer/export_ast.sc` ->\n`cartographer/render_lean.py` -> `Autoform/PyScopingProgram.lean` -- pinned by\n`#guard_msgs` in `Autoform/PyScoping.lean`.\n\nNames are deliberately distinctive: `Expr.call` resolves a bare name against the whole\nfunction table by suffix before it looks at local variables, so a local called `f` could\nreach an unrelated function `...x.f`. That is a separate, recorded Core rule; this fixture\ndoes not try to test it.\n"
     }
    },
    "b": {
