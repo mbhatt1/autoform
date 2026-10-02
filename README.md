@@ -300,12 +300,16 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 ## Not yet built
 
-- **Boxed mutable containers.** Steps 1 and 2 of `docs/boxed-containers.md` are in the
-  tree (`Obj.payload`/`version`, still inert; `Val.identical`, `Val.eqPy`), but nothing
-  allocates a container payload yet, so `Stmt.setIndex` is still the hole
-  `setIndex:immutable-containers` and mutating container methods still hole.
-- **Cross-scope writes** (`nonlocal` is the hole `scope:nonlocal-write`; reads and closures
-  work).
+- **Boxed mutable containers, remainder.** Python list/dict displays are heap objects;
+  `e[i] = v`, `del e[i]` and `append`/`pop`/... write through every alias. Still holes:
+  slices, live dict views, mutation during iteration, list/dict subclasses, and the
+  differential oracle's encoder still passes lists/dicts by value (`docs/boxed-containers.md`).
+- **Scoping and calling convention, remainder.** `nonlocal` writes (cell conversion),
+  literal default values, keyword-only/positional-only parameters and starred assignment
+  are translated (STRATEGY.md §58). Still holes: non-literal defaults
+  (`param:default-nonliteral`; Core would have to execute `def`), the `TypeError` for a
+  missing required argument, late-binding reads of captured non-`nonlocal` variables, and
+  `scope:del-cell`.
 - **Floats, partially.** `Val.float`/`Lit.float` exist and are wired: the exporter emits
   float literals, `render_lean.py` encodes them as exact binary64 bit patterns, and
   `Semantics.lean` evaluates `+ - * / %` (with int→float promotion), the six comparisons
@@ -317,12 +321,8 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   on two ints still floors, because the exporter maps `//` onto `/`
   (`Semantics.lean`, "Floating point"); and float `%` uses Python's floored remainder under
   `.cLike` as well as `.python`, so Java's `-5.5 % 2.0` (`-1.5`) is mis-modelled
-  (`.javascript` uses the truncated remainder and matches Node). The differential harness still refuses float arguments
-  (`Unencodable("float")`), so none of this is oracle-checked yet.
-- **Calling convention, remainder.** `op:starredUnpack` is **closed** (STRATEGY.md §35);
-  what is left is default parameter values, keyword-only parameters, and starred
-  *destructuring* (`op:starred-outside-call`).
-
+  (`.javascript` uses the truncated remainder and matches Node). The differential harness
+  now encodes float arguments recorded from the test suite (`docs/conformance.md`).
 - **Contract *inference* at holes.** The mechanism for reasoning about partially translated
   functions under named assumptions exists (`Autoform/Contracts.lean` for expression holes,
   `Autoform/HoleContracts.lean` for statement holes), as do the ledger's separate

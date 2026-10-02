@@ -8023,14 +8023,20 @@ import scala.annotation.tailrec
                 "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (mfn == "<operator>.conditional" && kids.size == 3)
       ujson.Obj("k" -> "cond", "c" -> expr(kids(0)), "t" -> expr(kids(1)), "e" -> expr(kids(2)))
+    // A Python list/dict display is a fresh OBJECT (`Expr.boxContainer`,
+    // `docs/boxed-containers.md`): `b = a` then shares it, so `b[0] = 1` is visible
+    // through `a`. Other front ends that reach these operators keep value semantics.
     else if (mfn == "<operator>.listLiteral")
-      ujson.Obj("k" -> "listE", "items" -> exprs(kids))
+      (if (pyFile) ujson.Obj("k" -> "boxContainer", "e" -> ujson.Obj("k" -> "listE", "items" -> exprs(kids)))
+       else ujson.Obj("k" -> "listE", "items" -> exprs(kids)))
     else if (mfn == "<operator>.tupleLiteral")
       ujson.Obj("k" -> "tupleE", "items" -> exprs(kids))
     else if (mfn == "<operator>.dictLiteral")
       // The Python frontend emits `{}` here and fills it with indexed stores; a
       // dictLiteral with children would be a shape we have not seen and must not guess at.
-      (if (kids.isEmpty) ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
+      (if (kids.isEmpty && pyFile)
+         ujson.Obj("k" -> "boxContainer", "e" -> ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr()))
+       else if (kids.isEmpty) ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
        else hole("op:dictLiteral-nonempty"))
     // `static_cast<uint8_t>(e)` — a **width conversion**, which Core does model.
     //
@@ -10823,6 +10829,13 @@ import scala.annotation.tailrec
         case (i: Identifier) :: Nil => ujson.Obj("k" -> "del", "x" -> i.name)
         // `del d[k]` / `del o.f` remove a binding from a container or object; Core's
         // `del` only unbinds a variable, so translating them would be a lie.
+        // Python only: `del e[i]` is `Stmt.delIndex`, which removes the key / position from
+        // a BOXED container (`docs/boxed-containers.md`) and runs a class's own
+        // `__delitem__`. Every other language keeps the hole.
+        case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") && pyFile &&
+                                    kidsOf(x).size == 2 =>
+          val ks = kidsOf(x)
+          ujson.Obj("k" -> "delIndex", "r" -> expr(ks(0)), "i" -> expr(ks(1)))
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
         case (x: Call) :: Nil if x.methodFullName.startsWith("<operator>") =>
@@ -11999,8 +12012,15 @@ import scala.annotation.tailrec
     // reused by BOTH `boxedStructs` below and `boxedStructArrayMembers` just
     // after it, so a struct's member list is only ever read from the CPG once
     // per candidate name.
+    // NOT for Python. A Python local whose static type is a CLASS -- `LFUCache` read as a
+    // value inside `LFUCache.__setitem__` -- is a reference to that class, not a struct
+    // held by value, and boxing it rebinds the name to a fresh `<local>` object: the
+    // class value disappears (`LFUCache._Link(1)` then dispatches on the box). Measured on
+    // cachetools 7.1.7: 43 of 209 methods gained such a prologue. Value-typed aggregates
+    // are a C/C++ notion; Python has none.
+    val pyMethod = m.filename.toLowerCase.endsWith(".py")
     val structCandidateDecls: Map[String, TypeDecl] =
-      if (moduleScope) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
+      if (moduleScope || pyMethod) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
         val (name, isParam, ty) = l match {
           case ll: Local             => (ll.name, false, localTypes.get(ll.name))
           case pp: MethodParameterIn => (pp.name, true, localTypes.get(pp.name))
