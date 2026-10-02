@@ -90,6 +90,7 @@ class TestParenthesisation:
         assert render_lean.stmt({"k": "skip"}) == ".skip"
         assert render_lean.stmt({"k": "brk"}) == ".brk"
         assert render_lean.expr({"k": "unit"}) == "(.lit .unit)"
+        assert render_lean.expr({"k": "jsnull"}) == "(.lit .jsnull)"
 
     def test_every_wrapped_output_balances(self, render_lean):
         node = {"k": "ifte", "c": {"k": "binop", "op": "<",

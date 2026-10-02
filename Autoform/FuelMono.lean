@@ -601,6 +601,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                         | bool _ => exact hy
                                         | float _ => exact hy
                                         | unit => exact hy
+                                        | jsnull => exact hy
                                         | list _ => exact hy
                                         | tuple _ => exact hy
                                         | dict _ => exact hy

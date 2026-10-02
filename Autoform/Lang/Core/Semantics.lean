@@ -334,9 +334,11 @@ Core's value representation limits what can be answered:
 
 * `.int` and `.float` are both a JS Number, compared numerically (`1 === 1.0`), with IEEE
   rules via `flCmp` (`NaN !== NaN`, `0 === -0`).
-* `.unit` is **both** `null` and `undefined` -- Core does not distinguish them -- so
-  `.unit === .unit` is a hole (`null === undefined` is `false`), while `.unit == .unit` is
-  `true` in every combination and `.unit == <non-nullish>` is `false`.
+* `.unit` is `undefined` and `.jsnull` is `null` (the JS source literal; `Val.jsnull`). The
+  two are loosely equal (`null == undefined`, and `x == null` holds exactly for them) and
+  strictly different (`null === undefined` is `false`); each is strictly equal to itself.
+  Before `Val.jsnull` Core had one `.unit` for both and `.unit === .unit` was the hole
+  `js:===:null-vs-undefined`.
 * Objects compare by identity. A `.ref` and a named `.fn` carry it; an unboxed
   `.list`/`.tuple`/`.dict` or a closure value does not, so two of those are a hole. -/
 
@@ -346,7 +348,7 @@ def jsEqTag : Val → Option Nat
   | .int _ | .float _ => some 0
   | .str _ => some 1
   | .bool _ => some 2
-  | .unit => some 3
+  | .unit | .jsnull => some 3
   | .ref _ | .list _ | .tuple _ | .dict _ | .fn _ | .clos _ _ | .clsClos _ _
   | .bobj _ _ => some 4
   | .iref _ _ => none
@@ -370,7 +372,9 @@ def jsEqE (strict neg : Bool) (x y : Val) : EResult :=
     | some tx, some ty =>
         if tx == ty then
           if tx == 3 then
-            if strict then .error "js:===:null-vs-undefined" else .ok true
+            -- `null`/`undefined`: loosely equal to each other, strictly equal only to
+            -- themselves. `.unit` is `undefined` and `.jsnull` is `null`.
+            if strict then .ok (x.kind == y.kind) else .ok true
           else match jsSameTypeEq x y with
                | some b => .ok b
                | none   => .error "js:eq:object-identity-unknown"
@@ -866,12 +870,21 @@ example : applyBinop .javascript "==" (.int 1) (.str "1")
     = .hole "js:==:cross-type-coercion" := rfl
 example : applyBinop .javascript "==" (.int 0) (.bool false)
     = .hole "js:==:cross-type-coercion" := rfl
--- `null == undefined` is `true`, `null == 0` is `false`, `null === undefined` is `false`
--- (Core cannot tell null from undefined, so `===` on two of them is a hole).
+-- `.unit` is `undefined` and `.jsnull` is `null` (the JS source literal). `null == undefined`
+-- is `true`, `null == 0` is `false`, `null === undefined` is `false`, `null === null` and
+-- `undefined === undefined` are `true`.
 example : applyBinop .javascript "==" .unit .unit = .val (.bool true) := rfl
+example : applyBinop .javascript "==" .unit .jsnull = .val (.bool true) := rfl
+example : applyBinop .javascript "==" .jsnull .jsnull = .val (.bool true) := rfl
 example : applyBinop .javascript "==" .unit (.int 0) = .val (.bool false) := rfl
+example : applyBinop .javascript "==" .jsnull (.int 0) = .val (.bool false) := rfl
 example : applyBinop .javascript "!=" .unit (.str "") = .val (.bool true) := rfl
-example : applyBinop .javascript "===" .unit .unit = .hole "js:===:null-vs-undefined" := rfl
+example : applyBinop .javascript "===" .unit .jsnull = .val (.bool false) := rfl
+example : applyBinop .javascript "===" .jsnull .unit = .val (.bool false) := rfl
+example : applyBinop .javascript "===" .unit .unit = .val (.bool true) := rfl
+example : applyBinop .javascript "===" .jsnull .jsnull = .val (.bool true) := rfl
+example : applyBinop .javascript "!==" .unit .jsnull = .val (.bool true) := rfl
+example : applyBinop .javascript "===" .jsnull (.int 0) = .val (.bool false) := rfl
 -- same-type `==` is exact
 example : applyBinop .javascript "==" (.bool true) (.bool true) = .val (.bool true) := rfl
 example : applyBinop .javascript "==" (.int 2) (.int 3) = .val (.bool false) := rfl
@@ -1204,6 +1217,7 @@ def Lit.toVal : Lit → Val
   | .bool b  => .bool b
   | .float f => .float f
   | .unit    => .unit
+  | .jsnull  => .jsnull
 
 /-- The value of a default expression **when evaluating it once at `def` time and
 evaluating it again at every call cannot be told apart**: a literal, or a tuple of
@@ -1986,6 +2000,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .lit (.bool b) => (h, .val (.bool b))
   | _+1, h, _, .lit (.float f) => (h, .val (.float f))
   | _+1, h, _, .lit .unit     => (h, .val .unit)
+  | _+1, h, _, .lit .jsnull   => (h, .val .jsnull)
   | _+1, h, ρ, .name x        =>
       match ρ.find? (·.1 == x) with
       | some (_, v) => (h, .val v)

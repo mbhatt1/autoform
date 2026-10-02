@@ -49,13 +49,6 @@
    "reproduction_attempted": false,
    "reproduced": false
   },
-  "ast-LangJS.json": {
-   "artifact_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
   "ast-LangJava.json": {
    "artifact_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
    "source_hint": null,
@@ -65,13 +58,6 @@
   },
   "ast-LangKt.json": {
    "artifact_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangTS.json": {
-   "artifact_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
    "source_hint": null,
    "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
    "reproduction_attempted": false,

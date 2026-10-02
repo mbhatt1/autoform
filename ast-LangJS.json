@@ -1,6 +1,6 @@
 [
  {
-  "name": "index.js::program:pMap:<lambda>0:signalListener",
+  "name": "index.js::program:pMap:<lambda>0:<lambda>1",
   "file": "index.js",
   "params": [
    "this"
@@ -19,7 +19,7 @@
      "k": "exprS",
      "e": {
       "k": "call",
-      "f": "index.js::program:pMap:<lambda>0:reject",
+      "f": "reject",
       "args": [
        {
         "k": "field",
@@ -192,7 +192,7 @@
                                  "op": "&&",
                                  "a": {
                                   "k": "binop",
-                                  "op": "==",
+                                  "op": "===",
                                   "a": {
                                    "k": "index",
                                    "a": {
@@ -209,13 +209,12 @@
                                    }
                                   },
                                   "b": {
-                                   "k": "name",
-                                   "v": "undefined"
+                                   "k": "unit"
                                   }
                                  },
                                  "b": {
                                   "k": "binop",
-                                  "op": "==",
+                                  "op": "===",
                                   "a": {
                                    "k": "index",
                                    "a": {
@@ -232,8 +231,7 @@
                                    }
                                   },
                                   "b": {
-                                   "k": "name",
-                                   "v": "undefined"
+                                   "k": "unit"
                                   }
                                  }
                                 },
@@ -251,7 +249,7 @@
                                  "k": "ifte",
                                  "c": {
                                   "k": "binop",
-                                  "op": "!=",
+                                  "op": "!==",
                                   "a": {
                                    "k": "hole",
                                    "label": "op:instanceOf"
@@ -301,13 +299,13 @@
                                       },
                                       "b": {
                                        "k": "int",
-                                       "v": 1
+                                       "v": "1"
                                       }
                                      }
                                     },
                                     "b": {
                                      "k": "binop",
-                                     "op": "==",
+                                     "op": "===",
                                      "a": {
                                       "k": "name",
                                       "v": "concurrency"
@@ -367,7 +365,7 @@
                                        "x": "_tmp_6",
                                        "e": {
                                         "k": "hole",
-                                        "label": "op:alloc"
+                                        "label": "op:alloc:ctor-unresolved-class"
                                        }
                                       },
                                       "b": {
@@ -428,7 +426,7 @@
                                          "x": "resolvingCount",
                                          "e": {
                                           "k": "int",
-                                          "v": 0
+                                          "v": "0"
                                          }
                                         },
                                         "b": {
@@ -438,7 +436,7 @@
                                           "x": "currentIndex",
                                           "e": {
                                            "k": "int",
-                                           "v": 0
+                                           "v": "0"
                                           }
                                          },
                                          "b": {
@@ -450,7 +448,7 @@
                                             "k": "cond",
                                             "c": {
                                              "k": "binop",
-                                             "op": "==",
+                                             "op": "===",
                                              "a": {
                                               "k": "index",
                                               "a": {
@@ -467,8 +465,7 @@
                                               }
                                              },
                                              "b": {
-                                              "k": "name",
-                                              "v": "undefined"
+                                              "k": "unit"
                                              }
                                             },
                                             "t": {
@@ -490,7 +487,7 @@
                                             "x": "signalListener",
                                             "e": {
                                              "k": "fnref",
-                                             "v": "index.js::program:pMap:<lambda>0:signalListener"
+                                             "v": "index.js::program:pMap:<lambda>0:<lambda>1"
                                             }
                                            },
                                            "b": {
@@ -500,7 +497,7 @@
                                              "x": "cleanup",
                                              "e": {
                                               "k": "fnref",
-                                              "v": "index.js::program:pMap:<lambda>0:cleanup"
+                                              "v": "index.js::program:pMap:<lambda>0:<lambda>2"
                                              }
                                             },
                                             "b": {
@@ -510,7 +507,7 @@
                                               "x": "resolve",
                                               "e": {
                                                "k": "fnref",
-                                               "v": "index.js::program:pMap:<lambda>0:resolve"
+                                               "v": "index.js::program:pMap:<lambda>0:<lambda>3"
                                               }
                                              },
                                              "b": {
@@ -520,7 +517,7 @@
                                                "x": "reject",
                                                "e": {
                                                 "k": "fnref",
-                                                "v": "index.js::program:pMap:<lambda>0:reject"
+                                                "v": "index.js::program:pMap:<lambda>0:<lambda>4"
                                                }
                                               },
                                               "b": {
@@ -549,7 +546,7 @@
                                                     "k": "exprS",
                                                     "e": {
                                                      "k": "call",
-                                                     "f": "index.js::program:pMap:<lambda>0:reject",
+                                                     "f": "reject",
                                                      "args": [
                                                       {
                                                        "k": "field",
@@ -610,7 +607,7 @@
                                                  "x": "next",
                                                  "e": {
                                                   "k": "fnref",
-                                                  "v": "index.js::program:pMap:<lambda>0:next"
+                                                  "v": "index.js::program:pMap:<lambda>0:<lambda>5"
                                                  }
                                                 },
                                                 "b": {
@@ -669,7 +666,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:cleanup",
+  "name": "index.js::program:pMap:<lambda>0:<lambda>2",
   "file": "index.js",
   "params": [
    "this"
@@ -709,7 +706,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:resolve",
+  "name": "index.js::program:pMap:<lambda>0:<lambda>3",
   "file": "index.js",
   "params": [
    "this",
@@ -744,7 +741,7 @@
       "k": "exprS",
       "e": {
        "k": "call",
-       "f": "index.js::program:pMap:<lambda>0:cleanup",
+       "f": "cleanup",
        "args": []
       }
      }
@@ -753,7 +750,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:reject",
+  "name": "index.js::program:pMap:<lambda>0:<lambda>4",
   "file": "index.js",
   "params": [
    "this",
@@ -818,7 +815,7 @@
           "k": "exprS",
           "e": {
            "k": "call",
-           "f": "index.js::program:pMap:<lambda>0:cleanup",
+           "f": "cleanup",
            "args": []
           }
          }
@@ -957,7 +954,7 @@
                        "k": "ifte",
                        "c": {
                         "k": "binop",
-                        "op": "==",
+                        "op": "===",
                         "a": {
                          "k": "name",
                          "v": "value"
@@ -1012,10 +1009,19 @@
                        "b": {
                         "k": "seq",
                         "a": {
-                         "k": "exprS",
+                         "k": "assign",
+                         "x": "resolvingCount",
                          "e": {
-                          "k": "hole",
-                          "label": "op:postIncrement"
+                          "k": "binop",
+                          "op": "+",
+                          "a": {
+                           "k": "name",
+                           "v": "resolvingCount"
+                          },
+                          "b": {
+                           "k": "int",
+                           "v": 1
+                          }
                          }
                         },
                         "b": {
@@ -1053,7 +1059,7 @@
                    "k": "exprS",
                    "e": {
                     "k": "call",
-                    "f": "index.js::program:pMap:<lambda>0:reject",
+                    "f": "reject",
                     "args": [
                      {
                       "k": "name",
@@ -1084,10 +1090,19 @@
                    "b": {
                     "k": "seq",
                     "a": {
-                     "k": "exprS",
+                     "k": "assign",
+                     "x": "resolvingCount",
                      "e": {
-                      "k": "hole",
-                      "label": "op:postIncrement"
+                      "k": "binop",
+                      "op": "+",
+                      "a": {
+                       "k": "name",
+                       "v": "resolvingCount"
+                      },
+                      "b": {
+                       "k": "int",
+                       "v": 1
+                      }
                      }
                     },
                     "b": {
@@ -1113,7 +1128,7 @@
                        "k": "exprS",
                        "e": {
                         "k": "call",
-                        "f": "index.js::program:pMap:<lambda>0:reject",
+                        "f": "reject",
                         "args": [
                          {
                           "k": "name",
@@ -1144,7 +1159,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:next",
+  "name": "index.js::program:pMap:<lambda>0:<lambda>5",
   "file": "index.js",
   "params": [
    "this"
@@ -1295,10 +1310,19 @@
                           "b": {
                            "k": "seq",
                            "a": {
-                            "k": "exprS",
+                            "k": "assign",
+                            "x": "currentIndex",
                             "e": {
-                             "k": "hole",
-                             "label": "op:postIncrement"
+                             "k": "binop",
+                             "op": "+",
+                             "a": {
+                              "k": "name",
+                              "v": "currentIndex"
+                             },
+                             "b": {
+                              "k": "int",
+                              "v": 1
+                             }
                             }
                            },
                            "b": {
@@ -1332,14 +1356,14 @@
                                  "op": "&&",
                                  "a": {
                                   "k": "binop",
-                                  "op": "==",
+                                  "op": "===",
                                   "a": {
                                    "k": "name",
                                    "v": "resolvingCount"
                                   },
                                   "b": {
                                    "k": "int",
-                                   "v": 0
+                                   "v": "0"
                                   }
                                  },
                                  "b": {
@@ -1384,7 +1408,7 @@
                                      },
                                      "b": {
                                       "k": "int",
-                                      "v": 0
+                                      "v": "0"
                                      }
                                     }
                                    },
@@ -1394,7 +1418,7 @@
                                      "k": "exprS",
                                      "e": {
                                       "k": "call",
-                                      "f": "index.js::program:pMap:<lambda>0:reject",
+                                      "f": "reject",
                                       "args": [
                                        {
                                         "k": "hole",
@@ -1430,7 +1454,7 @@
                                      "k": "ifte",
                                      "c": {
                                       "k": "binop",
-                                      "op": "==",
+                                      "op": "===",
                                       "a": {
                                        "k": "field",
                                        "a": {
@@ -1441,7 +1465,7 @@
                                       },
                                       "b": {
                                        "k": "int",
-                                       "v": 0
+                                       "v": "0"
                                       }
                                      },
                                      "t": {
@@ -1450,7 +1474,7 @@
                                        "k": "exprS",
                                        "e": {
                                         "k": "call",
-                                        "f": "index.js::program:pMap:<lambda>0:resolve",
+                                        "f": "resolve",
                                         "args": [
                                          {
                                           "k": "name",
@@ -1543,107 +1567,144 @@
                                               "b": {
                                                "k": "loop",
                                                "c": {
-                                                "k": "unop",
-                                                "op": "!",
-                                                "a": {
-                                                 "k": "field",
-                                                 "a": {
-                                                  "k": "hole",
-                                                  "label": "op:assignment"
-                                                 },
-                                                 "f": "done"
-                                                }
+                                                "k": "bool",
+                                                "v": true
                                                },
                                                "body": {
                                                 "k": "seq",
                                                 "a": {
                                                  "k": "assign",
-                                                 "x": "index",
+                                                 "x": "_result_0",
                                                  "e": {
-                                                  "k": "index",
-                                                  "a": {
-                                                   "k": "field",
-                                                   "a": {
-                                                    "k": "name",
-                                                    "v": "_result_0"
-                                                   },
-                                                   "f": "value"
+                                                  "k": "mcall",
+                                                  "recv": {
+                                                   "k": "name",
+                                                   "v": "_iterator_0"
                                                   },
-                                                  "b": {
-                                                   "k": "int",
-                                                   "v": 0
-                                                  }
+                                                  "m": "next",
+                                                  "args": [
+                                                   {
+                                                    "k": "name",
+                                                    "v": "_iterator_0"
+                                                   }
+                                                  ]
                                                  }
                                                 },
                                                 "b": {
                                                  "k": "seq",
                                                  "a": {
-                                                  "k": "assign",
-                                                  "x": "value",
-                                                  "e": {
-                                                   "k": "index",
+                                                  "k": "ifte",
+                                                  "c": {
+                                                   "k": "unop",
+                                                   "op": "~",
                                                    "a": {
                                                     "k": "field",
                                                     "a": {
                                                      "k": "name",
                                                      "v": "_result_0"
                                                     },
-                                                    "f": "value"
-                                                   },
-                                                   "b": {
-                                                    "k": "int",
-                                                    "v": 1
+                                                    "f": "done"
                                                    }
+                                                  },
+                                                  "t": {
+                                                   "k": "skip"
+                                                  },
+                                                  "e": {
+                                                   "k": "brk"
                                                   }
                                                  },
                                                  "b": {
                                                   "k": "seq",
                                                   "a": {
-                                                   "k": "ifte",
-                                                   "c": {
-                                                    "k": "binop",
-                                                    "op": "==",
+                                                   "k": "assign",
+                                                   "x": "index",
+                                                   "e": {
+                                                    "k": "index",
                                                     "a": {
-                                                     "k": "mcall",
-                                                     "recv": {
+                                                     "k": "field",
+                                                     "a": {
                                                       "k": "name",
-                                                      "v": "skippedIndexesMap"
+                                                      "v": "_result_0"
                                                      },
-                                                     "m": "get",
-                                                     "args": [
-                                                      {
-                                                       "k": "name",
-                                                       "v": "index"
-                                                      }
-                                                     ]
+                                                     "f": "value"
                                                     },
                                                     "b": {
-                                                     "k": "name",
-                                                     "v": "pMapSkip"
+                                                     "k": "int",
+                                                     "v": "0"
                                                     }
-                                                   },
-                                                   "t": {
-                                                    "k": "cont"
-                                                   },
-                                                   "e": {
-                                                    "k": "skip"
                                                    }
                                                   },
                                                   "b": {
-                                                   "k": "exprS",
-                                                   "e": {
-                                                    "k": "mcall",
-                                                    "recv": {
-                                                     "k": "name",
-                                                     "v": "pureResult"
-                                                    },
-                                                    "m": "push",
-                                                    "args": [
-                                                     {
-                                                      "k": "name",
-                                                      "v": "value"
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "assign",
+                                                    "x": "value",
+                                                    "e": {
+                                                     "k": "index",
+                                                     "a": {
+                                                      "k": "field",
+                                                      "a": {
+                                                       "k": "name",
+                                                       "v": "_result_0"
+                                                      },
+                                                      "f": "value"
+                                                     },
+                                                     "b": {
+                                                      "k": "int",
+                                                      "v": "1"
                                                      }
-                                                    ]
+                                                    }
+                                                   },
+                                                   "b": {
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "ifte",
+                                                     "c": {
+                                                      "k": "binop",
+                                                      "op": "===",
+                                                      "a": {
+                                                       "k": "mcall",
+                                                       "recv": {
+                                                        "k": "name",
+                                                        "v": "skippedIndexesMap"
+                                                       },
+                                                       "m": "get",
+                                                       "args": [
+                                                        {
+                                                         "k": "name",
+                                                         "v": "index"
+                                                        }
+                                                       ]
+                                                      },
+                                                      "b": {
+                                                       "k": "name",
+                                                       "v": "pMapSkip"
+                                                      }
+                                                     },
+                                                     "t": {
+                                                      "k": "cont"
+                                                     },
+                                                     "e": {
+                                                      "k": "skip"
+                                                     }
+                                                    },
+                                                    "b": {
+                                                     "k": "exprS",
+                                                     "e": {
+                                                      "k": "mcall",
+                                                      "recv": {
+                                                       "k": "name",
+                                                       "v": "pureResult"
+                                                      },
+                                                      "m": "push",
+                                                      "args": [
+                                                       {
+                                                        "k": "name",
+                                                        "v": "value"
+                                                       }
+                                                      ]
+                                                     }
+                                                    }
                                                    }
                                                   }
                                                  }
@@ -1662,7 +1723,7 @@
                                        "k": "exprS",
                                        "e": {
                                         "k": "call",
-                                        "f": "index.js::program:pMap:<lambda>0:resolve",
+                                        "f": "resolve",
                                         "args": [
                                          {
                                           "k": "name",
@@ -1696,10 +1757,19 @@
                             "b": {
                              "k": "seq",
                              "a": {
-                              "k": "exprS",
+                              "k": "assign",
+                              "x": "resolvingCount",
                               "e": {
-                               "k": "hole",
-                               "label": "op:postIncrement"
+                               "k": "binop",
+                               "op": "+",
+                               "a": {
+                                "k": "name",
+                                "v": "resolvingCount"
+                               },
+                               "b": {
+                                "k": "int",
+                                "v": 1
+                               }
                               }
                              },
                              "b": {
@@ -1780,8 +1850,113 @@
           "k": "skip"
          },
          "b": {
-          "k": "holeS",
-          "label": "control:FOR"
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "index",
+           "e": {
+            "k": "int",
+            "v": "0"
+           }
+          },
+          "b": {
+           "k": "loop",
+           "c": {
+            "k": "binop",
+            "op": "<",
+            "a": {
+             "k": "name",
+             "v": "index"
+            },
+            "b": {
+             "k": "name",
+             "v": "concurrency"
+            }
+           },
+           "body": {
+            "k": "seq",
+            "a": {
+             "k": "seq",
+             "a": {
+              "k": "tryCatch",
+              "body": {
+               "k": "exprS",
+               "e": {
+                "k": "hole",
+                "label": "op:await"
+               }
+              },
+              "x": "__exc",
+              "handler": {
+               "k": "seq",
+               "a": {
+                "k": "exprS",
+                "e": {
+                 "k": "name",
+                 "v": "error"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "call",
+                  "f": "reject",
+                  "args": [
+                   {
+                    "k": "name",
+                    "v": "error"
+                   }
+                  ]
+                 }
+                },
+                "b": {
+                 "k": "brk"
+                }
+               }
+              }
+             },
+             "b": {
+              "k": "ifte",
+              "c": {
+               "k": "binop",
+               "op": "||",
+               "a": {
+                "k": "name",
+                "v": "isIterableDone"
+               },
+               "b": {
+                "k": "name",
+                "v": "isRejected"
+               }
+              },
+              "t": {
+               "k": "brk"
+              },
+              "e": {
+               "k": "skip"
+              }
+             }
+            },
+            "b": {
+             "k": "assign",
+             "x": "index",
+             "e": {
+              "k": "binop",
+              "op": "+",
+              "a": {
+               "k": "name",
+               "v": "index"
+              },
+              "b": {
+               "k": "int",
+               "v": 1
+              }
+             }
+            }
+           }
+          }
          }
         }
        }
@@ -1851,7 +2026,7 @@
               "k": "cond",
               "c": {
                "k": "binop",
-               "op": "==",
+               "op": "===",
                "a": {
                 "k": "name",
                 "v": "param3_0"
@@ -1880,7 +2055,7 @@
                "k": "cond",
                "c": {
                 "k": "binop",
-                "op": "==",
+                "op": "===",
                 "a": {
                  "k": "field",
                  "a": {
@@ -1921,7 +2096,7 @@
                 "k": "cond",
                 "c": {
                  "k": "binop",
-                 "op": "==",
+                 "op": "===",
                  "a": {
                   "k": "field",
                   "a": {
@@ -1988,7 +2163,7 @@
             "x": "_tmp_2",
             "e": {
              "k": "hole",
-             "label": "op:alloc"
+             "label": "op:alloc:ctor-unresolved-class"
             }
            },
            "b": {
@@ -2268,10 +2443,19 @@
                "t": {
                 "k": "seq",
                 "a": {
-                 "k": "exprS",
+                 "k": "assign",
+                 "x": "pendingPromisesCount",
                  "e": {
-                  "k": "hole",
-                  "label": "op:postIncrement"
+                  "k": "binop",
+                  "op": "+",
+                  "a": {
+                   "k": "name",
+                   "v": "pendingPromisesCount"
+                  },
+                  "b": {
+                   "k": "int",
+                   "v": 1
+                  }
                  }
                 },
                 "b": {
@@ -2313,7 +2497,7 @@
                 "k": "exprS",
                 "e": {
                  "k": "call",
-                 "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
+                 "f": "trySpawn",
                  "args": []
                 }
                },
@@ -2332,11 +2516,41 @@
                   "b": {
                    "k": "seq",
                    "a": {
-                    "k": "assign",
-                    "x": "currentIndex",
-                    "e": {
-                     "k": "hole",
-                     "label": "op:postIncrement"
+                    "k": "seq",
+                    "a": {
+                     "k": "assign",
+                     "x": "$exprV$2",
+                     "e": {
+                      "k": "name",
+                      "v": "index"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "assign",
+                      "x": "index",
+                      "e": {
+                       "k": "binop",
+                       "op": "+",
+                       "a": {
+                        "k": "name",
+                        "v": "index"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": 1
+                       }
+                      }
+                     },
+                     "b": {
+                      "k": "assign",
+                      "x": "currentIndex",
+                      "e": {
+                       "k": "name",
+                       "v": "$exprV$2"
+                      }
+                     }
                     }
                    },
                    "b": {
@@ -2352,10 +2566,19 @@
                     "b": {
                      "k": "seq",
                      "a": {
-                      "k": "exprS",
+                      "k": "assign",
+                      "x": "pendingPromisesCount",
                       "e": {
-                       "k": "hole",
-                       "label": "op:postIncrement"
+                       "k": "binop",
+                       "op": "+",
+                       "a": {
+                        "k": "name",
+                        "v": "pendingPromisesCount"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": 1
+                       }
                       }
                      },
                      "b": {
@@ -2364,7 +2587,7 @@
                        "k": "ifte",
                        "c": {
                         "k": "binop",
-                        "op": "==",
+                        "op": "===",
                         "a": {
                          "k": "name",
                          "v": "returnValue"
@@ -2410,7 +2633,7 @@
                            },
                            "b": {
                             "k": "int",
-                            "v": 0
+                            "v": "0"
                            }
                           },
                           "t": {
@@ -2429,7 +2652,7 @@
                              },
                              {
                               "k": "int",
-                              "v": 1
+                              "v": "1"
                              }
                             ]
                            }
@@ -2450,7 +2673,7 @@
                         "k": "exprS",
                         "e": {
                          "k": "call",
-                         "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
+                         "f": "trySpawn",
                          "args": []
                         }
                        },
@@ -2517,10 +2740,19 @@
                  "b": {
                   "k": "seq",
                   "a": {
-                   "k": "exprS",
+                   "k": "assign",
+                   "x": "pendingPromisesCount",
                    "e": {
-                    "k": "hole",
-                    "label": "op:postIncrement"
+                    "k": "binop",
+                    "op": "+",
+                    "a": {
+                     "k": "name",
+                     "v": "pendingPromisesCount"
+                    },
+                    "b": {
+                     "k": "int",
+                     "v": 1
+                    }
                    }
                   },
                   "b": {
@@ -2701,10 +2933,19 @@
               "b": {
                "k": "seq",
                "a": {
-                "k": "exprS",
+                "k": "assign",
+                "x": "pendingPromisesCount",
                 "e": {
-                 "k": "hole",
-                 "label": "op:postIncrement"
+                 "k": "binop",
+                 "op": "+",
+                 "a": {
+                  "k": "name",
+                  "v": "pendingPromisesCount"
+                 },
+                 "b": {
+                  "k": "int",
+                  "v": 1
+                 }
                 }
                },
                "b": {
@@ -2830,7 +3071,7 @@
                  "k": "cond",
                  "c": {
                   "k": "binop",
-                  "op": "==",
+                  "op": "===",
                   "a": {
                    "k": "index",
                    "a": {
@@ -2847,8 +3088,7 @@
                    }
                   },
                   "b": {
-                   "k": "name",
-                   "v": "undefined"
+                   "k": "unit"
                   }
                  },
                  "t": {
@@ -2881,7 +3121,7 @@
                   "x": "pendingPromisesCount",
                   "e": {
                    "k": "int",
-                   "v": 0
+                   "v": "0"
                   }
                  },
                  "b": {
@@ -2901,7 +3141,7 @@
                     "x": "index",
                     "e": {
                      "k": "int",
-                     "v": 0
+                     "v": "0"
                     }
                    },
                    "b": {
@@ -2910,7 +3150,7 @@
                      "k": "exprS",
                      "e": {
                       "k": "call",
-                      "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
+                      "f": "trySpawn",
                       "args": []
                      }
                     },
@@ -2929,7 +3169,7 @@
                       },
                       "b": {
                        "k": "int",
-                       "v": 0
+                       "v": "0"
                       }
                      },
                      "body": {
@@ -3080,7 +3320,7 @@
                             "k": "exprS",
                             "e": {
                              "k": "call",
-                             "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
+                             "f": "trySpawn",
                              "args": []
                             }
                            },
@@ -3090,7 +3330,7 @@
                              "k": "ifte",
                              "c": {
                               "k": "binop",
-                              "op": "==",
+                              "op": "===",
                               "a": {
                                "k": "name",
                                "v": "value"
@@ -3221,7 +3461,7 @@
                   "k": "cond",
                   "c": {
                    "k": "binop",
-                   "op": "==",
+                   "op": "===",
                    "a": {
                     "k": "name",
                     "v": "param3_1"
@@ -3250,7 +3490,7 @@
                    "k": "cond",
                    "c": {
                     "k": "binop",
-                    "op": "==",
+                    "op": "===",
                     "a": {
                      "k": "field",
                      "a": {
@@ -3291,7 +3531,7 @@
                     "k": "cond",
                     "c": {
                      "k": "binop",
-                     "op": "==",
+                     "op": "===",
                      "a": {
                       "k": "field",
                       "a": {
@@ -3339,7 +3579,7 @@
                  "op": "&&",
                  "a": {
                   "k": "binop",
-                  "op": "==",
+                  "op": "===",
                   "a": {
                    "k": "index",
                    "a": {
@@ -3356,13 +3596,12 @@
                    }
                   },
                   "b": {
-                   "k": "name",
-                   "v": "undefined"
+                   "k": "unit"
                   }
                  },
                  "b": {
                   "k": "binop",
-                  "op": "==",
+                  "op": "===",
                   "a": {
                    "k": "index",
                    "a": {
@@ -3379,8 +3618,7 @@
                    }
                   },
                   "b": {
-                   "k": "name",
-                   "v": "undefined"
+                   "k": "unit"
                   }
                  }
                 },
@@ -3398,7 +3636,7 @@
                  "k": "ifte",
                  "c": {
                   "k": "binop",
-                  "op": "!=",
+                  "op": "!==",
                   "a": {
                    "k": "hole",
                    "label": "op:instanceOf"
@@ -3448,13 +3686,13 @@
                       },
                       "b": {
                        "k": "int",
-                       "v": 1
+                       "v": "1"
                       }
                      }
                     },
                     "b": {
                      "k": "binop",
-                     "op": "==",
+                     "op": "===",
                      "a": {
                       "k": "name",
                       "v": "concurrency"
@@ -3516,7 +3754,7 @@
                      },
                      "b": {
                       "k": "binop",
-                      "op": "==",
+                      "op": "===",
                       "a": {
                        "k": "name",
                        "v": "backpressure"
