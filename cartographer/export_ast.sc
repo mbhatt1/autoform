@@ -32,6 +32,33 @@ import scala.annotation.tailrec
   // decisions against the wrong configuration, so the pipeline passes it through.
   importCpg(cpgPath)
 
+  // Joern spells six compound-assignment operators with a PLURAL prefix:
+  // `<operators>.assignmentOr`, `.assignmentAnd`, `.assignmentXor`,
+  // `.assignmentShiftLeft`, `.assignmentArithmeticShiftRight`, `.assignmentModulo`
+  // (confirmed on c2cpg 4.0.606 with a one-function fixture: `x |= 1` has
+  // METHOD_FULL_NAME `<operators>.assignmentOr`, while `x += 1` is
+  // `<operator>.assignmentPlus`). Every operator test in this file is
+  // `startsWith("<operator>")` or an exact `<operator>.` key, and
+  // `"<operators>.x".startsWith("<operator>")` is FALSE -- so `x |= m` was exported as
+  // a CALL to a function named `<operators>.assignmentOr` with `x` passed by value:
+  // no hole, so the function counted as hole-free, while the write to `x` was lost
+  // (`boundOf`, `augOps` and the `>>=` signedness case all missed it). On the SQLite
+  // full tree 157 hole-free functions contained one. Renaming these calls to the
+  // singular spelling routes them through the existing `augOps` / `>>=` handling, i.e.
+  // exactly the translation `x = x | m` already gets, with the same single-evaluation
+  // guards (`assign:aug-impure-target`). C-family CPGs only: in Python `a |= b`
+  // mutates a set/list in place, which `a = a | b` does not, so other frontends keep
+  // their current (unresolved-call) behaviour until that is modelled.
+  if (cpg.metaData.language.l.exists(l => l == "NEWC" || l == "C")) {
+    val diff = Cpg.newDiffGraphBuilder
+    cpg.call.filter(_.methodFullName.startsWith("<operators>.")).l.foreach { c =>
+      val n = "<operator>." + c.methodFullName.stripPrefix("<operators>.")
+      diff.setNodeProperty(c, "METHOD_FULL_NAME", n)
+      diff.setNodeProperty(c, "NAME", n)
+    }
+    flatgraph.DiffGraphApplier.applyDiff(cpg.graph, diff)
+  }
+
   // `seqOf` and `moduleObjectsInit` (below) both fold a flat statement list into a
   // right-nested `"seq"` chain; `maxSeqChainLen` tracks the longest one either producer
   // has built so far. Declared here (rather than next to `writeJson`, which uses it) so
