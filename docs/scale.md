@@ -1,11 +1,19 @@
 # Scale: behaviour on a large codebase
 
 When this was written, every number in `README.md` and `STRATEGY.md` came from one corpus:
-`cachetools`, 1,637 lines, 238 functions at the time (now 209). (The README has since
-added a SQLite hole census, and `docs/evidence-*.md` cover V8, Linux and Ansible.) "Point it at an arbitrary codebase"
-was never tested. This document records that test, on seven open-source Python
-repositories from 8.8k to 165k lines. Figures move with every change to the pipeline;
-where a document and an artifact disagree, the artifact wins.
+`cachetools`, 1,637 lines, 238 functions at the time (now 209). "Point it at an arbitrary
+codebase" was never tested. This document records that test, on seven open-source Python
+repositories from 8.8k to 165k lines, and then the one large C corpus (SQLite) that has
+been taken through both the static census and the runtime oracle. Figures move with every
+change to the pipeline; where a document and an artifact disagree, the artifact wins.
+
+**How current each part is (checked 2026-10-02 against the tree at `9639df0`).**
+
+| Part | State |
+|---|---|
+| "Summary" through "Memory grows" (seven Python repositories) | **Dated measurement**, exporter and renderer as of `46c65fc` and earlier; **not re-run**. The two renderer/elaboration blockers it found are fixed in the code (marked in place); whether the 12k-line ceiling has moved was not re-measured. Only the `cachetools` row of the coverage table is regenerated and checked by `scripts/check_docs.py`. |
+| "SQLite (C, full tree)" | **Current** for the typed-integer results (amalgamation 1,907 -> 1,985 -> 1,774 hole-free; full tree 5,295 of 8,105; conformance sample 198/198 agree, 2 inconclusive, 10 functions). The older census and int-only sample rounds are kept as history and labelled so. The artifacts behind the current numbers were re-read on 2026-10-02 (`/opt/corpus/O/*.out`, `/opt/corpus/O/sample_after/conformance.json`); the SQLite corpus itself is not part of the repository. |
+| Other corpora | [`evidence-V8Base.md`](evidence-V8Base.md), [`evidence-LinuxLib.md`](evidence-LinuxLib.md), [`evidence-LinuxCrypto.md`](evidence-LinuxCrypto.md), [`evidence-ansible.md`](evidence-ansible.md): dated snapshots. |
 
 Reproduce with `scripts/scale_test.py`, which runs the same stages as `autoform.sh` but
 times, memory-profiles and error-captures each one separately, and writes nothing into
@@ -18,22 +26,29 @@ scripts/scale_test.py --scratch /tmp/scale --out scale-results.json \
 
 ## Summary
 
-**Largest codebase that works end to end on the pipeline as committed: `requests`,
-12,032 lines / 751 functions.** Everything larger fails, and the first thing that breaks
-is not Joern, not memory and not Lean — it is `cartographer/render_lean.py` hitting
-Python's default 1,000-frame recursion limit.
+**As measured (pipeline at `46c65fc`): the largest codebase that worked end to end as
+committed was `requests`, 12,032 lines / 751 functions.** Everything larger failed, and
+the first thing that broke was not Joern, not memory and not Lean — it was
+`cartographer/render_lean.py` hitting Python's default 1,000-frame recursion limit.
+*Since then* `render_lean.py` has been changed (see the status notes under "Where it
+breaks"): it renders on a large-stack thread and walks statement spines iteratively, and
+the generated module sets its own `maxRecDepth`. The ceiling was not re-measured after
+those changes, so read "everything larger failed" as a statement about `46c65fc`.
 
-**With two limits raised (and no pipeline code changed), Django's `django/` package —
+**With two limits raised (and no pipeline code changed at that time), Django's `django/` package —
 165,118 lines, 10,623 functions — completes end to end**: Joern parses it, the exporter
 produces a 54 MB neutral AST, the renderer emits 503,485 lines of Lean, Lean elaborates
 it in 110 s at 10.3 GB peak RSS, and the ledger reports 5,574 call-closed functions.
 
-The architecture scales. The *implementation* has three fixed-size limits that were never
-parameterized, and one superlinear stage.
+The architecture scales. At the time of measurement the *implementation* had three
+fixed-size limits that were never parameterized, and one superlinear stage. Status now:
+the renderer's recursion limit and the generated module's `maxRecDepth` are handled in
+code; the ledger got a separate index (below); `Ctx.resolve` on the interpreter's hot path
+is still a linear scan.
 
-"Arbitrary codebase" is therefore **aspirational as shipped and plausible as designed**:
-the two blocking failures are one-line configuration changes, the third (the ledger) is a
-data-structure change, and none of them are in the semantics.
+"Arbitrary codebase" was therefore **aspirational as shipped and plausible as designed**:
+the two blocking failures were configuration changes, the third (the ledger) a
+data-structure change, and none of them were in the semantics.
 
 ## Measurements
 
@@ -68,8 +83,10 @@ below).
 
 The `cachetools` row was regenerated on 2026-10-02 on the item-L branch (after merging `8d3a970`),
 from a fresh re-export of `ast-Cachetools.json` at cachetools `01af8e5` (`scripts/ledger.lean.tmpl`
-over the tracked AST; provenance in `provenance/ast-Cachetools.json.prov.json`); `scripts/check_docs.py` checks it. The other rows
-predate the exporter changes described below and were not re-run.
+over the tracked AST; provenance in `provenance/ast-Cachetools.json.prov.json`); `scripts/check_docs.py` checks it
+(on the final tree `ledger-Cachetools.json` still says 209 / 168 / 98 / 46, and `check_docs` passes 10 of 10).
+The other rows were measured with the exporter at `46c65fc` or earlier, were **not re-run**, and are not
+comparable with the `cachetools` row.
 
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
@@ -91,7 +108,7 @@ mostly inward and its callees resolve inside the translated program.
 
 **That reading no longer follows from these two numbers.** `cachetools` was 105/209 =
 50% at `46c65fc` (99/209 = 47% after the re-export that made generators, defaults and
-local-name calls honest; 98/209 once the class table made bare call names follow Python
+local-name calls honest; 98/209 = 47% on the final tree, once the class table made bare call names follow Python
 scoping, STRATEGY.md §62), against Django's 52%. The change came from exporter work — emitting Joern's resolved
 `fullName` so `Ctx.resolve`'s exact match fires, closing `op:starredUnpack`, and dropping
 `<metaClassCallHandler>` synthetics — not from the corpus getting larger. So most of the
@@ -103,8 +120,8 @@ which has not been done — every Django figure in this table predates that work
 
 Hole *density* was stable — 2.4%-3.0% of AST nodes across every corpus including Django's
 397,571 nodes — so translation quality was size-independent at the time these rows were
-measured. `cachetools` has since dropped to 0.5% (26 / 5,574) through exporter work, which
-the other rows have not been re-run against. The hole causes shift:
+measured. `cachetools` had dropped to 0.5% (26 / 5,574) at an intermediate exporter state; on the
+final tree its ledger has 46 holes over 5,677 nodes (0.8%). The other rows have not been re-run against any of this. The hole causes shift:
 Django's top cause is `import:unresolved` (5,122), which barely registers on `cachetools`.
 
 ## Where it breaks, in the order it breaks
@@ -146,6 +163,13 @@ printer iterative over the `seq` spine (a module body is a *list* of statements 
 as a right-nested tree, so an explicit worklist is the structurally honest version). The
 second is better: raising the limit moves the cliff.
 
+**Status (read from `cartographer/render_lean.py` on 2026-10-02; the 246/247 bisection was
+not re-run).** Both fixes are in the code: `main` runs the renderer on a thread with a
+512 MB stack (64 MB where the platform caps it) under `sys.setrecursionlimit(300_000)`, and
+`_render_seq_chain` walks a `Stmt.seq` spine with an explicit loop instead of one Python
+frame per statement (its docstring cites this document's 247-statement measurement). So the
+failure table above describes the renderer at `46c65fc`, not today's.
+
 ### 2. Lean's `maxRecDepth` overflows on the `program` function list
 
 Once the renderer is past its own limit, `lean` hits its default `maxRecDepth`. Two
@@ -165,6 +189,13 @@ names a Lean option rather than anything about their code.
 the generated module — it already knows the function count. It is a one-line change to a
 deterministic printer and does not affect what is proved.
 
+**Status (read from the renderer and a generated module on 2026-10-02).** Done: the generated
+module starts with `set_option maxRecDepth {max(8000, 8 * len(funcs) + 8000)}` (for example
+`Autoform/Generated/CAddr.lean` has `set_option maxRecDepth 8120`) and `set_option maxHeartbeats 0`
+(added for one pathologically large SQLite declaration, scoped to the generated file). The
+Django rerun with `-DmaxRecDepth=60000` was not repeated with the formula, which for 10,623
+functions gives 92,984.
+
 ### 3. The ledger goes superlinear — the `List` function table, measured
 
 The ledger is the only stage whose cost grows faster than its input:
@@ -181,7 +212,8 @@ Five times the functions cost **55 times** the wall-clock, and unlike the other 
 this cannot be attributed to contention — it is a single-threaded `lean` process, and the
 per-function cost rises by an order of magnitude across the range.
 
-The cause is in the source. `Program.table` is an association `List`:
+The cause was in the source. `Program.table` is an association `List`, and at `46c65fc`
+`Ctx.resolve` read (the current form is described under "Fixed" below):
 
 ```lean
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
@@ -196,7 +228,7 @@ miss is unconditionally O(F) with a string-suffix test per entry. `Program.callC
 runs `f.calls.all ctx.resolvable` over every hole-free function, making the ledger
 O(F × calls-per-function × F). At F = 10,623 that is the 363 seconds.
 
-**Fixed, for the ledger only.** The prescribed fix — make `Program.table` a
+**Fixed, for the ledger only (and `Ctx.resolve` has since lost its allocation).** The prescribed fix — make `Program.table` a
 `Std.HashMap String Func` — turned out not to be available: `Autoform/Contracts.lean`,
 `Autoform/Refine.lean` and `Autoform/CallingConvention.lean` `simp` through
 `Ctx.resolve.go` on the association list, so the list shape is load-bearing for the
@@ -205,14 +237,18 @@ proofs and changing it breaks them.
 What was done instead is a `ResolveIndex` that lives in `Autoform/Ledger.lean`, is built
 once per program, and answers exactly what `Ctx.resolvable` answers (exact keys, plus a
 count of table entries per dotted tail, so the *unique*-suffix rule and the first-match
-method rule stay distinct). `Ctx.resolve` itself is untouched. The quadratic definition is
+method rule stay distinct). `Ctx.resolve` keeps the association list but no longer builds
+the full `filter` list on a miss: it scans for a unique suffix match and stops at the second
+(`Semantics.lean`, `Ctx.resolve.go`), so a miss is still linear but allocation-free. The quadratic definition is
 kept as `Program.callClosedRef`, and `Program.callClosureAgrees` re-derives the answer
 both ways: `scripts/ledger.lean.tmpl` aborts if they differ, so the faster number can
 never be reported unchecked.
 
 Measured in one process per corpus, `callClosedRef` vs `callClosed`, identical results
-(a timing snapshot, not re-run; the Cachetools verifiable core is 105 today, see the
-coverage table above):
+(a timing snapshot, not re-run, on the corpora and exporter of the time. The Cachetools row's
+101 is that snapshot's core; the final tree's is 98. The V8Base row's 830 equals what was re-derived
+on 2026-10-02 with `scripts/ledger.lean.tmpl` over the tracked `ast-V8Base.json`. The Ansible row's
+5,547 functions / 2,205 differ from `evidence-ansible.md`'s 5,546 / 2,096: a different export):
 
 | corpus | functions | verifiable core | before | after |
 |---|---|---|---|---|
@@ -223,10 +259,11 @@ coverage table above):
 | LinuxLib | 3,368 | 920 | 1,789 ms | 21 ms |
 | Ansible | 5,547 | 2,205 | 10,806 ms | 72 ms |
 
-**Still open:** `Ctx.resolve` is also on the interpreter's hot path (`evalExpr`'s `.call`,
-`.mcall` and `.alloc` cases all go through it), so every evaluation and every conformance
-run still pays O(F) per call on a large program. The index above does nothing for that,
-and the assoc-list constraint from the proofs applies there too.
+**Still open:** `Ctx.resolve` is also on the interpreter's hot path (`evalExpr`'s call
+cases go through `ctx.resolve` / `ctx.resolveCallee`, and method dispatch through the
+`resolveMethod*` family), so every evaluation and every conformance run still pays O(F) per
+call on a large program. The index above does nothing for that, and the assoc-list constraint
+from the proofs applies there too.
 
 ### 4. Memory grows with the generated module
 
@@ -245,6 +282,23 @@ failed, never OOM'd and never timed out on any target.**
 Everything above is Python. This section is the one C corpus run at scale through the
 static census *and* the runtime oracle. Numbers are from the commands below, run on
 2026-10-02 against `sqlite/sqlite` 3.54.0 (`manifest.uuid` `52f84cfc…`), Joern 4.0.606.
+
+**Current figures (the end of this section's story; each earlier table is history).**
+
+| Quantity | Value | Where it comes from |
+|---|---|---|
+| Amalgamation (2,433 functions), hole-free, exporter before the address model | 1,907 (78.4%) | `/opt/corpus/O/amalg_before.out` |
+| ... with the address model (`Expr.ptrOp`, STRATEGY.md §60) | 1,985 (81.6%) | `/opt/corpus/O/amalg_before2.out` |
+| ... with width-typed integer operators (§63), **current exporter** | **1,774 (72.9%)** hole-free, 2,820 holes, 1,073 `op:int:unresolved-type` | `/opt/corpus/O/amalg_after2.out` |
+| Full tree (8,105 functions), current exporter | **5,295 (65.3%)** hole-free, 11,392 holes | `/opt/corpus/O/full.export.out` |
+| Typed C conformance sample, current exporter | **10 functions, 198/198 agree, 0 diverge, 2 inconclusive** (`sqlite3LogEstToInt`, `ub:shift count out of range`) | `/opt/corpus/O/sample_after/conformance.json` (`c-typed-v1`) |
+
+Everything below that is labelled "before", "round 1" or "int-only" is superseded by
+this table and kept so the path from 170 samples with 30 divergences to 198/198 stays
+legible. In particular the older full-tree figures (5,054, 5,736, 5,724 hole-free) are
+from earlier exporters and are **not** the current count. The 5,295 figure and the
+1,907 -> 1,985 -> 1,774 chain each isolate their own change on the amalgamation; no
+full-tree run isolates each change separately.
 
 ### Reproduce
 
@@ -276,7 +330,7 @@ A bare `--define NAME` makes `NAME` defined but EMPTY in c2cpg: on a two-branch 
 `--define FOO=1`. `SQLITE_OS_UNIX` and `SQLITE_TEST` are passed bare to match the
 published configuration, not because that is right.
 
-### Census
+### Census (history: exporter at `46c65fc` and the `<operators>.` normalization; superseded by the current-figures table above)
 
 | Run | Functions | Hole-free | Holes | `op:cast*` | `op:sizeOf*` |
 |---|--:|--:|--:|--:|--:|
@@ -317,7 +371,7 @@ signedness). On a fixture of `|= &= ^= <<= %= >>=` the result agreed with `cc` o
 random cases. Python is deliberately left alone: there `a |= b` mutates a set in place,
 which `a = a | b` does not.
 
-### Conformance sample
+### Conformance sample (history: rounds 1 and 2; the current sample is under "Width-typed integers" below)
 
 `scripts/sqlite_sample.py` keeps only what the C leg of `differential.py` can run with
 nothing invented. The AST carries no C types, so a candidate must be hole-free,
@@ -331,12 +385,12 @@ from a program compiled against the same amalgamation (`probe_types`), so `LogEs
 16-bit signed and `sqlite3_int64` 64-bit because the compiler says so. Selection is by
 sha256 of the name, so it is deterministic.
 
-Of 5,724 hole-free functions, 3,269 are in files the default amalgamation does not
+At the 5,724-hole-free exporter, of those functions 3,269 are in files the default amalgamation does not
 compile (`autosetup/jimsh0.c`, `tool/`, `ext/fts5`, `ext/jni`, `src/test*.c`, ...),
 1,135 return a non-integer type (849 `void`), 1,125 have a non-integer parameter
 (pointer, struct, float, ...), 133 have a definition the signature reader could not
 match, and the remaining filters remove 53 more (no parameters, preprocessor lines,
-non-candidate callees, ...). **9 qualify**, the same 9 as before the typed leg:
+non-candidate callees, ...). **9 qualified then**, the same 9 as before the typed leg (with the width-typed exporter the re-selected sample has 10, see below):
 admitting `_Bool`, `Bitmask`, `<stdint.h>` names and `SQLITE_OPT_INLINE u64` moved 8
 functions from "return type" to "parameter" (every one also takes a pointer), and no
 function in the population was refused for an integer *width* alone. The binding
@@ -413,19 +467,21 @@ it at compile time), and both truncate: `-5.5 % 2.0` is `-1.5` (JLS 15.17.3; `ja
 `java` on this box print `-1.5`, and `1.5` for `5.5 % -2`). `.cLike` now uses `fmod`, pinned
 by `#guard`s in `Semantics.lean` (with Python's `0.5` pinned alongside).
 
-**The inconclusive cases.** 11 (typed) / 10 (int-only) are `validJulianDay(iJD)` on
-`iJD >= 0`: `INT_464269060799999` is `((i64)0x1a640 << 32) | 0x1072fdff`, and Core's
-`.cLike` integers are 32-bit, so `<< 32` is `ub:shift count out of range`, a hole. The
-typed leg adds one: `vdbeSorterTreeDepth(nPMA)` keeps an `i64 nDiv` and multiplies it by
+**The inconclusive cases (history: round 2, before width-typed integers; this gap is closed, see the next section).** 11 (typed) / 10 (int-only) were `validJulianDay(iJD)` on
+`iJD >= 0`: `INT_464269060799999` is `((i64)0x1a640 << 32) | 0x1072fdff`, and at the time Core
+computed every `.cLike` integer operation at 32 bits, so `<< 32` was `ub:shift count out of range`,
+a hole. The typed leg added one: `vdbeSorterTreeDepth(nPMA)` keeps an `i64 nDiv` and multiplies it by
 16 until it exceeds `nPMA`. At 32 bits `16^8 = 2^32` wraps to 0, the loop never ends, and
 Core answers `outOfFuel` (checked directly: `runFunc` gives 6 for `nPMA = 2^28`, which
 `cc` agrees with, and `outOfFuel` for `2^28 + 1` and `INT_MAX`, where `cc` gives 7). Not
-a wrong answer here, but the same gap: **64-bit C arithmetic is computed at 32 bits**
-(`Dialect.toNumConfig .cLike = c32Wrapv` for every C integer type), and a function whose
+a wrong answer here, but the same gap: **64-bit C arithmetic was computed at 32 bits**
+(`Dialect.toNumConfig .cLike = c32Wrapv` for every untyped C operator, which is still the meaning of an
+UNTYPED `.cLike` operator today), and a function whose
 `i64`/`u64`/`unsigned` arithmetic leaves the `int` range without hitting a hole or a
 loop would be a wrong answer. The int-only leg could not reach it (`randint(-20, 20)`);
 the typed leg reaches it, and on this sample it lands on a hole and `outOfFuel` only.
-Per-type widths in Core (the exporter already resolves them for `>>`) are the fix.
+Per-type widths in Core (the exporter already resolved them for `>>`) were the fix, and
+they are in: next section.
 
 ### Width-typed integers (item O)
 
@@ -473,7 +529,8 @@ after (this branch's full export):
 | before | 9/9 | 168/168 | 0 | 12 (`validJulianDay` 11 `ub:shift count out of range`, `vdbeSorterTreeDepth` 1 `outOfFuel`) |
 | after | 10/10 | **198/198** | 0 | 2 (`sqlite3LogEstToInt`: `ub:shift count out of range`) |
 
-The 12 inconclusive cases of round 2 are now compared, and agree. `sqlite3LogEstToInt` is
+The 12 inconclusive cases of round 2 are now compared, and agree. (The typed sample is
+the current one: these are the numbers in the "Current figures" table at the top of this section.) `sqlite3LogEstToInt` is
 new to the sample (its `u64` arithmetic typed); its two inconclusive cases draw a negative
 `LogEst`, for which `(n+8)>>(3-x)` shifts a `u64` by 64 or more — undefined in C, a hole in
 Core, whatever `cc` happens to print.
@@ -500,9 +557,11 @@ checked with the Kotlin 2.3.21 compiler: before 20 agree, 20 wrong, 21 holes; af
 * **`assure.sh`** end to end (axiom sweep, mutation gate, SACM) on a large corpus. Only
   the `autoform.sh` stages were run.
 * **Conformance percentages at scale.** The 100% figures in `README.md` remain
-  `cachetools`-only for Python. The one large-corpus run, SQLite (above), compared 9
-  functions, found a real semantic divergence (C comparison results as `int`), and after
-  its fix agrees on every conclusive case.
+  `cachetools`-only for Python. The one large-corpus run, SQLite (above), now compares 10
+  functions (9 at the first typed round); it found a real semantic divergence (C comparison
+  results as `int`) and agrees on every conclusive case after its fix. Ten functions of an
+  8,105-function tree is a sample of what the C leg can run without inventing anything, not
+  a conformance rate for SQLite; pointers are the binding constraint.
 
 ## Caveats on these runs
 

@@ -1,7 +1,9 @@
 # Architecture
 
 How the pieces fit together. `STRATEGY.md` holds the full design record; this document is
-the map.
+the map. Last checked against the tree at `9639df0` (2026-10-02): the module and script
+tables were compared with the directory listings, the CI and trust descriptions with
+`.github/workflows/ci.yml` and `scripts/audit_all.py`.
 
 ## The approach
 
@@ -34,7 +36,9 @@ supported language. Joern's **code property graph** collapses that. C, C++, Java
 JavaScript, Python, Kotlin and compiled binaries all normalize into a single node
 vocabulary — `CALL`, `IDENTIFIER`, `LITERAL`, `CONTROL_STRUCTURE`, `RETURN`, `BLOCK`,
 `FIELD_IDENTIFIER`, `METHOD_REF`, `TYPE_REF` — with operators appearing as `<operator>.*`
-calls. The system therefore writes:
+calls. (Exercised in this repository, each with a tracked AST or fixture: Python, C, C++,
+Java, Go, JavaScript, TypeScript and Kotlin; `docs/languages.md` says how far each goes.)
+The system therefore writes:
 
 * **one** semantics for that vocabulary (`Autoform/Lang/Core/*`),
 * **one** CPG → JSON exporter (`cartographer/export_ast.sc`),
@@ -90,8 +94,13 @@ The cost falls in one place: **constructs that look alike across languages are t
 dangerous ones.** Integer division rounds toward negative infinity in Python and toward
 zero in C. `char*` arithmetic is not string concatenation. `<operator>.and` is bitwise,
 not logical. Each such construct is a latent *dialect parameter*, and the semantics
-carries `Core.Dialect` explicitly rather than picking a winner. See
-`docs/core-language.md`.
+carries `Core.Dialect` explicitly rather than picking a winner. There are three dialects:
+`.python`, `.cLike` (C, C++, Java, Go, Kotlin) and `.javascript` (`.js`, `.ts`, `.tsx`,
+`.jsx`, `.mjs`, `.cjs`; `render_lean.py` infers it from the file extension). Within `.cLike`,
+integer operators the exporter has typed (`"*:i64"`, `"+:j64"`, Go `"*:g64"`, Kotlin
+`"*:k64"`, ...) compute at that width, an operator whose type does not resolve is the hole
+`op:int:unresolved-type`, and an untyped operator still means 32-bit wrapping
+(`Autoform/Lang/Core/TypedInt.lean`). See `docs/core-language.md`.
 
 ## The pipeline
 
@@ -112,7 +121,7 @@ Autoform/Generated/<Module>.lean   :  Autoform.Core.Program
    │  lake build            ── type-checks
    ├── scripts/differential.py     ─▶ conformance.json   (vs CPython / cc)
    ├── scripts/core_oracle.py      ─▶ core-oracle.json   (execution vs coverage claim)
-   ├── scripts/audit_all.py        ─▶ audit.json         (axioms + escapes + leanchecker)
+   ├── scripts/audit_all.py        ─▶ audit.json         (axioms + escapes; kernel replay is hours, its own CI job)
    ├── scripts/mutate.py           ─▶ mutation.json      (specification teeth)
    ├── Autoform/Ledger.lean        ─▶ ledger-<Module>.json
    └── scripts/sacm.py             ─▶ sacm-<Module>.json (SACM assurance case)
@@ -120,6 +129,25 @@ Autoform/Generated/<Module>.lean   :  Autoform.Core.Program
 
 `./autoform.sh <src> <Name>` runs the top half (through the ledger).
 `./assure.sh <src> <Name>` runs all of it. See `docs/running.md`.
+
+Beside the pipeline, a second set of scripts checks that the artifacts it produces are the
+ones the claims are about; none of them appears in the diagram because none consumes the
+pipeline's output:
+
+```
+ast-<M>.json ──▶ scripts/check_render.py       render hash + AST hash vs artifact-manifest.json
+                                               (Ansible / LinuxCrypto / LinuxLib: NOT-TRACKED by
+                                                reviewed policy, never counted as verified)
+             ──▶ scripts/check_provenance.py   record or named baseline entry; Joern pin;
+                                               exporter digest (fixtures: tests/test_fixture_exporter_fresh.py)
+             ──▶ scripts/check_specs_fresh.py  specs vs the corpus AST they were generated from
+ledger-<M>.json ▶ scripts/check_docs.py        documented figures vs artifact fields
+```
+
+CI runs these (and the audit with `--skip-kernel`) in `build-and-audit`, `check_provenance.py`
+and pytest in `python-tests`, and the kernel replay in its own `kernel-replay` job; the Joern
+pipeline is manual. `docs/running.md` §1b lists the jobs, `docs/integrity.md` the incident
+behind each check.
 
 Two properties of this arrangement are load-bearing:
 
@@ -175,13 +203,19 @@ Two checks, one cheap and one expensive:
   not read the committed AST to decide what to expect. Minutes per corpus, so it is a
   command rather than a build step.
 
-`provenance/unattributed.json` is a **named backlog**, not an exemption. The eleven
-`ast-*.json` files that predate this mechanism are listed there with a reason, printed by
+`provenance/unattributed.json` is a **named backlog**, not an exemption. On the final tree
+nine `ast-*.json` files are listed there (`CMath`, `LangC`, `LangJava`, `LinuxLibSample`,
+`Sample`, `Stress`, `V8Base`, `V8BaseSample`, `V8Numbers`) with a reason each, printed by
 name on every run of the checker, and an entry expires the moment its artifact's digest
 changes — regenerate one and you must record real provenance. `--strict` refuses the
-backlog entirely. Three of the eleven were re-exported to find out rather than assumed;
-all three differ from a fresh export (module-initializer entries and integer-literal
-representation postdate them), which is recorded as the finding it is.
+backlog entirely. Six artifacts now carry a real record (`CAddr`, `Cachetools`, `LangGo`,
+`LangJS`, `LangKt`, `LangTS`), so the checker's summary is `6/15 in-repository artifacts
+fully attributed ... 9 unattributed (baselined) ... 0 violation(s)`. Three of the baselined ones
+were re-exported to find out rather than assumed; all three differ from a fresh export
+(module-initializer entries and integer-literal representation postdate them), which is
+recorded as the finding it is. A fixture's `provenance.json` under `tests/` is held to a
+stricter standard: its `exporter_sha256` must equal the current exporter
+(`tests/test_fixture_exporter_fresh.py`).
 
 ### Merge-phase changes this asks for elsewhere
 
@@ -207,7 +241,10 @@ attributed one.
 |---|---|
 | `Syntax.lean` | The universal deep embedding: `Val`, `Obj`/`Heap`, `Lit`, `Expr`, `Stmt`, `Func`, `Program`, `Dialect`, `EResult`, plus the hole/size folds the ledger is built on. |
 | `Semantics.lean` | The fuel-indexed total interpreter: `Env`, `Ctx`, `evalExpr`/`execStmt`/`applyFunc`/`applyClosure`, operator application, name resolution, `runFunc`/`runMain`. No `partial`, no `sorry`. |
-| `Numeric.lean` | Machine integers as a dialect parameter: `Width`, `IntType`, `NumConfig` (Python / C32 / C64 / unsigned / Java / Go presets), and `NumResult` with `ok`/`divZero`/`trap`/`ub`. Undefined behaviour becomes a hole, never a number. |
+| `Numeric.lean` | Machine integers as a dialect parameter: `Width`, `IntType`, `NumConfig` (presets `python`, `c32`, `c32Wrapv`, `c64Wrapv`, `u32`, `java32`, `java64`, `go64`), and `NumResult` with `ok`/`divZero`/`trap`/`ub`. Undefined behaviour becomes a hole, never a number. |
+| `TypedInt.lean` | Width-typed integer operators: the exporter names the operand type inside the operator (`"*:i64"`, `"+:j64"`, Go `"*:g64"`, Kotlin `"*:k64"`), the operator converts its operands to that type and computes through `NumConfig`; an unresolved type is a hole. Untyped `.cLike` operators keep their 32-bit meaning. |
+| `Address.lean` | The C address model: a pointer is a block (heap `Ref`) plus an offset (`Val.iref`), so comparison, `&p[i]` and pointer arithmetic within one array are defined and anything across objects is a hole. |
+| `Boxed.lean` | The heap-free half of Python's boxed containers: what a write does to a list/dict payload, what membership and the builtins may see (`docs/boxed-containers.md`). |
 | `Stdlib.lean` | A modelled Python standard library and builtins, consulted *after* user functions. Every entry returns `none` — falling through to a visible hole — on any argument shape it cannot model faithfully. Under `.cLike` and `.javascript` it returns `none` for everything. |
 | `Float.lean` | IEEE-754 binary32/binary64 as an explicit bit pattern (`Fl`) with exact-rational rounding, plus Python's float semantics (`pyMod`, int/float comparison without coercion, `OverflowError`). Chosen over Lean's `Float` because `Float` is an opaque `@[extern]` type the kernel cannot reduce. Wired in: `Syntax.lean` imports it for `Val.float`/`Lit.float`, and `Semantics.lean`'s "Floating point" section evaluates float literals, arithmetic, comparison and unary minus. What still holes is listed in `docs/core-language.md` §1. |
 
@@ -225,6 +262,8 @@ subject.
 |---|---|
 | `Refine.lean` | Deep ≈ shallow. `Refines p name N dom spec` says the interpreter applied to the translated AST equals a clean Lean function, for every fuel budget above a stated bound, on a stated domain. `Outcome` deliberately has no `hole` and no `outOfFuel` constructor. |
 | `Ledger.lean` | Coverage arithmetic and the trust ledger: hole-free, call-closed, dynamic-hole risk, holes-by-cause; `Program.ledger` (human) and `Program.ledgerJson` (evidence for the assurance case, tagged with module and dialect). |
+| `PyArith.lean`, `PyScoping.lean`, `PyMro.lean`, `CBoolInt.lean`, `CIntWidth.lean`, `JavaIntWidth.lean`, `GoIntWidth.lean`, `KotlinIntWidth.lean`, `JsNode.lean`, `BoxedContainers.lean` (+ the `*Program.lean` data they run) | Fixtures pinned by evaluation: each runs an exported-and-rendered program through the Core interpreter, `#guard_msgs`-pins the answers, and a pytest compares the same cases with the real runtime (CPython, `cc`, `java`, `go`, Kotlin, Node). They are in the root import graph, so `lake build` re-checks every pin. |
+| `HoleContracts.lean` | Contracts at *statement* holes, scoped to a site (the statement-level counterpart of `Contracts.lean`); the ledger's "conditionally verifiable" count rests on it (`docs/contracts.md`). |
 | `Overflow.lean` | Derives representability obligations (`Fits32`-style side conditions) mechanically from the AST, with a soundness theorem: if the generated obligations hold, evaluation agrees with the exact mathematical value and in particular is never `hole "ub:…"`. |
 | `Contracts.lean` | Contracts at holes: `RefinesUnder Γ`, refinement relative to stated assumptions about named holes, with the unsatisfiable-assumption failure mode stated as a theorem. See `docs/contracts.md`. |
 | `FuelMono.lean` | General fuel monotonicity for all seven mutually recursive interpreter functions, excluding `Stmt.tryFinally` (stated why in the file). |
@@ -233,9 +272,9 @@ subject.
 | `Harness/Audit.lean` | `#audit_axioms`, `#audit_depends`, `#audit_ledger`, implemented as Lean metaprogramming over `Lean.Environment`. |
 | `Harness/Conformance.lean` | Specimen-derived generators and checkers over the `BigStep` relation; `plausible` used as a **refutation** gate before a prover is allowed to spend time. |
 | `Tactics/Portfolio.lean` | The tiered proof portfolio, with the guard that a rung counts as success only if the resulting term passes `hasSorry`/`hasExprMVar` screening. Exhaustion records an `Obligation` as data; it never admits a theorem. |
-| `Specs/*.lean` | Hand-written specifications *about generated modules*, stated by import so that mutating the generated file mutates the subject of the theorems. |
+| `Specs/*.lean` | Hand-written specifications *about generated modules*, stated by import so that mutating the generated file mutates the subject of the theorems (`CachetoolsSpec`, `V8Spec`, `CppCastSpec`, `DoWhileSpec`, `AddressSpec`). |
 | `SpecsGen/*.lean` | The hand-written vocabulary (`Case`, `Obs`, the `law*` predicates, `MRefines`) that machine-synthesized specifications are generated in, plus the generated specs themselves. |
-| `Generated/*.lean` | Transpiler output. Data literals; never hand-edited. |
+| `Generated/*.lean` | Transpiler output. Data literals; never hand-edited. Mostly untracked build products (`docs/integrity.md` says which six are tracked); `render_lean.py` emits `set_option maxRecDepth` scaled to the function count at the top of each. |
 
 ### `cartographer/` — the front end
 
@@ -252,7 +291,14 @@ subject.
 |---|---|
 | `differential.py` | The conformance oracle. Drives from the repository's own test suite via a `sys.settrace` hook, snapshots receivers into a Lean `Heap` literal, and compares structured values and exceptions against the Lean interpreter. Three-valued: agree / diverge / INCONCLUSIVE. |
 | `core_oracle.py` | The execution oracle for the ledger's verifiable-core claim: runs every function in the claimed core over many inputs instead of analysing the AST that produced the claim. |
-| `audit_all.py` | Axiom sweep over every declaration, source sweep for escape hatches (`sorry`, `partial`, `unsafe`, `native_decide`, `@[implemented_by]`, `axiom`), and `leanchecker --fresh` kernel replay. Gates CI with `--strict`. |
+| `audit_all.py` | Axiom sweep over every declaration, source sweep for escape hatches (`sorry`, `partial`, `unsafe`, `native_decide`, `@[implemented_by]`, `axiom`, `@[extern]`), and `leanchecker --fresh` kernel replay. `--skip-kernel` reports the replay as `DELEGATED` (not a pass); `--kernel-only` runs just the replay. CI runs the sweep with `--strict --skip-kernel` in the build job and the replay (hours) in its own `kernel-replay` job. |
+| `check_render.py` | Render-integrity gate: each AST and its render against `artifact-manifest.json`; corpora whose AST is in no clone are `NOT-TRACKED` by a reviewed allowlist (never counted verified). `--strict` ignores the allowlist. |
+| `check_docs.py`, `check_specs.py`, `check_specs_fresh.py` | Documented figures vs artifact fields; the SpecsGen modules elaborate; each spec is bound to the AST hash of its corpus. |
+| `lang_matrix.py` | Per-language coverage measurement over exported ASTs; its language table equals `render_lean.py`'s (tested). |
+| `emit_contracts.py` | Renders `Autoform.Contracts.Demo.contractRecords` to JSON for the assurance case. |
+| `wasm_backend.py` / `wasm_run.mjs` | `--wasm` mode of the differential harness's C backend: runs the C side compiled to wasm32 so a wild pointer is a recorded trap rather than a crashed harness. |
+| `strip_kernel_attrs.py`, `label_function_counts.py`, `arity_blast.lean.tmpl` | Measurement helpers: strip GCC/kernel attributes that defeat Joern's C parser; count how many functions one hole label alone would unblock; count call sites passing too many positional arguments. Not on the gating path. |
+| `sqlite_corpus.sh`, `sqlite_sample.py` | The SQLite full-tree setup (generated `sqlite3.h`, parse, export) and the selector for the typed C conformance sample (`docs/scale.md`). |
 | `mutate.py` | Source-level mutation gate — the *sufficient* anti-vacuity test. Two modes: hand-written Lean, and generated modules (where the file mutated and the file rebuilt are different). |
 | `sacm.py` | Builds the SACM assurance case (G1–G5, status lattice, coverage caps) and wraps it in an in-toto Statement. |
 | `synth_specs.py` | Layer 4: specification synthesis working *down* the trustworthiness ordering — existing artefacts, structural/safety specs, mined algebraic laws, cross-implementation equivalence. |
