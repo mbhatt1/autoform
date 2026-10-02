@@ -9,17 +9,17 @@ import Autoform.Generated.Cachetools
 there: `substS` leaves `Stmt.hole` alone, because a statement hole is an untranslated
 *effect* and its contract has to be a relation on control outcomes, not on values. This
 file supplies that relation, so that a function whose only gaps are statements like
-`del self.__data[key]` (`op:delete-index`, 6 occurrences in `cachetools`) can be reasoned
+`del self.__index[:]` (`op:delete-slice`, 2 occurrences in `cachetools`) can be reasoned
 about **under a stated assumption** rather than discarded.
 
 Three design decisions, each forced by something that would otherwise be unsound or
 misleading:
 
 * **Contracts are per site, not per label.** A statement contract is keyed by
-  `(function, label)`. The same label means different things at different sites:
-  `del self.__data[key]` in `Cache.__delitem__` deletes from a plain `dict` and touches no
-  attribute, while `del self[key]` in `Cache.pop` dispatches to `Cache.__delitem__` and
-  *does* write `_Cache__currsize`. One label-wide contract would have to be false at one of
+  `(function, label)`. The same label means different things at different sites: when
+  `del x[k]` was still a hole, `del self.__data[key]` in `Cache.__delitem__` deleted from a
+  plain `dict` and touched no attribute, while `del self[key]` in `Cache.pop` dispatched to
+  `Cache.__delitem__` and *did* write `_Cache__currsize`. One label-wide contract would have to be false at one of
   them. Keying by site makes the assumption exactly as wide as the place it is used.
 * **The contract is a relation `post : Heap → Env → Heap × Ctl → Prop`.** That is where an
   *effect footprint* lives (`AttrFrame`: which parts of the heap the hole may change) and
@@ -37,7 +37,7 @@ The vacuity guards of `Contracts.lean` are re-proved for this relation — an em
 changes nothing (`underS_nil_iff`), an unsatisfiable `Γ` proves everything
 (`underS_of_unsatisfiable`) so satisfiability is a proof obligation, a false `post` is
 detectably unsatisfiable (`unsatisfiableS_of_false_post`), and the unconstrained contract
-proves nothing about a real function (`delitem_not_provable_under_top`).
+proves nothing about a real function (`rrclear_not_provable_under_top`).
 
 `docs/contracts.md` §"Statement holes" is the reader's guide.
 -/
@@ -338,7 +338,7 @@ theorem fillS_hole_of_lookup {ι : List (String × Stmt)} {l : String} {s : Stmt
 /-! ## 4. Standard statement contracts -/
 
 /-- **Assume nothing.** Always satisfiable, provably useless on a reachable hole
-(`delitem_not_provable_under_top`). The honest default for a site nobody has examined. -/
+(`rrclear_not_provable_under_top`). The honest default for a site nobody has examined. -/
 def topSContract (site label : String) : SContract :=
   { site, label, stmt := "may do anything (no assumption)", fuel := 0,
     post := fun _ _ _ => True }
@@ -409,34 +409,26 @@ def assumptionsJsonS (theoremName : String) (Γ : SContractEnv)
                               | some n => .str n
                               | none   => .null) ]
 
-/-! ## 6. Worked example: `cachetools` `Cache.__delitem__`, *as currently translated*
+/-! ## 6. Worked examples on `cachetools`
 
-```python
-def __delitem__(self, key):
-    size = self.__size.pop(key)
-    del self.__data[key]
-    self.__currsize -= size
-```
+Two, deliberately paired.
 
-The generated `f_cachetools___init___py__module__Cache___delitem__` is **partially
-translated**: `del self.__data[key]` is `Stmt.hole "op:delete-index"`. (This is the
-render of the *committed* `ast-Cachetools.json`; the merged exporter emits `Stmt.delIndex`
-there, so after regeneration this example should be retired in favour of an unconditional
-theorem and re-pointed at `op:delete-slice` — see `docs/contracts.md`.) Today that hole
-puts the function outside every unconditional statement (`delitem_reaches_hole`). The
-theorem below is about the generated `Program` *unmodified* — `Autoform.Generated.
-Cachetools.program`, all functions, imported — instantiated at that one site.
+* **`Cache.__delitem__` — the hole closed, the theorem became unconditional.** The first
+  version of this file proved `Cache.__delitem__` correct *relative to* a contract on
+  `del self.__data[key]` (`Stmt.hole "op:delete-index"`). The merged exporter now emits
+  `Stmt.delIndex` there (`docs/boxed-containers.md`), so the contract is no longer needed
+  and `delitem_refines` below states the method's exact heap effect and result with
+  `Γ = []`. This is the intended life-cycle of a contract: it is retired, not weakened,
+  when the construct it stood in for is translated.
+* **`RRCache.clear` — a statement hole that survives.** `del self.__index[:]` is still
+  `Stmt.hole "op:delete-slice"` (the exporter holes every slice deletion). Under one
+  site-scoped contract — the deletion completes or raises and changes no attribute — the
+  method leaves `_Cache__currsize = 0` whichever way it exits. The footprint is
+  load-bearing: `_Cache__currsize` is written by `Cache.clear` *before* the hole runs, so
+  only `AttrFrame` stops the hole from undoing it.
 
-Assumption made (and only this one): at `Cache.__delitem__`, `op:delete-index` completes
-normally or raises, and changes no object's attributes. That is true of `del d[k]` on a
-CPython `dict` *provided* `k`'s `__hash__`/`__eq__` have no attribute side effects — a
-condition a reader must check (`docs/contracts.md`), and which is not in `Γ`.
-
-Conclusion: for a `Cache` whose size table is a `_DefaultSize` (the class `cachetools`
-uses when no `getsizeof` is given), `__delitem__` either returns `None` having decreased
-`_Cache__currsize` by exactly 1, or raises having left `_Cache__currsize` unchanged. The
-footprint is load-bearing: without `AttrFrame` the hole could rewrite `_Cache__currsize`
-and the first disjunct would be false. -/
+Both are about `Autoform.Generated.Cachetools.program` itself — all functions, imported,
+not a slice — as rendered from the committed `ast-Cachetools.json`. -/
 
 namespace Demo
 
@@ -447,46 +439,62 @@ abbrev P : Program := Autoform.Generated.Cachetools.program
 
 theorem P_dialect : P.dialect = Dialect.python := rfl
 
-/-- Call a method of `q` on an explicit receiver; heap and result. -/
+/-- Call a method of `q` on an explicit receiver; heap and result. The globals frame is at
+address `0` (`Ctx.globals`'s default), which is where `initGlobals` allocates it. -/
 def runMethodIn (q : Program) (fuel : Nat) (h : Heap) (name : String) (self : Val)
     (args : List Val) : Heap × EResult :=
   match (ctxOf q).resolve name with
   | none    => (h, .hole s!"entry:{name}")
   | some fn => applyFunc (ctxOf q) fuel h fn (some self) args []
 
+theorem classDefines_onProgram (τ : SImpl) (p : Program) (cls meth : String) :
+    (ctxOf (τ.onProgram p)).classDefines cls meth = (ctxOf p).classDefines cls meth := by
+  simp [Ctx.classDefines, ctxOf, table_onProgram, List.any_map, Function.comp_def]
+
+/-! ### Heap facts -/
+
+theorem getField_setField_self (h : Heap) (r : Ref) (f : String) (v : Val) {o : Obj}
+    (ho : h.get r = some o) : (h.setField r f v).getField r f = v := by
+  simp only [Heap.get] at ho
+  simp [Heap.getField, Heap.setField, Heap.get, List.getElem?_mapIdx, ho]
+
+theorem get_setPayload_ne (h : Heap) {a r : Ref} (p : Payload) (hne : r ≠ a) :
+    (h.setPayload a p).get r = h.get r := by
+  simp [Heap.setPayload, Heap.get, List.getElem?_mapIdx]
+  cases h[r]? <;> simp [hne]
+
+theorem get_setField_ne (h : Heap) {a r : Ref} (f : String) (v : Val) (hne : r ≠ a) :
+    (h.setField a f v).get r = h.get r := by
+  simp [Heap.setField, Heap.get, List.getElem?_mapIdx]
+  cases h[r]? <;> simp [hne]
+
+theorem get_setField_self (h : Heap) {r : Ref} (f : String) (v : Val) {o : Obj}
+    (ho : h.get r = some o) :
+    (h.setField r f v).get r = some { o with fields := (f, v) :: o.fields } := by
+  simp only [Heap.get] at ho
+  simp [Heap.setField, Heap.get, List.getElem?_mapIdx, ho]
+
+theorem boxed_clear_dict (h : Heap) (a : Ref) (kvs : List (Val × Val)) :
+    boxedMethod .python h a (.dict kvs) "clear" [] = (h.setPayload a (.dict []), .val .unit) := by
+  simp [boxedMethod, Payload.toVal, methodRefusal, methodKeyError, Stdlib.method,
+    Val.toPayload, elementEqMethods, Stdlib.knowsMethod, Stdlib.methodNames, Stdlib.methodCore]
+
+theorem boxed_clear_list (h : Heap) (a : Ref) (vs : List Val) :
+    boxedMethod .python h a (.list vs) "clear" [] = (h.setPayload a (.list []), .val .unit) := by
+  simp [boxedMethod, Payload.toVal, methodRefusal, methodKeyError, Stdlib.method,
+    Val.toPayload, elementEqMethods, Stdlib.knowsMethod, Stdlib.methodNames, Stdlib.methodCore]
+
+/-! ### Name resolution on the full program (by evaluation, not by unfolding) -/
+
 def delitemName : String := "cachetools/__init__.py:<module>.Cache.__delitem__"
-
-/-- The one assumption. -/
-def delContract : SContract :=
-  completesOrRaisesFramed delitemName "op:delete-index"
-    "`del self.__data[key]` in Cache.__delitem__ completes normally (environment unchanged) \
-     or raises, and changes no object's class, attributes, captured bindings, or whether it \
-     is a builtin container"
-
-def Γdel : SContractEnv := [delContract]
-
-theorem satisfiable_delContract : SatisfiableS Γdel P :=
-  satisfiable_completesOrRaisesFramed _ _ _ P
-
-/-- The receiver shape the theorem is about. Stated as attributes the object *has*, so the
-domain is checkable and non-empty (`sampleCache`). -/
-def CacheShape (h : Heap) (r d : Ref) (c : Int) : Prop :=
-  ∃ o od, h.get r = some o
-    ∧ o.fields.find? (·.1 == "_Cache__size") = some ("_Cache__size", .ref d)
-    ∧ o.fields.find? (·.1 == "_Cache__currsize") = some ("_Cache__currsize", .int c)
-    ∧ o.captured = [] ∧ o.payload = .none
-    ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = [] ∧ od.payload = .none
-
-/-- What is proved of every admissible instantiation. -/
-def DelitemPost (q : Program) : Prop :=
-  ∀ h r d c key, CacheShape h r d c → ∀ fuel, 12 ≤ fuel →
-    (∃ h', runMethodIn q fuel h delitemName (.ref r) [key] = (h', .val .unit)
-        ∧ h'.getField r "_Cache__currsize" = .int (c - 1))
-    ∨ (∃ h' v, runMethodIn q fuel h delitemName (.ref r) [key] = (h', .exn v)
-        ∧ h'.getField r "_Cache__currsize" = .int c)
+def rrClearName : String := "cachetools/__init__.py:<module>.RRCache.clear"
 
 theorem resolve_delitem :
     (ctxOf P).resolve delitemName = some f_cachetools___init___py__module__Cache___delitem__ := by
+  rfl
+
+theorem resolve_rrclear :
+    (ctxOf P).resolve rrClearName = some f_cachetools___init___py__module__RRCache_clear := by
   rfl
 
 theorem resolveMethod_pop :
@@ -496,155 +504,352 @@ theorem resolveMethod_pop :
   · decide +kernel
   · rfl
 
-theorem getField_setField_self (h : Heap) (r : Ref) (f : String) (v : Val) {o : Obj}
-    (ho : h.get r = some o) : (h.setField r f v).getField r f = v := by
-  simp only [Heap.get] at ho
-  simp [Heap.getField, Heap.setField, Heap.get, List.getElem?_mapIdx, ho]
+theorem resolveMethod_sizeclear :
+    (ctxOf P).resolveMethod "_DefaultSize" "clear"
+      = some f_cachetools___init___py__module___DefaultSize_clear := by
+  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.clear"
+  · decide +kernel
+  · rfl
 
-theorem delitem_under : UnderS Γdel P DelitemPost := by
-  intro τ hc ht h r d c key hshape fuel hfuel
-  obtain ⟨s, hlk, hpost⟩ := filled_hole hc ht (c := delContract) (by simp [Γdel])
-  obtain ⟨o, od, hro, hsz, hcur, hcap, hpay, hdo, hdcls, hdcap, hdpay⟩ := hshape
+theorem resolveMethod_cacheclear :
+    (ctxOf P).resolveMethod "Cache" "clear"
+      = some f_cachetools___init___py__module__Cache_clear := by
+  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>.Cache.clear"
+  · decide +kernel
+  · rfl
+
+set_option linter.deprecated false in
+/-- `Cache.clear(self)` names the class through its value
+`cachetools/__init__.py:<module>.Cache<meta>`; the interpreter recovers the short name
+`Cache`. `String.splitOn` is well-founded recursion, which neither `rfl` nor
+`decide +kernel` reduces, so it is unfolded one step at a time. -/
+theorem className_Cache :
+    classNameOfValue "cachetools/__init__.py:<module>.Cache<meta>" = "Cache" := by
+  have h1 : ("cachetools/__init__.py:<module>.Cache<meta>".endsWith "<meta>") = true := by
+    decide +kernel
+  have h2 : "cachetools/__init__.py:<module>.Cache<meta>".dropRight 6
+      = "cachetools/__init__.py:<module>.Cache" := by decide +kernel
+  simp only [classNameOfValue, h1, h2, if_true]
+  unfold String.splitOn
+  repeat (rw [String.splitOnAux]; simp +decide)
+
+theorem classDefines_cacheclear : (ctxOf P).classDefines "Cache" "clear" = true := by
+  decide +kernel
+
+/-! ### `Cache.__delitem__`, unconditionally
+
+```python
+def __delitem__(self, key):
+    size = self.__size.pop(key)
+    del self.__data[key]
+    self.__currsize -= size
+```
+-/
+
+/-- The receiver: an ordinary `Cache` object whose size table is a `_DefaultSize` instance
+(the default when no `getsizeof` is given) and whose data is a boxed `dict` at a different
+address. -/
+def DelShape (h : Heap) (r d a : Ref) (c : Int) (kvs : List (Val × Val)) : Prop :=
+  ∃ o od oa, h.get r = some o
+    ∧ o.fields.find? (·.1 == "_Cache__size") = some ("_Cache__size", .ref d)
+    ∧ o.fields.find? (·.1 == "_Cache__data") = some ("_Cache__data", .ref a)
+    ∧ o.fields.find? (·.1 == "_Cache__currsize") = some ("_Cache__currsize", .int c)
+    ∧ o.captured = [] ∧ o.payload = .none
+    ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = [] ∧ od.payload = .none
+    ∧ h.get a = some oa ∧ oa.payload = .dict kvs ∧ r ≠ a
+
+/-- The specification, as a total function: an unhashable key raises `TypeError`, an
+absent key raises `KeyError` (heap untouched — `_DefaultSize.pop` is stateless), and a
+present key is deleted from the data dict and the size decremented by `1`. -/
+def delitemSpec (h : Heap) (r a : Ref) (c : Int) (kvs : List (Val × Val)) (key : Val) :
+    Heap × Outcome :=
+  if h.unhashable key then (h, .raise (.str "TypeError"))
+  else match Stdlib.dictGet kvs key with
+    | some _ => ((h.setPayload a (.dict (Stdlib.dictDel kvs key))).setField r
+                   "_Cache__currsize" (.int (c - 1)), .ret .unit)
+    | none   => (h, .raise (.str "KeyError"))
+
+/-- **Unconditional**: no contract, no hole. -/
+theorem delitem_refines (h : Heap) (r d a : Ref) (c : Int) (kvs : List (Val × Val))
+    (key : Val) (hs : DelShape h r d a c kvs) (fuel : Nat) (hf : 12 ≤ fuel) :
+    runMethodIn P fuel h delitemName (.ref r) [key]
+      = ((delitemSpec h r a c kvs key).1, (delitemSpec h r a c kvs key).2.toEResult) := by
+  obtain ⟨o, od, oa, hro, hsz, hdat, hcur, hcap, hpay, hdo, hdcls, hdcap, hdpay, hao, hapay,
+    hne⟩ := hs
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  have hpop : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "pop"
-      = some f_cachetools___init___py__module___DefaultSize_pop := by
-    rw [resolveMethod_onProgram, resolveMethod_pop]
-    simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
-  have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
+  have hdial : (ctxOf P).dialect = .python := rfl
   unfold runMethodIn
-  rw [resolve_onProgram, resolve_delitem]
-  simp only [Option.map_some, SImpl.onFunc, f_cachetools___init___py__module__Cache___delitem__,
+  rw [resolve_delitem]
+  simp only [delitemSpec]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
+    hdpay, hdat, hao, hapay, resolveMethod_pop,
+    f_cachetools___init___py__module__Cache___delitem__,
+    f_cachetools___init___py__module___DefaultSize_pop, hdial, Dialect.isPython, payloadDelete]
+  have hg' := get_setPayload_ne h (Payload.dict (Stdlib.dictDel kvs key)) hne
+  by_cases hu : h.unhashable key = true
+  · simp [hu]
+  · cases hg : Stdlib.dictGet kvs key with
+    | none => simp [hu]
+    | some v =>
+      simp [hu, hg', Heap.payload, hro, hpay, Payload.toVal, hcur]
+
+/-- …and it says something: the domain is inhabited, and on it the theorem pins the
+heap down exactly (`#eval`s below show both exits on a concrete heap). -/
+def delHeap : Heap :=
+  [ { cls := "Cache", fields := [("_Cache__size", .ref 1), ("_Cache__data", .ref 2),
+                                 ("_Cache__currsize", .int 5)] }
+  , { cls := "_DefaultSize", fields := [] }
+  , { cls := "dict", fields := [], payload := .dict [(.int 7, .str "v")] } ]
+
+theorem delHeap_shape : DelShape delHeap 0 1 2 5 [(.int 7, .str "v")] :=
+  ⟨_, _, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, by decide⟩
+
+/-- Unconditional means `Γ = []`: the same statement through the contract wrapper, with
+nothing assumed (`underS_nil_iff`). -/
+theorem delitem_unconditional :
+    UnderS [] P (fun q => ∀ h r d a c kvs key, DelShape h r d a c kvs → ∀ fuel, 12 ≤ fuel →
+      runMethodIn q fuel h delitemName (.ref r) [key]
+        = ((delitemSpec h r a c kvs key).1, (delitemSpec h r a c kvs key).2.toEResult)) :=
+  (underS_nil_iff P _).2 fun h r d a c kvs key hs fuel hf =>
+    delitem_refines h r d a c kvs key hs fuel hf
+
+/-! ### `RRCache.clear`, relative to a contract on `op:delete-slice`
+
+```python
+def clear(self):
+    Cache.clear(self)
+    self.__index.clear()
+    del self.__index[:]          # Stmt.hole "op:delete-slice"
+```
+-/
+
+/-- The one assumption, at this one site. -/
+def sliceContract : SContract :=
+  completesOrRaisesFramed rrClearName "op:delete-slice"
+    "`del self.__index[:]` in RRCache.clear completes normally (environment unchanged) \
+     or raises, and changes no object's class, attributes, captured bindings, or whether it \
+     is a builtin container"
+
+def Γslice : SContractEnv := [sliceContract]
+
+theorem satisfiable_sliceContract : SatisfiableS Γslice P :=
+  satisfiable_completesOrRaisesFramed _ _ _ P
+
+/-- The receiver and the module state the method reads. `Cache.clear(self)` names the
+class `Cache`, which `initGlobals` binds in the globals frame (address `0`) to the class
+value `cachetools/__init__.py:<module>.Cache<meta>`; the domain states that binding rather
+than running the module initialisers. -/
+def RRShape (h : Heap) (r d a i : Ref) : Prop :=
+  ∃ g o od oa oi kvs vs, h.get 0 = some g
+    ∧ g.fields.find? (·.1 == "Cache")
+        = some ("Cache", .fn "cachetools/__init__.py:<module>.Cache<meta>")
+    ∧ h.get r = some o
+    ∧ o.fields.find? (·.1 == "_Cache__data") = some ("_Cache__data", .ref a)
+    ∧ o.fields.find? (·.1 == "_Cache__size") = some ("_Cache__size", .ref d)
+    ∧ o.fields.find? (·.1 == "_RRCache__index") = some ("_RRCache__index", .ref i)
+    ∧ o.captured = [] ∧ o.payload = .none
+    ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = [] ∧ od.payload = .none
+    ∧ h.get a = some oa ∧ oa.payload = .dict kvs
+    ∧ h.get i = some oi ∧ oi.payload = .list vs
+    ∧ r ≠ a ∧ r ≠ i ∧ d ≠ a ∧ i ≠ a
+
+/-- What is proved of every admissible instantiation: whichever way `clear` exits, the
+cache's size is `0`. -/
+def RRPost (q : Program) : Prop :=
+  ∀ h r d a i, RRShape h r d a i → ∀ fuel, 30 ≤ fuel →
+    (∃ h', runMethodIn q fuel h rrClearName (.ref r) [] = (h', .val .unit)
+        ∧ h'.getField r "_Cache__currsize" = .int 0)
+    ∨ (∃ h' v, runMethodIn q fuel h rrClearName (.ref r) [] = (h', .exn v)
+        ∧ h'.getField r "_Cache__currsize" = .int 0)
+
+theorem rrclear_under : UnderS Γslice P RRPost := by
+  intro τ hc ht h r d a i hshape fuel hfuel
+  obtain ⟨s, hlk, hpost⟩ := filled_hole hc ht (c := sliceContract) (by simp [Γslice])
+  obtain ⟨g, o, od, oa, oi, kvs, vs, hg0, hgC, hro, hdat, hsz, hidx, hcap, hpay, hdo, hdcls,
+    hdcap, hdpay, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
+  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 30 := ⟨fuel - 30, by omega⟩
+  have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
+  have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
+  have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
+    rw [classDefines_onProgram]; exact classDefines_cacheclear
+  have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
+      = some f_cachetools___init___py__module__Cache_clear := by
+    rw [resolveMethod_onProgram, resolveMethod_cacheclear]
+    simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
+  have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
+      = some f_cachetools___init___py__module___DefaultSize_clear := by
+    rw [resolveMethod_onProgram, resolveMethod_sizeclear]
+    simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
+  have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
+      = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
+    get_setField_self _ _ _ (by rw [get_setPayload_ne _ _ hra]; exact hro)
+  unfold runMethodIn
+  rw [resolve_onProgram, resolve_rrclear]
+  simp only [Option.map_some, SImpl.onFunc, f_cachetools___init___py__module__RRCache_clear,
     fillS]
-  simp only [delContract, completesOrRaisesFramed, delitemName] at hlk hpost
+  simp only [sliceContract, completesOrRaisesFramed, rrClearName] at hlk hpost
   simp only [hlk]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
-    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop,
-    hdpay, Heap.payload, Heap.view,
-    f_cachetools___init___py__module___DefaultSize_pop]
+    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
+    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcd, hcc, hsc, hdial, hglob,
+    className_Cache, Heap.payload, boxed_clear_dict, boxed_clear_list,
+    get_setPayload_ne _ _ hra, get_setPayload_ne _ _ hda,
+    get_setPayload_ne _ _ hia, get_setField_ne _ _ _ (Ne.symm hri), Payload.toVal,
+    hr1,
+    f_cachetools___init___py__module__Cache_clear,
+    f_cachetools___init___py__module___DefaultSize_clear]
   -- The only thing known about the filled site is its contract.
-  have hP := hpost (k + 8) (by omega) h
-    [("size", Val.int 1), ("tmp0", Val.ref d), ("key", key), ("self", Val.ref r)]
-  generalize execStmt (ctxOf (τ.onProgram P)) (k + 8) h
-    [("size", Val.int 1), ("tmp0", Val.ref d), ("key", key), ("self", Val.ref r)] s = E at hP ⊢
+  have hP := hpost (k + 25) (by omega)
+    (((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).setPayload i
+      (Payload.list [])) [("tmp0", Val.ref i), ("self", Val.ref r)]
+  have hr3 : ((((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).setPayload i
+      (Payload.list []))).get r = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } := by
+    rw [get_setPayload_ne _ _ hri]; exact hr1
+  generalize execStmt (ctxOf (τ.onProgram P)) (k + 25)
+    (((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).setPayload i
+      (Payload.list [])) [("tmp0", Val.ref i), ("self", Val.ref r)] s = E at hP ⊢
   obtain ⟨h', ctl⟩ := E
   obtain ⟨hframe, hctl⟩ := hP
-  obtain ⟨o', ho', -, hf', -, hpay'⟩ := hframe r o hro
-  have hnc : o'.payload.toVal.isSome = false := by rw [hpay', hpay]; rfl
+  obtain ⟨o', ho', -, hf', -, -⟩ := hframe r _ hr3
+  have hcur' : h'.getField r "_Cache__currsize" = .int 0 := by
+    simp [Heap.getField, ho', hf']
   rcases hctl with hn | ⟨v, hx⟩
   · simp only at hn; subst hn
-    left
-    simp [ho', hf', hcur, hdial, hnc]
-    exact getField_setField_self h' r _ _ ho'
+    left; exact ⟨_, rfl, hcur'⟩
   · simp only at hx; subst hx
-    right
-    simp [Heap.getField, ho', hf', hcur]
+    right; exact ⟨_, ⟨v, rfl⟩, hcur'⟩
 
-/-! ### The status quo, and why the contract is needed
+/-! ### The status quo, and why the contract is needed -/
 
-Leaving the site unfilled — or filling it with itself — reaches the hole. So the generated
-program as it stands admits *no* statement of this kind, and the unconstrained contract
-(which permits leaving the hole in place) proves nothing. -/
-
-/-- Any instantiation that leaves this site a hole reaches it, on every `Cache`-shaped
+/-- Any instantiation that leaves this site a hole reaches it, on every admissible
 receiver, at every fuel at or above the bound. -/
-theorem delitem_reaches_hole_of (τ : SImpl)
-    (hfill : fillS (τ.atSite delitemName) (.hole "op:delete-index") = .hole "op:delete-index")
-    (h : Heap) (r d : Ref) (c : Int) (key : Val) (hshape : CacheShape h r d c) (k : Nat) :
-    (runMethodIn (τ.onProgram P) (k + 12) h delitemName (.ref r) [key]).2
-      = .hole "op:delete-index" := by
-  obtain ⟨o, od, hro, hsz, hcur, hcap, hpay, hdo, hdcls, hdcap, hdpay⟩ := hshape
-  have hpop : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "pop"
-      = some f_cachetools___init___py__module___DefaultSize_pop := by
-    rw [resolveMethod_onProgram, resolveMethod_pop]
-    simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_pop, fillS]
+theorem rrclear_reaches_hole_of (τ : SImpl)
+    (hfill : fillS (τ.atSite rrClearName) (.hole "op:delete-slice") = .hole "op:delete-slice")
+    (h : Heap) (r d a i : Ref) (hshape : RRShape h r d a i) (k : Nat) :
+    (runMethodIn (τ.onProgram P) (k + 30) h rrClearName (.ref r) []).2
+      = .hole "op:delete-slice" := by
+  obtain ⟨g, o, od, oa, oi, kvs, vs, hg0, hgC, hro, hdat, hsz, hidx, hcap, hpay, hdo, hdcls,
+    hdcap, hdpay, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
+  have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
+  have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
+  have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
+    rw [classDefines_onProgram]; exact classDefines_cacheclear
+  have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
+      = some f_cachetools___init___py__module__Cache_clear := by
+    rw [resolveMethod_onProgram, resolveMethod_cacheclear]
+    simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
+  have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
+      = some f_cachetools___init___py__module___DefaultSize_clear := by
+    rw [resolveMethod_onProgram, resolveMethod_sizeclear]
+    simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
+  have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
+      = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
+    get_setField_self _ _ _ (by rw [get_setPayload_ne _ _ hra]; exact hro)
   unfold runMethodIn
-  rw [resolve_onProgram, resolve_delitem]
-  simp only [Option.map_some, SImpl.onFunc, f_cachetools___init___py__module__Cache___delitem__,
+  rw [resolve_onProgram, resolve_rrclear]
+  simp only [Option.map_some, SImpl.onFunc, f_cachetools___init___py__module__RRCache_clear,
     fillS]
-  simp only [delitemName, fillS] at hfill
+  simp only [rrClearName, fillS] at hfill
   simp only [hfill]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
-    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap, hpop,
-    hdpay,
-    f_cachetools___init___py__module___DefaultSize_pop]
+    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
+    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcd, hcc, hsc, hdial, hglob,
+    className_Cache, Heap.payload, boxed_clear_dict, boxed_clear_list,
+    get_setPayload_ne _ _ hra, get_setPayload_ne _ _ hda,
+    get_setPayload_ne _ _ hia, get_setField_ne _ _ _ (Ne.symm hri), Payload.toVal,
+    hr1,
+    f_cachetools___init___py__module__Cache_clear,
+    f_cachetools___init___py__module___DefaultSize_clear]
 
-/-- **On the generated program itself**, `Cache.__delitem__` reaches the hole. -/
-theorem delitem_reaches_hole (h : Heap) (r d : Ref) (c : Int) (key : Val)
-    (hshape : CacheShape h r d c) (k : Nat) :
-    (runMethodIn P (k + 12) h delitemName (.ref r) [key]).2 = .hole "op:delete-index" := by
-  have := delitem_reaches_hole_of [] (by simp [fillS, SImpl.atSite]) h r d c key hshape k
+/-- **On the generated program itself**, `RRCache.clear` reaches the hole. -/
+theorem rrclear_reaches_hole (h : Heap) (r d a i : Ref) (hshape : RRShape h r d a i)
+    (k : Nat) :
+    (runMethodIn P (k + 30) h rrClearName (.ref r) []).2 = .hole "op:delete-slice" := by
+  have := rrclear_reaches_hole_of [] (by simp [fillS, SImpl.atSite]) h r d a i hshape k
   simpa using this
 
-/-- The domain is inhabited: a concrete `Cache` with `_DefaultSize` sizes and size 5. -/
-def sampleHeap : Heap :=
-  [ { cls := "Cache", fields := [("_Cache__size", .ref 1), ("_Cache__currsize", .int 5)] }
-  , { cls := "_DefaultSize", fields := [] } ]
+/-- The domain is inhabited: a globals frame binding `Cache`, an `RRCache` of size 3. -/
+def rrHeap : Heap :=
+  [ { cls := "<globals>",
+      fields := [("Cache", .fn "cachetools/__init__.py:<module>.Cache<meta>")] }
+  , { cls := "RRCache", fields := [("_Cache__data", .ref 2), ("_Cache__size", .ref 3),
+                                   ("_RRCache__index", .ref 4), ("_Cache__currsize", .int 3)] }
+  , { cls := "dict", fields := [], payload := .dict [(.int 1, .int 10)] }
+  , { cls := "_DefaultSize", fields := [] }
+  , { cls := "list", fields := [], payload := .list [.int 1] } ]
 
-theorem sample_shape : CacheShape sampleHeap 0 1 5 :=
-  ⟨_, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+theorem rrHeap_shape : RRShape rrHeap 1 3 2 4 :=
+  ⟨_, _, _, _, _, _, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl,
+    rfl, rfl, by decide, by decide, by decide, by decide⟩
 
 /-- The site filled with itself. Legal under `topSContract`, which is the point. -/
-def idImplS : SImpl := [((delitemName, "op:delete-index"), .hole "op:delete-index")]
+def idImplS : SImpl := [((rrClearName, "op:delete-slice"), .hole "op:delete-slice")]
 
-/-- **Assuming nothing proves nothing.** Under the unconstrained contract the property is
-not provable, because leaving the hole in place is one of the implementations it admits. -/
-theorem delitem_not_provable_under_top :
-    ¬ UnderS [topSContract delitemName "op:delete-index"] P DelitemPost := by
+/-- **Assuming nothing proves nothing.** -/
+theorem rrclear_not_provable_under_top :
+    ¬ UnderS [topSContract rrClearName "op:delete-slice"] P RRPost := by
   intro hU
-  have hc : ConsistentS [topSContract delitemName "op:delete-index"] P idImplS := by
+  have hc : ConsistentS [topSContract rrClearName "op:delete-slice"] P idImplS := by
     refine ⟨?_, ?_⟩
     · intro k hk
       simp [idImplS, SImpl.keys] at hk
       simp [SContractEnv.keys, SContract.key, topSContract, hk]
     · intro c hc _ _ _ _ _ _; simp at hc; subst hc; trivial
-  have ht : TotalS [topSContract delitemName "op:delete-index"] idImplS := by
+  have ht : TotalS [topSContract rrClearName "op:delete-slice"] idImplS := by
     intro c hc; simp at hc; subst hc; simp [SContract.key, topSContract, idImplS]
-  have hfill : fillS (idImplS.atSite delitemName) (.hole "op:delete-index")
-      = .hole "op:delete-index" := by
+  have hfill : fillS (idImplS.atSite rrClearName) (.hole "op:delete-slice")
+      = .hole "op:delete-slice" := by
     simp [idImplS, SImpl.atSite, fillS]
-  have hh := delitem_reaches_hole_of idImplS hfill sampleHeap 0 1 5 (.int 7) sample_shape 0
-  rcases hU idImplS hc ht sampleHeap 0 1 5 (.int 7) sample_shape 12 (Nat.le_refl _) with
+  have hh := rrclear_reaches_hole_of idImplS hfill rrHeap 1 3 2 4 rrHeap_shape 0
+  rcases hU idImplS hc ht rrHeap 1 3 2 4 rrHeap_shape 30 (Nat.le_refl _) with
     ⟨h', he, -⟩ | ⟨h', v, he, -⟩
   · rw [he] at hh; cases hh
   · rw [he] at hh; cases hh
 
-/-- With the contract satisfiable, the conditional result is not vacuous: `False` does not
-follow from `Γdel` (`not_underS_false`). -/
-theorem delitem_not_vacuous : ¬ UnderS Γdel P (fun _ => False) :=
-  not_underS_false satisfiable_delContract
+/-- With the contract satisfiable, the conditional result is not vacuous. -/
+theorem rrclear_not_vacuous : ¬ UnderS Γslice P (fun _ => False) :=
+  not_underS_false satisfiable_sliceContract
 
 /-! ### Cross-checks on the whole program
 
-Evidence for a reader, not part of any proof: the full generated program, with the site
-filled by two implementations that meet the contract — `skip` (the deletion succeeded) and
-`raise` (it raised `KeyError`) — on `sampleHeap`. The first prints `val unit` and a
-`_Cache__currsize` of 4; the second an exception and 5. Unfilled, it prints the hole. -/
+Evidence for a reader, not part of any proof. `delitem_refines` on `delHeap`: a present
+key returns `unit` with size 4; an absent one raises `KeyError` with size 5.
+`rrclear_under` with the site filled by `skip` and by `raise`: size 0 either way; unfilled,
+the hole. -/
 
-def skipImpl : SImpl := [((delitemName, "op:delete-index"), .skip)]
-def raiseImpl : SImpl := [((delitemName, "op:delete-index"), .raise (.lit (.str "KeyError")))]
+#eval let (h', r) := runMethodIn P 40 delHeap delitemName (.ref 0) [.int 7]
+      (reprStr r, reprStr (h'.getField 0 "_Cache__currsize"), reprStr (h'.payload 2))
+#eval let (h', r) := runMethodIn P 40 delHeap delitemName (.ref 0) [.int 8]
+      (reprStr r, reprStr (h'.getField 0 "_Cache__currsize"))
 
-#eval let (h', r) := runMethodIn (skipImpl.onProgram P) 40 sampleHeap delitemName (.ref 0) [.int 7]
-      (reprStr r, reprStr (h'.getField 0 "_Cache__currsize"))
-#eval let (h', r) := runMethodIn (raiseImpl.onProgram P) 40 sampleHeap delitemName (.ref 0) [.int 7]
-      (reprStr r, reprStr (h'.getField 0 "_Cache__currsize"))
-#eval reprStr (runMethodIn P 40 sampleHeap delitemName (.ref 0) [.int 7]).2
+def skipImpl : SImpl := [((rrClearName, "op:delete-slice"), .skip)]
+def raiseImpl : SImpl := [((rrClearName, "op:delete-slice"), .raise (.lit (.str "TypeError")))]
+
+#eval let (h', r) := runMethodIn (skipImpl.onProgram P) 60 rrHeap rrClearName (.ref 1) []
+      (reprStr r, reprStr (h'.getField 1 "_Cache__currsize"))
+#eval let (h', r) := runMethodIn (raiseImpl.onProgram P) 60 rrHeap rrClearName (.ref 1) []
+      (reprStr r, reprStr (h'.getField 1 "_Cache__currsize"))
+#eval reprStr (runMethodIn P 60 rrHeap rrClearName (.ref 1) []).2
 
 /-! ### Axiom audit
 
-No hole contract is an axiom: each theorem's assumptions are hypotheses in its statement,
-and the axiom base is Lean's standard three. -/
+No hole contract is an axiom: each theorem's assumptions are hypotheses in its statement. -/
 
-#print axioms delitem_under
-#print axioms delitem_not_provable_under_top
-#print axioms delitem_reaches_hole
-#print axioms underS_of_unsatisfiable
+#print axioms delitem_refines
+#print axioms delitem_unconditional
+#print axioms rrclear_under
+#print axioms rrclear_not_provable_under_top
+#print axioms rrclear_reaches_hole
+#print axioms className_Cache
 
 /-! ### Registry records
 
 What `scripts/emit_contracts.py` writes to `contracts-Cachetools.json`. Each record also
 names the `program` it is about and the `function`, so the assurance case can count
 *conditionally verified* functions of the current module separately from the historical
-`methodkey` slice in `Contracts.lean`. -/
+`methodkey` slice in `Contracts.lean`. `delitem_refines` is unconditional and therefore
+not in this registry: it is an ordinary theorem. -/
 
 /-- Tag a record with its subject. -/
 def withSubject (j : Lean.Json) (program function : String) : Lean.Json :=
@@ -652,9 +857,9 @@ def withSubject (j : Lean.Json) (program function : String) : Lean.Json :=
 
 def holeContractRecords : List Lean.Json :=
   [ withSubject
-      (assumptionsJsonS "Autoform.HoleContracts.Demo.delitem_under" Γdel
-        (some "Autoform.HoleContracts.Demo.satisfiable_delContract"))
-      "Autoform.Generated.Cachetools.program" delitemName ]
+      (assumptionsJsonS "Autoform.HoleContracts.Demo.rrclear_under" Γslice
+        (some "Autoform.HoleContracts.Demo.satisfiable_sliceContract"))
+      "Autoform.Generated.Cachetools.program" rrClearName ]
 
 /-- Every contract-relative record: the expression-hole demonstrations of
 `Contracts.lean` (about the historical slice `keysProgramHoled`, so tagged with that
