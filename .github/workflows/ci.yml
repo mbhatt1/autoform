@@ -25,7 +25,12 @@ jobs:
   build-and-audit:
     name: build + trust audit
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # A cold `lake build` (single core, see below) does not fit in 60 minutes: every run
+    # on main from #3 to #7 was cancelled inside `lake build` at exactly 60:00, and
+    # because `actions/cache` only saves on success the cache never warmed, so every run
+    # started cold again. The build step now has its own limit below this one, and the
+    # cache is saved even when it fails, so partial progress carries to the next run.
+    timeout-minutes: 340
 
     steps:
       - uses: actions/checkout@v4
@@ -69,15 +74,17 @@ jobs:
           python3 cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.lean V8Base
           test -s Autoform/Generated/V8Base.lean
 
-      - name: Cache .lake
-        uses: actions/cache@v4
+      - name: Restore .lake
+        id: lake-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             .lake
           # lean-toolchain and the manifest between them pin every input that
           # affects the build products; the source hash keeps the cache honest.
-          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}
           restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
             lake-${{ runner.os }}-
 
@@ -96,7 +103,24 @@ jobs:
       # clock time for peace under the fixed memory ceiling, verified locally to keep
       # memory well under the cap through the same V8Base phase that previously OOM'd.
       - name: lake build
+        id: build
+        # Below the job limit, so a slow cold build fails this step (not the whole job)
+        # and the save step after it still runs.
+        timeout-minutes: 300
         run: taskset -c 0 lake build
+
+      # Save whatever was built, success or not: Lake is incremental, so the next run
+      # resumes from here instead of from nothing. The key carries the run id because a
+      # cache entry is immutable -- a partial build saved under the plain source key would
+      # be restored forever and never replaced by the finished one. Restore takes the
+      # newest entry for the same sources (then toolchain), via the prefixes above.
+      - name: Save .lake
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}
 
       - uses: actions/setup-python@v5
         with:
