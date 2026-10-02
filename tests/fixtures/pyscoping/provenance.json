@@ -2,16 +2,17 @@
  "_": [
   "How tests/fixtures/pyscoping/ast.json was produced. `tests/test_pyscoping_cpython.py`",
   "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
-  "exporter_sha256 is informational: an exporter change does not invalidate this fixture",
-  "automatically; re-running the command and diffing ast.json is how to find out."
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py: an exporter change invalidates this fixture",
+  "automatically; re-running the command and diffing ast.json is how to find out.",
+  "Re-exported 2026-10-02 at the merged exporter (items Q+R+S): the previous AST predated the exporter's boxContainer wrapping of list literals, which made 2 of 28 pins the hole call:<unpackEx>; the only difference is `listE` -> `boxContainer(listE)` (5 sites)."
  ],
  "source": "tests/fixtures/pyscoping/pyscoping_cases.py",
  "source_sha256": "4f0d9aaa5f6ca3dadf01e860c1e5cfa0da7ee28d1f02ec5002494e094c9e24cc",
- "ast_sha256": "c5308b32b7178a91b702d7ab0071b5780915de3b72321c538611be4c8982da54",
+ "ast_sha256": "174203bcf6497976ce41e7b4cb6964ce8bb06868a0cc53868b6f99a0fb8fe403",
  "joern_version": "4.0.606",
  "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "d67aea125ff0e7791949926b47823734053087736130b6988a86b75eef52e186",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
  "command": [
   "joern-parse tests/fixtures/pyscoping --language pythonsrc --output pyscoping.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=pyscoping.cpg --param out=tests/fixtures/pyscoping/ast.json",

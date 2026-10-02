@@ -91,7 +91,7 @@ def f_pyscoping_cases_py__module__dflt_mutable : Func :=
   { name := "pyscoping_cases.py:<module>.dflt_mutable"
   , params := ["x", "acc"]
   , defaults := [("acc", (.hole "param:default-nonliteral"))]
-  , body := (.ret (.binop "+" (.name "acc") (.listE [(.name "x")]))) }
+  , body := (.ret (.binop "+" (.name "acc") (.boxContainer (.listE [(.name "x")])))) }
 
 /-- `pyscoping_cases.py:<module>.case_mutable_default_supplied`  (from `pyscoping_cases.py`) -/
 def f_pyscoping_cases_py__module__case_mutable_default_supplied : Func :=
@@ -101,7 +101,7 @@ def f_pyscoping_cases_py__module__case_mutable_default_supplied : Func :=
             (.ret
               (.call
                 "pyscoping_cases.py:<module>.dflt_mutable"
-                [(.lit (.int 1)), (.listE [(.lit (.int 0))])]))
+                [(.lit (.int 1)), (.boxContainer (.listE [(.lit (.int 0))]))]))
             .skip) }
 
 /-- `pyscoping_cases.py:<module>.case_mutable_default_needed`  (from `pyscoping_cases.py`) -/
@@ -471,7 +471,7 @@ def f_pyscoping_cases_py__module__case_nonlocal_in_a_loop : Func :=
             (.ret
               (.call
                 "pyscoping_cases.py:<module>.loop_total"
-                [(.listE [(.lit (.int 1)), (.lit (.int 2)), (.lit (.int 3))])]))
+                [(.boxContainer (.listE [(.lit (.int 1)), (.lit (.int 2)), (.lit (.int 3))]))]))
             .skip) }
 
 /-- `pyscoping_cases.py:<module>.star_tail`  (from `pyscoping_cases.py`) -/
@@ -532,7 +532,10 @@ def f_pyscoping_cases_py__module__case_star_tail_empty : Func :=
   { name := "pyscoping_cases.py:<module>.case_star_tail_empty"
   , params := []
   , body := (.seq
-            (.ret (.call "pyscoping_cases.py:<module>.star_tail" [(.listE [(.lit (.int 1))])]))
+            (.ret
+              (.call
+                "pyscoping_cases.py:<module>.star_tail"
+                [(.boxContainer (.listE [(.lit (.int 1))]))]))
             .skip) }
 
 /-- `pyscoping_cases.py:<module>.case_star_middle_of_str`  (from `pyscoping_cases.py`) -/
@@ -546,7 +549,10 @@ def f_pyscoping_cases_py__module__case_star_too_short : Func :=
   { name := "pyscoping_cases.py:<module>.case_star_too_short"
   , params := []
   , body := (.seq
-            (.ret (.call "pyscoping_cases.py:<module>.star_mid" [(.listE [(.lit (.int 1))])]))
+            (.ret
+              (.call
+                "pyscoping_cases.py:<module>.star_mid"
+                [(.boxContainer (.listE [(.lit (.int 1))]))]))
             .skip) }
 
 /-- `pyscoping_cases.py:<module>.case_star_head_of_str`  (from `pyscoping_cases.py`) -/

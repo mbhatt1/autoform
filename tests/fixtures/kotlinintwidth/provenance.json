@@ -2,7 +2,7 @@
  "_": [
   "How tests/fixtures/kotlinintwidth/ast.json was produced. `tests/test_kotlinintwidth_kotlin.py`",
   "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
-  "exporter_sha256 is informational.",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py.",
   "/opt/joern ships only c2cpg. kotlin2cpg 4.0.606 was assembled from Maven Central",
   "(io.joern:kotlin2cpg_3:4.0.606, runtime scope, org.gradle:gradle-tooling-api excluded) and run",
   "with the jars /opt/joern-mvn/lib lacks on that classpath.",
@@ -21,7 +21,7 @@
  "joern_version": "4.0.606",
  "frontend": "kotlin2cpg 4.0.606 (io.joern.kotlin2cpg.Main), default options",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "7b620d25a8aa06c629c5cf62db302b302320d37b2d3645d343b674d9d2bb637e",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
  "command": [
   "java -cp '/opt/joern-mvn/lib/*:<the kotlin2cpg_3 runtime jars>/*' io.joern.kotlin2cpg.Main <a directory holding only cases.kt> --output cpg.bin",
   "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/kotlinintwidth/ast.json",

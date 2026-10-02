@@ -2,7 +2,7 @@
  "_": [
   "How tests/fixtures/pyarith/ast.json was produced. `tests/test_pyarith_cpython.py`",
   "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
-  "exporter_sha256 is informational: an exporter change does not invalidate this fixture",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py: an exporter change invalidates this fixture",
   "automatically; re-running the command and diffing ast.json is how to find out."
  ],
  "source": "tests/fixtures/pyarith/pyarith_cases.py",
@@ -11,7 +11,7 @@
  "joern_version": "4.0.606",
  "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "2953ce6ce343d2e3eed6dd09dcaedc6f962bd03adbe5d1c34c8b6e90f7cd357c",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
  "command": [
   "joern-parse tests/fixtures/pyarith --language pythonsrc --output pyarith.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=pyarith.cpg --param out=tests/fixtures/pyarith/ast.json",

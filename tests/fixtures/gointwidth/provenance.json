@@ -2,7 +2,7 @@
  "_": [
   "How tests/fixtures/gointwidth/ast.json was produced. `tests/test_gointwidth_go.py`",
   "checks source_sha256 and ast_sha256, so editing the fixture without re-exporting fails.",
-  "exporter_sha256 is informational.",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py.",
   "/opt/joern ships only c2cpg. gosrc2cpg 4.0.606 was assembled from Maven Central",
   "(io.joern:gosrc2cpg_3:4.0.606, runtime scope, org.gradle:gradle-tooling-api excluded) and run",
   "with the jars /opt/joern-mvn/lib lacks on that classpath. gosrc2cpg shells out to `goastgen`:",
@@ -20,7 +20,7 @@
  "joern_version": "4.0.606",
  "frontend": "gosrc2cpg 4.0.606 (io.joern.gosrc2cpg.Main) with goastgen v0.1.0, default options",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "7b620d25a8aa06c629c5cf62db302b302320d37b2d3645d343b674d9d2bb637e",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
  "command": [
   "java -cp '/opt/joern-mvn/lib/*:<the gosrc2cpg_3 runtime jars>/*' io.joern.gosrc2cpg.Main <a directory holding only cases.go and go.mod> --output cpg.bin",
   "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/gointwidth/ast.json",

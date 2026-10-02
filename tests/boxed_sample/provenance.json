@@ -2,7 +2,7 @@
  "_": [
   "How tests/boxed_sample/ast-BoxedSample.json was produced. `tests/test_boxed_containers.py`",
   "checks source_sha256 and ast_sha256, so editing boxed.py without re-exporting fails.",
-  "exporter_sha256 is informational: an exporter change does not invalidate this fixture",
+  "exporter_sha256 is checked by tests/test_fixture_exporter_fresh.py: an exporter change invalidates this fixture",
   "automatically; re-running the command and diffing the AST is how to find out.",
   "Re-exported 2026-10-02 (item P): the previous AST predated the Python class table",
   "(STRATEGY.md section 62); the only difference was `\"pyClasses\": {}` on the module",
@@ -14,7 +14,7 @@
  "joern_version": "4.0.606",
  "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "c024b0ea6d062f7990871baa128f00324b265d31a3c3c458c52809edc51f62c7",
+ "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
  "command": [
   "joern-parse tests/boxed_sample --language pythonsrc --output boxed.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=boxed.cpg --param out=tests/boxed_sample/ast-BoxedSample.json"

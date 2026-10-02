@@ -216,13 +216,16 @@
      "v": "acc"
     },
     "b": {
-     "k": "listE",
-     "items": [
-      {
-       "k": "name",
-       "v": "x"
-      }
-     ]
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "name",
+        "v": "x"
+       }
+      ]
+     }
     }
    }
   },
@@ -253,13 +256,16 @@
        "v": "1"
       },
       {
-       "k": "listE",
-       "items": [
-        {
-         "k": "int",
-         "v": "0"
-        }
-       ]
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "int",
+          "v": "0"
+         }
+        ]
+       }
       }
      ]
     }
@@ -1840,21 +1846,24 @@
      "f": "pyscoping_cases.py:<module>.loop_total",
      "args": [
       {
-       "k": "listE",
-       "items": [
-        {
-         "k": "int",
-         "v": "1"
-        },
-        {
-         "k": "int",
-         "v": "2"
-        },
-        {
-         "k": "int",
-         "v": "3"
-        }
-       ]
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "int",
+          "v": "1"
+         },
+         {
+          "k": "int",
+          "v": "2"
+         },
+         {
+          "k": "int",
+          "v": "3"
+         }
+        ]
+       }
       }
      ]
     }
@@ -2248,13 +2257,16 @@
      "f": "pyscoping_cases.py:<module>.star_tail",
      "args": [
       {
-       "k": "listE",
-       "items": [
-        {
-         "k": "int",
-         "v": "1"
-        }
-       ]
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "int",
+          "v": "1"
+         }
+        ]
+       }
       }
      ]
     }
@@ -2301,13 +2313,16 @@
      "f": "pyscoping_cases.py:<module>.star_mid",
      "args": [
       {
-       "k": "listE",
-       "items": [
-        {
-         "k": "int",
-         "v": "1"
-        }
-       ]
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "int",
+          "v": "1"
+         }
+        ]
+       }
       }
      ]
     }
