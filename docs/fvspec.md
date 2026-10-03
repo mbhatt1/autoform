@@ -58,6 +58,17 @@ into the project tree.
 
 ## Measured result (full 9,415-row run)
 
+**Verification status.** The harness's structure was checked against `scripts/fvspec.py` at
+HEAD 9639df0: the seven checks, the flags (`--path --limit --out --cache --canonical-only
+--per-theorem --quiet`), and the acquisition order (`--path`, then the GitHub clone, then the
+Hugging Face file) are as described, and a three-theorem synthetic input produced the
+documented `dependency_vacuity` / `trivial_conclusion` / `reflexive_conclusion` flags and the
+`not_checked` list. The *numbers* below come from the one full run (recorded in STRATEGY.md
+§15, which quotes the same figures: not independent evidence). They were NOT re-derived for
+this revision: the dataset is not reachable from the review sandbox (the Hugging Face request
+returned 403), the run time and JSON size are unmeasured here, and no test in `tests/`
+exercises `fvspec.py`. Treat them as a dated measurement, not a current one.
+
 | | |
 |---|---|
 | problems read / analyzed | 9,415 / 9,352 (63 had no recognizable theorem) |

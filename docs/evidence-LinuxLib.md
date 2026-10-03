@@ -1,13 +1,22 @@
 # Evidence for `LinuxLib` (Linux `lib/`, C, 3368 functions)
 
-> **Staleness notice added during the merge (STRATEGY.md §40).** The figures in this
-> document were produced against the `Autoform/Generated/<M>.lean` that was committed at
-> the time. That module has since been re-rendered: every large corpus's committed render
-> was behind its neutral AST, and all five were regenerated and re-pinned in
-> `artifact-manifest.json`. The counts below therefore describe the *previous* render.
-> `core_oracle.py`'s own body-staleness gate is what makes this visible rather than
-> silent; re-running it against the current module is the way to refresh these numbers,
-> and until that is done they should be read as a dated measurement, not as today's.
+> **DATED SNAPSHOT, produced 2026-08-20. Not current. Status re-checked 2026-10-02 (tree `9639df0`).**
+>
+> * **Internal consistency, verified:** the ledger and oracle figures below match the tracked
+>   `evidence-LinuxLib.json` and `core-oracle-LinuxLib.json` (3,368 functions, 1,168 hole-free, 843
+>   core, 6,744 cases, 466 / 377, 2,980 runtime hole events).
+> * **Not re-derivable from a clone:** `ast-LinuxLib.json` is in no clone; `scripts/check_render.py`
+>   reports `LinuxLib` as `NOT-TRACKED` by reviewed policy (never counted as verified). The oracle
+>   JSON records an author-local AST path. Wall-clock figures (5 s ledger) cannot be re-checked.
+>   `SpecsGen/LinuxLib` is pinned to `LinuxLibSample`, a 7-function tracked subset, not to this
+>   corpus.
+> * **Produced by an older pipeline:** before typed integer operators, the C address model and the
+>   other exporter changes of STRATEGY.md §59-66. Every count below would move; none has been
+>   re-measured, so the 1.81x overstatement is a 2026-08-20 figure.
+> * **Superseded statements** are marked "(as of 2026-08-20)" below.
+>
+> The original staleness notice (STRATEGY.md §40) said the module had since been re-rendered; the
+> counts describe the previous render and should be read as a dated measurement.
 
 
 First coverage/hole accounting for one of the five large corpora. Produced 2026-08-20
@@ -37,9 +46,10 @@ Top hole causes: `op:addressOf:local:unknown-type` 2782, `op:addressOf:field:unk
 `op:arrayInitializer` 289 — 409 distinct labels in all. C's holes are dominated by
 address-of / pointer indirection, i.e. by the memory model, not by exotic syntax.
 
-**Cost note.** The ledger is quadratic (`Ctx.resolve` is O(n)) but on 3368 C functions it
+**Cost note.** The ledger was quadratic (`Ctx.resolve` is O(n)) but on 3368 C functions it
 ran in **5 seconds** wall clock, not the 363 s seen on Django's 10k. No sampling or
-truncation was needed.
+truncation was needed. (As of 2026-08-20; the ledger's call-closure now goes through
+`ResolveIndex`, `docs/scale.md`.)
 
 ## 2. Assurance case (`sacm-LinuxLib.json`)
 
@@ -47,7 +57,7 @@ Top goal **G1 = UNDEVELOPED**. Nothing was tuned to make a goal green.
 
 | goal | status | why |
 |---|---|---|
-| G2 agreement with the real runtime | UNDEVELOPED | `conformance.json` absent — no differential run exists for this module, and none can be produced the usual way: the corpus is kernel C with no in-process oracle. |
+| G2 agreement with the real runtime | UNDEVELOPED | `conformance.json` absent — no differential run existed for this module (as of 2026-08-20), and none can be produced the usual way: the corpus is kernel C with no in-process oracle. A C leg against `cc` exists now and has been run on a SQLite sample (`docs/scale.md`); it has not been run on LinuxLib. |
 | G3 every function translated hole-free | UNSUPPORTED | 2200/3368 functions carry ≥1 hole; 10106 hole occurrences over 409 causes. |
 | G3.1 the 843-function core is statically hole-free and call-closed | SUPPORTED | ledger evidence (STATIC — an upper bound by construction). |
 | G3.2 the core is hole-free **at runtime** | **DEFEATED** | settled by execution, not estimated: 466 of 843 never holed; **377 did**. |
@@ -83,7 +93,7 @@ no choice of argument shape avoids.
 
 Runtime hole labels (events): `op:addressOf:local:scalar` 752, `op:indirection:pointer`
 568, `op:arrayInitializer` 120, `binop:+` 80, `call:va_start` 56, `field:parent:non-object`
-52 … 2980 hole events total across 11 label families.
+52 … 2980 hole events total across 114 distinct labels (`core-oracle-LinuxLib.json`).
 
 **Denominator disclosure.** Every input was synthetic. Linux `lib/` has no test suite this
 harness can trace (the tracer records Python call arguments), so

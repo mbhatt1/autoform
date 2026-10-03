@@ -7,13 +7,15 @@ interpreter written in Lean. See `STRATEGY.md` for the design and the build/buy 
 and every property is a theorem about `eval` applied to it.
 
 **Generalization:** Joern's code property graph is a universal AST. C, C++, Java,
-JavaScript, Python, Kotlin and binaries normalize to one node vocabulary, so one semantics
-and one exporter cover all of them. There is no per-language transpiler. How far that
-holds is measured per language in `docs/languages.md`: Python is checked against CPython,
-and C against `cc` only on integer-argument functions (the harness crashed on `sds`'s
-`char *` API); Java, Go, JS and TS translate but have no runtime oracle beyond
-integer-width fixtures (§63, §66), real Kotlin cannot be exported (Joern's dataflow overlay
-crashes on it), and binaries were not tested.
+JavaScript, TypeScript, Go, Python, Kotlin and binaries normalize to one node vocabulary,
+so one semantics and one exporter cover all of them. There is no per-language transpiler.
+How far that holds is measured per language in `docs/languages.md`. Python is checked
+against CPython (the corpus's own test suite, plus fixtures); C against `cc` (fixtures, and
+a 9-function SQLite sample limited to integer-argument functions: the harness crashed on
+`sds`'s `char *` API); JavaScript against Node (a 55-case fixture, §65); and integer
+arithmetic for Java, Go and Kotlin against the real runtimes (§63, §66). There is no
+whole-corpus oracle for Java, Go, TypeScript or JavaScript; real Kotlin projects cannot be
+exported (Joern's dataflow overlay crashes on them), and binaries were not tested.
 
 ## Use
 
@@ -182,10 +184,15 @@ not match the runtime — caught automatically rather than by inspection.
 | `Autoform/Lang/Core/Syntax.lean` | 3 | Universal deep embedding: objects, heap, exceptions, containers, iteration. `Expr.hole`/`Stmt.hole` are the effect boundary. |
 | `Autoform/Lang/Core/Semantics.lean` | 2 | Fuel-indexed total interpreter with an explicit heap, method dispatch, exceptions. Dialect-parameterized. No `sorry`, no `partial`. |
 | `Autoform/Lang/Core/Float.lean` | 2 | IEEE-754 binary32/binary64 as explicit bit patterns (`Fl`), exact-rational rounding, Python float semantics. Wired into `Val.float` (see "Not yet built" for what still holes). |
+| `Autoform/Lang/Core/TypedInt.lean` | 2 | Width-typed integer operators. The exporter names the operand type inside the operator (`"*:i64"`, `"+:j64"`, Go `"*:g64"`, Kotlin `"*:k64"`); Core converts the operands to that type and runs the operation at that width under the language's own overflow, shift and division rules. An unresolved type is the hole `op:int:unresolved-type` (§63, §66). |
+| `Autoform/Lang/Core/Address.lean` | 2 | C address model: block plus offset. Pointer comparison, `&p[i]` and pointer arithmetic within one array are answered from the heap; undefined or unspecified cases are holes (§60). |
+| `Autoform/Lang/Core/Boxed.lean` | 2 | Python lists and dicts as heap objects, so `e[i] = v`, `del e[i]` and `append`/`pop` are seen through every alias. See `docs/boxed-containers.md`. |
 | `Autoform/Contracts.lean` | 5 | Contracts at holes: `RefinesUnder`, refinement relative to stated assumptions about named holes. See `docs/contracts.md`. |
+| `Autoform/HoleContracts.lean` | 5 | Contracts at *statement* holes, with worked examples on real cachetools code (`delitem_refines`, `rrclear_under`). |
 | `Autoform/Ledger.lean` | 6 | Coverage, holes-by-cause, verifiable core; JSON evidence for the assurance case. |
 | `Autoform/Tactics/Portfolio.lean` | 5 | Tiered proof portfolio; records open obligations instead of admitting them. |
-| `scripts/audit_all.py` | 6 | Axiom sweep over every declaration + source sweep for escape hatches. |
+| `scripts/audit_all.py` | 6 | Axiom sweep over every declaration, source sweep for escape hatches, and the independent kernel replay (`leanchecker --fresh`). `--skip-kernel` reports the replay as DELEGATED (never a pass); `--kernel-only` runs just the replay, which CI does as its own job because it takes hours. |
+| `scripts/provenance.py`, `check_provenance.py`, `check_render.py`, `check_specs_fresh.py` | 6 | Which committed artifacts were produced by what: every tracked AST is attributed (tool, version, source revision, exact command, exporter digest) or named in `provenance/unattributed.json`; committed Lean modules are renders of committed ASTs; specs describe the corpus in the tree. |
 | `scripts/mutate.py` | 4 | Source-level mutation gate — the *sufficient* anti-vacuity test. |
 | `scripts/sacm.py` | 6 | SACM assurance case + in-toto attestation. |
 | `scripts/fvspec.py` | 4 | Vacuity screen over the FVSpec benchmark. |
@@ -196,6 +203,7 @@ not match the runtime — caught automatically rather than by inspection.
 | `cartographer/export_ast.sc` | 3 | CPG → neutral AST. Deterministic; no LLM on this path. |
 | `cartographer/render_lean.py` | 3 | Neutral AST → Lean. Infers dialect from file extension. |
 | `scripts/differential.py` | 2 | Conformance oracle vs CPython / `cc`. |
+| `tests/test_*_{cpython,node,cc,java,go,kotlin}.py`, `tests/fixtures/*` | 2 | Fixtures pinned against the real runtime: each exported by the current exporter (the fixture's `exporter_sha256` is checked, `tests/test_fixture_exporter_fresh.py`), rendered to Lean, evaluated by Core, and compared with CPython, Node, `cc`, `java`, `go` or the Kotlin compiler. |
 | `Demo.lean` | — | Refutation gate, axiom audit, vacuity detection, ledger. |
 
 ## Design commitments
@@ -267,9 +275,9 @@ population (see `docs/languages.md`) and have not been re-run against it.
 | link | oracle | status |
 |---|---|---|
 | semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **42 of 209** `cachetools` functions compared, **220/220 cases agree, 0 divergences** since the re-export with the class table and builtin exception classes resolving through `builtins` (STRATEGY.md §62); before it, 48 compared and 12 divergences, all root-caused to Core's name-suffix resolution and now named holes, not exclusions ([docs/conformance.md](docs/conformance.md)) |
-| specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
-| proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
-| `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
+| specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed. **Not re-run since the two `mutate.py` attribution fixes** (see Findings): treat it as unverified for the current tree. The attributable re-run covers `Autoform/Lang/Imp/*` only (24/27 and 7/9 killed) |
+| proofs depend on no unsound axiom | axiom sweep over every declaration (`audit_all.py --skip-kernel`, 2026-10-02) | clean: 7,974 declarations, using only `propext` (2,609), `Quot.sound` (1,495) and `Classical.choice` (1,422); no `axiom` of our own; no `sorryAx`/`ofReduceBool`/`ofReduceNat`; no escape hatch under `Autoform/Lang/Core` |
+| `.olean`s match a kernel replay | `leanchecker --fresh` | **not observed on the current tree.** It passed when the import graph was small (about 1.5 minutes). With the 73 V8Base spec parts in the graph it takes hours: about 2.5-3 h single-threaded, *extrapolated* from five timed pieces (core 396 s, `V8Base.Base` 291 s, `Part1` 283 s, `Part33` 574 s, `Part60` 774 s), because both attempts at a full run were lost (one to the audit's own old 60-minute timeout, one to a container restart). CI therefore runs it as its own job, `kernel-replay`; see Continuous integration |
 | untranslated code is declared | hole counting + SACM assumptions | 46 holes, all named |
 
 The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
@@ -290,7 +298,7 @@ run's score as the other's.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
-It was wrong to say 100%, because the denominator is small. Only 41 of 209 `cachetools`
+It was wrong to say 100%, because the denominator is small. Only 42 of 209 `cachetools`
 functions are compared (60 before the item-L re-export of `ast-Cachetools.json`, whose
 honest parameter defaults hole 12 previously compared functions; 48 before the item-M
 re-export with the class table, which turned the 12 remaining divergences and 10 legacy
@@ -355,9 +363,9 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   `.javascript`), unary `-`, truthiness and `==` (NaN ≠ NaN, `-0.0 == 0.0`). Still holes:
   float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), casts to a floating
   type in C (`op:cast:float`), and `float()`/`str()`/`repr()` conversions (the Python
-  stdlib model has no float builtins). One known gap that is *not* a hole: float `%` uses Python's floored remainder under
-  `.cLike` as well as `.python`, so Java's `-5.5 % 2.0` (`-1.5`) is mis-modelled
-  (`.javascript` uses the truncated remainder and matches Node). Python `/` on two ints is
+  stdlib model has no float builtins). Float `%` is the truncated remainder (`fmod`) under `.cLike` and `.javascript`
+  (`-5.5 % 2.0` is `-1.5`, as in C, Java and Node) and the floored one only under `.python`.
+  Python `/` on two ints is
   true division (a correctly rounded float when both operands are at most 2^53 in magnitude,
   the hole `binop:/:int-true-division-beyond-2^53` beyond that, `ZeroDivisionError` for a zero
   divisor), `//` is its own operator, and `bool` is an `int` under `.python` (`True == 1`,
@@ -370,8 +378,50 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   conditional count and a worked example (`docs/contracts.md`); every hole contract is
   still hand-written.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs four jobs.
+
+- **`pytest (Python tooling)`**: the whole `tests/` suite and `check_provenance`. No Lean, no
+  Joern. Minutes.
+- **`build + trust audit`**: the build, in stages, then the axiom and source audit
+  (`audit_all.py --strict --skip-kernel`), `check_render`, `check_specs_fresh`, the cachetools
+  conformance oracle (must compare more than zero functions), a regenerated ledger and
+  `check_docs`, three guard checks (the FuelMono exclusion list is exactly
+  `["Stmt.tryFinally"]`; the proof-inventory floors do not shrink; the cachetools spec still
+  records the refutation, not the premise), and the demo. The build is staged because a single
+  `lake build` ran several V8Base parts at once, and one heavy part alone peaks at 6.6-8.7 GB
+  (measured), so the runner ran out of memory and was shut down partway through (runs 115 and
+  117, exit 143, no Lean error): stage 1 builds everything except the 73 V8Base parts; stages
+  2-6 build them one at a time (`scripts/ci_build_v8base_parts.sh FROM TO`); a final default
+  `lake build` checks completeness. Each stage is followed by its own `.lake` cache save that
+  runs even when the stage fails, so a runner loss costs at most one stage. The job limit is
+  340 minutes. A cold build is slow: in the first run to get past 60 minutes, 472 of 497
+  modules were built after 108 minutes.
+- **`kernel-replay`**: `audit_all.py --kernel-only --strict`, the independent kernel replay,
+  single-threaded and measured in hours. It needs the build job, restores the `.lake` that
+  job saved, and fails fast on a cache miss instead of becoming a second build.
+  `tests/test_ci_kernel_replay.py` fails if this job, or the build job's `--skip-kernel`,
+  is removed.
+- **`end-to-end pipeline (Joern, manual only)`**: not part of the gate.
+
+**Status (2026-10-02):** `pytest` and `check_provenance` pass on `main`. The staged build
+has not yet run on a real runner, and neither have the build job's later steps or the
+`kernel-replay` job: the single-`lake build` layout that preceded it was ended by the
+runner's memory limit in every run that got far enough (see STRATEGY.md section 67).
+Three corpora (Ansible, LinuxCrypto, LinuxLib) have no committed AST by policy, and
+`check_render` reports them as *not checked* (never as verified).
+
 ## Dependencies
 
 Lean 4.30.0-rc1 (pinned in `lean-toolchain`; includes `leanchecker`) · [Specimen](https://github.com/strata-org/specimen) ·
 [Plausible](https://github.com/leanprover-community/plausible) ·
 [Joern](https://github.com/joernio/joern) 4.0.606 · Python 3 · a C compiler (for C conformance)
+
+Used by the oracle tests: `cc` (the C fixtures need a C compiler), and, optional, `java`,
+`node`, `go` (1.24 was used) and a Kotlin compiler (`kotlinc` on `PATH`, or
+`AUTOFORM_KOTLIN_JARS`): the Java, Node, Go and Kotlin tests skip when their runtime is
+absent. `differential.py` on cachetools needs Python 3.11. Exporting
+JavaScript, TypeScript, Go and Kotlin needs the matching Joern frontends
+(`jssrc2cpg`, `gosrc2cpg`, `kotlin2cpg` 4.0.606), which are not part of the base Joern
+install; `docs/running.md` and the provenance records give the exact commands.

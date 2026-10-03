@@ -4159,3 +4159,107 @@ width) and not for `/ % >>` of values beyond `int64`. (c) Named integer types fr
 packages (`time.Duration`), Kotlin `typealias`es and `Char` arithmetic are holes. (d)
 Floating-point arithmetic is untouched; the dialect is still `.cLike` for both. (e) Go `int`
 under `ilp32` would be `g32` by construction and was not exercised.
+
+## 67. The CI build could not finish inside its limit, the kernel replay takes hours, and a timed-out replay leaked a process
+
+Recorded 2026-10-02, at the end of the bug-fix round that produced §64-§66. Everything
+below was measured in this session except where it says *extrapolated* or *not observed*.
+
+### The build job never finished, so its cache never warmed
+
+Every `main` run from #3 to #7 (runs 105, 107, 110, 112) and the PR-branch run 109 was
+cancelled inside `lake build` at exactly 60:00. `actions/cache` saves only when the job
+succeeds, so the `.lake` cache was never written and each run started cold again: the
+gate could not pass on any commit, and none of the steps after `lake build` (audit,
+`check_render`, `check_docs`, the guards, the demo) had run in CI for weeks.
+
+The job limit is now 340 minutes (under GitHub's 360), the build step has its own 300, and
+the cache is restored and saved as two steps, the save running `if: always()` under a key
+that ends in the run id (a cache entry is immutable, so a partial build saved under the
+plain source key would be restored forever and never replaced by the finished one).
+
+The first run to get past 60 minutes (run 115) showed what a cold build costs on the
+runner: 472 of 497 modules built, **no Lean error**, the heavy V8Base parts at about 1,000 s
+each, 108 minutes in, and then `The runner has received a shutdown signal` (exit 143).
+The cache-save step was skipped. That is an infrastructure event, not a verdict on the
+code, but it exposes the remaining weakness: a cache written only at the end of a
+two-hour step is lost to any runner loss. Staged saves (core first, then V8Base in
+batches) would fix it and were **not done**.
+
+### One heavy V8Base part peaks at 6.6-8.7 GB, and several at once do not fit in 15 GB
+
+Verifying the final tree locally: a plain `lake build` runs four heavy parts at once. With
+other work on the box, 26 of the 73 parts were killed with exit 137 (OOM); rerunning with
+three parts at a time and nothing else running still killed 18. All 18 built when run one at
+a time, so **73 of 73 elaborate and the default `lake build` (497 jobs) succeeds**. Lake has
+no job-limit flag in 5.0.0.
+
+The peak of a single part, measured by sampling `VmHWM` of one `lean` process building it
+alone (so it includes the mapped `.olean` pages, which are file-backed and reclaimable): `Part60`
+**8.7 GB** in 575 s, `Part33` **6.6 GB** in 325 s. The 3-4 GB figures I first quoted were
+instantaneous samples taken mid-run and were too low. Consequences: building one part at a
+time fits a 16 GB runner and does not fit a 7 GB one, and two at once do not fit 16 GB. The
+repo is public, which should mean the standard 16 GB runner; the CI now prints `nproc`,
+`free -m` and `df -h` in a "Runner resources" step so that is read off a run, not assumed.
+
+### The kernel replay takes hours; the audit's limit killed its wrapper and leaked the checker
+
+`audit_all.py` ran `lake env leanchecker --fresh Autoform` under `subprocess.run(timeout=
+3600)`. Its docstring said about 1.5 minutes, true before the 73 V8Base parts joined the
+graph. At 60 minutes it printed `leanchecker timed out`, but `subprocess.run` kills only its
+direct child (`lake env`); `leanchecker`, lake's child, was found still running, parented to
+init, at 4-6 GB, more than an hour later. The audit now starts the command in its own
+session and kills the group (`run_in_group`), and `tests/test_audit_all.py` reconstructs the
+old behaviour and shows the grandchild surviving it.
+
+Timing the replay in pieces on the final tree (`leanchecker --fresh <module>`, each including
+about 75 s of `lake env` start-up): `Semantics` 396 s, `V8Base.Base` 291 s, `Part1` 283 s,
+`Part33` 574 s, `Part60` 774 s. That is about 5 minutes fixed and 5-13 minutes per heavy
+part, so roughly 2.5-3 hours for the whole graph. **That total is extrapolated**: the two
+full-length attempts were lost, one to the timeout above and one to a container restart,
+and the replay has **not been observed to complete on the current tree**.
+
+So the replay is its own job. `audit_all.py --skip-kernel` reports it as `DELEGATED`, which
+is not a pass and which the verdict line says (`PASS (no trusted-code leak); the kernel
+replay was NOT run here`); `--kernel-only` runs it alone; CI's `kernel-replay` job
+(`needs: build-and-audit`, 340 minutes, `fail-on-cache-miss`) runs it with `--strict`.
+`tests/test_ci_kernel_replay.py` pins both halves, and was checked by mutating `ci.yml`
+both ways (drop the flag; delete the job): each fails a test. Its first real run is the
+one on the merge of PR #8, **not yet observed** when this was written.
+
+### Starred assignment had regressed into a hole when lists became objects
+
+After lists and dicts became heap objects (item G), `a, *b = xs` on a list display held a
+reference that `Stdlib.unpackEx` could not see through, and became the hole
+`call:<unpackEx>`. Item P found 2 of the 28 `pyscoping` pins turning into that hole on
+re-export, and left the fixture unreproduced. `<unpackEx>` is now a viewed and a fresh
+builtin, and `Heap.boxFresh` boxes the `list`/`dict` values inside the tuple it returns, so
+the starred name is bound to a new list object, as in CPython. Four pins then printed
+`<unprintable>`, because `runMain` drops the heap and a boxed list is a `Val.ref`: that was
+the printer, not the semantics. `runMainH` returns the heap, `PyScoping.showVH` reads
+list/dict payloads, and the expected values did not change.
+
+The reason the fixture could rot is that its `exporter_sha256` was documented as
+"informational". `tests/test_fixture_exporter_fresh.py` now checks it, for every fixture.
+
+### Two tools that had never worked
+
+`scripts/core_oracle.py` wrote Lean probes that opened `Autoform.Generated` where `program`
+lives in `Autoform.Generated.<Module>`: `Unknown identifier program.holes.length`, and 46
+once fixed (the ledger's hole count). `scripts/lang_matrix.py` kept a private copy of the
+extension-to-dialect table that still sent `.js`/`.ts` to `cLike`. `tests/test_lang_matrix.py`
+fails on both old versions.
+
+### Verified on the final tree, and what is not
+
+Verified: default `lake build`, 497 jobs, 0 errors; `pytest` 334 passed, 1 skipped (no
+Kotlin compiler on `PATH`), 1 xfailed; `check_provenance` 0 violations; `check_render` 15
+verified, 3 not checked by policy; `check_specs_fresh` 7/7; `check_docs` 10/10; the
+cachetools differential 42 functions compared, 220/220 agree, 0 divergences; the CI guard
+steps (FuelMono exclusions, proof-inventory floors, refutation theorem, `check_specs Basis`,
+demo) run locally; the axiom audit: 7,974 declarations using only `propext`, `Quot.sound`
+and `Classical.choice`, none of our own axioms, no `sorryAx`.
+
+Not verified: the kernel replay (above); the new CI layout on a real runner; the cachetools
+mutation score of 78/88, which predates the two `mutate.py` attribution fixes and was not
+re-run.

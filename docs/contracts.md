@@ -108,7 +108,8 @@ In order. A theorem that fails any of these is not weak evidence, it is no evide
    two-function slice of the translated `cachetools`, using the generated `Func` values
    verbatim. The only thing a slice can change is name resolution, since `Ctx.resolve`
    falls back to a unique-suffix match over the function table. `#eval`s at the end of the
-   demonstration section run the *full* 208-function program and confirm it agrees. That
+   demonstration section run the *full* translated `cachetools` (209 functions today; the
+   `Contracts.lean` comment still says 208) program and confirm it agrees. That
    is evidence, not proof, and it is listed here as a reader obligation rather than
    claimed as one.
 
@@ -122,7 +123,7 @@ def methodkey(self, *args, **kwargs):
 ```
 
 — **used** to translate to a body containing exactly one hole, `op:starredUnpack`, the most
-common hole label in the corpus (36 occurrences on the committed AST). That one node was
+common hole label in the corpus (36 occurrences in the AST of that time; the label no longer occurs in `ast-Cachetools.json`). That one node was
 the entire reason the function was outside the verifiable core.
 
 It no longer is. STRATEGY.md §35 added the calling convention, so `methodkey` is hole-free
@@ -276,10 +277,16 @@ whereas real `cachetools` reaches `_DefaultSize` through a class attribute the t
 does not model; and both require the receiver and the size table to be ordinary objects
 (`payload = .none`), because the semantics dispatches on payload.
 
-**Next candidates.** `op:delete-slice` in `TLRUCache.clear` is the same shape behind a
-timer context manager; `control:TRY-multiCatch` in `_DescriptorBase.__get__` is the other
-surviving statement hole; for an expression-hole example via `Contracts.lean`,
-`call:computed-callee` in the six `cachetools/func.py` decorators. The 30
+**Next candidates.** The statement holes left in the current ledger
+(`ledger-Cachetools.json`, `holeAssumptions`) are: `op:delete-slice` in `RRCache.clear`
+(done above) and `TLRUCache.clear` (the same shape behind a timer context manager),
+`gen:generator`/`gen:yield` in `TTLCache.__iter__` and `TLRUCache.__iter__` (a generator
+needs suspension in Core, so a footprint contract would have to describe an iterator rather
+than a completion), and `control:TRY-multiCatch` in `_DescriptorBase.__get__` (the one statement
+hole the ledger does not count as conditionally verifiable). The expression holes are
+`call:computed-callee` (six: `_cache.decorator` and the five `cachetools/func.py`
+decorators), `expr:genExp` (two, in `typedkey`) and `op:stringExpressionList` (one, in
+`_DescriptorBase.__set_name__`), a candidate set for `Contracts.lean`. The 30
 `param:default-nonliteral` holes sit in parameter *defaults*, which neither substitution
 fills yet — a contract for them would have to be stated on `Func.defaults`.
 
@@ -372,7 +379,8 @@ What `scripts/sacm.py` should do with it:
 3. Record `fuelBound`, so the assumed cost of the untranslated construct appears in the
    case rather than only in the Lean source.
 
-> **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
+> **Figures for `cachetools` are regenerated, not typed** (the figures below are for
+> cachetools v7.1.7 at `01af8e5`, as of the exporter at this commit). The authoritative source is
 > `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
 > fails on a mismatch. Current: 209 functions, 168 hole-free, 98 call-closed, 46 holes,
 > 32 conditionally verifiable.

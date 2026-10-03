@@ -10,9 +10,16 @@ tagged `origin: test-suite | random | constructed`.
 
 This is the "drive the harness from the repository's own test suite" item from
 STRATEGY.md §3/§13. It has been the harness's primary input source since STRATEGY.md §19.
-This document describes the recorder as it stands after a round of fixes to it. The
-measurements below are from that round, and so are the findings, which are about the
-exporter and Core.
+
+**Current figures** (cachetools `01af8e5`, `ast-Cachetools.json` on the final tree, command
+below, re-run 2026-10-02): **42 functions compared, 220/220 cases agree, 0 divergences, 364
+INCONCLUSIVE.** The section "Measurement" gives the full breakdown. Everything labelled
+"history" further down (the 48-versus-60 table, the 14 divergences, the 12 divergences, the
+41-function table) describes an intermediate state of the exporter or of Core, and has been
+superseded; it is kept because the findings were made there. The recorder section describes the
+recorder after a round of fixes to it. This page covers the Python leg; the C, Java, Go,
+JavaScript and Kotlin legs and their fixtures are in `docs/running.md` §1 and `docs/scale.md`
+(SQLite).
 
 ## Running it
 
@@ -24,9 +31,13 @@ python3.11 scripts/differential.py ast-Cachetools.json ~/src/cachetools Cachetoo
 ```
 
 Run it from a scratch directory, because it writes `conformance.json` to the current
-directory. A run takes about 15 minutes on a loaded 4-core box. Tracing the suite takes
-under 10 seconds; almost all of the time is the Lean interpreter evaluating the cases in
-chunks of 20.
+directory. The script runs `lake build Autoform.Generated.Cachetools` itself (a stale `.olean`
+answers with the previous semantics), so it needs a built `.lake`. The 2026-10-02 run took
+about 8 minutes on a 4-core box (earlier, loaded runs took about 15). Almost all of the time
+is the Lean interpreter evaluating the cases in chunks of 20; tracing the suite is quick. The
+script re-executes itself with `PYTHONHASHSEED=0` unless `AUTOFORM_NO_REEXEC` is set, and it
+accepts either the repository root or its `src/` directory (it reported `source root
+corrected` for the root and found 5/5 AST paths under `src/`).
 
 **Python version.** cachetools at `01af8e5` declares `requires-python >= 3.10`. On the
 measurement box `python3` is 3.11.15, and that is the only interpreter there with
@@ -34,7 +45,7 @@ measurement box `python3` is 3.11.15, and that is the only interpreter there wit
 the suite passes: 312 tests, rc 0, both standalone and under the tracer. The harness
 prints a `WARNING` and records `test_runs[].rc` whenever the suite does not pass under
 tracing, because a failing suite only yields the calls made before each failure.
-`exit_kind` was checked on CPython 3.10–3.13.
+`exit_kind` was checked on CPython 3.10–3.13. (Recorded when the recorder was written; not re-run for this edit. The 312-test and rc 0 claims were re-run on 2026-10-02 under 3.11.15 with `PYTHONPATH=src`.)
 
 ## What a recorded case is, and how it can be wrong
 
@@ -73,11 +84,47 @@ Three things remain refused, each with a counted reason:
 
 ## Measurement
 
-The same AST, the same corpus commit (`01af8e5`), the same Python (3.11.15) and the same
-command were used for both runs. `build_stable: true` held in both. Both runs used
-`python3.11 scripts/differential.py ast-Cachetools.json <cachetools> Cachetools 5`.
+### Current (final tree, produced 2026-10-02)
 
-| | harness at `46c65fc` | this round (merged with item I) |
+`python3.11 scripts/differential.py ast-Cachetools.json <cachetools@01af8e5> Cachetools 5`,
+Python 3.11.15, measurement basis `varargs-attempted-v2`, `build_stable: true`,
+`mutation_in_progress: false`, the cachetools suite 312 tests with rc 0 under the tracer.
+
+| | |
+|---|--:|
+| functions in `ast-Cachetools.json` | 209 |
+| hole-free | 168 |
+| exercised (at least one case built) | 116 |
+| **compared** (at least one case adjudicated) | **42** (20% of all, 25% of hole-free) |
+| cases built / adjudicated | 584 / 220 |
+| **cases agreeing** | **220 / 220** |
+| **divergences** | **0** |
+| **INCONCLUSIVE cases** | **364** (hole, `outOfFuel` or unrepresentable) |
+| cases cut by the budget | 0 |
+| by origin (agree / diverge / inconclusive) | test-suite 165 / 0 / 329; random 50 / 0 / 30; constructed 5 / 0 / 5 |
+| by status: compared / blocked by semantics or transpiler / AST holes / value model / unexercised | 42 / 72 / 41 / 30 / 24 |
+
+Read this carefully: 0 divergences over 42 compared functions is not "the semantics agrees
+with CPython on cachetools". 364 of 584 cases did not reach a verdict, and 167 of the 209
+functions did not reach one at all. The most frequent inconclusive reasons in this run are
+`call:set` (`_cached.py` `_condition`, `_wrapper`, `_condition_info`), the unbound builtin
+`DeprecationWarning`, `expr:genExp`, `mro:unknown-class:OrderedDict` and `…:Descriptor`, and
+`call:isinstance`.
+
+### History: how the figures got here
+
+Every table from here to the end of "Re-export (item L)" is an earlier state, kept because
+the findings below were made against it. None of its figures is current.
+
+**Round 1: the harness at `46c65fc` versus the same harness after merging items C and I
+(intermediate state).** The same AST, the same corpus commit (`01af8e5`), the same Python
+(3.11.15) and the same command were used for both runs. `build_stable: true` held in both. Both
+runs used `python3.11 scripts/differential.py ast-Cachetools.json <cachetools> Cachetools 5`.
+The second column quotes 60 compared functions and 14 divergences; that is the intermediate
+state (the committed AST of the time, before the re-export of item L and before the class
+table of item M), **not** the current result above.
+
+| | harness at `46c65fc` | intermediate state (merged with item I), superseded |
 |---|--:|--:|
 | functions in `ast-Cachetools.json` | 209 | 209 |
 | hole-free | 184 | 184 |
@@ -89,11 +136,11 @@ command were used for both runs. `build_stable: true` held in both. Both runs us
 | cases cut by the 600-case budget (counted) | 0 | 64, from 17 functions |
 | by status: compared / blocked by semantics or transpiler / AST holes / value model / unexercised | 48 / 57 / 25 / 22 / 57 | 60 / 67 / 25 / 33 / 24 |
 
-The "this round" column was re-run on the merged branch (items C and I: the class-aware
-`_HashedTuple` encoding adds three compared functions). The README's earlier "30 of 208" was stale. At `46c65fc` the harness compares 48 of 209
+The second column was re-run on the merged branch (items C and I: the class-aware
+`_HashedTuple` encoding adds three compared functions). The README's earlier "30 of 208" was stale. At `46c65fc` the harness compared 48 of 209
 (208 entries carry a `.py` file; the 209th is `<module-objects>`).
 
-Compared, gained: `LRUCache.__setitem__`, `TTLCache.__contains__`, `TTLCache.ttl`,
+Compared, gained (between those two columns): `LRUCache.__setitem__`, `TTLCache.__contains__`, `TTLCache.ttl`,
 `_UnboundTTLCache.maxsize` (all reached through floats), `_DescriptorBase.__init__`
 (descriptor instances), and the `_cachedmethod.py` closures `_locked.wrapper`,
 `_unlocked.wrapper`, `_condition/_locked/_unlocked.cache_clear` (which reached the oracle
@@ -183,7 +230,7 @@ That fallback is how finding 2's misbinding would also have surfaced, had the ha
 supplied captures. Inside a corpus these fallbacks are right only when names are unique.
 For a receiver class Core does not know, the honest answer is a hole.
 
-**Fixed in Core (item M, STRATEGY.md §62), with the Core half of finding 2.** With a class
+**Fixed in Core (item M, STRATEGY.md §62), with the Core half of finding 2.** (The table below is a history table; the current result is under "Measurement".) With a class
 table (`Program.pyClasses`, recorded by the exporter), methods resolve along the C3 MRO,
 `super()` along the instance's MRO, an instance attribute shadows a method, and a bare
 name is local → global → builtin; whatever the table cannot answer is a named hole
@@ -213,9 +260,10 @@ same command on it gives the right-hand column again: 41 compared, 215/215, 0 di
 with no globals binding was `name:unbound`; it now resolves through `builtins`, and `raise C`
 of a builtin exception class raises `C()`. Same command, same AST: **42 compared, 220/220,
 0 divergences, 364 INCONCLUSIVE** — the new function is `_TimedCache.expire`, raising
-`NotImplementedError` on all 5 cases on both sides.
+`NotImplementedError` on all 5 cases on both sides. The 2026-10-02 re-run on the final tree gave the same
+figures (above).
 
-## Re-export (item L)
+## Re-export (item L) (history: static figures and the intermediate differential columns)
 
 `ast-Cachetools.json` was re-exported from cachetools `01af8e5` with the merged exporter
 (items H, G and L) and now has a provenance record
@@ -227,7 +275,7 @@ counting over the AST and checked against `ledger-Cachetools.json`:
 | committed at `46c65fc` | 26 | 184 |
 | fresh export, exporter at `86a161b` (H: cells, defaults) | 48 | 167 |
 | + G (boxed containers) | 42 | 170 |
-| + L (this change: `gen:*`, local-name calls) — committed | 46 | 168 |
+| + L (this change: `gen:*`, local-name calls) — committed, and still the AST on the final tree (46 holes, 168 hole-free: `ledger-Cachetools.json`) | 46 | 168 |
 
 L's own static delta is exactly 10 functions: the two `__iter__`s gain `gen:generator` +
 `gen:yield`, and 8 call sites change callee name (`_locked/_unlocked/_condition` ×
@@ -257,6 +305,10 @@ Cachetools 5`, each run against its own rendered module:
 
 ## What remains
 
+The bullets below were written at the item-L state; items M and P have since landed (the
+current result is at the top of "Measurement") and these were **not** re-derived, so treat
+the counts in them as dated.
+
 * The harness could compare a function whose only static hole is a parameter default on
   every recorded call that supplies that argument; today it skips the function.
 * Lambdas (9 functions) need the exporter's per-file lambda numbering reproduced from the
@@ -264,5 +316,6 @@ Cachetools 5`, each run against its own rendered module:
 * `functools.partial` (the `key=` of every `cachedmethod` wrapper) and `set` (all of
   `LFUCache`) are the two largest value-model blocks. Each needs a Core value, not harness
   work.
-* The 600-case budget now cuts 49 cases, mostly the 4th and 5th case of a function and
-  random-origin cases. Raising it costs Lean time linearly.
+* The 600-case budget cut 49 cases at the item-L state (mostly the 4th and 5th case of a
+  function and random-origin cases); in the 2026-10-02 run it cut none (584 cases built).
+  Raising it costs Lean time linearly.

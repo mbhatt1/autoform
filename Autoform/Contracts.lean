@@ -1013,7 +1013,7 @@ theorem methodkey_not_refinable_under_top (N : Nat) (dom : List Val → Prop)
 /-! ### Cross-checks against the full program
 
 `keysProgram` is a two-function slice. These evaluate the *whole* translated `cachetools`
-(208 functions) and confirm the slice did not change the answer — the same
+(209 functions in the current AST; 208 when this was written) and confirm the slice did not change the answer — the same
 oracle-not-sharing-the-artifact's-assumptions discipline as §17. They are `#eval`, so they
 are evidence for a reader, not part of any proof. -/
 

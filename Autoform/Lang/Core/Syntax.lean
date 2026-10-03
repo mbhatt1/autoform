@@ -43,17 +43,18 @@ arithmetic now agrees with Node up to `Number.MAX_SAFE_INTEGER` (2^53 - 1).
 
 **What `javascript` does NOT fix, named rather than hidden:** real JS numbers are IEEE
 doubles, and this project's `Val` has no single "JS number" representation that is
-sometimes-int-sometimes-float the way `Number` is — `NumConfig.python`'s *unbounded*
-integers are themselves a known-wrong approximation past 2^53 (Numeric.lean already
-recorded this before this dialect existed). Bitwise/shift operators (`&`, `|`, `^`, `<<`,
-`>>`, `>>>`) go through the same `NumConfig`, but real JS converts their operands to
-Int32 first (ECMA `ToInt32`) — a genuinely different width policy from JS's own
-arithmetic operators. Modelling that correctly needs a *second* numeric config per
-dialect (one for arithmetic, one for bitwise), which `Dialect.toNumConfig`'s
-one-config-per-dialect shape does not support yet; until it does, `<<`/`>>`/bitwise ops
-on `.javascript` inherit the unbounded config and are a known, recorded gap, not a
-claimed fix. `Lang.approximated` still marks JavaScript/TypeScript `true` for this
-reason. -/
+sometimes-int-sometimes-float the way `Number` is. `NumConfig.python`'s *unbounded*
+integers are a known-wrong approximation past 2^53 (`Numeric.lean` recorded this before
+this dialect existed), so integer arithmetic beyond `Number.MAX_SAFE_INTEGER` is not what
+Node computes. `Lang.approximated` marks JavaScript/TypeScript `true` for that reason.
+
+**Since fixed (STRATEGY.md sections 61 and 65):** the bitwise and shift operators are
+exact. They used to go through the same unbounded `NumConfig` and so disagreed with JS,
+which converts the operands to Int32/Uint32 first (ECMA `ToInt32`/`ToUint32`); `jsBitwise`
+and `jsBitNot` (`Semantics.lean`) now do that, and an operand beyond 2^53 is a hole rather
+than a guess. `==` and `===` are distinct operators, integer `/` and `%` follow JS
+(`jsIntDiv`, `jsIntMod`), and `null` is `Val.jsnull`, distinct from `undefined`
+(`Val.unit`). `tests/test_jsnode_node.py` compares 55 such cases with Node. -/
 inductive Dialect where
   | python
   | cLike

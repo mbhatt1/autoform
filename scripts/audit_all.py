@@ -448,7 +448,8 @@ def main() -> int:
     ap.add_argument("--skip-lean", action="store_true",
                     help="source sweep only (no lake invocation)")
     ap.add_argument("--strict", action="store_true",
-                    help="also fail on demonstration sorries and on a missing leanchecker")
+                    help="also fail when leanchecker is missing (UNVERIFIED). Demonstration sorries "
+                         "are reported but never fail the audit")
     ap.add_argument("--skip-kernel", action="store_true",
                     help="do not run the kernel replay in this invocation: it is reported as "
                          "DELEGATED (it is its own CI job, because it takes hours) and does "

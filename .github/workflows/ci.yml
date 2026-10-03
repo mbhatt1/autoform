@@ -74,6 +74,15 @@ jobs:
           python3 cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.lean V8Base
           test -s Autoform/Generated/V8Base.lean
 
+      # What this runner actually has. The comments in this file once assumed ~7 GB; the repo
+      # is public, which should mean the standard 4-vCPU / 16 GB runner. The heaviest V8Base part
+      # peaks at 8.7 GB, so the answer decides whether building it one at a time is enough.
+      - name: Runner resources
+        run: |
+          nproc
+          free -m
+          df -h /
+
       - name: Restore .lake
         id: lake-cache
         uses: actions/cache/restore@v4
@@ -88,39 +97,114 @@ jobs:
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
             lake-${{ runner.os }}-
 
-      # `lake build` has no job-count/parallelism flag in this Lake version (confirmed
-      # via `lake --help` / `lake build --help` -- neither exposes one). Left to its own
-      # concurrency, it elaborates enough of Autoform/SpecsGen/V8Base/PartN.lean at once
-      # to exceed a standard GitHub-hosted runner's ~7 GB RAM: reproduced locally in a
-      # --memory=7g-capped container (`lean` OOM-killed, exit 137, partway through
-      # V8Base/Part8) and confirmed on this repo's own runner (job killed, exit 143,
-      # partway through the same V8Base parts) -- both only reachable at all after the
-      # regeneration fix above, since every run before it died instantly on the missing
-      # file. `taskset -c 0` pins the whole `lake build` process tree to one core, which
-      # throttles how many elaboration jobs can be genuinely in flight at once (Lake still
-      # reports the runner's real core count via nproc(), so a container/cgroup CPU quota
-      # doesn't change what it tries to schedule -- pinning affinity does). Trades wall-
-      # clock time for peace under the fixed memory ceiling, verified locally to keep
-      # memory well under the cap through the same V8Base phase that previously OOM'd.
-      - name: lake build
-        id: build
-        # Below the job limit, so a slow cold build fails this step (not the whole job)
-        # and the save step after it still runs.
-        timeout-minutes: 300
-        run: taskset -c 0 lake build
+      # THE BUILD IS STAGED, and one V8Base part is built at a time. Why:
+      #
+      # * `lake build` has no job-count flag (Lake 5.0.0: `lake build --help` lists none), so
+      #   it starts as many V8Base parts at once as there are workers. Each heavy part is an
+      #   `rfl`-by-computation file with a large peak (measured alone: Part60 8.7 GB, Part33
+      #   6.6 GB resident, STRATEGY.md section 67), so on a hosted runner the build exhausted
+      #   memory partway through the heavy parts and the runner was shut down (`The runner has received a shutdown signal`, exit 143):
+      #   run 115 at 108 minutes (472 of 497 modules built, no Lean error) and run 117 at
+      #   20 minutes into a run that had restored 427 modules from the cache. `taskset -c 0`
+      #   (which this step used to carry) does not help: it shares one core among the
+      #   processes, it does not reduce how many are resident. Locally, three heavy parts
+      #   at once killed 18 of 73 with exit 137 on a 15 GB box; all 18 built one at a time.
+      # * A cache saved only after a two-hour step is lost to any runner loss. Each stage
+      #   therefore ends in its own save step (`if: always()`, own key), and the next run
+      #   restores the newest entry, so a runner loss costs at most one stage.
+      #
+      # Stage 1: every module except the V8Base parts (they depend on `V8Base.Base`, built here).
+      - name: lake build -- all modules except the V8Base parts
+        timeout-minutes: 150
+        run: |
+          set -euo pipefail
+          mods=$(grep '^import Autoform' Autoform.lean | sed 's/^import //' | grep -vx 'Autoform.SpecsGen.V8Base')
+          taskset -c 0 lake build $mods Autoform.SpecsGen.V8Base.Base
 
-      # Save whatever was built, success or not: Lake is incremental, so the next run
-      # resumes from here instead of from nothing. The key carries the run id because a
-      # cache entry is immutable -- a partial build saved under the plain source key would
-      # be restored forever and never replaced by the finished one. Restore takes the
-      # newest entry for the same sources (then toolchain), via the prefixes above.
-      - name: Save .lake
+      - name: Save .lake (stage 1 - all but V8Base parts)
         if: always()
         uses: actions/cache/save@v4
         with:
           path: |
             .lake
-          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}-1
+
+      - name: lake build -- V8Base parts 1-15, one at a time
+        timeout-minutes: 150
+        run: scripts/ci_build_v8base_parts.sh 1 15
+
+      - name: Save .lake (stage 2 - V8Base parts 1-15)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}-2
+
+      - name: lake build -- V8Base parts 16-30, one at a time
+        timeout-minutes: 150
+        run: scripts/ci_build_v8base_parts.sh 16 30
+
+      - name: Save .lake (stage 3 - V8Base parts 16-30)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}-3
+
+      - name: lake build -- V8Base parts 31-45, one at a time
+        timeout-minutes: 150
+        run: scripts/ci_build_v8base_parts.sh 31 45
+
+      - name: Save .lake (stage 4 - V8Base parts 31-45)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}-4
+
+      - name: lake build -- V8Base parts 46-60, one at a time
+        timeout-minutes: 150
+        run: scripts/ci_build_v8base_parts.sh 46 60
+
+      - name: Save .lake (stage 5 - V8Base parts 46-60)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}-5
+
+      - name: lake build -- V8Base parts 61-73, one at a time
+        timeout-minutes: 150
+        run: scripts/ci_build_v8base_parts.sh 61 73
+
+      - name: Save .lake (stage 6 - V8Base parts 61-73)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}-6
+
+      # The default target, exactly what a developer runs. Everything above should have built
+      # it already, so this is a completeness check: a module that is in the library but in
+      # neither list above (a new part, a new root) is built here, and an incomplete stage
+      # cannot pass unnoticed.
+      - name: lake build (default target; must find nothing left to do but verify)
+        id: build
+        timeout-minutes: 120
+        run: lake build
+
+      - name: Save .lake (final)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}-${{ github.run_id }}-7
 
       - uses: actions/setup-python@v5
         with:
@@ -328,9 +412,10 @@ jobs:
       # `Autoform.Generated.<Module>`, so cachetools and V8 coexist in one build.
       #
       # Do NOT re-add a step like that for a module you merely hope is checked: check that
-      # Autoform.lean imports it. `Autoform.SpecsGen.V8Base` is the one module still
-      # outside, for elaboration cost rather than namespaces (see Autoform.lean), and it
-      # is gated by scripts/check_specs.py, not by grep.
+      # Autoform.lean imports it. `Autoform.SpecsGen.V8Base` is imported too: it is now just
+      # the 73 `V8Base.Part<N>` imports, built one at a time by the staged steps above (an
+      # older version of this comment called it the one module still outside the graph,
+      # for elaboration cost; that was true of the unsplit module).
 
       # SpecsGen/Cachetools.lean used to be pinned here as KNOWN BROKEN. It elaborates
       # again as of this change, and is built by the step above. Its `C_tfFree` premise

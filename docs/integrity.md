@@ -20,9 +20,9 @@ substitutes for either.
 ## What is tracked, and why (policy decided 2026-08-19)
 
 > **The AST is the tracked source of truth. `Autoform/Generated/<M>.lean` is a build
-> product and is not tracked.** The exceptions are `Cachetools.lean`, `SC.lean`, and the
-> three small modules `CMath.lean`, `V8BaseSample.lean` and `LinuxLibSample.lean`; see
-> below and `.gitignore`.
+> product and is not tracked.** The exceptions (the `!` rules in `.gitignore`) are
+> `Cachetools.lean`, `CAddr.lean`, `SC.lean`, and the three small modules `CMath.lean`,
+> `V8BaseSample.lean` and `LinuxLibSample.lean`; see below.
 
 This reverses the earlier policy, and the reversal is the point of the section.
 
@@ -60,9 +60,9 @@ now has to enter through `ast-<M>.json`, where it is a small, reviewable JSON di
 Autoform.Generated.<M>` without running the renderer first (`autoform.sh` and
 `scripts/check_render.py --typecheck` both do). *Correction (2026-10-02, at `46c65fc`):*
 an earlier revision said `Autoform.lean` imports no generated module. It does, transitively:
-the specs it imports pull in `Generated.Cachetools`, `CMath`, `V8BaseSample`,
+the specs it imports pull in `Generated.Cachetools`, `CMath`, `CAddr`, `V8BaseSample`,
 `LinuxLibSample` (all tracked) and `Generated.V8Base` (untracked), so a clean clone must
-render `ast-V8Base.json` before the root `lake build`. For the large corpora — Ansible,
+render `ast-V8Base.json` before the root `lake build`. CI does exactly that in its first step. For the large corpora — Ansible,
 LinuxLib, LinuxCrypto — the AST is itself 15–55 MB, *larger* than the module it renders to,
 so tracking the AST by bytes would trade one blob for a bigger one. Those three are tracked
 by **sha256 + provenance** in `artifact-manifest.json` (V8Base was in this group; its
@@ -73,8 +73,11 @@ check on its own, and it is recorded here rather than papered over.
 **The exception.** `Autoform/Generated/Cachetools.lean` stays tracked. Two conditions make
 tracking a render worth its drift risk, and of the large renders only Cachetools meets both
 (`CMath`, `V8BaseSample` and `LinuxLibSample` are tracked because they are 4–7 functions
-and on the root import graph): hand-written
-theorems refer to it by name (all 108 of them), and at 300 KB its diff is still something
+and on the root import graph; `CAddr` because `Autoform/Specs/AddressSpec.lean` names it and
+its diff is about 21 KB): hand-written
+theorems refer to it by name (`Autoform/Specs/CachetoolsSpec.lean` and the generated
+`Autoform/SpecsGen/Cachetools.lean`; the older "108 theorems" figure was a `grep` count,
+withdrawn in STRATEGY.md §40), and at 300 KB its diff is still something
 a person can read. `check_render.py` diffs it against a fresh render on every run — the
 original check, kept exactly where it has teeth.
 
@@ -123,7 +126,7 @@ verified and some **UNVERIFIABLE**. A missing AST, a missing manifest entry or a
 render is reported with a reason and a non-zero exit — this check must never pass by
 having stopped looking.
 
-**Not tracked by policy (2026-10-02, STRATEGY §59).** `Ansible`, `LinuxCrypto` and
+**Not tracked by policy (2026-10-02, STRATEGY §59; behaviour re-checked against the script).** `Ansible`, `LinuxCrypto` and
 `LinuxLib` are pinned in the manifest but their ASTs exist in no clone, and cannot be
 regenerated to the pinned hash: neither the corpus commit nor the exporter version that
 produced them was recorded, no copy survives on the build machine, and Ansible's 136.6 MB
@@ -138,16 +141,21 @@ ignored, `git ls-files` that it is untracked, the manifest says `ast_tracked: fa
 UNVERIFIABLE whatever the allowlist says, per §55). An absent AST that is not on the list is
 UNVERIFIABLE exactly as before; an allowlisted AST that *is* on disk is fully checked;
 `--strict` ignores the list. `--record` never writes it. The cost is unchanged and stated in
-each entry: the evidence figures for those three corpora cannot be re-derived from a clone.
+each entry: the evidence figures for those three corpora (`docs/evidence-ansible.md`,
+`evidence-LinuxCrypto.md`, `evidence-LinuxLib.md`) cannot be re-derived from a clone, and
+those documents are labelled as dated snapshots accordingly. The pinned hashes are of the AST
+that was current when the manifest was last recorded (the Ansible one is 136.6 MB), which is a
+different, later artifact than the one some evidence figures were measured on.
 
-**Open finding, recorded rather than laundered.** On the first run under the new policy,
-`Cachetools` came back MISMATCH: the tracked module was rendered by an older
-`render_lean.py` (no `set_option maxRecDepth`, pre-indent-cap layout) and is ~1148 lines
-different from a fresh render, though whitespace-insensitively the terms agree. It was not
-re-rendered here, because the theorems that depend on it were being edited
-concurrently. `check_render.py` therefore exits 1 today, on purpose. The fix is to
-re-render Cachetools and re-run its proofs; suppressing the verdict until then would be
-the exact failure mode this document exists to prevent.
+**Finding, recorded rather than laundered (history, resolved).** On the first run under the
+new policy, `Cachetools` came back MISMATCH: the tracked module was rendered by an older
+`render_lean.py` (no `set_option maxRecDepth`, pre-indent-cap layout) and was ~1148 lines
+different from a fresh render, though whitespace-insensitively the terms agreed. It was left
+red on purpose until the module was re-rendered. **Resolved:** on the final tree
+`scripts/check_render.py` reports `OK Cachetools ... (working-tree module matches)` and the whole
+run `15 verified, 0 mismatched, 0 unverifiable, 3 NOT checked (untracked by reviewed policy:
+Ansible, LinuxCrypto, LinuxLib) (of 18)`, exit 0; `--strict` reports the same three as
+`3 unverifiable`.
 
 **Still in history.** Untracking removes these blobs from the *tip*, not from the object
 graph. The 35 MB module and today's 27 MB are still reachable from old commits and would
@@ -177,6 +185,40 @@ equal the number of functions in the AST it was computed from. It reports:
 
 Negative-tested in both directions. A checker that has only ever passed has not been
 tested.
+
+## `scripts/check_provenance.py` and fixture freshness — is the AST traceable to its exporter?
+
+**Incident.** `ast-*.json` is tracked but its `.cpg` is not, so a committed AST could drift
+arbitrarily far from the exporter committed beside it, and the only thing that compared them
+was a Lean module rendered from the same AST, which agrees with it by construction.
+
+**The policy** (details: `docs/architecture.md` "Provenance", `docs/running.md` §5):
+
+* every tracked `ast-*.json` has a record in `provenance/<artifact>.prov.json` **or** is a
+  named entry in `provenance/unattributed.json`. The baseline is a named gap, not an
+  exemption: every entry is printed on every run, it expires when the artifact's digest
+  changes, and `--strict` refuses it. Gitignored corpora (`ast-Ansible`, `LinuxLib`,
+  `LinuxCrypto`) are reported `LOCAL`, not judged;
+* a record is checked for artifact digest, the Joern pin (`joern-version`), the digest of the
+  exporter script (`cartographer/export_ast.sc`: change the exporter and every older AST is
+  mechanically known to be stale), required fields, orphans, and baseline expiry;
+* it does **not** check that the recorded command reproduces the artifact
+  (`scripts/reproduce_ast.py` does, with Joern); `--verify-source` re-derives the source
+  revision where a tree exists, and says UNVERIFIED where not.
+
+On the final tree: 6 of 15 in-repository ASTs fully attributed (`CAddr`, `Cachetools`, `LangGo`,
+`LangJS`, `LangKt`, `LangTS`), 9 baselined (`CMath`, `LangC`, `LangJava`, `LinuxLibSample`,
+`Sample`, `Stress`, `V8Base`, `V8BaseSample`, `V8Numbers`), 0 violations. It runs in the
+`python-tests` CI job. **Green means "attributed or explicitly excused", not "attributed".**
+
+**Fixture exporters.** Each fixture under `tests/fixtures/*` (and `tests/boxed_sample`) has a
+`provenance.json` carrying `exporter_sha256` and `ast_sha256`. Before
+`tests/test_fixture_exporter_fresh.py` the exporter field was informational, and the `pyscoping`
+fixture silently stopped reproducing after the exporter began wrapping list literals; two of
+its 28 pins degraded to a hole without any test noticing. The test now fails when a fixture's
+recorded exporter digest differs from the current `export_ast.sc`, or its AST digest from the
+file. The remedy is to re-export with the recorded command and compare: byte-identical means
+update the two digests, different means understand the diff and re-run the fixture's oracle.
 
 ## Concurrency: `build_stable`, `mutation_in_progress`, `measurement_basis`
 
@@ -218,10 +260,13 @@ it produced a wrong correction to a right finding.
 ## Running them
 
 `assure.sh` runs `check_render.py` then `check_docs.py` before building the assurance
-case. Both are advisory there (`|| true`) so a stale figure does not block evidence
-generation — but a red check means every number downstream describes a program nobody
-wrote, and should be treated that way.
+case (`assure.sh` lines 69 and 71). Both are advisory there (`|| true`) so a stale figure
+does not block evidence generation — but a red check means every number downstream
+describes a program nobody wrote, and should be treated that way. In CI they gate: the
+`build-and-audit` job runs `check_render.py`, `check_specs_fresh.py` and `check_docs.py`
+(after regenerating `ledger-Cachetools.json`), and the `python-tests` job runs
+`check_provenance.py` and pytest.
 
 ```bash
-scripts/check_render.py && scripts/check_docs.py
+scripts/check_render.py && scripts/check_docs.py && scripts/check_provenance.py
 ```

@@ -35,10 +35,10 @@ rules.
 
 | Emitted `sacmClass` | SACM / GSN counterpart | Use here |
 |---|---|---|
-| `Claim` | Claim / GSN Goal | Top claim `G1`, sub-claims `G2`–`G5` and their narrowed siblings `G2.1`, `G2.2`, `G3.1`, `G3.2`, `G5.1`, defeaters `D*` |
+| `Claim` | Claim / GSN Goal | Top claim `G1`, sub-claims `G2`–`G5` and their narrowed siblings `G2.1`, `G2.2`, `G3.1`, `G3.2`, `G3.3`, `G5.1`, defeaters `D1`, `D2`, `D3`, `D3.1`, and one `G.CONTRACT` branch per contract-relative theorem when `contracts-<Module>.json` exists |
 | `Claim` with `assumed: true` | Assumption (GSN oval) | One per hole label; plus context claims `C*` |
 | `ArgumentReasoning` | ArgumentReasoning / GSN Strategy | `S1`: decomposition over failure modes |
-| `ArtifactReference` | ArtifactReference / GSN Solution | `E1`–`E6`, each naming a file on disk, each tagged `evidenceKind` |
+| `ArtifactReference` | ArtifactReference / GSN Solution | `E1`–`E8`, each naming a file on disk, each tagged `evidenceKind` |
 | `AssertedRelationship` | AssertedInference / AssertedEvidence / AssertedChallenge | typed `SUPPORTS` or `COUNTERS` |
 | `TerminologyElement` | TerminologyPackage | *hole*, *verifiable core*, *conformance rate*, *axiom basis*, *tested, not proved*, *coverage of a claim* |
 
@@ -50,10 +50,11 @@ rules.
 |---|---|---|---|
 | `E1` | conformance rate (`agree/total`, divergence count, runtime) | `conformance.json` | `scripts/differential.py` |
 | `E2` | verifiable-core fraction, hole occurrences, distinct causes | `ast-<Module>.json` | `cartographer/export_ast.sc` |
-| `E3` | mutation score (`killed/total`) | `mutation.json` | `scripts/mutate.py` (source-level mutation gate) |
+| `E3` | mutation score (`killed/total`) | `mutation.json` (the default `--json` of `scripts/mutate.py`; the committed `mutation-Cachetools.json` is a differently named copy that `sacm.py` does not read) | `scripts/mutate.py` (source-level mutation gate) |
 | `E4` | axiom basis, theorem count | `axioms.json`, falling back to `audit.json`'s `axiom_sweep` | `#audit_axioms` (`Autoform/Harness/Audit.lean`) |
 | `E5` | population context: function count, purity, effect histogram | `formalization-graph.json` | `cartographer/formalization_graph.sc` |
 | `E6` | call-closed core (`verifiableCore`), `dynamicHoleRisk` | `ledger-<Module>.json` | `Program.ledgerJson` (`Autoform/Ledger.lean`) |
+| `E7` | execution over the claimed core: functions that never holed / holed on some input / holed on a real recorded input / never exercised (`kind: TEST`). Present only when `core-oracle.json` is tagged with this module. It answers `G3.2` directly and, when it refutes, adds defeater `D3.1` against `G3.1` | `core-oracle.json` | `scripts/core_oracle.py` |
 | `E8` | **conditionally** verifiable functions (`conditionallyVerifiable`), the named hole assumptions they rest on (`conditionalAssumptions`); every hole occurrence named in `holeAssumptions` | `ledger-<Module>.json` | `Program.ledgerJson` (`Autoform/Ledger.lean`); see `docs/contracts.md` |
 
 `E5` is **context, not support**: the formalization graph is corpus-scoped, not
@@ -186,10 +187,17 @@ them apart:
 - Defeater `D3` records the reason: `Func.total` is computed from the same AST it
   describes, so it cannot see what the interpreter does with that AST.
 
-**R3 (adequacy, `G4`).** `SUPPORTED` iff every mutant is killed, `evidenceKind: TEST`.
-Absent `mutation.json`, `UNDEVELOPED`. Mutation evidence scoped to a different subject is
-`UNDEVELOPED`, not borrowed: the gate runs over the Imp reference semantics, not over
-translated modules, so its score is real but off-subject.
+**R3 (adequacy, `G4`).** `SUPPORTED` iff every mutant is killed, `evidenceKind: TEST`; with
+survivors it is `UNSUPPORTED` (no mutants at all: `UNDEVELOPED`). Absent `mutation.json`,
+`UNDEVELOPED`. Mutation evidence scoped to a different subject is `UNDEVELOPED`, not
+borrowed: attribution is by the module name recorded in `mutation.json` (it must contain
+the module being assured). The gate used to run only over the Imp reference semantics, whose
+score is real but off-subject; `assure.sh` now mutates the generated module itself when
+`Autoform/Specs/<Module>Spec.lean` exists. The tracked `mutation-Cachetools.json` is one
+run (57 mutants, 2 invalid, seed 20260819, against `CachetoolsSpec.lean`); the README's
+78/88 is a different run whose output is not in the repository, and neither was re-run
+after the two attribution fixes in `mutate.py`. Do not quote one as the other.
+
 
 **R4 (proof validity, `G5`).** `DEFEATED` if `sorryAx` or any leak appears in the basis.
 Otherwise `SUPPORTED` requires at least one recorded declaration **and** a basis confined
@@ -214,6 +222,20 @@ omitted; absence of a node must not be readable as absence of a problem. Convers
 must not be used to reduce every claim to `UNDEVELOPED`. Each restriction above comes with a
 narrowed sibling stating what is earned — `G2.1`, `G3.1`, `G5.1` — so the case reports a
 trust boundary.
+
+## Evidence that is absent is stated, not skipped
+
+`E7` and the `G.CONTRACT` branch appear only if their artifact exists for the module
+(`core-oracle.json` tagged with this module; `contracts-<Module>.json`). When
+`core-oracle.json` is absent, `G3.2` falls back to the conformance-coverage estimate and the
+`D3` upper-bound defeater stays undefeated. Neither case is an error: the argument is built
+from whichever artifacts exist and the rest are `UNDEVELOPED`.
+
+Observed by running `scripts/sacm.py --module Cachetools` on this tree: the tracked
+`core-oracle.json` is tagged `Cachetools`, so `E7` is present and `G3.2` renders `DEFEATED`
+(60 of 101 claimed-core functions holed on some input, none on a recorded real input) with
+defeater `D3.1`. Its claimed core (101) differs from the current ledger's 98, so that
+artifact predates the current export; re-run `scripts/core_oracle.py` before quoting it.
 
 ## Usage
 
