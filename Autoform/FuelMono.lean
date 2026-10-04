@@ -1223,9 +1223,32 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 -- Body raised exception, try handlers
                 rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                -- Need to show that trying handlers with fuel k and k+1 gives same result
-                -- The handler list is fuel-free, so we can inductively apply ihS to each
-                sorry
+                -- All handlers are fuel-free, so we can apply ihS to each one
+                -- Prove that tryHandlers gives same result with fuel k and k+1
+                clear hA hne
+                revert hy
+                -- Induct over the handlers list
+                induction hs generalizing h₁ with
+                | nil =>
+                    intro hy
+                    simp only at hy ⊢
+                    exact hy
+                | cons handler rest ih =>
+                    intro hy
+                    simp only at hfree
+                    rcases hfree with ⟨h_free, rest_free⟩
+                    simp only [execStmt] at hy ⊢
+                    rcases hB : execStmt ctx k h₁ (ρ.set handler.1 v) handler.2 with ⟨h₂, c₂⟩
+                    rw [hB] at hy
+                    cases c₂ with
+                    | exn _ =>
+                        -- Handler raised, try next
+                        rw [ihS _ hctx _ _ _ h_free _ _ hB (by simp)]
+                        exact ih rest_free hy
+                    | c =>
+                        -- Handler succeeded, return result
+                        rw [ihS _ hctx _ _ _ h_free _ _ hB (by simp)]
+                        exact hy
             | c =>
                 -- Body completed normally (not an exception)
                 rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
