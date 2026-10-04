@@ -6895,6 +6895,34 @@ import scala.annotation.tailrec
     else None
   }
 
+  /** Parse a Python default expression that is not a literal.
+    * Handles: simple names, attribute access (a.b.c), and function calls.
+    * Returns an Autoform expression node, or None if parsing fails.
+    */
+  def pyDefaultExpr(t0: String): Option[ujson.Obj] = {
+    val t = t0.trim
+    // First try literal handling
+    pyDefaultLiteral(t).orElse {
+      // Try to parse as a simple name or attribute chain (e.g., "time.monotonic" or "Cache.__setitem__")
+      if (t.matches("""[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*""")) {
+        // Parse as a chain of attribute accesses
+        val parts = t.split("\\.")
+        val base = ujson.Obj("k" -> "name", "v" -> parts(0))
+        val result = parts.drop(1).foldLeft(base) { (acc, field) =>
+          ujson.Obj("k" -> "field", "a" -> acc, "f" -> field)
+        }
+        Some(result)
+      } else if (t.matches("""[A-Za-z_][A-Za-z0-9_]*\(\s*\)""")) {
+        // Parse as function call with no arguments (e.g., "object()" or "dict()")
+        val funcName = t.takeWhile(ch => ch.isLetterOrDigit || ch == '_')
+        Some(ujson.Obj("k" -> "call", "f" -> funcName, "args" -> ujson.Arr()))
+      } else {
+        // Cannot parse this default expression type
+        None
+      }
+    }
+  }
+
   // ---- Python starred assignment: `a, *b, c = xs` --------------------------------
   //
   // `pysrc2cpg` lowers it to `tmp = xs; a = tmp[0]; b = tmp[1:-1:1]; c = tmp[-1]`. That
@@ -14662,7 +14690,7 @@ import scala.annotation.tailrec
           if (po.nonEmpty) obj("posonly") = ujson.Arr.from(po.map(ujson.Str(_)))
           if (ds.nonEmpty)
             obj("defaults") = ujson.Arr.from(ds.map { case (p, t) =>
-              ujson.Arr(ujson.Str(p), pyDefaultLiteral(t).getOrElse(hole("param:default-nonliteral")))
+              ujson.Arr(ujson.Str(p), pyDefaultExpr(t).getOrElse(hole("param:default-nonliteral")))
             })
         case None =>
           obj("body") = seqOf(List(holeS("param:signature-unparsed"), body))
