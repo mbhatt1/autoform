@@ -500,6 +500,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                 | none => rw [hr3] at hy; exact hy
                             all_goals (dsimp only at hy ⊢; exact hy)
                     all_goals (rw [hg] at hy; exact hy)
+        | ccall f_expr args => sorry
         | mcall recv m args =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ recv with ⟨h₁, r₁⟩

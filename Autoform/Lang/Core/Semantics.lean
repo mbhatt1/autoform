@@ -2349,6 +2349,37 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+  | n+1, h, ρ, .ccall f_expr args =>
+      match evalExpr ctx n h ρ f_expr with
+      | (h₁, .val f_val) =>
+        match evalList ctx n h₁ ρ args with
+        | (h₂, .inl r)  => (h₂, r)
+        | (h₂, .inr (vs, kws)) =>
+          match f_val with
+          | .fn g      => match ctx.resolve g with
+                          | some fn =>
+                            if fn.isMethod && fn.vararg.isNone
+                               && vs.length == fn.params.length + 1 then
+                              applyFunc ctx n h₂ fn (some (vs.headD .unit)) vs.tail kws
+                            else applyFunc ctx n h₂ fn none vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .clos g cap => match ctx.resolve g with
+                          | some fn => applyClosure ctx n h₂ fn cap vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .ref addr  =>
+            -- Function value stored as a boxed ref
+            match h₂.get addr with
+            | some o => match o.fields.find? (·.1 == "v") with
+                        | some (_, .fn g) => match ctx.resolve g with
+                                            | some fn => applyFunc ctx n h₂ fn none vs kws
+                                            | none    => (h₂, .hole "call:computed-ref")
+                        | some (_, .clos g cap) => match ctx.resolve g with
+                                                 | some fn => applyClosure ctx n h₂ fn cap vs kws
+                                                 | none    => (h₂, .hole "call:computed-ref")
+                        | _ => (h₂, .hole "call:computed-not-fn")
+            | none => (h₂, .hole "call:computed-dangling")
+          | _ => (h₂, .hole "call:computed-not-fn")
+      | (h₁, r)       => (h₁, r)
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>

@@ -406,6 +406,8 @@ inductive Expr where
   | binop  : String → Expr → Expr → Expr
   | unop   : String → Expr → Expr
   | call   : String → List Expr → Expr
+  /-- Call through a computed function value: `f()` where `f` is a runtime value. -/
+  | ccall  : Expr → List Expr → Expr
   | index  : Expr → Expr → Expr
   /-- Attribute access: `e.f`. -/
   | field  : Expr → String → Expr
