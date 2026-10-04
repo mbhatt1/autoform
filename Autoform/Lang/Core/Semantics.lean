@@ -2913,21 +2913,52 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `del e[start:stop:step]`: slice deletion. Like delIndex but removes a range.
-  -- Python slice semantics require handling None values, negative indices, and step.
-  -- Full implementation deferred; basic structure evaluates all operands and returns hole.
+  -- Supports step=1 (most common case). Other steps remain holes.
   | n+1, h, ρ, .delSlice e start stop step =>
       if !ctx.dialect.isPython then (h, .hole "op:delete-slice:not-python") else
       match evalExpr ctx n h ρ e with
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ start with
-        | (h₂, _) =>
+        | (h₂, .val startV) =>
           match evalExpr ctx n h₂ ρ stop with
-          | (h₃, _) =>
+          | (h₃, .val stopV) =>
             match evalExpr ctx n h₃ ρ step with
-            | (h₄, .val _) =>
-              -- All operands evaluated without error; implementation deferred
-              -- Would need: normalize indices, compute affected elements, modify container
-              (h₄, .hole "op:delete-slice:deferred-implementation")
+            | (h₄, .val stepV) =>
+              -- Only implement step=1 case; multi-step slicing deferred
+              match pyIndex stepV with
+              | some stepI =>
+                  if stepI != 1 then (h₄, .hole "op:delete-slice:non-unit-step")
+                  else match c with
+                  | .ref r =>
+                    match h₄.get r with
+                    | none => (h₄, .hole "op:delete-slice:dangling-ref")
+                    | some o =>
+                      match o.payload with
+                      | .list vs =>
+                          match (pyIndex startV, pyIndex stopV) with
+                          | (some istart, some istop) =>
+                              match (Stdlib.seqIndex vs.length istart, Stdlib.seqIndex vs.length istop) with
+                              | (some jstart, some jstop) =>
+                                  (h₄.setPayload r (.list (Stdlib.dropRange vs jstart jstop)), .normal ρ)
+                              | _ => (h₄, .hole "op:delete-slice:index-out-of-range")
+                          | _ => (h₄, .hole "op:delete-slice:non-integer-index")
+                      | .str s =>
+                          match (pyIndex startV, pyIndex stopV) with
+                          | (some istart, some istop) =>
+                              match (Stdlib.seqIndex s.length istart, Stdlib.seqIndex s.length istop) with
+                              | (some jstart, some jstop) =>
+                                  let chars := s.toList.map String.mk
+                                  let deleted := Stdlib.dropRange chars jstart jstop
+                                  (h₄.setPayload r (.str (String.mk (deleted.map (·.get! 0)))), .normal ρ)
+                              | _ => (h₄, .hole "op:delete-slice:index-out-of-range")
+                          | _ => (h₄, .hole "op:delete-slice:non-integer-index")
+                      | _ => (h₄, .hole "op:delete-slice:unsupported-container")
+                  | c =>
+                    match valueSubscriptWrite ctx.dialect c "delSlice" with
+                    | .exn ex => (h₄, .exn ex)
+                    | .hole l => (h₄, .hole l)
+                    | _ => (h₄, .hole "delSlice:immutable-containers")
+              | none => (h₄, .hole "op:delete-slice:non-integer-step")
             | (h₄, .exn ex)    => (h₄, .exn ex)
             | (h₄, .hole l)    => (h₄, .hole l)
             | (h₄, .outOfFuel) => (h₄, .outOfFuel)

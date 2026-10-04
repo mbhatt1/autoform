@@ -1076,6 +1076,50 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                       · rw [if_neg hcd] at hy ⊢; exact hy
                     | _ => (simp only [hp] at hy ⊢; exact hy)
                 | _ => (dsimp only at hy ⊢; exact hy)
+        -- `del e[start:stop:step]`: slice deletion with unit step support
+        | delSlice e start stop step =>
+            simp only [execStmt] at hy ⊢
+            by_cases hpy : (!ctx.dialect.isPython) = true
+            · rw [if_pos hpy] at hy ⊢; exact hy
+            rw [if_neg hpy] at hy ⊢
+            rcases hB : evalExpr ctx k h ρ e with ⟨h₂, r₂⟩
+            rw [hB] at hy
+            cases r₂ with
+            | exn _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+            | hole _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val cv =>
+              rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+              dsimp only at hy ⊢
+              rcases hC : evalExpr ctx k h₂ ρ start with ⟨h₃, r₃⟩
+              rw [hC] at hy
+              cases r₃ with
+              | exn _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+              | hole _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+              | outOfFuel => cases hy; exact absurd rfl hne
+              | val sv =>
+                rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                dsimp only at hy ⊢
+                rcases hD : evalExpr ctx k h₃ ρ stop with ⟨h₄, r₄⟩
+                rw [hD] at hy
+                cases r₄ with
+                | exn _ => rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy
+                | hole _ => rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val tv =>
+                  rw [ihE _ hctx _ _ _ _ _ hD (by simp)]
+                  dsimp only at hy ⊢
+                  rcases hE : evalExpr ctx k h₄ ρ step with ⟨h₅, r₅⟩
+                  rw [hE] at hy
+                  cases r₅ with
+                  | exn _ => rw [ihE _ hctx _ _ _ _ _ hE (by simp)]; exact hy
+                  | hole _ => rw [ihE _ hctx _ _ _ _ _ hE (by simp)]; exact hy
+                  | outOfFuel => cases hy; exact absurd rfl hne
+                  | val stv =>
+                    rw [ihE _ hctx _ _ _ _ _ hE (by simp)]
+                    dsimp only at hy ⊢
+                    -- All operands evaluated; remaining cases just propagate results
+                    split_ifs at hy ⊢ <;> exact hy
         -- `006-reduce-remaining-holes`, Story 5: `*p = v` -- same shape as
         -- `setField`'s `ref`/non-object split, one constructor case instead of three.
         | setDerefIref p v =>
