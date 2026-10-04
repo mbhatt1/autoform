@@ -131,7 +131,16 @@ def expr_shape(n):
     if k == "unop":   return ".unop", [("atom", lean_str(f('op'))), ("e", f('a'))]
     if k == "index":  return ".index", [("e", f('a')), ("e", f('b'))]
     if k == "call":   return ".call", [("atom", lean_str(f('f'))), ("es", f('args'))]
-    if k == "hole":   return ".hole", [("atom", lean_str(f('label')))]
+    if k == "hole":
+        label = f('label')
+        # Represent computed calls as ccall with placeholders, since the JSON
+        # doesn't include the original function expression and arguments.
+        if label == "call:computed-callee":
+            # .ccall with a hole for the function and empty args list
+            fn_hole = {"k": "hole", "label": "ccall:func"}
+            args_list = []  # Empty args - will be evaluated as empty list
+            return ".ccall", [("e", fn_hole), ("es", args_list)]
+        return ".hole", [("atom", lean_str(label))]
     # `003-box-address-taken-locals`: unconditional, constructor-free box allocation.
     # See `data-model.md` for the on-disk shape and `Expr.boxNew` (`Syntax.lean`) for
     # its semantics.

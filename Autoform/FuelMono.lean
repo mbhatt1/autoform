@@ -501,7 +501,8 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                             all_goals (dsimp only at hy ⊢; exact hy)
                     all_goals (rw [hg] at hy; exact hy)
         | ccall f_expr args =>
-            -- Similar to call: evaluate the function value, then dispatch on its type
+            -- Computed call: evaluate the function expression to get a value,
+            -- then dispatch based on the value's type (fn, clos, ref).
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ f_expr with ⟨h₁, r₁⟩
             rw [hA] at hy
@@ -511,7 +512,62 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | outOfFuel => cases hy; exact absurd rfl hne
             | val f_val =>
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
-                sorry  -- TODO: complete case analysis on f_val (fn, clos, ref)
+                -- Now f_val is the function to call; evaluate arguments
+                rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
+                rw [hB] at hy
+                cases s with
+                | inl e => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | inr p =>
+                    rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                    -- Now we have arguments; dispatch on the function value type
+                    cases f_val
+                    case fn g =>
+                        dsimp only at hy ⊢
+                        cases hres : Ctx.resolve ctx g with
+                        | some fn =>
+                            rw [hres] at hy
+                            dsimp only at hy ⊢
+                            split at hy <;> exact hy
+                        | none => rw [hres] at hy; exact hy
+                    case clos g cap =>
+                        dsimp only at hy ⊢
+                        cases hres : Ctx.resolve ctx g with
+                        | some fn =>
+                            rw [hres] at hy
+                            exact ihC _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                        | none => rw [hres] at hy; exact hy
+                    case ref addr =>
+                        dsimp only at hy ⊢
+                        cases hub : h₂.get addr with
+                        | none => rw [hub] at hy; exact hy
+                        | some o =>
+                            rw [hub] at hy
+                            dsimp only at hy ⊢
+                            cases hfind : o.fields.find? (fun x => x.1 == "v") with
+                            | none => simp only [hfind] at hy ⊢; exact hy
+                            | some fld =>
+                                simp only [hfind] at hy ⊢
+                                -- The field value is the actual function; recurse
+                                obtain ⟨_, fld_val⟩ := fld
+                                cases fld_val
+                                case fn g2 =>
+                                    dsimp only at hy ⊢
+                                    cases hres : Ctx.resolve ctx g2 with
+                                    | some fn =>
+                                        rw [hres] at hy
+                                        exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                                    | none => rw [hres] at hy; exact hy
+                                case clos g2 cap2 =>
+                                    dsimp only at hy ⊢
+                                    cases hres : Ctx.resolve ctx g2 with
+                                    | some fn =>
+                                        rw [hres] at hy
+                                        exact ihC _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                                    | none => rw [hres] at hy; exact hy
+                                -- For other value types in the ref field, it's an error
+                                all_goals (dsimp only at hy ⊢; exact hy)
+                    -- For other value types (int, str, bool, etc.), they can't be called
+                    all_goals (dsimp only at hy ⊢; exact hy)
         | mcall recv m args =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ recv with ⟨h₁, r₁⟩
