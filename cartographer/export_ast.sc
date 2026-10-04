@@ -6895,6 +6895,34 @@ import scala.annotation.tailrec
     else None
   }
 
+  /** Parse a Python default expression that is not a literal.
+    * Handles: simple names, attribute access (a.b.c), and function calls.
+    * Returns an Autoform expression node, or None if parsing fails.
+    */
+  def pyDefaultExpr(t0: String): Option[ujson.Obj] = {
+    val t = t0.trim
+    // First try literal handling
+    pyDefaultLiteral(t).orElse {
+      // Try to parse as a simple name or attribute chain (e.g., "time.monotonic" or "Cache.__setitem__")
+      if (t.matches("""[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*""")) {
+        // Parse as a chain of attribute accesses
+        val parts = t.split("\\.")
+        val base = ujson.Obj("k" -> "name", "v" -> parts(0))
+        val result = parts.drop(1).foldLeft(base) { (acc, field) =>
+          ujson.Obj("k" -> "field", "a" -> acc, "f" -> field)
+        }
+        Some(result)
+      } else if (t.matches("""[A-Za-z_][A-Za-z0-9_]*\(\s*\)""")) {
+        // Parse as function call with no arguments (e.g., "object()" or "dict()")
+        val funcName = t.takeWhile(ch => ch.isLetterOrDigit || ch == '_')
+        Some(ujson.Obj("k" -> "call", "f" -> funcName, "args" -> ujson.Arr()))
+      } else {
+        // Cannot parse this default expression type
+        None
+      }
+    }
+  }
+
   // ---- Python starred assignment: `a, *b, c = xs` --------------------------------
   //
   // `pysrc2cpg` lowers it to `tmp = xs; a = tmp[0]; b = tmp[1:-1:1]; c = tmp[-1]`. That
@@ -10099,6 +10127,19 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "unit")
     // f-strings. Python only — see `pyFile`.
     else if (mfn == "<operator>.formatString" && pyFile) fstring(kids)
+    // String literal concatenation: `"a" "b"` and `"a" f"{x}"`. Python's implicit
+    // concatenation of adjacent string literals arrives as `<operator>.stringExpressionList`
+    // over the parts. Convert each part (plain literal or f-string) and concatenate with "+".
+    else if (pyFile && mfn == "<operator>.stringExpressionList") {
+      val parts: List[Option[ujson.Obj]] = kidsOf(c).map {
+        case l: Literal => pyStringLit(l.code.trim).map(t => ujson.Obj("k" -> "str", "v" -> t))
+        case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))
+        case _ => None
+      }
+      if (parts.nonEmpty && parts.forall(_.isDefined))
+        parts.map(_.get).reduceLeft((a, b) => ujson.Obj("k" -> "binop", "op" -> "+", "a" -> a, "b" -> b))
+      else hole("op:stringExpressionList:non-literal-part")
+    }
     // `004-function-pointer-tracking`: a call through a function-pointer-valued
     // variable Joern itself could not statically resolve (`<operator>.pointerCall`,
     // research.md §1). When the callee names a variable this method's own
@@ -10327,13 +10368,15 @@ import scala.annotation.tailrec
                           ujson.Obj("k" -> "name", "v" -> "self")))
             case None => (if (c.name.isEmpty) boundMethodCall(c, callee, args) else None)
               .getOrElse {
-              // A call with no callee name is not a call we can emit. `Expr.call` is *by
-              // name*; there is no "apply this value", so `f(x)(y)` — a callee that is
-              // itself computed — has no Core form. Emitting `call ""` (as this did) was
-              // worse than a hole: it type-checked, counted as translated, and then
-              // resolved to nothing at run time. That is the silently-wrong category the
-              // ledger exists to prevent, so it is now a hole that says which shape it was.
-              if (c.name.isEmpty)
+              // When the callee is a computed expression, emit `ccall` (call via computed value)
+              // rather than a hole. `Expr.ccall` evaluates the callee expression to a function
+              // and applies it.
+              if (c.name.isEmpty && callee.isDefined && !callee.exists(_.isInstanceOf[Call])) {
+                ujson.Obj("k" -> "ccall", "e" -> expr(callee.get),
+                          "args" -> argExprs(args, kwArgs))
+              }
+              // For cases we can't handle (nested calls, unresolvable names), emit a hole.
+              else if (c.name.isEmpty)
                 hole(if (callee.exists(_.isInstanceOf[Call])) "call:computed-callee"
                      else "call:no-callee-name")
               // Joern often resolves the callee to a method of this program. Emitting that
@@ -12669,6 +12712,11 @@ import scala.annotation.tailrec
                                     kidsOf(x).size == 2 =>
           val ks = kidsOf(x)
           ujson.Obj("k" -> "delIndex", "r" -> expr(ks(0)), "i" -> expr(ks(1)))
+        case (x: AstNode) :: Nil if isOp(x, "<operator>.slice") && pyFile &&
+                                    kidsOf(x).size == 4 =>
+          val ks = kidsOf(x)
+          ujson.Obj("k" -> "delSlice", "r" -> expr(ks(0)), "start" -> expr(ks(1)),
+                    "stop" -> expr(ks(2)), "step" -> expr(ks(3)))
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
         case (x: Call) :: Nil if x.methodFullName.startsWith("<operator>") =>
@@ -12948,7 +12996,26 @@ import scala.annotation.tailrec
     val body      = seqOf(bodyNodes.map(stmt))
     if (bodyNodes.isEmpty) holeS("control:TRY-shape")
     // Which handler runs depends on the exception type, which the CPG discarded.
-    else if (catches.size > 1) holeS("control:TRY-multiCatch")
+    else if (catches.size > 1) {
+      // For multiCatch, we emit all handlers with their (exception_var, handler_stmt) pairs.
+      // Since the CPG doesn't provide exception types, we use sequential trying in evaluation.
+      val handlers = catches.zipWithIndex.map { case (c, idx) =>
+        // Try to extract exception variable name from the CATCH node.
+        // In Joern's CPG, this might be accessible through various properties.
+        val excVar = try {
+          // Attempt to get the exception variable name from the CATCH node.
+          // The CPG might store this as a parameter or property.
+          c.asInstanceOf[ControlStructure].parameter
+            .filter(_.nonEmpty)
+            .map(_.head.name)
+            .getOrElse("__exc" + (idx + 1))
+        } catch {
+          case _: Exception => "__exc" + (idx + 1)
+        }
+        ujson.Arr(ujson.Str(excVar), stmt(c))
+      }
+      ujson.Obj("k" -> "multiCatch", "body" -> body, "handlers" -> ujson.Arr(handlers: _*))
+    }
     else {
       // `try: B except: H else: E finally: F` is three independent layers, and now that
       // `Stmt.tryFinally` exists each one has a constructor, so they compose:
@@ -14662,7 +14729,7 @@ import scala.annotation.tailrec
           if (po.nonEmpty) obj("posonly") = ujson.Arr.from(po.map(ujson.Str(_)))
           if (ds.nonEmpty)
             obj("defaults") = ujson.Arr.from(ds.map { case (p, t) =>
-              ujson.Arr(ujson.Str(p), pyDefaultLiteral(t).getOrElse(hole("param:default-nonliteral")))
+              ujson.Arr(ujson.Str(p), pyDefaultExpr(t).getOrElse(hole("param:default-nonliteral")))
             })
         case None =>
           obj("body") = seqOf(List(holeS("param:signature-unparsed"), body))

@@ -2349,6 +2349,37 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+  | n+1, h, ρ, .ccall f_expr args =>
+      match evalExpr ctx n h ρ f_expr with
+      | (h₁, .val f_val) =>
+        match evalList ctx n h₁ ρ args with
+        | (h₂, .inl r)  => (h₂, r)
+        | (h₂, .inr (vs, kws)) =>
+          match f_val with
+          | .fn g      => match ctx.resolve g with
+                          | some fn =>
+                            if fn.isMethod && fn.vararg.isNone
+                               && vs.length == fn.params.length + 1 then
+                              applyFunc ctx n h₂ fn (some (vs.headD .unit)) vs.tail kws
+                            else applyFunc ctx n h₂ fn none vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .clos g cap => match ctx.resolve g with
+                          | some fn => applyClosure ctx n h₂ fn cap vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .ref addr  =>
+            -- Function value stored as a boxed ref
+            match h₂.get addr with
+            | some o => match o.fields.find? (·.1 == "v") with
+                        | some (_, .fn g) => match ctx.resolve g with
+                                            | some fn => applyFunc ctx n h₂ fn none vs kws
+                                            | none    => (h₂, .hole "call:computed-ref")
+                        | some (_, .clos g cap) => match ctx.resolve g with
+                                                 | some fn => applyClosure ctx n h₂ fn cap vs kws
+                                                 | none    => (h₂, .hole "call:computed-ref")
+                        | _ => (h₂, .hole "call:computed-not-fn")
+            | none => (h₂, .hole "call:computed-dangling")
+          | _ => (h₂, .hole "call:computed-not-fn")
+      | (h₁, r)       => (h₁, r)
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>
@@ -2881,6 +2912,65 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .exn ex)    => (h₁, .exn ex)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  -- `del e[start:stop:step]`: slice deletion. Like delIndex but removes a range.
+  -- Supports step=1 (most common case). Other steps remain holes.
+  | n+1, h, ρ, .delSlice e start stop step =>
+      if !ctx.dialect.isPython then (h, .hole "op:delete-slice:not-python") else
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val c) =>
+        match evalExpr ctx n h₁ ρ start with
+        | (h₂, .val startV) =>
+          match evalExpr ctx n h₂ ρ stop with
+          | (h₃, .val stopV) =>
+            match evalExpr ctx n h₃ ρ step with
+            | (h₄, .val stepV) =>
+              -- Only implement step=1 case; multi-step slicing deferred
+              match pyIndex stepV with
+              | some stepI =>
+                  if stepI != 1 then (h₄, .hole "op:delete-slice:non-unit-step")
+                  else match c with
+                  | .ref r =>
+                    match h₄.get r with
+                    | none => (h₄, .hole "op:delete-slice:dangling-ref")
+                    | some o =>
+                      match o.payload with
+                      | .list vs =>
+                          match (pyIndex startV, pyIndex stopV) with
+                          | (some istart, some istop) =>
+                              match (Stdlib.seqIndex vs.length istart, Stdlib.seqIndex vs.length istop) with
+                              | (some jstart, some jstop) =>
+                                  (h₄.setPayload r (.list (Stdlib.dropRange vs jstart jstop)), .normal ρ)
+                              | _ => (h₄, .hole "op:delete-slice:index-out-of-range")
+                          | _ => (h₄, .hole "op:delete-slice:non-integer-index")
+                      | .str s =>
+                          match (pyIndex startV, pyIndex stopV) with
+                          | (some istart, some istop) =>
+                              match (Stdlib.seqIndex s.length istart, Stdlib.seqIndex s.length istop) with
+                              | (some jstart, some jstop) =>
+                                  let chars := s.toList.map String.mk
+                                  let deleted := Stdlib.dropRange chars jstart jstop
+                                  (h₄.setPayload r (.str (String.mk (deleted.map (·.get! 0)))), .normal ρ)
+                              | _ => (h₄, .hole "op:delete-slice:index-out-of-range")
+                          | _ => (h₄, .hole "op:delete-slice:non-integer-index")
+                      | _ => (h₄, .hole "op:delete-slice:unsupported-container")
+                  | c =>
+                    match valueSubscriptWrite ctx.dialect c "delSlice" with
+                    | .exn ex => (h₄, .exn ex)
+                    | .hole l => (h₄, .hole l)
+                    | _ => (h₄, .hole "delSlice:immutable-containers")
+              | none => (h₄, .hole "op:delete-slice:non-integer-step")
+            | (h₄, .exn ex)    => (h₄, .exn ex)
+            | (h₄, .hole l)    => (h₄, .hole l)
+            | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+          | (h₃, .exn ex)    => (h₃, .exn ex)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .exn ex)    => (h₂, .exn ex)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` an interior-pointer VALUE --
   -- requires the pointer operand to evaluate to `Val.iref r sel` and delegates,
   -- unconditionally, to the unchanged `Heap.setField`.
@@ -2930,6 +3020,20 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       match execStmt ctx n h ρ body with
       | (h₁, .exn v) => execStmt ctx n h₁ (ρ.set x v) handler
       | (h₁, r)      => (h₁, r)
+  -- Multi-catch: try body, then try handlers in order until one succeeds
+  | n+1, h, ρ, .multiCatch body handlers =>
+      match execStmt ctx n h ρ body with
+      | (h₁, .exn v) =>
+        -- Try each handler in order
+        let tryHandlers : List (String × Stmt) → (Heap × ExecResult) :=
+          fun hs => match hs with
+          | [] => (h₁, .exn v)  -- No handler matched, propagate
+          | (x, handler) :: rest =>
+            match execStmt ctx n h₁ (ρ.set x v) handler with
+            | (h₂, .exn _) => tryHandlers rest  -- This handler failed, try next
+            | (h₂, r)      => (h₂, r)           -- Handler succeeded
+        tryHandlers handlers
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
       | (h₁, .val v) =>

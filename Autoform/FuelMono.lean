@@ -54,6 +54,7 @@ def tfFreeS : Stmt → Bool
   | .breakBlock b    => tfFreeS b
   | .forIn _ _ b     => tfFreeS b
   | .tryCatch b _ hd => tfFreeS b && tfFreeS hd
+  | .multiCatch b hs => tfFreeS b && hs.all (fun (_, h) => tfFreeS h)
   | _                => true
 
 /-- A context every one of whose *reachable* function bodies is `tryFinally`-free.
@@ -500,6 +501,74 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                 | none => rw [hr3] at hy; exact hy
                             all_goals (dsimp only at hy ⊢; exact hy)
                     all_goals (rw [hg] at hy; exact hy)
+        | ccall f_expr args =>
+            -- Computed call: evaluate the function expression to get a value,
+            -- then dispatch based on the value's type (fn, clos, ref).
+            simp only [evalExpr] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ f_expr with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val f_val =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                -- Now f_val is the function to call; evaluate arguments
+                rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
+                rw [hB] at hy
+                cases s with
+                | inl e => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | inr p =>
+                    rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                    -- Now we have arguments; dispatch on the function value type
+                    cases f_val
+                    case fn g =>
+                        dsimp only at hy ⊢
+                        cases hres : Ctx.resolve ctx g with
+                        | some fn =>
+                            rw [hres] at hy
+                            dsimp only at hy ⊢
+                            split at hy <;> exact hy
+                        | none => rw [hres] at hy; exact hy
+                    case clos g cap =>
+                        dsimp only at hy ⊢
+                        cases hres : Ctx.resolve ctx g with
+                        | some fn =>
+                            rw [hres] at hy
+                            exact ihC _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                        | none => rw [hres] at hy; exact hy
+                    case ref addr =>
+                        dsimp only at hy ⊢
+                        cases hub : h₂.get addr with
+                        | none => rw [hub] at hy; exact hy
+                        | some o =>
+                            rw [hub] at hy
+                            dsimp only at hy ⊢
+                            cases hfind : o.fields.find? (fun x => x.1 == "v") with
+                            | none => simp only [hfind] at hy ⊢; exact hy
+                            | some fld =>
+                                simp only [hfind] at hy ⊢
+                                -- The field value is the actual function; recurse
+                                obtain ⟨_, fld_val⟩ := fld
+                                cases fld_val
+                                case fn g2 =>
+                                    dsimp only at hy ⊢
+                                    cases hres : Ctx.resolve ctx g2 with
+                                    | some fn =>
+                                        rw [hres] at hy
+                                        exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                                    | none => rw [hres] at hy; exact hy
+                                case clos g2 cap2 =>
+                                    dsimp only at hy ⊢
+                                    cases hres : Ctx.resolve ctx g2 with
+                                    | some fn =>
+                                        rw [hres] at hy
+                                        exact ihC _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                                    | none => rw [hres] at hy; exact hy
+                                -- For other value types in the ref field, it's an error
+                                all_goals (dsimp only at hy ⊢; exact hy)
+                    -- For other value types (int, str, bool, etc.), they can't be called
+                    all_goals (dsimp only at hy ⊢; exact hy)
         | mcall recv m args =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ recv with ⟨h₁, r₁⟩
@@ -1007,6 +1076,50 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                       · rw [if_neg hcd] at hy ⊢; exact hy
                     | _ => (simp only [hp] at hy ⊢; exact hy)
                 | _ => (dsimp only at hy ⊢; exact hy)
+        -- `del e[start:stop:step]`: slice deletion with unit step support
+        | delSlice e start stop step =>
+            simp only [execStmt] at hy ⊢
+            by_cases hpy : (!ctx.dialect.isPython) = true
+            · rw [if_pos hpy] at hy ⊢; exact hy
+            rw [if_neg hpy] at hy ⊢
+            rcases hB : evalExpr ctx k h ρ e with ⟨h₂, r₂⟩
+            rw [hB] at hy
+            cases r₂ with
+            | exn _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+            | hole _ => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val cv =>
+              rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+              dsimp only at hy ⊢
+              rcases hC : evalExpr ctx k h₂ ρ start with ⟨h₃, r₃⟩
+              rw [hC] at hy
+              cases r₃ with
+              | exn _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+              | hole _ => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+              | outOfFuel => cases hy; exact absurd rfl hne
+              | val sv =>
+                rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                dsimp only at hy ⊢
+                rcases hD : evalExpr ctx k h₃ ρ stop with ⟨h₄, r₄⟩
+                rw [hD] at hy
+                cases r₄ with
+                | exn _ => rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy
+                | hole _ => rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val tv =>
+                  rw [ihE _ hctx _ _ _ _ _ hD (by simp)]
+                  dsimp only at hy ⊢
+                  rcases hE : evalExpr ctx k h₄ ρ step with ⟨h₅, r₅⟩
+                  rw [hE] at hy
+                  cases r₅ with
+                  | exn _ => rw [ihE _ hctx _ _ _ _ _ hE (by simp)]; exact hy
+                  | hole _ => rw [ihE _ hctx _ _ _ _ _ hE (by simp)]; exact hy
+                  | outOfFuel => cases hy; exact absurd rfl hne
+                  | val stv =>
+                    rw [ihE _ hctx _ _ _ _ _ hE (by simp)]
+                    dsimp only at hy ⊢
+                    -- All operands evaluated; remaining cases just propagate results
+                    split_ifs at hy ⊢ <;> exact hy
         -- `006-reduce-remaining-holes`, Story 5: `*p = v` -- same shape as
         -- `setField`'s `ref`/non-object split, one constructor case instead of three.
         | setDerefIref p v =>
@@ -1142,6 +1255,48 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                  first
                    | exact hy
                    | exact ihS _ hctx _ _ _ hfree.2 _ _ hy hne)
+        | multiCatch b hs =>
+            simp only [tfFreeS, Bool.and_eq_true] at hfree
+            simp only [execStmt] at hy ⊢
+            rcases hA : execStmt ctx k h ρ b with ⟨h₁, c₁⟩
+            rw [hA] at hy
+            -- For multiCatch, handlers are a list of (String, Stmt) pairs
+            -- hfree.2 : hs.all (fun (_, h) => tfFreeS h) = true
+            cases c₁ with
+            | exn v =>
+                -- Body raised exception, try handlers
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                -- All handlers are fuel-free, so we can apply ihS to each one
+                -- Prove that tryHandlers gives same result with fuel k and k+1
+                clear hA hne
+                revert hy
+                -- Induct over the handlers list
+                induction hs generalizing h₁ with
+                | nil =>
+                    intro hy
+                    simp only at hy ⊢
+                    exact hy
+                | cons handler rest ih =>
+                    intro hy
+                    simp only at hfree
+                    rcases hfree with ⟨h_free, rest_free⟩
+                    simp only [execStmt] at hy ⊢
+                    rcases hB : execStmt ctx k h₁ (ρ.set handler.1 v) handler.2 with ⟨h₂, c₂⟩
+                    rw [hB] at hy
+                    cases c₂ with
+                    | exn _ =>
+                        -- Handler raised, try next
+                        rw [ihS _ hctx _ _ _ h_free _ _ hB (by simp)]
+                        exact ih rest_free hy
+                    | c =>
+                        -- Handler succeeded, return result
+                        rw [ihS _ hctx _ _ _ h_free _ _ hB (by simp)]
+                        exact hy
+            | c =>
+                -- Body completed normally (not an exception)
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact hy
         | ifte cnd t el =>
             simp only [tfFreeS, Bool.and_eq_true] at hfree
             simp only [execStmt] at hy ⊢

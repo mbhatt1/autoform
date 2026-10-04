@@ -145,6 +145,12 @@ def seqIndex (n : Nat) (i : Int) : Option Nat :=
 /-- Remove the element at a resolved position. -/
 def dropAt (vs : List Val) (k : Nat) : List Val := vs.take k ++ vs.drop (k + 1)
 
+/-- Remove elements in the range [start, stop). Used for slice deletion. -/
+def dropRange (vs : List Val) (start stop : Nat) : List Val :=
+  if start >= vs.length then vs
+  else if stop <= start then vs
+  else vs.take start ++ vs.drop (Nat.min stop vs.length)
+
 /-! ## Iteration and ordering -/
 
 /-- What a value yields when iterated. Extends `Val.iterable` with the string case

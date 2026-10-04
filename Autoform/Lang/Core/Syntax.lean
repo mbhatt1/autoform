@@ -406,6 +406,8 @@ inductive Expr where
   | binop  : String → Expr → Expr → Expr
   | unop   : String → Expr → Expr
   | call   : String → List Expr → Expr
+  /-- Call through a computed function value: `f()` where `f` is a runtime value. -/
+  | ccall  : Expr → List Expr → Expr
   | index  : Expr → Expr → Expr
   /-- Attribute access: `e.f`. -/
   | field  : Expr → String → Expr
@@ -606,6 +608,10 @@ inductive Stmt where
   `dict` loses the key (`KeyError` if absent), a boxed `list` loses the position
   (`IndexError` if out of range), a user class runs its own `__delitem__`. -/
   | delIndex : Expr → Expr → Stmt
+  /-- `del x[start:stop:step]` — slice deletion. Like `delIndex` but removes a range
+  from a sequence. `start`, `stop`, and `step` are the slice bounds; Python semantics apply
+  (negative indices, None values, etc.). Applies to lists and strings like `delIndex` does. -/
+  | delSlice : Expr → Expr → Expr → Expr → Stmt
   /-- `006-reduce-remaining-holes`, Story 5: `*p = v` where `p` is an interior-pointer
   VALUE (as opposed to `Stmt.setField`, which takes an explicit field name for a NAMED
   receiver). Requires its pointer operand to evaluate to `Val.iref r sel` and
@@ -636,6 +642,10 @@ inductive Stmt where
   abnormal exit from the finalizer discards the pending outcome of the body — Python's
   rule, so `try: return 1 finally: return 2` returns 2. -/
   | tryFinally : Stmt → Stmt → Stmt
+  /-- `try: body except name1: h1 except name2: h2 ...` Multiple exception handlers.
+  List of (exception_var, handler_stmt) pairs, tried in order. Like tryCatch but handles
+  multiple except clauses instead of just one. -/
+  | multiCatch : Stmt → List (String × Stmt) → Stmt
   | raise    : Expr → Stmt
   /-- `del x` -/
   | del      : String → Stmt
@@ -837,6 +847,7 @@ def holes : Stmt → List String
   | .setField r _ v  => r.holes ++ v.holes
   | .setIndex r i v  => r.holes ++ i.holes ++ v.holes
   | .delIndex r i    => r.holes ++ i.holes
+  | .delSlice r s e st => r.holes ++ s.holes ++ e.holes ++ st.holes
   | .setDerefIref p v => p.holes ++ v.holes
   | .seq a b         => a.holes ++ b.holes
   | .ifte c a b      => c.holes ++ a.holes ++ b.holes
@@ -846,6 +857,7 @@ def holes : Stmt → List String
   | .ret e           => e.holes
   | .tryCatch b _ h  => b.holes ++ h.holes
   | .tryFinally b f  => b.holes ++ f.holes
+  | .multiCatch b hs => b.holes ++ (hs.flatMap fun (_, h) => h.holes)
   | .raise e         => e.holes
   | .setGlobal _ e   => e.holes
   | _                => []
@@ -857,6 +869,7 @@ def size : Stmt → Nat
   | .setField r _ v  => 1 + r.size + v.size
   | .setIndex r i v  => 1 + r.size + i.size + v.size
   | .delIndex r i    => 1 + r.size + i.size
+  | .delSlice r s e st => 1 + r.size + s.size + e.size + st.size
   | .setDerefIref p v => 1 + p.size + v.size
   | .seq a b         => a.size + b.size
   | .ifte c a b      => 1 + c.size + a.size + b.size
@@ -866,6 +879,7 @@ def size : Stmt → Nat
   | .ret e           => 1 + e.size
   | .tryCatch b _ h  => 1 + b.size + h.size
   | .tryFinally b f  => 1 + b.size + f.size
+  | .multiCatch b hs => 1 + b.size + (hs.map fun (_, h) => h.size).sum
   | .raise e         => 1 + e.size
   | .setGlobal _ e   => 1 + e.size
   | _                => 1
