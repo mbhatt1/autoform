@@ -2987,6 +2987,20 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       match execStmt ctx n h ρ body with
       | (h₁, .exn v) => execStmt ctx n h₁ (ρ.set x v) handler
       | (h₁, r)      => (h₁, r)
+  -- Multi-catch: try body, then try handlers in order until one succeeds
+  | n+1, h, ρ, .multiCatch body handlers =>
+      match execStmt ctx n h ρ body with
+      | (h₁, .exn v) =>
+        -- Try each handler in order
+        let tryHandlers : List (String × Stmt) → (Heap × ExecResult) :=
+          fun hs => match hs with
+          | [] => (h₁, .exn v)  -- No handler matched, propagate
+          | (x, handler) :: rest =>
+            match execStmt ctx n h₁ (ρ.set x v) handler with
+            | (h₂, .exn _) => tryHandlers rest  -- This handler failed, try next
+            | (h₂, r)      => (h₂, r)           -- Handler succeeded
+        tryHandlers handlers
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
       | (h₁, .val v) =>

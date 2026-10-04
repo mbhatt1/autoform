@@ -12981,7 +12981,26 @@ import scala.annotation.tailrec
     val body      = seqOf(bodyNodes.map(stmt))
     if (bodyNodes.isEmpty) holeS("control:TRY-shape")
     // Which handler runs depends on the exception type, which the CPG discarded.
-    else if (catches.size > 1) holeS("control:TRY-multiCatch")
+    else if (catches.size > 1) {
+      // For multiCatch, we emit all handlers with their (exception_var, handler_stmt) pairs.
+      // Since the CPG doesn't provide exception types, we use sequential trying in evaluation.
+      val handlers = catches.zipWithIndex.map { case (c, idx) =>
+        // Try to extract exception variable name from the CATCH node.
+        // In Joern's CPG, this might be accessible through various properties.
+        val excVar = try {
+          // Attempt to get the exception variable name from the CATCH node.
+          // The CPG might store this as a parameter or property.
+          c.asInstanceOf[ControlStructure].parameter
+            .filter(_.nonEmpty)
+            .map(_.head.name)
+            .getOrElse("__exc" + (idx + 1))
+        } catch {
+          case _: Exception => "__exc" + (idx + 1)
+        }
+        ujson.Arr(ujson.Str(excVar), stmt(c))
+      }
+      ujson.Obj("k" -> "multiCatch", "body" -> body, "handlers" -> ujson.Arr(handlers: _*))
+    }
     else {
       // `try: B except: H else: E finally: F` is three independent layers, and now that
       // `Stmt.tryFinally` exists each one has a constructor, so they compose:

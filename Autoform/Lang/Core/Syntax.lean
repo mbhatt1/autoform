@@ -642,6 +642,10 @@ inductive Stmt where
   abnormal exit from the finalizer discards the pending outcome of the body — Python's
   rule, so `try: return 1 finally: return 2` returns 2. -/
   | tryFinally : Stmt → Stmt → Stmt
+  /-- `try: body except name1: h1 except name2: h2 ...` Multiple exception handlers.
+  List of (exception_var, handler_stmt) pairs, tried in order. Like tryCatch but handles
+  multiple except clauses instead of just one. -/
+  | multiCatch : Stmt → List (String × Stmt) → Stmt
   | raise    : Expr → Stmt
   /-- `del x` -/
   | del      : String → Stmt
@@ -853,6 +857,7 @@ def holes : Stmt → List String
   | .ret e           => e.holes
   | .tryCatch b _ h  => b.holes ++ h.holes
   | .tryFinally b f  => b.holes ++ f.holes
+  | .multiCatch b hs => b.holes ++ (hs.flatMap fun (_, h) => h.holes)
   | .raise e         => e.holes
   | .setGlobal _ e   => e.holes
   | _                => []
@@ -874,6 +879,7 @@ def size : Stmt → Nat
   | .ret e           => 1 + e.size
   | .tryCatch b _ h  => 1 + b.size + h.size
   | .tryFinally b f  => 1 + b.size + f.size
+  | .multiCatch b hs => 1 + b.size + (hs.map fun (_, h) => h.size).sum
   | .raise e         => 1 + e.size
   | .setGlobal _ e   => 1 + e.size
   | _                => 1

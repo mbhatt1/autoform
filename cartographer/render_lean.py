@@ -286,6 +286,14 @@ def stmt_shape(n):
     if k == "setDerefIref": return ".setDerefIref", [("e", f('p')), ("e", f('v'))]
     if k == "forIn":    return ".forIn", [("atom", lean_str(f('x'))), ("e", f('e')), ("s", f('body'))]
     if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]
+    if k == "multiCatch":
+        handlers = f('handlers')
+        if not isinstance(handlers, list):
+            raise ValueError(f"multiCatch handlers must be a list, got {type(handlers)}")
+        # multiCatch handlers are (String, Stmt) pairs, not (Expr, Expr) pairs.
+        # We render them as a list of pairs where each pair is (string_expr, stmt).
+        # The "ss" tag indicates "statement-pairs" (list of statement pairs).
+        return ".multiCatch", [("s", f('body')), ("ss", [[{"k": "str", "v": name}, stmt] for name, stmt in handlers])]
     # `try: body finally: fin`. Distinct from `tryCatch` because it intercepts *every* way
     # control leaves the body — return/break/continue as well as exceptions — and then
     # re-raises that outcome unless the finalizer itself leaves abnormally.
@@ -361,15 +369,19 @@ def flat_child_capped(c, cap):
         return val if len(val) <= cap else None
     if tag in ("e", "s"):
         return flat_capped(val, tag, cap)
-    if tag in ("es", "ps"):
+    if tag in ("es", "ps", "ss"):
         items = _seq(val)
         budget = cap - 2                  # the brackets
         if budget < 0:
             return None
         parts = []
         for x in items:
-            piece = (flat_capped(x, "e", budget) if tag == "es"
-                     else _flat_pair_capped(x, budget))
+            if tag == "es":
+                piece = flat_capped(x, "e", budget)
+            elif tag == "ps":
+                piece = _flat_pair_capped(x, budget)
+            else:  # tag == "ss"
+                piece = _flat_stmt_pair_capped(x, budget)
             if piece is None:
                 return None
             budget -= len(piece) + 2      # ", "
@@ -394,6 +406,19 @@ def _flat_pair_capped(p, cap):
     return out if len(out) <= cap else None
 
 
+def _flat_stmt_pair_capped(p, cap):
+    if not (isinstance(p, list) and len(p) == 2):
+        raise ValueError(f"statement pair must be a 2-element array, got {p!r}")
+    a = flat_capped(p[0], "e", cap - 4)
+    if a is None:
+        return None
+    b = flat_capped(p[1], "s", cap - 4 - len(a))
+    if b is None:
+        return None
+    out = "(" + a + ", " + b + ")"
+    return out if len(out) <= cap else None
+
+
 def flat_child(c) -> str:
     tag, val = c
     if tag == "atom":
@@ -404,6 +429,8 @@ def flat_child(c) -> str:
         return "[" + ", ".join(flat(x, "e") for x in _seq(val)) + "]"
     if tag == "ps":
         return "[" + ", ".join(_flat_pair(p) for p in _seq(val)) + "]"
+    if tag == "ss":
+        return "[" + ", ".join(_flat_stmt_pair(p) for p in _seq(val)) + "]"
     raise AssertionError(tag)
 
 def _seq(val):
@@ -417,6 +444,11 @@ def _flat_pair(p):
     if not (isinstance(p, list) and len(p) == 2):
         raise ValueError(f"dictE pair must be a 2-element array, got {p!r}")
     return "(" + flat(p[0], "e") + ", " + flat(p[1], "e") + ")"
+
+def _flat_stmt_pair(p):
+    if not (isinstance(p, list) and len(p) == 2):
+        raise ValueError(f"statement pair must be a 2-element array, got {p!r}")
+    return "(" + flat(p[0], "e") + ", " + flat(p[1], "s") + ")"
 
 def _render_seq_chain(node, col) -> str:
     """Render a `Stmt.seq` whose flat form already failed to fit at `col`, without one
@@ -499,7 +531,7 @@ def render_child(c, col) -> str:
         return val
     if tag in ("e", "s"):
         return render(val, tag, col)
-    if tag in ("es", "ps"):
+    if tag in ("es", "ps", "ss"):
         items = _seq(val)
         if not items:
             return "[]"
@@ -510,8 +542,12 @@ def render_child(c, col) -> str:
         # stays readable and each line is independently diffable.
         pad = " " * col
         deeper = min(col + INDENT, MAX_INDENT)
-        rendered = ([render(x, "e", deeper) for x in items] if tag == "es"
-                    else [render_pair(p, deeper) for p in items])
+        if tag == "es":
+            rendered = [render(x, "e", deeper) for x in items]
+        elif tag == "ps":
+            rendered = [render_pair(p, deeper) for p in items]
+        else:  # tag == "ss"
+            rendered = [render_stmt_pair(p, deeper) for p in items]
         body = ("\n" + pad + ", ").join(rendered)
         return "[ " + body + " ]"
     raise AssertionError(tag)
@@ -523,6 +559,14 @@ def render_pair(p, col) -> str:
     inner = min(col + INDENT, MAX_INDENT)
     return ("(" + render(p[0], "e", inner) + ",\n" + " " * inner
             + render(p[1], "e", inner) + ")")
+
+def render_stmt_pair(p, col) -> str:
+    one = _flat_stmt_pair(p)
+    if col + len(one) <= WIDTH:
+        return one
+    inner = min(col + INDENT, MAX_INDENT)
+    return ("(" + render(p[0], "e", inner) + ",\n" + " " * inner
+            + render(p[1], "s", inner) + ")")
 
 # Kept as the public entry points other tooling may import.
 def expr(n) -> str:
