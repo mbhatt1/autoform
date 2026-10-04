@@ -54,6 +54,7 @@ def tfFreeS : Stmt → Bool
   | .breakBlock b    => tfFreeS b
   | .forIn _ _ b     => tfFreeS b
   | .tryCatch b _ hd => tfFreeS b && tfFreeS hd
+  | .multiCatch b hs => tfFreeS b && hs.all (fun (_, h) => tfFreeS h)
   | _                => true
 
 /-- A context every one of whose *reachable* function bodies is `tryFinally`-free.
@@ -1210,6 +1211,25 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                  first
                    | exact hy
                    | exact ihS _ hctx _ _ _ hfree.2 _ _ hy hne)
+        | multiCatch b hs =>
+            simp only [tfFreeS, Bool.and_eq_true] at hfree
+            simp only [execStmt] at hy ⊢
+            rcases hA : execStmt ctx k h ρ b with ⟨h₁, c₁⟩
+            rw [hA] at hy
+            -- For multiCatch, handlers are a list of (String, Stmt) pairs
+            -- hfree.2 : hs.all (fun (_, h) => tfFreeS h) = true
+            cases c₁ with
+            | exn v =>
+                -- Body raised exception, try handlers
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                -- Need to show that trying handlers with fuel k and k+1 gives same result
+                -- The handler list is fuel-free, so we can inductively apply ihS to each
+                sorry
+            | c =>
+                -- Body completed normally (not an exception)
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact hy
         | ifte cnd t el =>
             simp only [tfFreeS, Bool.and_eq_true] at hfree
             simp only [execStmt] at hy ⊢
