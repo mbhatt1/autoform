@@ -10127,6 +10127,19 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "unit")
     // f-strings. Python only — see `pyFile`.
     else if (mfn == "<operator>.formatString" && pyFile) fstring(kids)
+    // String literal concatenation: `"a" "b"` and `"a" f"{x}"`. Python's implicit
+    // concatenation of adjacent string literals arrives as `<operator>.stringExpressionList`
+    // over the parts. Convert each part (plain literal or f-string) and concatenate with "+".
+    else if (pyFile && mfn == "<operator>.stringExpressionList") {
+      val parts: List[Option[ujson.Obj]] = kidsOf(c).map {
+        case l: Literal => pyStringLit(l.code.trim).map(t => ujson.Obj("k" -> "str", "v" -> t))
+        case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))
+        case _ => None
+      }
+      if (parts.nonEmpty && parts.forall(_.isDefined))
+        parts.map(_.get).reduceLeft((a, b) => ujson.Obj("k" -> "binop", "op" -> "+", "a" -> a, "b" -> b))
+      else hole("op:stringExpressionList:non-literal-part")
+    }
     // `004-function-pointer-tracking`: a call through a function-pointer-valued
     // variable Joern itself could not statically resolve (`<operator>.pointerCall`,
     // research.md §1). When the callee names a variable this method's own
