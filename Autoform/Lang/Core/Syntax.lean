@@ -608,6 +608,10 @@ inductive Stmt where
   `dict` loses the key (`KeyError` if absent), a boxed `list` loses the position
   (`IndexError` if out of range), a user class runs its own `__delitem__`. -/
   | delIndex : Expr → Expr → Stmt
+  /-- `del x[start:stop:step]` — slice deletion. Like `delIndex` but removes a range
+  from a sequence. `start`, `stop`, and `step` are the slice bounds; Python semantics apply
+  (negative indices, None values, etc.). Applies to lists and strings like `delIndex` does. -/
+  | delSlice : Expr → Expr → Expr → Expr → Stmt
   /-- `006-reduce-remaining-holes`, Story 5: `*p = v` where `p` is an interior-pointer
   VALUE (as opposed to `Stmt.setField`, which takes an explicit field name for a NAMED
   receiver). Requires its pointer operand to evaluate to `Val.iref r sel` and
