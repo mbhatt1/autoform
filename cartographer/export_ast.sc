@@ -10355,13 +10355,15 @@ import scala.annotation.tailrec
                           ujson.Obj("k" -> "name", "v" -> "self")))
             case None => (if (c.name.isEmpty) boundMethodCall(c, callee, args) else None)
               .getOrElse {
-              // A call with no callee name is not a call we can emit. `Expr.call` is *by
-              // name*; there is no "apply this value", so `f(x)(y)` — a callee that is
-              // itself computed — has no Core form. Emitting `call ""` (as this did) was
-              // worse than a hole: it type-checked, counted as translated, and then
-              // resolved to nothing at run time. That is the silently-wrong category the
-              // ledger exists to prevent, so it is now a hole that says which shape it was.
-              if (c.name.isEmpty)
+              // When the callee is a computed expression, emit `ccall` (call via computed value)
+              // rather than a hole. `Expr.ccall` evaluates the callee expression to a function
+              // and applies it.
+              if (c.name.isEmpty && callee.isDefined && !callee.exists(_.isInstanceOf[Call])) {
+                ujson.Obj("k" -> "ccall", "e" -> expr(callee.get),
+                          "args" -> argExprs(args, kwArgs))
+              }
+              // For cases we can't handle (nested calls, unresolvable names), emit a hole.
+              else if (c.name.isEmpty)
                 hole(if (callee.exists(_.isInstanceOf[Call])) "call:computed-callee"
                      else "call:no-callee-name")
               // Joern often resolves the callee to a method of this program. Emitting that
