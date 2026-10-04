@@ -282,6 +282,7 @@ def stmt_shape(n):
     if k == "setIndex": return ".setIndex", [("e", f('r')), ("e", f('i')), ("e", f('v'))]
     # `del e[i]` (Python only; every other language keeps `op:delete-index`).
     if k == "delIndex": return ".delIndex", [("e", f('r')), ("e", f('i'))]
+    if k == "delSlice": return ".delSlice", [("e", f('r')), ("e", f('start')), ("e", f('stop')), ("e", f('step'))]
     if k == "setDerefIref": return ".setDerefIref", [("e", f('p')), ("e", f('v'))]
     if k == "forIn":    return ".forIn", [("atom", lean_str(f('x'))), ("e", f('e')), ("s", f('body'))]
     if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]

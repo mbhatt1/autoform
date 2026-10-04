@@ -843,6 +843,7 @@ def holes : Stmt → List String
   | .setField r _ v  => r.holes ++ v.holes
   | .setIndex r i v  => r.holes ++ i.holes ++ v.holes
   | .delIndex r i    => r.holes ++ i.holes
+  | .delSlice r s e st => r.holes ++ s.holes ++ e.holes ++ st.holes
   | .setDerefIref p v => p.holes ++ v.holes
   | .seq a b         => a.holes ++ b.holes
   | .ifte c a b      => c.holes ++ a.holes ++ b.holes
@@ -863,6 +864,7 @@ def size : Stmt → Nat
   | .setField r _ v  => 1 + r.size + v.size
   | .setIndex r i v  => 1 + r.size + i.size + v.size
   | .delIndex r i    => 1 + r.size + i.size
+  | .delSlice r s e st => 1 + r.size + s.size + e.size + st.size
   | .setDerefIref p v => 1 + p.size + v.size
   | .seq a b         => a.size + b.size
   | .ifte c a b      => 1 + c.size + a.size + b.size

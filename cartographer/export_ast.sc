@@ -12697,6 +12697,11 @@ import scala.annotation.tailrec
                                     kidsOf(x).size == 2 =>
           val ks = kidsOf(x)
           ujson.Obj("k" -> "delIndex", "r" -> expr(ks(0)), "i" -> expr(ks(1)))
+        case (x: AstNode) :: Nil if isOp(x, "<operator>.slice") && pyFile &&
+                                    kidsOf(x).size == 4 =>
+          val ks = kidsOf(x)
+          ujson.Obj("k" -> "delSlice", "r" -> expr(ks(0)), "start" -> expr(ks(1)),
+                    "stop" -> expr(ks(2)), "step" -> expr(ks(3)))
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
         case (x: Call) :: Nil if x.methodFullName.startsWith("<operator>") =>
