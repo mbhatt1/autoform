@@ -2913,19 +2913,21 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `del e[start:stop:step]`: slice deletion. Like delIndex but removes a range.
-  -- For now, holes on complex cases; handles the common `del x[:]` pattern.
+  -- Python slice semantics require handling None values, negative indices, and step.
+  -- Full implementation deferred; basic structure evaluates all operands and returns hole.
   | n+1, h, ρ, .delSlice e start stop step =>
       if !ctx.dialect.isPython then (h, .hole "op:delete-slice:not-python") else
       match evalExpr ctx n h ρ e with
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ start with
-        | (h₂, start_val) =>
+        | (h₂, _) =>
           match evalExpr ctx n h₂ ρ stop with
-          | (h₃, stop_val) =>
+          | (h₃, _) =>
             match evalExpr ctx n h₃ ρ step with
-            | (h₄, step_val) =>
-              -- For now, return holes on complex slice operations
-              (h₄, .hole "op:delete-slice:complex")
+            | (h₄, .val _) =>
+              -- All operands evaluated without error; implementation deferred
+              -- Would need: normalize indices, compute affected elements, modify container
+              (h₄, .hole "op:delete-slice:deferred-implementation")
             | (h₄, .exn ex)    => (h₄, .exn ex)
             | (h₄, .hole l)    => (h₄, .hole l)
             | (h₄, .outOfFuel) => (h₄, .outOfFuel)
