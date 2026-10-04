@@ -500,7 +500,18 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                 | none => rw [hr3] at hy; exact hy
                             all_goals (dsimp only at hy ⊢; exact hy)
                     all_goals (rw [hg] at hy; exact hy)
-        | ccall f_expr args => sorry
+        | ccall f_expr args =>
+            -- Similar to call: evaluate the function value, then dispatch on its type
+            simp only [evalExpr] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ f_expr with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val f_val =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                sorry  -- TODO: complete case analysis on f_val (fn, clos, ref)
         | mcall recv m args =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ recv with ⟨h₁, r₁⟩
