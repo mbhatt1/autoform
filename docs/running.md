@@ -53,8 +53,7 @@ python3 cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.le
 ### Joern — pinned, like the Lean toolchain
 
 Joern supplies the code property graph that is this project's universal front end. It is a
-**~1.7 GB download**, which is why CI never installs it on the gating build — the Joern
-end-to-end job is opt-in.
+**~1.7 GB download**, so CI installs it only in the dedicated `joern-pipeline` job. That job now runs automatically after `build-and-audit`, restores the `.lake` cache saved by the build job, caches the Joern zip install, verifies the pin, and then drives a small corpus through the CLI.
 
 **The version is pinned in `joern-version`, and the pin is load-bearing.** The neutral AST
 is a *function of the front end*: which nodes exist, how `fullName`s resolve, whether
@@ -91,14 +90,9 @@ mkdir -p ~/joern && unzip -q joern-cli.zip -d ~/joern
 The scripts look for `"$JOERN_HOME/joern-cli"` with `JOERN_HOME` defaulting to `~/joern`,
 so the layout above needs no configuration. Joern needs a JDK (temurin 21 is what CI uses).
 
-On Linux the official installer generally works:
+On Linux the official installer generally works, but CI deliberately uses the same pinned zip asset as the macOS instructions. That avoids a moving `latest` download and keeps the installed bytes tied to `joern-version`.
 
-```sh
-curl -L https://github.com/joernio/joern/releases/latest/download/joern-install.sh -o joern-install.sh
-chmod +x joern-install.sh && sudo ./joern-install.sh --without-plugins
-```
-
-Confirm the binary runs before believing the install — "exit 0" is the shape a silent
+Confirm the binary runs before believing any install — "exit 0" is the shape a silent
 failure takes.
 
 ### The source tree the CPG was built from — a hard precondition
@@ -181,14 +175,16 @@ on `workflow_dispatch`). Four jobs:
 | `python-tests` (`pytest (Python tooling)`, 20 min) | yes | Python 3.12, `pip install pytest`, `python3 -m pytest tests/ -q`, then `python3 scripts/check_provenance.py`. No Lean and no Joern. |
 | `build-and-audit` (`build + trust audit`, job limit 340 min) | yes | regenerate `Autoform/Generated/V8Base.lean` from the tracked AST; print the runner's `nproc`/`free -m`/`df -h`; restore `.lake` from cache; build in **stages**, each with its own time limit and each followed by its own cache save (`if: always()`, a distinct key ending in the run id, so a partial build is kept and the newest entry is restored): stage 1 every module except the V8Base parts (+ `V8Base.Base`), stages 2-6 `scripts/ci_build_v8base_parts.sh FROM TO` over parts 1-15, 16-30, 31-45, 46-60, 61-73 **one part at a time** (a single heavy part peaks at 6.6-8.7 GB, so Lake's default of several at once exhausted the runner), then a default `lake build` as a completeness check; `audit_all.py --strict --skip-kernel`; `check_render.py`; `check_specs_fresh.py`; clone cachetools at the pinned `01af8e5` and require the conformance oracle to compare more than 0 cases; regenerate `ledger-Cachetools.json` and run `check_docs.py`; the FuelMono exclusion-list guard; the theorem-count floors; `check_specs.py Basis`; the `C_not_tfFree` refutation guard; `check_render.py --strict` for the log only (`|| true`); the demo. |
 | `kernel-replay` (job limit 340 min) | yes, but only runs if `build-and-audit` succeeded (`needs`) | restores the `.lake` the build job saved and **fails on a cache miss** rather than rebuilding; `lake build` as a no-op bounded to 30 min; then `audit_all.py --kernel-only --strict`. |
-| `joern-pipeline` (120 min) | no: only on `workflow_dispatch` with `run_joern: true` | installs Joern (about 1.7 GB), builds, runs `./autoform.sh` on a sample directory. |
+| `joern-pipeline` (120 min) | yes, after `build-and-audit` succeeds (`needs`) | restores the `.lake` saved by the build job and fails on a cache miss; installs or restores cached Joern 4.0.606 from the pinned release zip asset; verifies the Joern pin; runs a bounded no-op `lake build`; creates a small C corpus and runs `./autoform.sh` end to end. |
+
+
+`.github/workflows/cli.yml` separately tests the packaged CLI, builds the wheel and source distribution, runs `twine check`, and uploads the distributions as a workflow artifact. It publishes to the PyPI project `autoform-cli` only when a GitHub release is published or when the workflow is manually run with `publish=true`; the package still installs the `autoform` console command.
 
 What this does and does not establish. The build job's audit prints `VERDICT: PASS (no
 trusted-code leak); the kernel replay was NOT run here` and records the replay as
 `DELEGATED` in `audit.json`; that line is a pass of the axiom and source sweeps only. The
 replay itself is the other job. CI does **not** run the mutation gate, the execution
-oracle, any non-Python oracle fixture except through pytest, or Joern on the gating path;
-the conformance step only asserts the oracle is alive, not what its agreement rate is.
+oracle, or any non-Python oracle fixture except through pytest and the Joern pipeline's small C smoke corpus; the conformance step only asserts the oracle is alive, not what its agreement rate is.
 
 ## 2. The two entry points
 

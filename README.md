@@ -19,10 +19,11 @@ exported (Joern's dataflow overlay crashes on them), and binaries were not teste
 
 ## Use
 
-The preferred entry point is the `autoform` CLI. It owns pipeline orchestration and provides config-file support, dry-run mode, dependency checks, run manifests and JSON output for CI. The legacy shell scripts now delegate to it.
+The preferred entry point is the `autoform` CLI. It owns pipeline orchestration and provides config-file support, dry-run mode, dependency checks, run manifests and JSON output for CI. The Python package name is `autoform-cli` because the `autoform` PyPI name is already occupied; the installed command remains `autoform`. The legacy shell scripts now delegate to it.
 
 ```sh
 python3 -m pip install -e .[dev]
+# after a PyPI release: python3 -m pip install autoform-cli
 autoform --repo-root /path/to/autoform doctor
 autoform validate --json               # validate autoform.toml before fleet runs
 autoform translate <source-dir> <ModuleName>
@@ -396,7 +397,7 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs four jobs.
+`.github/workflows/ci.yml` runs four jobs. `.github/workflows/cli.yml` smoke-tests the packaged CLI, builds the wheel and source distribution on every push/PR/release/manual run, and publishes `autoform-cli` to PyPI only for a GitHub release or a manual run with `publish=true`.
 
 - **`pytest (Python tooling)`**: the whole `tests/` suite and `check_provenance`. No Lean, no
   Joern. Minutes.
@@ -419,14 +420,9 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   job saved, and fails fast on a cache miss instead of becoming a second build.
   `tests/test_ci_kernel_replay.py` fails if this job, or the build job's `--skip-kernel`,
   is removed.
-- **`end-to-end pipeline (Joern, manual only)`**: not part of the gate.
+- **`end-to-end pipeline (Joern)`**: restores the `.lake` cache saved by `build + trust audit`, installs cached Joern 4.0.606 from the release zip asset, verifies the Joern pin, runs a no-op `lake build`, and drives a small C corpus through `./autoform.sh`.
 
-**Status (2026-10-02):** `pytest` and `check_provenance` pass on `main`. The staged build
-has not yet run on a real runner, and neither have the build job's later steps or the
-`kernel-replay` job: the single-`lake build` layout that preceded it was ended by the
-runner's memory limit in every run that got far enough (see STRATEGY.md section 67).
-Three corpora (Ansible, LinuxCrypto, LinuxLib) have no committed AST by policy, and
-`check_render` reports them as *not checked* (never as verified).
+**Status (2026-10-05):** the CI and CLI smoke workflows pass on `main` after the regenerated AST baseline fixes. Joern now runs automatically after `build + trust audit` instead of behind a manual `workflow_dispatch` flag. Three corpora (Ansible, LinuxCrypto, LinuxLib) have no committed AST by policy, and `check_render` reports them as *not checked* (never as verified).
 
 ## Dependencies
 

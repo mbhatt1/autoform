@@ -4,7 +4,17 @@ on:
   pull_request:
   push:
     branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish autoform-cli to PyPI after tests and package checks pass"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 jobs:
   cli-smoke:
@@ -68,3 +78,52 @@ jobs:
             autoform-fleet-report.md
             autoform-checks.xml
             autoform.sarif
+
+  build-package:
+    name: build Python package
+    runs-on: ubuntu-latest
+    needs: cli-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check dist/*
+      - name: Upload package distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/*
+
+  publish-pypi:
+    name: publish autoform-cli to PyPI
+    runs-on: ubuntu-latest
+    needs: build-package
+    if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish == true) }}
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+    steps:
+      - name: Download package distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist
+      - name: Publish to PyPI with API token
+        if: ${{ env.PYPI_API_TOKEN != '' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish to PyPI with trusted publishing
+        if: ${{ env.PYPI_API_TOKEN == '' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
