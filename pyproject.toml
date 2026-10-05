@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autoform-cli"
+version = "0.1.0"
+description = "Enterprise command line interface for Autoform assurance pipelines"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Autoform contributors" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+toml = ["tomli>=2; python_version < '3.11'"]
+
+[project.scripts]
+autoform = "autoform_cli.cli:main"
+
+[tool.setuptools]
+packages = ["autoform_cli"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

@@ -370,9 +370,9 @@ scripts/export_with_provenance.sh <source-dir> <ModuleName>
 ```
 
 `joern-parse` → `export_ast.sc` → `provenance.py record`, refusing to start unless the
-installed Joern matches the pin. `./autoform.sh` does **not** yet record provenance (it
-contains no call to `provenance.py`; see docs/architecture.md, "Merge-phase changes this
-asks for elsewhere"), so an AST it produces is unattributed and the checker will name it.
+installed Joern matches the pin. The `autoform translate` / `autoform assure` pipeline,
+including the legacy `./autoform.sh` and `./assure.sh` wrappers, performs that same pin
+check and records `provenance/ast-<Module>.json.prov.json` during full runs.
 
 To record provenance for an artifact produced some other way:
 

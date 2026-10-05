@@ -11,7 +11,7 @@
  "joern_version": "4.0.606",
  "frontend": "io.joern:jssrc2cpg_3:4.0.606 (Maven Central) with the astgen 3.47.0 binary (github.com/joernio/astgen-monorepo, release javascript-astgen/v3.47.0, asset astgen-linux, sha256 88b83632f6e8149d51b8d47503bda802c04501c099da98ce8ee3597fe1835f17) named by ASTGEN_BIN, run through io.joern.joerncli.JoernParse --language jssrc (a root directory whose js2cpg.sh strips -J flags and runs io.joern.jssrc2cpg.Main)",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "exporter_sha256": "dc486ebf6c8fbbb0d2cbcd94f3af9fc1df1a8459a7e5d3b9bd3a2ab15155e68b",
  "command": [
   "joern-parse <a directory holding only jsnode_cases.js> --language jssrc --output jsnode.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=jsnode.cpg --param out=tests/fixtures/jsnode/ast.json",

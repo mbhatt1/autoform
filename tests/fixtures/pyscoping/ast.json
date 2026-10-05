@@ -326,8 +326,8 @@
    [
     "lim",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "name",
+     "v": "GLOBAL_LIMIT"
     }
    ]
   ]

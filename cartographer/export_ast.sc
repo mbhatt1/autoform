@@ -10133,7 +10133,7 @@ import scala.annotation.tailrec
     else if (pyFile && mfn == "<operator>.stringExpressionList") {
       val parts: List[Option[ujson.Obj]] = kidsOf(c).map {
         case l: Literal => pyStringLit(l.code.trim).map(t => ujson.Obj("k" -> "str", "v" -> t))
-        case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))
+        case fc: Call if fc.name == "<operator>.formatString" => Some(fstring(kidsOf(fc)))
         case _ => None
       }
       if (parts.nonEmpty && parts.forall(_.isDefined))
@@ -13005,9 +13005,9 @@ import scala.annotation.tailrec
         val excVar = try {
           // Attempt to get the exception variable name from the CATCH node.
           // The CPG might store this as a parameter or property.
-          c.asInstanceOf[ControlStructure].parameter
-            .filter(_.nonEmpty)
-            .map(_.head.name)
+          c.asInstanceOf[ControlStructure].parameter.l
+            .headOption
+            .map(_.name)
             .getOrElse("__exc" + (idx + 1))
         } catch {
           case _: Exception => "__exc" + (idx + 1)

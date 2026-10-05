@@ -19,10 +19,26 @@ exported (Joern's dataflow overlay crashes on them), and binaries were not teste
 
 ## Use
 
+The preferred entry point is the `autoform` CLI. It owns pipeline orchestration and provides config-file support, dry-run mode, dependency checks, run manifests and JSON output for CI. The legacy shell scripts now delegate to it.
+
+```sh
+python3 -m pip install -e .[dev]
+autoform --repo-root /path/to/autoform doctor
+autoform validate --json               # validate autoform.toml before fleet runs
+autoform translate <source-dir> <ModuleName>
+autoform assure <source-dir> <ModuleName>
+autoform batch                         # run configured [targets.<name>] entries
+autoform gate --manifest .autoform-runs/<run-id>/run.json --json
+```
+
+The legacy shell scripts remain supported:
+
 ```sh
 ./autoform.sh <source-dir> [ModuleName]   # translate + type-check + conformance + ledger
 ./assure.sh   <source-dir> <ModuleName>   # the above, plus audit, mutation gate, SACM case
 ```
+
+See [`docs/cli.md`](docs/cli.md) for configuration, CI usage and command details.
 
 ```
 source ──Joern──▶ CPG ──▶ neutral JSON AST ──▶ Lean Core program ──▶ trust ledger

@@ -1,0 +1,70 @@
+name: CLI smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  cli-smoke:
+    name: package + CLI smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package
+        run: python -m pip install -e .[dev]
+      - name: CLI help and dry-run
+        run: |
+          autoform --help
+          autoform --repo-root "$PWD" --dry-run --json translate /tmp/example Example
+          autoform --repo-root "$PWD" --dry-run --json assure /tmp/example Example
+          cat > autoform.toml <<'EOF'
+          [targets.example]
+          source = "/tmp/example"
+          module = "Example"
+          mode = "translate"
+          owner = "ci"
+          tier = "smoke"
+          tags = ["nightly", "smoke"]
+          EOF
+          autoform --repo-root "$PWD" --json targets
+          autoform --repo-root "$PWD" --json targets --tag smoke --owner ci --tier smoke
+          autoform --repo-root "$PWD" --json validate
+          autoform --repo-root "$PWD" --json schema run-manifest
+          autoform --repo-root "$PWD" --json schema manifest-index
+          autoform --repo-root "$PWD" --json schema fleet-plan
+          autoform --repo-root "$PWD" --json schema config
+          autoform --repo-root "$PWD" --json --run-id ci-smoke plan --tag smoke --output autoform-plan.json
+          autoform --repo-root "$PWD" --json verify-plan --plan autoform-plan.json
+          autoform --repo-root "$PWD" --dry-run --json batch --plan autoform-plan.json
+          cat > ci-run.json <<'EOF'
+          {"kind":"translate","module":"Example","source":"/tmp/example","run_id":"ci","dry_run":false,"returncode":0,"artifacts":["autoform.toml"],"steps":[]}
+          EOF
+          autoform --repo-root "$PWD" --json bundle --manifest ci-run.json --output autoform-evidence.tar.gz
+          autoform --repo-root "$PWD" --json report --manifest ci-run.json --output autoform-report.md
+          autoform --repo-root "$PWD" --json index ci-run.json --output autoform-index.json
+          autoform --repo-root "$PWD" --json gate --manifest autoform-index.json
+          autoform --repo-root "$PWD" --json report --manifest autoform-index.json --output autoform-fleet-report.md
+          autoform --repo-root "$PWD" --dry-run --json check --junit autoform-checks.xml --sarif autoform.sarif
+      - name: CLI unit tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest tests/test_cli.py -q
+
+      - name: Upload CLI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoform-cli-evidence
+          path: |
+            autoform-evidence.tar.gz
+            autoform-report.md
+            autoform-index.json
+            autoform-plan.json
+            autoform-fleet-report.md
+            autoform-checks.xml
+            autoform.sarif
