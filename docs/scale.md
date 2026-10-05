@@ -84,13 +84,13 @@ below).
 The `cachetools` row was regenerated on 2026-10-02 on the item-L branch (after merging `8d3a970`),
 from a fresh re-export of `ast-Cachetools.json` at cachetools `01af8e5` (`scripts/ledger.lean.tmpl`
 over the tracked AST; provenance in `provenance/ast-Cachetools.json.prov.json`); `scripts/check_docs.py` checks it
-(on the final tree `ledger-Cachetools.json` still says 209 / 168 / 98 / 46, and `check_docs` passes 10 of 10).
+(on the final tree `ledger-Cachetools.json` says 209 / 204 / 127 / 11, and `check_docs` passes 10 of 10).
 The other rows were measured with the exporter at `46c65fc` or earlier, were **not re-run**, and are not
 comparable with the `cachetools` row.
 
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 209 | 168 (80%) | 98 (46%) | 46 | 5,677 | 915 |
+| `cachetools` (published) | 209 | 204 (97%) | 127 (60%) | 11 | 5,728 | 916 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |

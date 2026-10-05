@@ -839,6 +839,7 @@ end Expr
 
 namespace Stmt
 
+mutual
 /-- Holes in a statement, by label. -/
 def holes : Stmt → List String
   | .hole l          => [l]
@@ -857,11 +858,18 @@ def holes : Stmt → List String
   | .ret e           => e.holes
   | .tryCatch b _ h  => b.holes ++ h.holes
   | .tryFinally b f  => b.holes ++ f.holes
-  | .multiCatch b hs => b.holes ++ (hs.flatMap fun (_, h) => h.holes)
+  | .multiCatch b hs => b.holes ++ holesHandlers hs
   | .raise e         => e.holes
   | .setGlobal _ e   => e.holes
   | _                => []
 
+/-- Holes across catch handlers. Kept explicit so Lean sees structural recursion. -/
+def holesHandlers : List (String × Stmt) → List String
+  | [] => []
+  | (_, h) :: hs => h.holes ++ holesHandlers hs
+end
+
+mutual
 /-- Total node count. -/
 def size : Stmt → Nat
   | .expr e          => 1 + e.size
@@ -879,10 +887,16 @@ def size : Stmt → Nat
   | .ret e           => 1 + e.size
   | .tryCatch b _ h  => 1 + b.size + h.size
   | .tryFinally b f  => 1 + b.size + f.size
-  | .multiCatch b hs => 1 + b.size + (hs.map fun (_, h) => h.size).sum
+  | .multiCatch b hs => 1 + b.size + sizeHandlers hs
   | .raise e         => 1 + e.size
   | .setGlobal _ e   => 1 + e.size
   | _                => 1
+
+/-- Total node count across catch handlers. Kept explicit so Lean sees structural recursion. -/
+def sizeHandlers : List (String × Stmt) → Nat
+  | [] => 0
+  | (_, h) :: hs => h.size + sizeHandlers hs
+end
 
 end Stmt
 

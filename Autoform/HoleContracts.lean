@@ -87,6 +87,7 @@ def SImpl.keys (τ : SImpl) : List (String × String) := τ.map (·.1)
 def SImpl.atSite (τ : SImpl) (site : String) : List (String × Stmt) :=
   τ.filterMap fun e => if e.1.1 == site then some (e.1.2, e.2) else none
 
+mutual
 /-- Replace statement holes by label. Expressions — and therefore expression holes — are
 untouched: those belong to `Contracts.substE`, and keeping the two substitutions disjoint
 means neither can silently repair the other's holes. -/
@@ -101,7 +102,15 @@ def fillS (ι : List (String × Stmt)) : Stmt → Stmt
   | .forIn x e b     => .forIn x e (fillS ι b)
   | .tryCatch b x hd => .tryCatch (fillS ι b) x (fillS ι hd)
   | .tryFinally b f  => .tryFinally (fillS ι b) (fillS ι f)
+  | .multiCatch b hs => .multiCatch (fillS ι b) (fillHandlers ι hs)
+  | .delSlice r a b c => .delSlice r a b c
   | s                => s
+
+/-- Fill statement holes inside a multi-catch handler list. -/
+def fillHandlers (ι : List (String × Stmt)) : List (String × Stmt) → List (String × Stmt)
+  | [] => []
+  | (x, h) :: hs => (x, fillS ι h) :: fillHandlers ι hs
+end
 
 /-- Apply an implementation to one function: only that function's own sites are filled. -/
 def SImpl.onFunc (τ : SImpl) (f : Func) : Func :=
@@ -113,9 +122,25 @@ untouched, so name resolution in the instantiated program is that of the origina
 def SImpl.onProgram (τ : SImpl) (p : Program) : Program :=
   { p with funcs := p.funcs.map τ.onFunc }
 
-theorem fillS_nil : ∀ s : Stmt, fillS [] s = s := by
-  intro s
-  induction s <;> simp [fillS, *]
+mutual
+theorem fillS_nil : ∀ s : Stmt, fillS [] s = s
+  | .skip | .brk | .cont | .del _ | .declGlobal _ | .hole _ => rfl
+  | .expr _ | .assign _ _ | .setField _ _ _ | .setIndex _ _ _
+  | .delIndex _ _ | .delSlice _ _ _ _ | .setDerefIref _ _ | .ret _
+  | .raise _ | .setGlobal _ _ => rfl
+  | .seq a b         => by rw [fillS, fillS_nil a, fillS_nil b]
+  | .ifte c a b      => by rw [fillS, fillS_nil a, fillS_nil b]
+  | .loop c a        => by rw [fillS, fillS_nil a]
+  | .breakBlock a    => by rw [fillS, fillS_nil a]
+  | .forIn x e b     => by rw [fillS, fillS_nil b]
+  | .tryCatch b x hd => by rw [fillS, fillS_nil b, fillS_nil hd]
+  | .tryFinally b f  => by rw [fillS, fillS_nil b, fillS_nil f]
+  | .multiCatch b hs => by rw [fillS, fillS_nil b, fillHandlers_nil hs]
+
+theorem fillHandlers_nil : ∀ hs : List (String × Stmt), fillHandlers [] hs = hs
+  | [] => rfl
+  | (x, h) :: hs => by rw [fillHandlers, fillS_nil h, fillHandlers_nil hs]
+end
 
 @[simp] theorem onFunc_nil (f : Func) : SImpl.onFunc [] f = f := by
   simp [SImpl.onFunc, SImpl.atSite, fillS_nil]
@@ -715,242 +740,26 @@ theorem delitem_unconditional :
   (underS_nil_iff P _).2 fun h r d a c kvs key hs fuel hf =>
     delitem_refines h r d a c kvs key hs fuel hf
 
-/-! ### `RRCache.clear`, relative to a contract on `op:delete-slice`
+/-! ### Retired statement-hole example
 
-```python
-def clear(self):
-    Cache.clear(self)
-    self.__index.clear()
-    del self.__index[:]          # Stmt.hole "op:delete-slice"
-```
--/
+`RRCache.clear` used to contain `Stmt.hole "op:delete-slice"`. The current Cachetools
+render emits `Stmt.delSlice` for that source construct, so the site-scoped statement
+contract that used to live here is intentionally retired instead of being re-recorded as a
+claim about code that no longer has that hole. The framework above remains for future
+statement holes; this module's current Cachetools contract registry is empty for
+statement-hole proofs. -/
 
-/-- The one assumption, at this one site. -/
-def sliceContract : SContract :=
-  completesOrRaisesFramed rrClearName "op:delete-slice"
-    "`del self.__index[:]` in RRCache.clear completes normally (environment unchanged) \
-     or raises, and changes no object's class, attributes, captured bindings, or whether it \
-     is a builtin container"
-
-def Γslice : SContractEnv := [sliceContract]
-
-theorem satisfiable_sliceContract : SatisfiableS Γslice P :=
-  satisfiable_completesOrRaisesFramed _ _ _ P
-
-/-- The receiver and the module state the method reads. `Cache.clear(self)` names the
-class `Cache`, which `initGlobals` binds in the globals frame (address `0`) to the class
-value `cachetools/__init__.py:<module>.Cache<meta>`; the domain states that binding rather
-than running the module initialisers. -/
-/- `RRShape` gains `od` has no instance attribute `clear`, for the reason `DelShape`
-gains `pop`: `Cache.clear` calls `self.__size.clear()`. -/
-def RRShape (h : Heap) (r d a i : Ref) : Prop :=
-  ∃ g o od oa oi kvs vs, h.get 0 = some g
-    ∧ g.fields.find? (·.1 == "Cache")
-        = some ("Cache", .fn "cachetools/__init__.py:<module>.Cache<meta>")
-    ∧ h.get r = some o
-    ∧ o.fields.find? (·.1 == "_Cache__data") = some ("_Cache__data", .ref a)
-    ∧ o.fields.find? (·.1 == "_Cache__size") = some ("_Cache__size", .ref d)
-    ∧ o.fields.find? (·.1 == "_RRCache__index") = some ("_RRCache__index", .ref i)
-    ∧ o.captured = [] ∧ o.payload = .none
-    ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = [] ∧ od.payload = .none
-    ∧ od.fields.any (·.1 == "clear") = false
-    ∧ h.get a = some oa ∧ oa.payload = .dict kvs
-    ∧ h.get i = some oi ∧ oi.payload = .list vs
-    ∧ r ≠ a ∧ r ≠ i ∧ d ≠ a ∧ i ≠ a
-
-/-- What is proved of every admissible instantiation: whichever way `clear` exits, the
-cache's size is `0`. -/
-def RRPost (q : Program) : Prop :=
-  ∀ h r d a i, RRShape h r d a i → ∀ fuel, 30 ≤ fuel →
-    (∃ h', runMethodIn q fuel h rrClearName (.ref r) [] = (h', .val .unit)
-        ∧ h'.getField r "_Cache__currsize" = .int 0)
-    ∨ (∃ h' v, runMethodIn q fuel h rrClearName (.ref r) [] = (h', .exn v)
-        ∧ h'.getField r "_Cache__currsize" = .int 0)
-
-theorem rrclear_under : UnderS Γslice P RRPost := by
-  intro τ hc ht h r d a i hshape fuel hfuel
-  obtain ⟨s, hlk, hpost⟩ := filled_hole hc ht (c := sliceContract) (by simp [Γslice])
-  obtain ⟨g, o, od, oa, oi, kvs, vs, hg0, hgC, hro, hdat, hsz, hidx, hcap, hpay, hdo, hdcls,
-    hdcap, hdpay, hdclr, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 30 := ⟨fuel - 30, by omega⟩
-  have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
-  have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
-  have hOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "clear"
-      = (ctxOf (τ.onProgram P)).resolveMethod od.cls "clear" :=
-    Ctx.resolveMethodOn_of_not_field hdclr
-  have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
-    rw [classDefines_onProgram]; exact classDefines_cacheclear
-  -- Calling through the class value `Cache` is guarded by `classResponds`: under the class
-  -- table, the MRO lookup of `clear` on `Cache` reaches `Cache.clear` itself.
-  have hcr : (ctxOf (τ.onProgram P)).classResponds "Cache" "clear" = true := by
-    rw [classResponds_onProgram]; exact classResponds_cacheclear
-  have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
-      = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_cacheclear rfl]
-    simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
-  have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
-      = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_sizeclear rfl]
-    simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
-  have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
-      = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
-    get_setField_self _ _ _ (by rw [get_setPayload_ne _ _ hra]; exact hro)
-  unfold runMethodIn
-  rw [resolve_onProgram, resolve_rrclear]
-  simp only [Option.map_some, SImpl.onFunc, f_cachetools___init___py__module__RRCache_clear,
-    fillS]
-  simp only [sliceContract, completesOrRaisesFramed, rrClearName] at hlk hpost
-  simp only [hlk]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
-    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
-    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcr, hcc, hsc, hdial, hglob,
-    hOn,
-    className_Cache, Heap.payload, boxed_clear_dict, boxed_clear_list,
-    get_setPayload_ne _ _ hra, get_setPayload_ne _ _ hda,
-    get_setPayload_ne _ _ hia, get_setField_ne _ _ _ (Ne.symm hri), Payload.toVal,
-    hr1,
-    f_cachetools___init___py__module__Cache_clear,
-    f_cachetools___init___py__module___DefaultSize_clear]
-  -- The only thing known about the filled site is its contract.
-  have hP := hpost (k + 25) (by omega)
-    (((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).setPayload i
-      (Payload.list [])) [("tmp0", Val.ref i), ("self", Val.ref r)]
-  have hr3 : ((((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).setPayload i
-      (Payload.list []))).get r = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } := by
-    rw [get_setPayload_ne _ _ hri]; exact hr1
-  generalize execStmt (ctxOf (τ.onProgram P)) (k + 25)
-    (((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).setPayload i
-      (Payload.list [])) [("tmp0", Val.ref i), ("self", Val.ref r)] s = E at hP ⊢
-  obtain ⟨h', ctl⟩ := E
-  obtain ⟨hframe, hctl⟩ := hP
-  obtain ⟨o', ho', -, hf', -, -⟩ := hframe r _ hr3
-  have hcur' : h'.getField r "_Cache__currsize" = .int 0 := by
-    simp [Heap.getField, ho', hf']
-  rcases hctl with hn | ⟨v, hx⟩
-  · simp only at hn; subst hn
-    left; exact ⟨_, rfl, hcur'⟩
-  · simp only at hx; subst hx
-    right; exact ⟨_, ⟨v, rfl⟩, hcur'⟩
-
-/-! ### The status quo, and why the contract is needed -/
-
-/-- Any instantiation that leaves this site a hole reaches it, on every admissible
-receiver, at every fuel at or above the bound. -/
-theorem rrclear_reaches_hole_of (τ : SImpl)
-    (hfill : fillS (τ.atSite rrClearName) (.hole "op:delete-slice") = .hole "op:delete-slice")
-    (h : Heap) (r d a i : Ref) (hshape : RRShape h r d a i) (k : Nat) :
-    (runMethodIn (τ.onProgram P) (k + 30) h rrClearName (.ref r) []).2
-      = .hole "op:delete-slice" := by
-  obtain ⟨g, o, od, oa, oi, kvs, vs, hg0, hgC, hro, hdat, hsz, hidx, hcap, hpay, hdo, hdcls,
-    hdcap, hdpay, hdclr, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
-  have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
-  have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
-  have hOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "clear"
-      = (ctxOf (τ.onProgram P)).resolveMethod od.cls "clear" :=
-    Ctx.resolveMethodOn_of_not_field hdclr
-  have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
-    rw [classDefines_onProgram]; exact classDefines_cacheclear
-  -- Calling through the class value `Cache` is guarded by `classResponds`: under the class
-  -- table, the MRO lookup of `clear` on `Cache` reaches `Cache.clear` itself.
-  have hcr : (ctxOf (τ.onProgram P)).classResponds "Cache" "clear" = true := by
-    rw [classResponds_onProgram]; exact classResponds_cacheclear
-  have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
-      = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_cacheclear rfl]
-    simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
-  have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
-      = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl (by decide +kernel) lookup_sizeclear rfl]
-    simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
-  have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
-      = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
-    get_setField_self _ _ _ (by rw [get_setPayload_ne _ _ hra]; exact hro)
-  unfold runMethodIn
-  rw [resolve_onProgram, resolve_rrclear]
-  simp only [Option.map_some, SImpl.onFunc, f_cachetools___init___py__module__RRCache_clear,
-    fillS]
-  simp only [rrClearName, fillS] at hfill
-  simp only [hfill]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
-    execStmt, evalExpr, Env.set, Env.get, evalList, Val.truthy, hro, hsz, hdo, hdcls, hdcap,
-    hdpay, hdat, hao, hapay, hio, hipay, hidx, hcap, hpay, hg0, hgC, hcr, hcc, hsc, hdial, hglob,
-    hOn,
-    className_Cache, Heap.payload, boxed_clear_dict, boxed_clear_list,
-    get_setPayload_ne _ _ hra, get_setPayload_ne _ _ hda,
-    get_setPayload_ne _ _ hia, get_setField_ne _ _ _ (Ne.symm hri), Payload.toVal,
-    hr1,
-    f_cachetools___init___py__module__Cache_clear,
-    f_cachetools___init___py__module___DefaultSize_clear]
-
-/-- **On the generated program itself**, `RRCache.clear` reaches the hole. -/
-theorem rrclear_reaches_hole (h : Heap) (r d a i : Ref) (hshape : RRShape h r d a i)
-    (k : Nat) :
-    (runMethodIn P (k + 30) h rrClearName (.ref r) []).2 = .hole "op:delete-slice" := by
-  have := rrclear_reaches_hole_of [] (by simp [fillS, SImpl.atSite]) h r d a i hshape k
-  simpa using this
-
-/-- The domain is inhabited: a globals frame binding `Cache`, an `RRCache` of size 3. -/
-def rrHeap : Heap :=
-  [ { cls := "<globals>",
-      fields := [("Cache", .fn "cachetools/__init__.py:<module>.Cache<meta>")] }
-  , { cls := "RRCache", fields := [("_Cache__data", .ref 2), ("_Cache__size", .ref 3),
-                                   ("_RRCache__index", .ref 4), ("_Cache__currsize", .int 3)] }
-  , { cls := "dict", fields := [], payload := .dict [(.int 1, .int 10)] }
-  , { cls := "_DefaultSize", fields := [] }
-  , { cls := "list", fields := [], payload := .list [.int 1] } ]
-
-theorem rrHeap_shape : RRShape rrHeap 1 3 2 4 :=
-  ⟨_, _, _, _, _, _, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl,
-    rfl, rfl, rfl, by decide, by decide, by decide, by decide⟩
-
-/-- The site filled with itself. Legal under `topSContract`, which is the point. -/
-def idImplS : SImpl := [((rrClearName, "op:delete-slice"), .hole "op:delete-slice")]
-
-/-- **Assuming nothing proves nothing.** -/
-theorem rrclear_not_provable_under_top :
-    ¬ UnderS [topSContract rrClearName "op:delete-slice"] P RRPost := by
-  intro hU
-  have hc : ConsistentS [topSContract rrClearName "op:delete-slice"] P idImplS := by
-    refine ⟨?_, ?_⟩
-    · intro k hk
-      simp [idImplS, SImpl.keys] at hk
-      simp [SContractEnv.keys, SContract.key, topSContract, hk]
-    · intro c hc _ _ _ _ _ _; simp at hc; subst hc; trivial
-  have ht : TotalS [topSContract rrClearName "op:delete-slice"] idImplS := by
-    intro c hc; simp at hc; subst hc; simp [SContract.key, topSContract, idImplS]
-  have hfill : fillS (idImplS.atSite rrClearName) (.hole "op:delete-slice")
-      = .hole "op:delete-slice" := by
-    simp [idImplS, SImpl.atSite, fillS]
-  have hh := rrclear_reaches_hole_of idImplS hfill rrHeap 1 3 2 4 rrHeap_shape 0
-  rcases hU idImplS hc ht rrHeap 1 3 2 4 rrHeap_shape 30 (Nat.le_refl _) with
-    ⟨h', he, -⟩ | ⟨h', v, he, -⟩
-  · rw [he] at hh; cases hh
-  · rw [he] at hh; cases hh
-
-/-- With the contract satisfiable, the conditional result is not vacuous. -/
-theorem rrclear_not_vacuous : ¬ UnderS Γslice P (fun _ => False) :=
-  not_underS_false satisfiable_sliceContract
+theorem delete_slice_contract_retired : True := by trivial
 
 /-! ### Cross-checks on the whole program
 
 Evidence for a reader, not part of any proof. `delitem_refines` on `delHeap`: a present
-key returns `unit` with size 4; an absent one raises `KeyError` with size 5.
-`rrclear_under` with the site filled by `skip` and by `raise`: size 0 either way; unfilled,
-the hole. -/
+key returns `unit` with size 4; an absent one raises `KeyError` with size 5. -/
 
 #eval let (h', r) := runMethodIn P 40 delHeap delitemName (.ref 0) [.int 7]
       (reprStr r, reprStr (h'.getField 0 "_Cache__currsize"), reprStr (h'.payload 2))
 #eval let (h', r) := runMethodIn P 40 delHeap delitemName (.ref 0) [.int 8]
       (reprStr r, reprStr (h'.getField 0 "_Cache__currsize"))
-
-def skipImpl : SImpl := [((rrClearName, "op:delete-slice"), .skip)]
-def raiseImpl : SImpl := [((rrClearName, "op:delete-slice"), .raise (.lit (.str "TypeError")))]
-
-#eval let (h', r) := runMethodIn (skipImpl.onProgram P) 60 rrHeap rrClearName (.ref 1) []
-      (reprStr r, reprStr (h'.getField 1 "_Cache__currsize"))
-#eval let (h', r) := runMethodIn (raiseImpl.onProgram P) 60 rrHeap rrClearName (.ref 1) []
-      (reprStr r, reprStr (h'.getField 1 "_Cache__currsize"))
-#eval reprStr (runMethodIn P 60 rrHeap rrClearName (.ref 1) []).2
 
 /-! ### Axiom audit
 
@@ -958,9 +767,7 @@ No hole contract is an axiom: each theorem's assumptions are hypotheses in its s
 
 #print axioms delitem_refines
 #print axioms delitem_unconditional
-#print axioms rrclear_under
-#print axioms rrclear_not_provable_under_top
-#print axioms rrclear_reaches_hole
+#print axioms delete_slice_contract_retired
 #print axioms className_Cache
 
 /-! ### Registry records
@@ -975,16 +782,12 @@ not in this registry: it is an ordinary theorem. -/
 def withSubject (j : Lean.Json) (program function : String) : Lean.Json :=
   (j.setObjVal! "program" (.str program)).setObjVal! "function" (.str function)
 
-def holeContractRecords : List Lean.Json :=
-  [ withSubject
-      (assumptionsJsonS "Autoform.HoleContracts.Demo.rrclear_under" Γslice
-        (some "Autoform.HoleContracts.Demo.satisfiable_sliceContract"))
-      "Autoform.Generated.Cachetools.program" rrClearName ]
+def holeContractRecords : List Lean.Json := []
 
 /-- Every contract-relative record: the expression-hole demonstrations of
 `Contracts.lean` (about the historical slice `keysProgramHoled`, so tagged with that
 program and *not* counted as a conditionally verified function of the current module),
-then this file's. -/
+then this file's current statement-hole records. -/
 def allContractRecords : List Lean.Json :=
   (Autoform.Contracts.Demo.contractRecords.map fun j =>
       withSubject j "Autoform.Contracts.Demo.keysProgramHoled"

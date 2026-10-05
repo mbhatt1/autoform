@@ -43,7 +43,7 @@ RENDER = os.path.join(ROOT, "cartographer", "render_lean.py")
 # (for `acc=[]`, the classic aliasing bug in reverse).
 EXPECTED_HOLES = {
     "case_mutable_default_needed": "param:default-nonliteral",
-    "case_global_default_needed": "param:default-nonliteral",
+    "case_global_default_needed": "param:default-unsupported",
 }
 
 

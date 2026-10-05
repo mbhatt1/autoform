@@ -332,6 +332,8 @@ such functions as a **separate** number, never folded into the verifiable core:
 
 namespace Analysis
 
+mutual
+
 /-- Every hole in a statement with its position: `true` for a `Stmt.hole`, `false` for an
 `Expr.hole`. Mirrors `Stmt.holes` arm for arm (`holeSites_labels`). -/
 def sHoleSites : Stmt → List (Bool × String)
@@ -341,6 +343,7 @@ def sHoleSites : Stmt → List (Bool × String)
   | .setField r _ v  => (r.holes ++ v.holes).map (false, ·)
   | .setIndex r i v  => (r.holes ++ i.holes ++ v.holes).map (false, ·)
   | .delIndex r i    => (r.holes ++ i.holes).map (false, ·)
+  | .delSlice r s e st => (r.holes ++ s.holes ++ e.holes ++ st.holes).map (false, ·)
   | .setDerefIref p v => (p.holes ++ v.holes).map (false, ·)
   | .seq a b         => sHoleSites a ++ sHoleSites b
   | .ifte c a b      => c.holes.map (false, ·) ++ sHoleSites a ++ sHoleSites b
@@ -350,13 +353,55 @@ def sHoleSites : Stmt → List (Bool × String)
   | .ret e           => e.holes.map (false, ·)
   | .tryCatch b _ h  => sHoleSites b ++ sHoleSites h
   | .tryFinally b f  => sHoleSites b ++ sHoleSites f
+  | .multiCatch b hs => sHoleSites b ++ sHoleSitesHandlers hs
   | .raise e         => e.holes.map (false, ·)
   | .setGlobal _ e   => e.holes.map (false, ·)
   | _                => []
 
+/-- Hole sites across `multiCatch` handlers. Kept explicit so Lean sees structural recursion. -/
+def sHoleSitesHandlers : List (String × Stmt) → List (Bool × String)
+  | [] => []
+  | (_, h) :: hs => sHoleSites h ++ sHoleSitesHandlers hs
+
+end
+
+mutual
+
 /-- The site inventory is complete and exact: its labels are `Stmt.holes`, in order. -/
-theorem holeSites_labels (s : Stmt) : (sHoleSites s).map (·.2) = s.holes := by
-  induction s <;> simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def, *]
+theorem holeSites_labels : (s : Stmt) → (sHoleSites s).map (·.2) = s.holes
+  | .hole l => by simp [sHoleSites, Stmt.holes]
+  | .expr e => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .assign x e => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .setField r f v => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .setIndex r i v => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .delIndex r i => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .delSlice r s e st => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .setDerefIref p v => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .seq a b => by simp [sHoleSites, Stmt.holes, holeSites_labels a, holeSites_labels b]
+  | .ifte c a b => by simp [sHoleSites, Stmt.holes, holeSites_labels a, holeSites_labels b, List.map_map, Function.comp_def]
+  | .loop c a => by simp [sHoleSites, Stmt.holes, holeSites_labels a, List.map_map, Function.comp_def]
+  | .breakBlock a => by simp [sHoleSites, Stmt.holes, holeSites_labels a]
+  | .forIn x e b => by simp [sHoleSites, Stmt.holes, holeSites_labels b, List.map_map, Function.comp_def]
+  | .ret e => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .brk => by simp [sHoleSites, Stmt.holes]
+  | .cont => by simp [sHoleSites, Stmt.holes]
+  | .tryCatch b x h => by simp [sHoleSites, Stmt.holes, holeSites_labels b, holeSites_labels h]
+  | .tryFinally b f => by simp [sHoleSites, Stmt.holes, holeSites_labels b, holeSites_labels f]
+  | .multiCatch b hs => by simp [sHoleSites, Stmt.holes, holeSites_labels b, holeSitesHandlers_labels hs]
+  | .raise e => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .del x => by simp [sHoleSites, Stmt.holes]
+  | .setGlobal x e => by simp [sHoleSites, Stmt.holes, List.map_map, Function.comp_def]
+  | .declGlobal x => by simp [sHoleSites, Stmt.holes]
+  | .skip => by simp [sHoleSites, Stmt.holes]
+
+/-- The handler-site inventory is complete and exact. -/
+theorem holeSitesHandlers_labels : (hs : List (String × Stmt)) →
+    (sHoleSitesHandlers hs).map (·.2) = Stmt.holesHandlers hs
+  | [] => by simp [sHoleSitesHandlers, Stmt.holesHandlers]
+  | (_, h) :: hs => by
+      simp [sHoleSitesHandlers, Stmt.holesHandlers, holeSites_labels h, holeSitesHandlers_labels hs]
+
+end
 
 end Analysis
 

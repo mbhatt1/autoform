@@ -2398,8 +2398,17 @@
                  "f": "UnmarshalText",
                  "args": [
                   {
-                   "k": "hole",
-                   "label": "call:no-callee-name"
+                   "k": "ccall",
+                   "e": {
+                    "k": "name",
+                    "v": "value"
+                   },
+                   "args": [
+                    {
+                     "k": "name",
+                     "v": "value"
+                    }
+                   ]
                   }
                  ]
                 }
@@ -2453,8 +2462,17 @@
                    "f": "UnmarshalBinary",
                    "args": [
                     {
-                     "k": "hole",
-                     "label": "call:no-callee-name"
+                     "k": "ccall",
+                     "e": {
+                      "k": "name",
+                      "v": "value"
+                     },
+                     "args": [
+                      {
+                       "k": "name",
+                       "v": "value"
+                      }
+                     ]
                     }
                    ]
                   }

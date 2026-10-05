@@ -114,7 +114,7 @@ def f_pyscoping_cases_py__module__case_mutable_default_needed : Func :=
 def f_pyscoping_cases_py__module__dflt_global : Func :=
   { name := "pyscoping_cases.py:<module>.dflt_global"
   , params := ["x", "lim"]
-  , defaults := [("lim", (.name "GLOBAL_LIMIT"))]
+  , defaults := [("lim", (.hole "param:default-unsupported"))]
   , body := (.ret (.tupleE [(.name "x"), (.name "lim")])) }
 
 /-- `pyscoping_cases.py:<module>.case_global_default_supplied`  (from `pyscoping_cases.py`) -/

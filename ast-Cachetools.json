@@ -1087,8 +1087,8 @@
    [
     "default",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "name",
+     "v": "__marker"
     }
    ]
   ]
@@ -1543,8 +1543,12 @@
    [
     "cache_setitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__setitem__"
     }
    ]
   ]
@@ -1595,8 +1599,12 @@
    [
     "cache_delitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__delitem__"
     }
    ]
   ]
@@ -2222,8 +2230,12 @@
    [
     "cache_getitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__getitem__"
     }
    ]
   ]
@@ -2551,8 +2563,12 @@
    [
     "cache_setitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__setitem__"
     }
    ]
   ]
@@ -2707,8 +2723,12 @@
    [
     "cache_delitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__delitem__"
     }
    ]
   ]
@@ -3617,8 +3637,12 @@
    [
     "cache_getitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__getitem__"
     }
    ]
   ]
@@ -3676,8 +3700,12 @@
    [
     "cache_setitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__setitem__"
     }
    ]
   ]
@@ -3728,8 +3756,12 @@
    [
     "cache_delitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__delitem__"
     }
    ]
   ]
@@ -4151,8 +4183,12 @@
    [
     "choice",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "random"
+     },
+     "f": "choice"
     }
    ],
    [
@@ -4323,8 +4359,12 @@
    [
     "cache_setitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__setitem__"
     }
    ]
   ]
@@ -4559,8 +4599,12 @@
    [
     "cache_delitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__delitem__"
     }
    ]
   ]
@@ -4779,8 +4823,24 @@
        "k": "skip"
       },
       "b": {
-       "k": "holeS",
-       "label": "op:delete-slice"
+       "k": "delSlice",
+       "r": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "self"
+        },
+        "f": "_RRCache__keys"
+       },
+       "start": {
+        "k": "unit"
+       },
+       "stop": {
+        "k": "unit"
+       },
+       "step": {
+        "k": "unit"
+       }
       }
      }
     }
@@ -5339,8 +5399,12 @@
    [
     "cache_repr",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__repr__"
     }
    ]
   ]
@@ -5511,8 +5575,12 @@
    [
     "cache_len",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__len__"
     }
    ]
   ]
@@ -6592,8 +6660,12 @@
    [
     "timer",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "time"
+     },
+     "f": "monotonic"
     }
    ],
    [
@@ -6867,8 +6939,12 @@
    [
     "cache_getitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__getitem__"
     }
    ]
   ]
@@ -7370,8 +7446,12 @@
    [
     "cache_setitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__setitem__"
     }
    ]
   ]
@@ -7520,8 +7600,12 @@
    [
     "cache_delitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__delitem__"
     }
    ]
   ]
@@ -9211,8 +9295,12 @@
    [
     "timer",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "time"
+     },
+     "f": "monotonic"
     }
    ],
    [
@@ -9486,8 +9574,12 @@
    [
     "cache_getitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__getitem__"
     }
    ]
   ]
@@ -9887,8 +9979,12 @@
    [
     "cache_setitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__setitem__"
     }
    ]
   ]
@@ -10155,8 +10251,12 @@
    [
     "cache_delitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__delitem__"
     }
    ]
   ]
@@ -11339,8 +11439,24 @@
        "k": "skip"
       },
       "b": {
-       "k": "holeS",
-       "label": "op:delete-slice"
+       "k": "delSlice",
+       "r": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "self"
+        },
+        "f": "_TLRUCache__order"
+       },
+       "start": {
+        "k": "unit"
+       },
+       "stop": {
+        "k": "unit"
+       },
+       "step": {
+        "k": "unit"
+       }
       }
      }
     }
@@ -11532,8 +11648,12 @@
    [
     "cache_delitem",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "Cache"
+     },
+     "f": "__delitem__"
     }
    ]
   ]
@@ -11639,8 +11759,12 @@
    [
     "key",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "keys"
+     },
+     "f": "hashkey"
     }
    ],
    [
@@ -12140,8 +12264,12 @@
    [
     "key",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "keys"
+     },
+     "f": "methodkey"
     }
    ],
    [
@@ -18409,8 +18537,16 @@
        "f": "TypeError",
        "args": [
         {
-         "k": "hole",
-         "label": "op:stringExpressionList"
+         "k": "binop",
+         "op": "+",
+         "a": {
+          "k": "str",
+          "v": "Cannot assign the same @cachedmethod to two different names "
+         },
+         "b": {
+          "k": "hole",
+          "label": "op:formatString:conversion-or-spec"
+         }
         }
        ]
       }
@@ -18493,8 +18629,184 @@
         }
        },
        "t": {
-        "k": "holeS",
-        "label": "control:TRY-multiCatch"
+        "k": "multiCatch",
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "tmp0",
+          "e": {
+           "k": "field",
+           "a": {
+            "k": "name",
+            "v": "obj"
+           },
+           "f": "__dict__"
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "wrapper",
+          "e": {
+           "k": "mcall",
+           "recv": {
+            "k": "name",
+            "v": "tmp0"
+           },
+           "m": "setdefault",
+           "args": [
+            {
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "self"
+             },
+             "f": "_DescriptorBase__attrname"
+            },
+            {
+             "k": "name",
+             "v": "wrapper"
+            }
+           ]
+          }
+         }
+        },
+        "handlers": [
+         [
+          "__exc1",
+          {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "msg",
+            "e": {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "hole",
+              "label": "op:formatString:conversion-or-spec"
+             },
+             "b": {
+              "k": "hole",
+              "label": "op:formatString:conversion-or-spec"
+             }
+            }
+           },
+           "b": {
+            "k": "ifte",
+            "c": {
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "self"
+             },
+             "f": "_DescriptorBase__deprecated"
+            },
+            "t": {
+             "k": "exprS",
+             "e": {
+              "k": "call",
+              "f": "cachetools/_cachedmethod.py:<module>._warn_instance_dict",
+              "args": [
+               {
+                "k": "name",
+                "v": "msg"
+               },
+               {
+                "k": "int",
+                "v": "3"
+               }
+              ]
+             }
+            },
+            "e": {
+             "k": "raise",
+             "e": {
+              "k": "call",
+              "f": "TypeError",
+              "args": [
+               {
+                "k": "name",
+                "v": "msg"
+               }
+              ]
+             }
+            }
+           }
+          }
+         ],
+         [
+          "__exc2",
+          {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "msg",
+            "e": {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "binop",
+              "op": "+",
+              "a": {
+               "k": "hole",
+               "label": "op:formatString:conversion-or-spec"
+              },
+              "b": {
+               "k": "str",
+               "v": "instance does not support item assignment for "
+              }
+             },
+             "b": {
+              "k": "hole",
+              "label": "op:formatString:conversion-or-spec"
+             }
+            }
+           },
+           "b": {
+            "k": "ifte",
+            "c": {
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "self"
+             },
+             "f": "_DescriptorBase__deprecated"
+            },
+            "t": {
+             "k": "exprS",
+             "e": {
+              "k": "call",
+              "f": "cachetools/_cachedmethod.py:<module>._warn_instance_dict",
+              "args": [
+               {
+                "k": "name",
+                "v": "msg"
+               },
+               {
+                "k": "int",
+                "v": "3"
+               }
+              ]
+             }
+            },
+            "e": {
+             "k": "raise",
+             "e": {
+              "k": "call",
+              "f": "TypeError",
+              "args": [
+               {
+                "k": "name",
+                "v": "msg"
+               }
+              ]
+             }
+            }
+           }
+          }
+         ]
+        ]
        },
        "e": {
         "k": "ifte",
@@ -25718,8 +26030,12 @@
    [
     "choice",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "random"
+     },
+     "f": "choice"
     }
    ],
    [
@@ -25891,8 +26207,12 @@
    [
     "timer",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "time"
+     },
+     "f": "monotonic"
     }
    ],
    [
@@ -26008,8 +26328,12 @@
    [
     "hash",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "tuple"
+     },
+     "f": "__hash__"
     }
    ]
   ]
@@ -26054,8 +26378,12 @@
    [
     "add",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "tuple"
+     },
+     "f": "__add__"
     }
    ]
   ]
@@ -26100,8 +26428,12 @@
    [
     "add",
     {
-     "k": "hole",
-     "label": "param:default-nonliteral"
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "tuple"
+     },
+     "f": "__add__"
     }
    ]
   ]

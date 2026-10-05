@@ -2942,16 +2942,6 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
                                   (h₄.setPayload r (.list (Stdlib.dropRange vs jstart jstop)), .normal ρ)
                               | _ => (h₄, .hole "op:delete-slice:index-out-of-range")
                           | _ => (h₄, .hole "op:delete-slice:non-integer-index")
-                      | .str s =>
-                          match (pyIndex startV, pyIndex stopV) with
-                          | (some istart, some istop) =>
-                              match (Stdlib.seqIndex s.length istart, Stdlib.seqIndex s.length istop) with
-                              | (some jstart, some jstop) =>
-                                  let chars := s.toList.map String.mk
-                                  let deleted := Stdlib.dropRange chars jstart jstop
-                                  (h₄.setPayload r (.str (String.mk (deleted.map (·.get! 0)))), .normal ρ)
-                              | _ => (h₄, .hole "op:delete-slice:index-out-of-range")
-                          | _ => (h₄, .hole "op:delete-slice:non-integer-index")
                       | _ => (h₄, .hole "op:delete-slice:unsupported-container")
                   | c =>
                     match valueSubscriptWrite ctx.dialect c "delSlice" with
@@ -3020,19 +3010,19 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       match execStmt ctx n h ρ body with
       | (h₁, .exn v) => execStmt ctx n h₁ (ρ.set x v) handler
       | (h₁, r)      => (h₁, r)
-  -- Multi-catch: try body, then try handlers in order until one succeeds
+  -- Multi-catch: try body, then try handlers in order until one succeeds.
   | n+1, h, ρ, .multiCatch body handlers =>
       match execStmt ctx n h ρ body with
       | (h₁, .exn v) =>
-        -- Try each handler in order
-        let tryHandlers : List (String × Stmt) → (Heap × ExecResult) :=
-          fun hs => match hs with
-          | [] => (h₁, .exn v)  -- No handler matched, propagate
-          | (x, handler) :: rest =>
-            match execStmt ctx n h₁ (ρ.set x v) handler with
-            | (h₂, .exn _) => tryHandlers rest  -- This handler failed, try next
-            | (h₂, r)      => (h₂, r)           -- Handler succeeded
-        tryHandlers handlers
+        handlers.foldl
+          (fun acc (x, handler) =>
+            match acc with
+            | (hcur, .exn _) =>
+                match execStmt ctx n hcur (ρ.set x v) handler with
+                | (h₂, .exn _) => (h₂, .exn v)
+                | done         => done
+            | done           => done)
+          (h₁, .exn v)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with

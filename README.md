@@ -204,7 +204,7 @@ not match the runtime — caught automatically rather than by inspection.
 | `Autoform/Lang/Core/Address.lean` | 2 | C address model: block plus offset. Pointer comparison, `&p[i]` and pointer arithmetic within one array are answered from the heap; undefined or unspecified cases are holes (§60). |
 | `Autoform/Lang/Core/Boxed.lean` | 2 | Python lists and dicts as heap objects, so `e[i] = v`, `del e[i]` and `append`/`pop` are seen through every alias. See `docs/boxed-containers.md`. |
 | `Autoform/Contracts.lean` | 5 | Contracts at holes: `RefinesUnder`, refinement relative to stated assumptions about named holes. See `docs/contracts.md`. |
-| `Autoform/HoleContracts.lean` | 5 | Contracts at *statement* holes, with worked examples on real cachetools code (`delitem_refines`, `rrclear_under`). |
+| `Autoform/HoleContracts.lean` | 5 | Contracts at *statement* holes, with the current cachetools statement-hole registry retired after `op:delete-slice` became `delSlice`. |
 | `Autoform/Ledger.lean` | 6 | Coverage, holes-by-cause, verifiable core; JSON evidence for the assurance case. |
 | `Autoform/Tactics/Portfolio.lean` | 5 | Tiered proof portfolio; records open obligations instead of admitting them. |
 | `scripts/audit_all.py` | 6 | Axiom sweep over every declaration, source sweep for escape hatches, and the independent kernel replay (`leanchecker --fresh`). `--skip-kernel` reports the replay as DELEGATED (never a pass); `--kernel-only` runs just the replay, which CI does as its own job because it takes hours. |
@@ -294,7 +294,7 @@ population (see `docs/languages.md`) and have not been re-run against it.
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed. **Not re-run since the two `mutate.py` attribution fixes** (see Findings): treat it as unverified for the current tree. The attributable re-run covers `Autoform/Lang/Imp/*` only (24/27 and 7/9 killed) |
 | proofs depend on no unsound axiom | axiom sweep over every declaration (`audit_all.py --skip-kernel`, 2026-10-02) | clean: 7,974 declarations, using only `propext` (2,609), `Quot.sound` (1,495) and `Classical.choice` (1,422); no `axiom` of our own; no `sorryAx`/`ofReduceBool`/`ofReduceNat`; no escape hatch under `Autoform/Lang/Core` |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | **not observed on the current tree.** It passed when the import graph was small (about 1.5 minutes). With the 73 V8Base spec parts in the graph it takes hours: about 2.5-3 h single-threaded, *extrapolated* from five timed pieces (core 396 s, `V8Base.Base` 291 s, `Part1` 283 s, `Part33` 574 s, `Part60` 774 s), because both attempts at a full run were lost (one to the audit's own old 60-minute timeout, one to a container restart). CI therefore runs it as its own job, `kernel-replay`; see Continuous integration |
-| untranslated code is declared | hole counting + SACM assumptions | 46 holes, all named |
+| untranslated code is declared | hole counting + SACM assumptions | 17 holes, all named |
 
 The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
 not a property of the specifications: `scripts/mutate.py`'s `error_lines` regex matched

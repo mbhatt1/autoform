@@ -36,6 +36,8 @@ function table contains no `tryFinally`.
 
 namespace Autoform.Core
 
+mutual
+
 /-- `tryFinally`-freedom, the one syntactic exclusion this file needs.
 
 `Stmt.tryFinally` is the *only* interpreter construct whose result does not propagate an
@@ -54,8 +56,14 @@ def tfFreeS : Stmt → Bool
   | .breakBlock b    => tfFreeS b
   | .forIn _ _ b     => tfFreeS b
   | .tryCatch b _ hd => tfFreeS b && tfFreeS hd
-  | .multiCatch b hs => tfFreeS b && hs.all (fun (_, h) => tfFreeS h)
+  | .multiCatch b hs => tfFreeS b && tfFreeHandlers hs
   | _                => true
+
+def tfFreeHandlers : List (String × Stmt) → Bool
+  | [] => true
+  | (_, h) :: hs => tfFreeS h && tfFreeHandlers hs
+
+end
 
 /-- A context every one of whose *reachable* function bodies is `tryFinally`-free.
 
@@ -80,6 +88,127 @@ theorem tfFree_resolveMethodOn {ctx : Ctx} (hctx : TFFreeCtx ctx) {o : Obj} {m :
   split at h
   · cases h; rfl
   · exact hctx.2 _ _ _ h
+
+
+/-- Once a multi-catch handler chain has a non-exception result, later handlers are skipped. -/
+private theorem multiCatchFold_done (ctx : Ctx) (k : Nat) (ρ : Env) (v : Val) :
+    ∀ (rest : List (String × Stmt)) (h : Heap) (c : Ctl),
+      (∀ w, c ≠ Ctl.exn w) →
+      List.foldl
+          (fun acc x =>
+            match acc with
+            | (hcur, .exn _) =>
+                match execStmt ctx k hcur (ρ.set x.1 v) x.2 with
+                | (h₂, .exn _) => (h₂, .exn v)
+                | done         => done
+            | done           => done)
+          (h, c) rest = (h, c)
+  | [], h, c, _ => rfl
+  | x :: rest, h, .exn a, hn => False.elim (hn a rfl)
+  | x :: rest, h, .normal ρ, hn => by simp [List.foldl, multiCatchFold_done]
+  | x :: rest, h, .ret v₂, hn => by simp [List.foldl, multiCatchFold_done]
+  | x :: rest, h, .brk ρ, hn => by simp [List.foldl, multiCatchFold_done]
+  | x :: rest, h, .cont ρ, hn => by simp [List.foldl, multiCatchFold_done]
+  | x :: rest, h, .hole l, hn => by simp [List.foldl, multiCatchFold_done]
+  | x :: rest, h, .outOfFuel, hn => by simp [List.foldl, multiCatchFold_done]
+
+
+@[simp] private theorem foldSkip_normal {α : Type} (step : Heap × Ctl → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (ρ : Env) :
+    List.foldl (fun acc x => match acc with | (_h, .exn _) => step acc x | done => done)
+      (h, Ctl.normal ρ) xs = (h, Ctl.normal ρ) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip_ret {α : Type} (step : Heap × Ctl → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (v : Val) :
+    List.foldl (fun acc x => match acc with | (_h, .exn _) => step acc x | done => done)
+      (h, Ctl.ret v) xs = (h, Ctl.ret v) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip_brk {α : Type} (step : Heap × Ctl → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (ρ : Env) :
+    List.foldl (fun acc x => match acc with | (_h, .exn _) => step acc x | done => done)
+      (h, Ctl.brk ρ) xs = (h, Ctl.brk ρ) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip_cont {α : Type} (step : Heap × Ctl → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (ρ : Env) :
+    List.foldl (fun acc x => match acc with | (_h, .exn _) => step acc x | done => done)
+      (h, Ctl.cont ρ) xs = (h, Ctl.cont ρ) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip_hole {α : Type} (step : Heap × Ctl → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (l : String) :
+    List.foldl (fun acc x => match acc with | (_h, .exn _) => step acc x | done => done)
+      (h, Ctl.hole l) xs = (h, Ctl.hole l) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip_outOfFuel {α : Type} (step : Heap × Ctl → α → Heap × Ctl)
+    (xs : List α) (h : Heap) :
+    List.foldl (fun acc x => match acc with | (_h, .exn _) => step acc x | done => done)
+      (h, Ctl.outOfFuel) xs = (h, Ctl.outOfFuel) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+
+@[simp] private theorem foldSkip2_normal {α : Type} (f : Heap → Val → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (ρ : Env) :
+    List.foldl (fun acc x => match acc with | (hcur, .exn a) => f hcur a x | done => done)
+      (h, Ctl.normal ρ) xs = (h, Ctl.normal ρ) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip2_ret {α : Type} (f : Heap → Val → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (v : Val) :
+    List.foldl (fun acc x => match acc with | (hcur, .exn a) => f hcur a x | done => done)
+      (h, Ctl.ret v) xs = (h, Ctl.ret v) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip2_brk {α : Type} (f : Heap → Val → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (ρ : Env) :
+    List.foldl (fun acc x => match acc with | (hcur, .exn a) => f hcur a x | done => done)
+      (h, Ctl.brk ρ) xs = (h, Ctl.brk ρ) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip2_cont {α : Type} (f : Heap → Val → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (ρ : Env) :
+    List.foldl (fun acc x => match acc with | (hcur, .exn a) => f hcur a x | done => done)
+      (h, Ctl.cont ρ) xs = (h, Ctl.cont ρ) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip2_hole {α : Type} (f : Heap → Val → α → Heap × Ctl)
+    (xs : List α) (h : Heap) (l : String) :
+    List.foldl (fun acc x => match acc with | (hcur, .exn a) => f hcur a x | done => done)
+      (h, Ctl.hole l) xs = (h, Ctl.hole l) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
+
+@[simp] private theorem foldSkip2_outOfFuel {α : Type} (f : Heap → Val → α → Heap × Ctl)
+    (xs : List α) (h : Heap) :
+    List.foldl (fun acc x => match acc with | (hcur, .exn a) => f hcur a x | done => done)
+      (h, Ctl.outOfFuel) xs = (h, Ctl.outOfFuel) := by
+  induction xs generalizing h with
+  | nil => rfl
+  | cons x xs ih => simp [List.foldl, ih]
 
 /-- The seven-way simultaneous statement, at a fixed fuel `k`. -/
 private def FuelStep (k : Nat) : Prop :=
@@ -515,11 +644,25 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                 -- Now f_val is the function to call; evaluate arguments
                 rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
-                rw [hB] at hy
+                simp only [hB] at hy
                 cases s with
-                | inl e => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | inl e =>
+                    have hneB : e ≠ EResult.outOfFuel := by
+                      intro he
+                      apply hne
+                      cases hy
+                      simpa [he]
+                    have hneBL : (Sum.inl e : Sum EResult (List Val × List (String × Val))) ≠ Sum.inl EResult.outOfFuel := by
+                      intro he
+                      apply hneB
+                      cases he
+                      rfl
+                    simp only [ihL _ hctx _ _ _ _ _ hB hneBL]
+                    simpa using hy
                 | inr p =>
-                    rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                    simp only [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                    rcases p with ⟨vs, kws⟩
+                    simp only at hy ⊢
                     -- Now we have arguments; dispatch on the function value type
                     cases f_val
                     case fn g =>
@@ -528,7 +671,11 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         | some fn =>
                             rw [hres] at hy
                             dsimp only at hy ⊢
-                            split at hy <;> exact hy
+                            by_cases hm : (fn.isMethod && fn.vararg.isNone && vs.length == fn.params.length + 1) = true
+                            · simp only [hm, if_true] at hy ⊢
+                              exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                            · simp only [hm, if_false] at hy ⊢
+                              exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
                         | none => rw [hres] at hy; exact hy
                     case clos g cap =>
                         dsimp only at hy ⊢
@@ -1118,8 +1265,8 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                   | val stv =>
                     rw [ihE _ hctx _ _ _ _ _ hE (by simp)]
                     dsimp only at hy ⊢
-                    -- All operands evaluated; remaining cases just propagate results
-                    split_ifs at hy ⊢ <;> exact hy
+                    -- All operands evaluated; remaining cases just propagate results.
+                    exact hy
         -- `006-reduce-remaining-holes`, Story 5: `*p = v` -- same shape as
         -- `setField`'s `ref`/non-object split, one constructor case instead of three.
         | setDerefIref p v =>
@@ -1269,34 +1416,124 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 dsimp only at hy ⊢
                 -- All handlers are fuel-free, so we can apply ihS to each one
                 -- Prove that tryHandlers gives same result with fuel k and k+1
-                clear hA hne
+                clear hA
                 revert hy
                 -- Induct over the handlers list
                 induction hs generalizing h₁ with
                 | nil =>
                     intro hy
-                    simp only at hy ⊢
                     exact hy
                 | cons handler rest ih =>
                     intro hy
-                    simp only at hfree
-                    rcases hfree with ⟨h_free, rest_free⟩
-                    simp only [execStmt] at hy ⊢
+                    simp only [tfFreeHandlers, Bool.and_eq_true] at hfree
+                    rcases hfree with ⟨h_body_free, rest_free⟩
+                    rcases rest_free with ⟨h_handler_free, h_rest_free⟩
+                    simp only [List.foldl_cons] at hy ⊢
                     rcases hB : execStmt ctx k h₁ (ρ.set handler.1 v) handler.2 with ⟨h₂, c₂⟩
                     rw [hB] at hy
+                    have doneK : ∀ (h0 : Heap) (cc : Ctl), (∀ w, cc ≠ Ctl.exn w) →
+                        List.foldl
+                          (fun acc x =>
+                            match acc with
+                            | (hcur, .exn _) =>
+                              match execStmt ctx k hcur (ρ.set x.1 v) x.2 with
+                              | (h₂, .exn _) => (h₂, .exn v)
+                              | done => done
+                            | done => done)
+                          (h0, cc) rest = (h0, cc) := by
+                      intro h0 cc hn
+                      induction rest generalizing h0 cc with
+                      | nil => rfl
+                      | cons x xs ihd =>
+                          cases cc with
+                          | exn a => exact False.elim (hn a rfl)
+                          | normal ρx => simp [List.foldl, ihd]
+                          | ret vx => simp [List.foldl, ihd]
+                          | brk ρx => simp [List.foldl, ihd]
+                          | cont ρx => simp [List.foldl, ihd]
+                          | hole lx => simp [List.foldl, ihd]
+                          | outOfFuel => simp [List.foldl, ihd]
+                    have doneK1 : ∀ (h0 : Heap) (cc : Ctl), (∀ w, cc ≠ Ctl.exn w) →
+                        List.foldl
+                          (fun acc x =>
+                            match acc with
+                            | (hcur, .exn _) =>
+                              match execStmt ctx (k + 1) hcur (ρ.set x.1 v) x.2 with
+                              | (h₂, .exn _) => (h₂, .exn v)
+                              | done => done
+                            | done => done)
+                          (h0, cc) rest = (h0, cc) := by
+                      intro h0 cc hn
+                      induction rest generalizing h0 cc with
+                      | nil => rfl
+                      | cons x xs ihd =>
+                          cases cc with
+                          | exn a => exact False.elim (hn a rfl)
+                          | normal ρx => simp [List.foldl, ihd]
+                          | ret vx => simp [List.foldl, ihd]
+                          | brk ρx => simp [List.foldl, ihd]
+                          | cont ρx => simp [List.foldl, ihd]
+                          | hole lx => simp [List.foldl, ihd]
+                          | outOfFuel => simp [List.foldl, ihd]
                     cases c₂ with
                     | exn _ =>
                         -- Handler raised, try next
-                        rw [ihS _ hctx _ _ _ h_free _ _ hB (by simp)]
-                        exact ih rest_free hy
-                    | c =>
-                        -- Handler succeeded, return result
-                        rw [ihS _ hctx _ _ _ h_free _ _ hB (by simp)]
-                        exact hy
-            | c =>
-                -- Body completed normally (not an exception)
+                        simp only [ihS _ hctx _ _ _ h_handler_free _ _ hB (by simp)]
+                        exact ih ⟨h_body_free, h_rest_free⟩ h₂ hy
+                    | normal ρ₂ =>
+                        simp only [ihS _ hctx _ _ _ h_handler_free _ _ hB (by simp)]
+                        simp only at hy
+                        have hk := doneK h₂ (.normal ρ₂) (by intro w hw; cases hw)
+                        have hk1 := doneK1 h₂ (.normal ρ₂) (by intro w hw; cases hw)
+                        exact hk1.trans (hk.symm.trans hy)
+                    | ret v₂ =>
+                        simp only [ihS _ hctx _ _ _ h_handler_free _ _ hB (by simp)]
+                        simp only at hy
+                        have hk := doneK h₂ (.ret v₂) (by intro w hw; cases hw)
+                        have hk1 := doneK1 h₂ (.ret v₂) (by intro w hw; cases hw)
+                        exact hk1.trans (hk.symm.trans hy)
+                    | brk ρ₂ =>
+                        simp only [ihS _ hctx _ _ _ h_handler_free _ _ hB (by simp)]
+                        simp only at hy
+                        have hk := doneK h₂ (.brk ρ₂) (by intro w hw; cases hw)
+                        have hk1 := doneK1 h₂ (.brk ρ₂) (by intro w hw; cases hw)
+                        exact hk1.trans (hk.symm.trans hy)
+                    | cont ρ₂ =>
+                        simp only [ihS _ hctx _ _ _ h_handler_free _ _ hB (by simp)]
+                        simp only at hy
+                        have hk := doneK h₂ (.cont ρ₂) (by intro w hw; cases hw)
+                        have hk1 := doneK1 h₂ (.cont ρ₂) (by intro w hw; cases hw)
+                        exact hk1.trans (hk.symm.trans hy)
+                    | hole l₂ =>
+                        simp only [ihS _ hctx _ _ _ h_handler_free _ _ hB (by simp)]
+                        simp only at hy
+                        have hk := doneK h₂ (.hole l₂) (by intro w hw; cases hw)
+                        have hk1 := doneK1 h₂ (.hole l₂) (by intro w hw; cases hw)
+                        exact hk1.trans (hk.symm.trans hy)
+                    | outOfFuel =>
+                        simp only at hy
+                        have hk := doneK h₂ .outOfFuel (by intro w hw; cases hw)
+                        have hp : (h₂, Ctl.outOfFuel) = (h', c) := hk.symm.trans hy
+                        cases hp
+                        exact absurd rfl hne
+            | normal ρ₁ =>
                 rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
                 exact hy
+            | ret v₁ =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact hy
+            | brk ρ₁ =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact hy
+            | cont ρ₁ =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact hy
+            | hole l₁ =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact hy
+            | outOfFuel =>
+                cases hy
+                exact absurd rfl hne
         | ifte cnd t el =>
             simp only [tfFreeS, Bool.and_eq_true] at hfree
             simp only [execStmt] at hy ⊢

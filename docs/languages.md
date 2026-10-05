@@ -48,7 +48,7 @@ checks `lang_matrix.py`'s copy against it). "Integer ops" says how the exporter 
 
 | Language | Dialect | Functions | Hole-free | Verifiable core | Holes / nodes | Integer ops | Differential oracle |
 |---|---|---|---|---|---|---|---|
-| Python (`cachetools`) | `.python` | 209 | 80% (168) | 98 (47%) | 0.8% (46 / 5,677) | Python semantics: `/` is true division, `//` floors, `bool` is an `int` (§64) | **CPython**: 42 functions compared, 220/220 agree, 0 divergences (STRATEGY §57, not re-run here) |
+| Python (`cachetools`) | `.python` | 209 | 97% (204) | 127 (60%) | 0.2% (11 / 5,728) | Python semantics: `/` is true division, `//` floors, `bool` is an `int` (§64) | **CPython**: 42 functions compared, 220/220 agree, 0 divergences (STRATEGY §57, not re-run here) |
 | C (`sds`) | `.cLike` | 59 | 29% (17) | 13% (8), as recorded 2026-08-20, not re-measured | 8.8% (171 / 1,948) | **untyped** in this AST (32-bit wrapping): the committed AST predates §63. A re-export would carry `*:i64`-style tags | `cc` fixtures: `cintwidth` 23 cases (§63), `cboolint`, `c_address`. The `sds` corpus-level run is not re-run (see "Open items") |
 | Java (`gson/internal`) | `.cLike` | 669 | 52% (350) | 28% (191), as recorded, not re-measured | 5.5% (678 / 12,330) | **untyped** in this AST (predates §63); the exporter now emits `+:j32`/`*:j64` | `java`: `javaintwidth` fixture, 22 cases agree (§63; `tests/test_javaintwidth_java.py` passed 2026-10-02) |
 | Go (`envconfig`) | `.cLike` | 82 | 24% (20) | not re-measured | 4.1% (232 / 5,653) | typed (`*:g64`, `-:w08`; 5 tagged operators in the AST, 2 `op:int:unresolved-type` holes) | `go` 1.24: `gointwidth` 56 cases, 55 agree + 1 hole (§66; test passed 2026-10-02) |
@@ -60,8 +60,8 @@ checks `lang_matrix.py`'s copy against it). "Integer ops" says how the exporter 
 | `.tsx` / `.jsx` | `.javascript` | — | — | — | — | — | covered by the JS fixture's dialect only |
 
 The Python row is the ledger's population (`ledger-Cachetools.json`, regenerated and checked
-by `scripts/check_docs.py`): 209 functions, 168 hole-free, 98 verifiable core, 46 holes over
-5,677 nodes. `lang_matrix.py` on `ast-Cachetools.json` counts a different population
+by `scripts/check_docs.py`): 209 functions, 204 hole-free, 127 verifiable core, 11 holes over
+5,728 nodes. `lang_matrix.py` on `ast-Cachetools.json` counts a different population
 (209 functions, 196 hole-free = 94%, 16 holes over 7,538 nodes): the 30-hole difference was
 **not** investigated here (the neutral AST evidently does not contain every hole the ledger
 counts). Likewise the C figure moved from 11% recorded (ledger) to 8.8% (`lang_matrix.py`)
@@ -225,7 +225,7 @@ not work on real code.*
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 209 | 80% | 99 (47%; the ledger now says 98) | 0.8% | **yes** (CPython) |
+| Python | yes | yes | yes | `.python` ✅ | 209 | 97% | 127 (60%) | 0.2% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% (8.8% by `lang_matrix.py` now) | crashed (see below; not re-run) |
 | Java | yes | yes | yes | `.cLike` ⚠️ (as recorded) | 669 | 350 (52%) | 191 (28%) | 6% | **none** as recorded (a `java`-checked integer fixture exists since §63) |
 | Go | yes | yes | yes | `.cLike` ⚠️ (as recorded) | 82 | 20 (24%) | not re-measured | 4.1% | **none** as recorded (a `go`-checked integer fixture exists since §66) |

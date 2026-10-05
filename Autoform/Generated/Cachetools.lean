@@ -261,7 +261,7 @@ def f_cachetools___init___py__module__Cache_get : Func :=
 def f_cachetools___init___py__module__Cache_pop : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.pop"
   , params := ["key", "default"]
-  , defaults := [("default", (.hole "param:default-nonliteral"))]
+  , defaults := [("default", (.name "__marker"))]
   , body := (.seq
             (.ifte
               (.inOp false (.name "key") (.name "self"))
@@ -349,7 +349,7 @@ def f_cachetools___init___py__module__FIFOCache___init__ : Func :=
 def f_cachetools___init___py__module__FIFOCache___setitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.FIFOCache.__setitem__"
   , params := ["key", "value", "cache_setitem"]
-  , defaults := [("cache_setitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_setitem", (.field (.name "Cache") "__setitem__"))]
   , body := (.seq
             (.expr (.call "cache_setitem" [(.name "self"), (.name "key"), (.name "value")]))
             (.seq
@@ -365,7 +365,7 @@ def f_cachetools___init___py__module__FIFOCache___setitem__ : Func :=
 def f_cachetools___init___py__module__FIFOCache___delitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.FIFOCache.__delitem__"
   , params := ["key", "cache_delitem"]
-  , defaults := [("cache_delitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_delitem", (.field (.name "Cache") "__delitem__"))]
   , body := (.seq
             (.expr (.call "cache_delitem" [(.name "self"), (.name "key")]))
             (.delIndex (.field (.name "self") "_FIFOCache__order") (.name "key"))) }
@@ -474,7 +474,7 @@ def f_cachetools___init___py__module__LFUCache___init__ : Func :=
 def f_cachetools___init___py__module__LFUCache___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.LFUCache.__getitem__"
   , params := ["key", "cache_getitem"]
-  , defaults := [("cache_getitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_getitem", (.field (.name "Cache") "__getitem__"))]
   , body := (.seq
             (.assign "value" (.call "cache_getitem" [(.name "self"), (.name "key")]))
             (.seq
@@ -490,7 +490,7 @@ def f_cachetools___init___py__module__LFUCache___getitem__ : Func :=
 def f_cachetools___init___py__module__LFUCache___setitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.LFUCache.__setitem__"
   , params := ["key", "value", "cache_setitem"]
-  , defaults := [("cache_setitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_setitem", (.field (.name "Cache") "__setitem__"))]
   , body := (.seq
             (.expr (.call "cache_setitem" [(.name "self"), (.name "key"), (.name "value")]))
             (.seq
@@ -547,7 +547,7 @@ def f_cachetools___init___py__module__LFUCache___setitem__ : Func :=
 def f_cachetools___init___py__module__LFUCache___delitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.LFUCache.__delitem__"
   , params := ["key", "cache_delitem"]
-  , defaults := [("cache_delitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_delitem", (.field (.name "Cache") "__delitem__"))]
   , body := (.seq
             (.expr (.call "cache_delitem" [(.name "self"), (.name "key")]))
             (.seq
@@ -736,7 +736,7 @@ def f_cachetools___init___py__module__LRUCache___init__ : Func :=
 def f_cachetools___init___py__module__LRUCache___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.LRUCache.__getitem__"
   , params := ["key", "cache_getitem"]
-  , defaults := [("cache_getitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_getitem", (.field (.name "Cache") "__getitem__"))]
   , body := (.seq
             (.assign "value" (.call "cache_getitem" [(.name "self"), (.name "key")]))
             (.seq
@@ -752,7 +752,7 @@ def f_cachetools___init___py__module__LRUCache___getitem__ : Func :=
 def f_cachetools___init___py__module__LRUCache___setitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.LRUCache.__setitem__"
   , params := ["key", "value", "cache_setitem"]
-  , defaults := [("cache_setitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_setitem", (.field (.name "Cache") "__setitem__"))]
   , body := (.seq
             (.expr (.call "cache_setitem" [(.name "self"), (.name "key"), (.name "value")]))
             (.expr (.mcall (.name "self") "_LRUCache__touch" [(.name "key")]))) }
@@ -761,7 +761,7 @@ def f_cachetools___init___py__module__LRUCache___setitem__ : Func :=
 def f_cachetools___init___py__module__LRUCache___delitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.LRUCache.__delitem__"
   , params := ["key", "cache_delitem"]
-  , defaults := [("cache_delitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_delitem", (.field (.name "Cache") "__delitem__"))]
   , body := (.seq
             (.expr (.call "cache_delitem" [(.name "self"), (.name "key")]))
             (.delIndex (.field (.name "self") "_LRUCache__order") (.name "key"))) }
@@ -832,7 +832,7 @@ def f_cachetools___init___py__module__LRUCache__LRUCache__touch : Func :=
 def f_cachetools___init___py__module__RRCache___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.RRCache.__init__"
   , params := ["maxsize", "choice", "getsizeof"]
-  , defaults := [("choice", (.hole "param:default-nonliteral")), ("getsizeof", (.lit .unit))]
+  , defaults := [("choice", (.field (.name "random") "choice")), ("getsizeof", (.lit .unit))]
   , body := (.seq
             (.expr
               (.mcall
@@ -861,7 +861,7 @@ def f_cachetools___init___py__module__RRCache_choice : Func :=
 def f_cachetools___init___py__module__RRCache___setitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.RRCache.__setitem__"
   , params := ["key", "value", "cache_setitem"]
-  , defaults := [("cache_setitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_setitem", (.field (.name "Cache") "__setitem__"))]
   , body := (.seq
             (.expr (.call "cache_setitem" [(.name "self"), (.name "key"), (.name "value")]))
             (.seq
@@ -884,7 +884,7 @@ def f_cachetools___init___py__module__RRCache___setitem__ : Func :=
 def f_cachetools___init___py__module__RRCache___delitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.RRCache.__delitem__"
   , params := ["key", "cache_delitem"]
-  , defaults := [("cache_delitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_delitem", (.field (.name "Cache") "__delitem__"))]
   , body := (.seq
             (.expr (.call "cache_delitem" [(.name "self"), (.name "key")]))
             (.seq
@@ -976,7 +976,13 @@ def f_cachetools___init___py__module__RRCache_clear : Func :=
                 (.seq
                   (.assign "tmp0" (.field (.name "self") "_RRCache__index"))
                   (.expr (.mcall (.name "tmp0") "clear" [])))
-                (.seq .skip (.hole "op:delete-slice"))))) }
+                (.seq
+                  .skip
+                  (.delSlice
+                    (.field (.name "self") "_RRCache__keys")
+                    (.lit .unit)
+                    (.lit .unit)
+                    (.lit .unit)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer___init__ : Func :=
@@ -1068,7 +1074,7 @@ def f_cachetools___init___py__module___TimedCache___init__ : Func :=
 def f_cachetools___init___py__module___TimedCache___repr__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.__repr__"
   , params := ["cache_repr"]
-  , defaults := [("cache_repr", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_repr", (.field (.name "Cache") "__repr__"))]
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
@@ -1091,7 +1097,7 @@ def f_cachetools___init___py__module___TimedCache___repr__ : Func :=
 def f_cachetools___init___py__module___TimedCache___len__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.__len__"
   , params := ["cache_len"]
-  , defaults := [("cache_len", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_len", (.field (.name "Cache") "__len__"))]
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
@@ -1264,7 +1270,7 @@ def f_cachetools___init___py__module__TTLCache__Link_unlink : Func :=
 def f_cachetools___init___py__module__TTLCache___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__init__"
   , params := ["maxsize", "ttl", "timer", "getsizeof"]
-  , defaults := [("timer", (.hole "param:default-nonliteral")), ("getsizeof", (.lit .unit))]
+  , defaults := [("timer", (.field (.name "time") "monotonic")), ("getsizeof", (.lit .unit))]
   , body := (.seq
             (.expr
               (.mcall
@@ -1317,7 +1323,7 @@ def f_cachetools___init___py__module__TTLCache___contains__ : Func :=
 def f_cachetools___init___py__module__TTLCache___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__getitem__"
   , params := ["key", "cache_getitem"]
-  , defaults := [("cache_getitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_getitem", (.field (.name "Cache") "__getitem__"))]
   , body := (.seq
             (.seq
               (.assign "__else_ok27" (.lit (.bool true)))
@@ -1352,7 +1358,7 @@ def f_cachetools___init___py__module__TTLCache___getitem__ : Func :=
 def f_cachetools___init___py__module__TTLCache___setitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__setitem__"
   , params := ["key", "value", "cache_setitem"]
-  , defaults := [("cache_setitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_setitem", (.field (.name "Cache") "__setitem__"))]
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "timer"))
@@ -1435,7 +1441,7 @@ def f_cachetools___init___py__module__TTLCache___setitem__ : Func :=
 def f_cachetools___init___py__module__TTLCache___delitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__delitem__"
   , params := ["key", "cache_delitem"]
-  , defaults := [("cache_delitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_delitem", (.field (.name "Cache") "__delitem__"))]
   , body := (.seq
             (.expr (.call "cache_delitem" [(.name "self"), (.name "key")]))
             (.seq
@@ -1776,7 +1782,7 @@ def f_cachetools___init___py__module__TLRUCache__Item___lt__ : Func :=
 def f_cachetools___init___py__module__TLRUCache___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache.__init__"
   , params := ["maxsize", "ttu", "timer", "getsizeof"]
-  , defaults := [("timer", (.hole "param:default-nonliteral")), ("getsizeof", (.lit .unit))]
+  , defaults := [("timer", (.field (.name "time") "monotonic")), ("getsizeof", (.lit .unit))]
   , body := (.seq
             (.expr
               (.mcall
@@ -1817,7 +1823,7 @@ def f_cachetools___init___py__module__TLRUCache___contains__ : Func :=
 def f_cachetools___init___py__module__TLRUCache___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache.__getitem__"
   , params := ["key", "cache_getitem"]
-  , defaults := [("cache_getitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_getitem", (.field (.name "Cache") "__getitem__"))]
   , body := (.seq
             (.seq
               (.assign "__else_ok31" (.lit (.bool true)))
@@ -1852,7 +1858,7 @@ def f_cachetools___init___py__module__TLRUCache___getitem__ : Func :=
 def f_cachetools___init___py__module__TLRUCache___setitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache.__setitem__"
   , params := ["key", "value", "cache_setitem"]
-  , defaults := [("cache_setitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_setitem", (.field (.name "Cache") "__setitem__"))]
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "timer"))
@@ -1925,7 +1931,7 @@ def f_cachetools___init___py__module__TLRUCache___setitem__ : Func :=
 def f_cachetools___init___py__module__TLRUCache___delitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache.__delitem__"
   , params := ["key", "cache_delitem"]
-  , defaults := [("cache_delitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_delitem", (.field (.name "Cache") "__delitem__"))]
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "timer"))
@@ -2197,7 +2203,13 @@ def f_cachetools___init___py__module__TLRUCache_clear : Func :=
                 (.seq
                   (.assign "tmp0" (.field (.name "self") "_TLRUCache__items"))
                   (.expr (.mcall (.name "tmp0") "clear" [])))
-                (.seq .skip (.hole "op:delete-slice"))))) }
+                (.seq
+                  .skip
+                  (.delSlice
+                    (.field (.name "self") "_TLRUCache__order")
+                    (.lit .unit)
+                    (.lit .unit)
+                    (.lit .unit)))))) }
 
 /-- `cachetools/__init__.py:<module>.TLRUCache._TLRUCache__getitem`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TLRUCache__TLRUCache__getitem : Func :=
@@ -2217,7 +2229,7 @@ def f_cachetools___init___py__module__TLRUCache__TLRUCache__getitem : Func :=
 def f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache._TLRUCache__delitem"
   , params := ["key", "cache_delitem"]
-  , defaults := [("cache_delitem", (.hole "param:default-nonliteral"))]
+  , defaults := [("cache_delitem", (.field (.name "Cache") "__delitem__"))]
   , body := (.seq
             (.seq
               (.assign "__else_ok33" (.lit (.bool true)))
@@ -2239,7 +2251,7 @@ def f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem : Func :=
 def f_cachetools___init___py__module__cached : Func :=
   { name := "cachetools/__init__.py:<module>.cached"
   , params := ["cache", "key", "lock", "condition", "info"]
-  , defaults := [("key", (.hole "param:default-nonliteral")), ("lock", (.lit .unit)), ("condition", (.lit .unit)), ("info", (.lit (.bool false)))]
+  , defaults := [("key", (.field (.name "keys") "hashkey")), ("lock", (.lit .unit)), ("condition", (.lit .unit)), ("info", (.lit (.bool false)))]
   , body := (.seq
             (.expr
               (.lit
@@ -2352,7 +2364,7 @@ def f_cachetools___init___py__module__cached_decorator_make_info : Func :=
 def f_cachetools___init___py__module__cachedmethod : Func :=
   { name := "cachetools/__init__.py:<module>.cachedmethod"
   , params := ["cache", "key", "lock", "condition", "info"]
-  , defaults := [("key", (.hole "param:default-nonliteral")), ("lock", (.lit .unit)), ("condition", (.lit .unit)), ("info", (.lit (.bool false)))]
+  , defaults := [("key", (.field (.name "keys") "methodkey")), ("lock", (.lit .unit)), ("condition", (.lit .unit)), ("info", (.lit (.bool false)))]
   , body := (.seq
             (.expr
               (.lit
@@ -3612,7 +3624,13 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___set_name__ : Func :
               (.setField (.name "self") "_DescriptorBase__attrname" (.name "name"))
               (.ifte
                 (.binop "!=" (.name "name") (.field (.name "self") "_DescriptorBase__attrname"))
-                (.raise (.call "TypeError" [(.hole "op:stringExpressionList")]))
+                (.raise
+                  (.call
+                    "TypeError"
+                    [ (.binop
+                        "+"
+                        (.lit (.str "Cannot assign the same @cachedmethod to two different names "))
+                        (.hole "op:formatString:conversion-or-spec")) ]))
                 .skip))
             .skip) }
 
@@ -3631,7 +3649,48 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___get__ : Func :=
                   .skip
                   (.ifte
                     (.isOp true (.field (.name "self") "_DescriptorBase__attrname") (.lit .unit))
-                    (.hole "control:TRY-multiCatch")
+                    (.multiCatch
+                      (.seq
+                        (.assign "tmp0" (.field (.name "obj") "__dict__"))
+                        (.assign
+                          "wrapper"
+                          (.mcall
+                            (.name "tmp0")
+                            "setdefault"
+                            [(.field (.name "self") "_DescriptorBase__attrname"), (.name "wrapper")])))
+                      [ ("__exc1",
+                          (.seq
+                            (.assign
+                              "msg"
+                              (.binop
+                                "+"
+                                (.hole "op:formatString:conversion-or-spec")
+                                (.hole "op:formatString:conversion-or-spec")))
+                            (.ifte
+                              (.field (.name "self") "_DescriptorBase__deprecated")
+                              (.expr
+                                (.call
+                                  "cachetools/_cachedmethod.py:<module>._warn_instance_dict"
+                                  [(.name "msg"), (.lit (.int 3))]))
+                              (.raise (.call "TypeError" [(.name "msg")])))))
+                      , ("__exc2",
+                          (.seq
+                            (.assign
+                              "msg"
+                              (.binop
+                                "+"
+                                (.binop
+                                  "+"
+                                  (.hole "op:formatString:conversion-or-spec")
+                                  (.lit (.str "instance does not support item assignment for ")))
+                                (.hole "op:formatString:conversion-or-spec")))
+                            (.ifte
+                              (.field (.name "self") "_DescriptorBase__deprecated")
+                              (.expr
+                                (.call
+                                  "cachetools/_cachedmethod.py:<module>._warn_instance_dict"
+                                  [(.name "msg"), (.lit (.int 3))]))
+                              (.raise (.call "TypeError" [(.name "msg")]))))) ])
                     (.ifte
                       (.field (.name "self") "_DescriptorBase__deprecated")
                       .skip
@@ -5057,7 +5116,7 @@ def f_cachetools_func_py__module__lru_cache : Func :=
 def f_cachetools_func_py__module__rr_cache : Func :=
   { name := "cachetools/func.py:<module>.rr_cache"
   , params := ["maxsize", "choice", "typed"]
-  , defaults := [("maxsize", (.lit (.int 128))), ("choice", (.hole "param:default-nonliteral")), ("typed", (.lit (.bool false)))]
+  , defaults := [("maxsize", (.lit (.int 128))), ("choice", (.field (.name "random") "choice")), ("typed", (.lit (.bool false)))]
   , body := (.seq
             (.expr
               (.lit
@@ -5086,7 +5145,7 @@ def f_cachetools_func_py__module__rr_cache : Func :=
 def f_cachetools_func_py__module__ttl_cache : Func :=
   { name := "cachetools/func.py:<module>.ttl_cache"
   , params := ["maxsize", "ttl", "timer", "typed"]
-  , defaults := [("maxsize", (.lit (.int 128))), ("ttl", (.lit (.int 600))), ("timer", (.hole "param:default-nonliteral")), ("typed", (.lit (.bool false)))]
+  , defaults := [("maxsize", (.lit (.int 128))), ("ttl", (.lit (.int 600))), ("timer", (.field (.name "time") "monotonic")), ("typed", (.lit (.bool false)))]
   , body := (.seq
             (.expr
               (.lit
@@ -5117,7 +5176,7 @@ def f_cachetools_func_py__module__ttl_cache : Func :=
 def f_cachetools_keys_py__module___HashedTuple___hash__ : Func :=
   { name := "cachetools/keys.py:<module>._HashedTuple.__hash__"
   , params := ["hash"]
-  , defaults := [("hash", (.hole "param:default-nonliteral"))]
+  , defaults := [("hash", (.field (.name "tuple") "__hash__"))]
   , body := (.seq
             (.assign "hashvalue" (.field (.name "self") "_HashedTuple__hashvalue"))
             (.seq
@@ -5137,7 +5196,7 @@ def f_cachetools_keys_py__module___HashedTuple___hash__ : Func :=
 def f_cachetools_keys_py__module___HashedTuple___add__ : Func :=
   { name := "cachetools/keys.py:<module>._HashedTuple.__add__"
   , params := ["other", "add"]
-  , defaults := [("add", (.hole "param:default-nonliteral"))]
+  , defaults := [("add", (.field (.name "tuple") "__add__"))]
   , body := (.seq
             (.ret (.alloc "_HashedTuple" [(.call "add" [(.name "self"), (.name "other")])]))
             .skip) }
@@ -5146,7 +5205,7 @@ def f_cachetools_keys_py__module___HashedTuple___add__ : Func :=
 def f_cachetools_keys_py__module___HashedTuple___radd__ : Func :=
   { name := "cachetools/keys.py:<module>._HashedTuple.__radd__"
   , params := ["other", "add"]
-  , defaults := [("add", (.hole "param:default-nonliteral"))]
+  , defaults := [("add", (.field (.name "tuple") "__add__"))]
   , body := (.seq
             (.ret (.alloc "_HashedTuple" [(.call "add" [(.name "other"), (.name "self")])]))
             .skip) }

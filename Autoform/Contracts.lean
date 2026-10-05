@@ -116,6 +116,7 @@ def substE (σ : Impl) : Expr → Expr
   | .index a b     => .index (substE σ a) (substE σ b)
   | .field a f     => .field (substE σ a) f
   | .call f as     => .call f (substEL σ as)
+  | .ccall f as    => .ccall (substE σ f) (substEL σ as)
   | .mcall r m as  => .mcall (substE σ r) m (substEL σ as)
   | .alloc c as    => .alloc c (substEL σ as)
   | .listE as      => .listE (substEL σ as)
@@ -154,6 +155,7 @@ def substEP (σ : Impl) : List (Expr × Expr) → List (Expr × Expr)
   | (k, v) :: ps => (substE σ k, substE σ v) :: substEP σ ps
 end
 
+mutual
 /-- Substitute implementations for holes in a statement.
 
 `Stmt.hole` is **not** filled: a statement-level hole is an untranslated *effect*, and
@@ -165,6 +167,7 @@ def substS (σ : Impl) : Stmt → Stmt
   | .setField r f v  => .setField (substE σ r) f (substE σ v)
   | .setIndex r i v  => .setIndex (substE σ r) (substE σ i) (substE σ v)
   | .delIndex r i    => .delIndex (substE σ r) (substE σ i)
+  | .delSlice r s e st => .delSlice (substE σ r) (substE σ s) (substE σ e) (substE σ st)
   | .setDerefIref p v => .setDerefIref (substE σ p) (substE σ v)
   | .seq a b         => .seq (substS σ a) (substS σ b)
   | .ifte c a b      => .ifte (substE σ c) (substS σ a) (substS σ b)
@@ -174,6 +177,7 @@ def substS (σ : Impl) : Stmt → Stmt
   | .ret e           => .ret (substE σ e)
   | .tryCatch b x hd => .tryCatch (substS σ b) x (substS σ hd)
   | .tryFinally b f  => .tryFinally (substS σ b) (substS σ f)
+  | .multiCatch b hs => .multiCatch (substS σ b) (substHandlers σ hs)
   | .raise e         => .raise (substE σ e)
   | .setGlobal x e   => .setGlobal x (substE σ e)
   | .skip            => .skip
@@ -182,6 +186,12 @@ def substS (σ : Impl) : Stmt → Stmt
   | .del x           => .del x
   | .declGlobal x    => .declGlobal x
   | .hole l          => .hole l
+
+/-- Substitution across multi-catch handlers. -/
+def substHandlers (σ : Impl) : List (String × Stmt) → List (String × Stmt)
+  | [] => []
+  | (x, h) :: hs => (x, substS σ h) :: substHandlers σ hs
+end
 
 /-- Apply an implementation to a function. Name and parameters are untouched, so name
 resolution in the instantiated program is the same as in the original. -/
@@ -209,6 +219,7 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .index a b     => by rw [substE, substE_nil a, substE_nil b]
   | .field a f     => by rw [substE, substE_nil a]
   | .call f as     => by rw [substE, substEL_nil as]
+  | .ccall f as    => by rw [substE, substE_nil f, substEL_nil as]
   | .mcall r m as  => by rw [substE, substE_nil r, substEL_nil as]
   | .alloc c as    => by rw [substE, substEL_nil as]
   | .listE as      => by rw [substE, substEL_nil as]
@@ -240,6 +251,7 @@ theorem substEP_nil : ∀ ps : List (Expr × Expr), substEP [] ps = ps
   | (k, v) :: ps => by rw [substEP, substE_nil k, substE_nil v, substEP_nil ps]
 end
 
+mutual
 theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .skip | .brk | .cont | .del _ | .declGlobal _ | .hole _ => rfl
   | .expr e          => by rw [substS, substE_nil e]
@@ -247,6 +259,7 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .setField r f v  => by rw [substS, substE_nil r, substE_nil v]
   | .setIndex r i v  => by rw [substS, substE_nil r, substE_nil i, substE_nil v]
   | .delIndex r i    => by rw [substS, substE_nil r, substE_nil i]
+  | .delSlice r s e st => by rw [substS, substE_nil r, substE_nil s, substE_nil e, substE_nil st]
   | .setDerefIref p v => by rw [substS, substE_nil p, substE_nil v]
   | .seq a b         => by rw [substS, substS_nil a, substS_nil b]
   | .ifte c a b      => by rw [substS, substE_nil c, substS_nil a, substS_nil b]
@@ -256,8 +269,14 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .ret e           => by rw [substS, substE_nil e]
   | .tryCatch b x hd => by rw [substS, substS_nil b, substS_nil hd]
   | .tryFinally b f  => by rw [substS, substS_nil b, substS_nil f]
+  | .multiCatch b hs => by rw [substS, substS_nil b, substHandlers_nil hs]
   | .raise e         => by rw [substS, substE_nil e]
   | .setGlobal x e   => by rw [substS, substE_nil e]
+
+theorem substHandlers_nil : ∀ hs : List (String × Stmt), substHandlers [] hs = hs
+  | [] => rfl
+  | (x, h) :: hs => by rw [substHandlers, substS_nil h, substHandlers_nil hs]
+end
 
 @[simp] theorem onFunc_nil (f : Func) : Impl.onFunc [] f = f := by
   simp [Impl.onFunc, substS_nil]

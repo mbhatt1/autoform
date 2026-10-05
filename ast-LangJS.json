@@ -1,6 +1,6 @@
 [
  {
-  "name": "index.js::program:pMap:<lambda>0:<lambda>1",
+  "name": "index.js::program:pMap:<lambda>0:signalListener",
   "file": "index.js",
   "params": [
    "this"
@@ -19,7 +19,7 @@
      "k": "exprS",
      "e": {
       "k": "call",
-      "f": "reject",
+      "f": "index.js::program:pMap:<lambda>0:reject",
       "args": [
        {
         "k": "field",
@@ -487,7 +487,7 @@
                                             "x": "signalListener",
                                             "e": {
                                              "k": "fnref",
-                                             "v": "index.js::program:pMap:<lambda>0:<lambda>1"
+                                             "v": "index.js::program:pMap:<lambda>0:signalListener"
                                             }
                                            },
                                            "b": {
@@ -497,7 +497,7 @@
                                              "x": "cleanup",
                                              "e": {
                                               "k": "fnref",
-                                              "v": "index.js::program:pMap:<lambda>0:<lambda>2"
+                                              "v": "index.js::program:pMap:<lambda>0:cleanup"
                                              }
                                             },
                                             "b": {
@@ -507,7 +507,7 @@
                                               "x": "resolve",
                                               "e": {
                                                "k": "fnref",
-                                               "v": "index.js::program:pMap:<lambda>0:<lambda>3"
+                                               "v": "index.js::program:pMap:<lambda>0:resolve"
                                               }
                                              },
                                              "b": {
@@ -517,7 +517,7 @@
                                                "x": "reject",
                                                "e": {
                                                 "k": "fnref",
-                                                "v": "index.js::program:pMap:<lambda>0:<lambda>4"
+                                                "v": "index.js::program:pMap:<lambda>0:reject"
                                                }
                                               },
                                               "b": {
@@ -546,7 +546,7 @@
                                                     "k": "exprS",
                                                     "e": {
                                                      "k": "call",
-                                                     "f": "reject",
+                                                     "f": "index.js::program:pMap:<lambda>0:reject",
                                                      "args": [
                                                       {
                                                        "k": "field",
@@ -607,7 +607,7 @@
                                                  "x": "next",
                                                  "e": {
                                                   "k": "fnref",
-                                                  "v": "index.js::program:pMap:<lambda>0:<lambda>5"
+                                                  "v": "index.js::program:pMap:<lambda>0:next"
                                                  }
                                                 },
                                                 "b": {
@@ -666,7 +666,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:<lambda>2",
+  "name": "index.js::program:pMap:<lambda>0:cleanup",
   "file": "index.js",
   "params": [
    "this"
@@ -706,7 +706,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:<lambda>3",
+  "name": "index.js::program:pMap:<lambda>0:resolve",
   "file": "index.js",
   "params": [
    "this",
@@ -741,7 +741,7 @@
       "k": "exprS",
       "e": {
        "k": "call",
-       "f": "cleanup",
+       "f": "index.js::program:pMap:<lambda>0:cleanup",
        "args": []
       }
      }
@@ -750,7 +750,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:<lambda>4",
+  "name": "index.js::program:pMap:<lambda>0:reject",
   "file": "index.js",
   "params": [
    "this",
@@ -815,7 +815,7 @@
           "k": "exprS",
           "e": {
            "k": "call",
-           "f": "cleanup",
+           "f": "index.js::program:pMap:<lambda>0:cleanup",
            "args": []
           }
          }
@@ -1059,7 +1059,7 @@
                    "k": "exprS",
                    "e": {
                     "k": "call",
-                    "f": "reject",
+                    "f": "index.js::program:pMap:<lambda>0:reject",
                     "args": [
                      {
                       "k": "name",
@@ -1128,7 +1128,7 @@
                        "k": "exprS",
                        "e": {
                         "k": "call",
-                        "f": "reject",
+                        "f": "index.js::program:pMap:<lambda>0:reject",
                         "args": [
                          {
                           "k": "name",
@@ -1159,7 +1159,7 @@
   }
  },
  {
-  "name": "index.js::program:pMap:<lambda>0:<lambda>5",
+  "name": "index.js::program:pMap:<lambda>0:next",
   "file": "index.js",
   "params": [
    "this"
@@ -1418,7 +1418,7 @@
                                      "k": "exprS",
                                      "e": {
                                       "k": "call",
-                                      "f": "reject",
+                                      "f": "index.js::program:pMap:<lambda>0:reject",
                                       "args": [
                                        {
                                         "k": "hole",
@@ -1474,7 +1474,7 @@
                                        "k": "exprS",
                                        "e": {
                                         "k": "call",
-                                        "f": "resolve",
+                                        "f": "index.js::program:pMap:<lambda>0:resolve",
                                         "args": [
                                          {
                                           "k": "name",
@@ -1723,7 +1723,7 @@
                                        "k": "exprS",
                                        "e": {
                                         "k": "call",
-                                        "f": "resolve",
+                                        "f": "index.js::program:pMap:<lambda>0:resolve",
                                         "args": [
                                          {
                                           "k": "name",
@@ -1902,7 +1902,7 @@
                  "k": "exprS",
                  "e": {
                   "k": "call",
-                  "f": "reject",
+                  "f": "index.js::program:pMap:<lambda>0:reject",
                   "args": [
                    {
                     "k": "name",
@@ -2497,7 +2497,7 @@
                 "k": "exprS",
                 "e": {
                  "k": "call",
-                 "f": "trySpawn",
+                 "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
                  "args": []
                 }
                },
@@ -2673,7 +2673,7 @@
                         "k": "exprS",
                         "e": {
                          "k": "call",
-                         "f": "trySpawn",
+                         "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
                          "args": []
                         }
                        },
@@ -3150,7 +3150,7 @@
                      "k": "exprS",
                      "e": {
                       "k": "call",
-                      "f": "trySpawn",
+                      "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
                       "args": []
                      }
                     },
@@ -3320,7 +3320,7 @@
                             "k": "exprS",
                             "e": {
                              "k": "call",
-                             "f": "trySpawn",
+                             "f": "index.js::program:pMapIterable:_computed_object_method_0:trySpawn",
                              "args": []
                             }
                            },

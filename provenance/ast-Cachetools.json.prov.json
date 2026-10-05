@@ -1,14 +1,14 @@
 {
  "artifact": "ast-Cachetools.json",
- "artifact_bytes": 591573,
- "artifact_sha256": "a3a2267aa09169fbf6e8132abe15b1d00385d95ca5f2b8f91c04c2e3e79ac852",
- "command": "git clone https://github.com/tkem/cachetools && git -C cachetools checkout 01af8e5 (v7.1.7); joern-parse cachetools/src --language pythonsrc --output <cpg>; joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-Cachetools.json. Joern 4.0.606 from Maven Central (io.joern:joern-cli_3:4.0.606, io.joern:pysrc2cpg_3:4.0.606, codepropertygraph_3:1.7.70), run as io.joern.joerncli.JoernParse / io.joern.joerncli.console.ReplBridge --script; joern_version was detected from those jars. Re-exported at item Q's exporter (floorDiv -> \"//\"): byte-identical to the previous artifact, since cachetools contains no floor division. Re-verified at the merged exporter (sha 0f6b40b9eb37, items Q+R+S): a fresh export of the same source with the same frontend is byte-identical to the committed artifact (cmp), so only exporter_sha256 moved.",
+ "artifact_bytes": 597432,
+ "artifact_sha256": "275491c43e6b154996a6be4bbc9d00128649b1c2cc997bb486b5115ac8902a3e",
+ "command": "git clone https://github.com/tkem/cachetools && git -C cachetools checkout 01af8e5b7ce44432b357e26c7d67eb7fa055ae72; joern-parse cachetools/src --language pythonsrc --output <cpg>; joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-Cachetools.json",
  "cpg_schema_version": "1.7.70",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "exporter_sha256": "dc486ebf6c8fbbb0d2cbcd94f3af9fc1df1a8459a7e5d3b9bd3a2ab15155e68b",
  "joern_version": "4.0.606",
  "recorded_by": "scripts/provenance.py record",
  "schema_version": 1,
- "source_path": "/tmp/claude-0/-home-user-autoform/50aed7c6-e1a7-5570-8335-131f3caffbc5/scratchpad/itemC/cachetools/src",
+ "source_path": "/private/tmp/autoform-repro-cachetools/cachetools/src",
  "source_revision": "git:01af8e5b7ce44432b357e26c7d67eb7fa055ae72"
 }

@@ -264,7 +264,7 @@ def pyRun (c : String) : String :=
 #guard_msgs in #eval pyRun "case_global_default_supplied"
 
 -- CPython: (1, 4)
-/-- info: "hole param:default-nonliteral" -/
+/-- info: "hole param:default-unsupported" -/
 #guard_msgs in #eval pyRun "case_global_default_needed"
 
 -- CPython: 3

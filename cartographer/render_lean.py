@@ -131,6 +131,7 @@ def expr_shape(n):
     if k == "unop":   return ".unop", [("atom", lean_str(f('op'))), ("e", f('a'))]
     if k == "index":  return ".index", [("e", f('a')), ("e", f('b'))]
     if k == "call":   return ".call", [("atom", lean_str(f('f'))), ("es", f('args'))]
+    if k == "ccall":  return ".ccall", [("e", f('e')), ("es", f('args'))]
     if k == "hole":
         label = f('label')
         # Represent computed calls as ccall with placeholders, since the JSON
@@ -291,9 +292,9 @@ def stmt_shape(n):
         if not isinstance(handlers, list):
             raise ValueError(f"multiCatch handlers must be a list, got {type(handlers)}")
         # multiCatch handlers are (String, Stmt) pairs, not (Expr, Expr) pairs.
-        # We render them as a list of pairs where each pair is (string_expr, stmt).
-        # The "ss" tag indicates "statement-pairs" (list of statement pairs).
-        return ".multiCatch", [("s", f('body')), ("ss", [[{"k": "str", "v": name}, stmt] for name, stmt in handlers])]
+        # The "ss" tag indicates "statement-pairs" and renders the first element
+        # directly as a Lean string literal.
+        return ".multiCatch", [("s", f('body')), ("ss", handlers)]
     # `try: body finally: fin`. Distinct from `tryCatch` because it intercepts *every* way
     # control leaves the body — return/break/continue as well as exceptions — and then
     # re-raises that outcome unless the finalizer itself leaves abnormally.
@@ -409,8 +410,8 @@ def _flat_pair_capped(p, cap):
 def _flat_stmt_pair_capped(p, cap):
     if not (isinstance(p, list) and len(p) == 2):
         raise ValueError(f"statement pair must be a 2-element array, got {p!r}")
-    a = flat_capped(p[0], "e", cap - 4)
-    if a is None:
+    a = lean_str(p[0])
+    if len(a) > cap - 4:
         return None
     b = flat_capped(p[1], "s", cap - 4 - len(a))
     if b is None:
@@ -448,7 +449,7 @@ def _flat_pair(p):
 def _flat_stmt_pair(p):
     if not (isinstance(p, list) and len(p) == 2):
         raise ValueError(f"statement pair must be a 2-element array, got {p!r}")
-    return "(" + flat(p[0], "e") + ", " + flat(p[1], "s") + ")"
+    return "(" + lean_str(p[0]) + ", " + flat(p[1], "s") + ")"
 
 def _render_seq_chain(node, col) -> str:
     """Render a `Stmt.seq` whose flat form already failed to fit at `col`, without one
@@ -565,7 +566,7 @@ def render_stmt_pair(p, col) -> str:
     if col + len(one) <= WIDTH:
         return one
     inner = min(col + INDENT, MAX_INDENT)
-    return ("(" + render(p[0], "e", inner) + ",\n" + " " * inner
+    return ("(" + lean_str(p[0]) + ",\n" + " " * inner
             + render(p[1], "s", inner) + ")")
 
 # Kept as the public entry points other tooling may import.
