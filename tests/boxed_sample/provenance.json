@@ -14,7 +14,7 @@
  "joern_version": "4.0.606",
  "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "exporter_sha256": "dc486ebf6c8fbbb0d2cbcd94f3af9fc1df1a8459a7e5d3b9bd3a2ab15155e68b",
  "command": [
   "joern-parse tests/boxed_sample --language pythonsrc --output boxed.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=boxed.cpg --param out=tests/boxed_sample/ast-BoxedSample.json"

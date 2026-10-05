@@ -1,0 +1,31 @@
+# Autoform project configuration for the enterprise CLI.
+
+[project]
+# Used when no --target is passed.
+source = "/path/to/source/repo"
+module = "Translated"
+
+[runtime]
+joern_home = "~/joern"
+# lake = "/opt/lean/bin/lake"
+# cpp_defines = ["SQLITE_TEST", "SQLITE_API= "]
+
+# Large organizations can define many services and run them with:
+#   autoform --dry-run --json batch
+#   autoform --run-id nightly-2026-10-04 batch payments search
+[targets.payments]
+source = "/repos/payments"
+module = "Payments"
+mode = "assure"
+owner = "payments-platform"
+tier = "critical"
+tags = ["pci", "python", "nightly"]
+
+[targets.search]
+source = "/repos/search"
+module = "Search"
+mode = "translate"
+owner = "search-platform"
+tier = "standard"
+tags = ["go", "nightly"]
+# cpp_defines = ["SERVICE_SEARCH=1"]

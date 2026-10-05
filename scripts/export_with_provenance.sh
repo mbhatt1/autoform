@@ -20,10 +20,10 @@
 # checks, without any of that, that the record still describes the artifact and that the
 # exporter has not moved underneath it.
 #
-# This does not render Lean or run the differential; use ./autoform.sh for the full run.
-# Until autoform.sh calls provenance.py itself (see docs/architecture.md, "Merge-phase
-# changes this asks for elsewhere"), an AST produced by autoform.sh is unattributed and
-# scripts/check_provenance.py will say so by name.
+# This does not render Lean or run the differential. The main `autoform translate` /
+# `autoform assure` pipeline now performs the same Joern pin check and records AST
+# provenance as part of a full run; keep this helper for teams that only need an
+# attributed neutral AST.
 set -euo pipefail
 
 SRC="${1:?usage: export_with_provenance.sh <source-dir> <ModuleName>}"

@@ -1,9 +1,9 @@
 # tests/ — the Python tooling's own test suite
 
 ```sh
-python3 -m pytest tests/ -q          # whole suite, ~30 s, no Lean toolchain needed
-python3 -m pytest tests/ -q -rx      # ...and print the reason for each strict xfail
-python3 -m pytest tests/test_regressions.py -q     # the five silent failures
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ -q          # whole suite, no ambient plugins
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ -q -rx      # ...and print strict xfail reasons
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_regressions.py -q     # the five silent failures
 ```
 
 No plugins, no fixtures directory, no network, no `lake`. Every test either runs a script

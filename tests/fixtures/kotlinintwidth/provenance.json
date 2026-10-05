@@ -21,7 +21,7 @@
  "joern_version": "4.0.606",
  "frontend": "kotlin2cpg 4.0.606 (io.joern.kotlin2cpg.Main), default options",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "0f6b40b9eb37ce555c89fa3d95c912810922f689bbaee94f686746212717f268",
+ "exporter_sha256": "dc486ebf6c8fbbb0d2cbcd94f3af9fc1df1a8459a7e5d3b9bd3a2ab15155e68b",
  "command": [
   "java -cp '/opt/joern-mvn/lib/*:<the kotlin2cpg_3 runtime jars>/*' io.joern.kotlin2cpg.Main <a directory holding only cases.kt> --output cpg.bin",
   "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/kotlinintwidth/ast.json",

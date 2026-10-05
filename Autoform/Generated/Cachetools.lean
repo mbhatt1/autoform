@@ -4938,7 +4938,7 @@ def f_cachetools_func_py__module___cache_decorator : Func :=
                 (.fnref "cachetools/keys.py:<module>.typedkey")
                 (.fnref "cachetools/keys.py:<module>.hashkey")))
             (.seq
-              (.assign "wrapper" (.hole "call:computed-callee"))
+              (.assign "wrapper" (.ccall (.hole "ccall:func") []))
               (.seq
                 (.setField
                   (.name "wrapper")
@@ -4986,7 +4986,7 @@ def f_cachetools_func_py__module__fifo_cache : Func :=
                       [(.boxContainer (.dictE [])), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret (.ccall (.hole "ccall:func") []))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5015,7 +5015,7 @@ def f_cachetools_func_py__module__lfu_cache : Func :=
                       [(.boxContainer (.dictE [])), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret (.ccall (.hole "ccall:func") []))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5044,7 +5044,7 @@ def f_cachetools_func_py__module__lru_cache : Func :=
                       [(.boxContainer (.dictE [])), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret (.ccall (.hole "ccall:func") []))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5073,7 +5073,7 @@ def f_cachetools_func_py__module__rr_cache : Func :=
                       [(.boxContainer (.dictE [])), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret (.ccall (.hole "ccall:func") []))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5104,7 +5104,7 @@ def f_cachetools_func_py__module__ttl_cache : Func :=
                       , (.name "typed") ]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret (.ccall (.hole "ccall:func") []))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"

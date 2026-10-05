@@ -186,8 +186,7 @@ provenance/<artifact>.prov.json
 
 Sidecar files rather than a field inside the artifact, because `export_ast.sc` writes a
 bare JSON array and `render_lean.py`, `check_docs.py` and `differential.py` all index it as
-one. An envelope is the better end state; see "Merge-phase changes this asks for
-elsewhere".
+one. An envelope is the better end state; see "Remaining provenance hardening" below.
 
 Two checks, one cheap and one expensive:
 
@@ -217,21 +216,19 @@ recorded as the finding it is. A fixture's `provenance.json` under `tests/` is h
 stricter standard: its `exporter_sha256` must equal the current exporter
 (`tests/test_fixture_exporter_fresh.py`).
 
-### Merge-phase changes this asks for elsewhere
+### Remaining provenance hardening
 
-Neither is made here — `cartographer/export_ast.sc` and `autoform.sh` are owned elsewhere
-this round — and until they are, an AST produced by `./autoform.sh` is unattributed and
-the checker says so by name. Use `scripts/export_with_provenance.sh` to produce an
-attributed one.
+The CLI pipeline now enforces the Joern pin before parsing and records
+`provenance/ast-<Module>.json.prov.json` after `export_ast.sc` emits a tracked AST; the
+legacy `./autoform.sh` and `./assure.sh` wrappers delegate to that shared path. The
+standalone `scripts/export_with_provenance.sh` helper remains useful when a team only
+needs an attributed neutral AST without rendering Lean or running assurance checks.
 
-1. **`autoform.sh`**: call `python3 scripts/provenance.py joern-version --check` before
-   stage 1, and `python3 scripts/provenance.py record --artifact ast-$MOD.json --source
-   "$SRC" --exporter cartographer/export_ast.sc --command "…"` after stage 3.
-2. **`cartographer/export_ast.sc`**: emit `joern.metaData.version` and the CPG root into
-   the artifact itself, so provenance survives a file copied out of the repository. This
-   requires changing the top-level JSON from an array to
-   `{"provenance": {...}, "functions": [...]}` and updating the three readers; the sidecar
-   is the interim.
+The remaining hardening item is inside **`cartographer/export_ast.sc`**: emit
+`joern.metaData.version` and the CPG root into the artifact itself, so provenance survives
+a file copied out of the repository. This requires changing the top-level JSON from an
+array to `{"provenance": {...}, "functions": [...]}` and updating the readers; the
+sidecar is the interim.
 
 ## Module layout
 

@@ -9,7 +9,7 @@
    `case_*` function; THIS file builds `cases.go` together with `main.go` (the driver,
    which is not exported), runs it, and checks each pin against Go's own output.
 
-Skipped, not passed, when no `go` is on PATH.
+Skipped, not passed, when no usable `go` toolchain is on PATH.
 """
 import hashlib
 import json
@@ -53,8 +53,27 @@ def as_go(core: str) -> str:
     return core
 
 
-@pytest.mark.skipif(shutil.which("go") is None, reason="no go toolchain on PATH")
+def _usable_go_toolchain() -> tuple[bool, str]:
+    go = shutil.which("go")
+    if go is None:
+        return False, "no go toolchain on PATH"
+    try:
+        r = subprocess.run([go, "env", "GOROOT"], capture_output=True, text=True, timeout=10)
+    except Exception as exc:
+        return False, f"go env failed: {exc}"
+    goroot = r.stdout.strip()
+    if r.returncode != 0 or not goroot or not os.path.exists(os.path.join(goroot, "src", "fmt")):
+        return False, "go toolchain is present but its standard library is unavailable"
+    probe = subprocess.run([go, "list", "fmt", "os"], capture_output=True, text=True, timeout=10)
+    if probe.returncode != 0:
+        return False, "go toolchain is present but cannot resolve its standard library"
+    return True, ""
+
+
 def test_every_case_is_pinned_and_agrees_with_go(tmp_path):
+    ok, reason = _usable_go_toolchain()
+    if not ok:
+        pytest.skip(reason)
     exe = tmp_path / "gointwidth"
     subprocess.run(["go", "build", "-o", str(exe), SRC, DRIVER], check=True,
                    capture_output=True, text=True, cwd=tmp_path)
