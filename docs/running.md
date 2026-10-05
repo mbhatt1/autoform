@@ -80,10 +80,11 @@ while having failed**, leaving no `joern-cli` directory and a shell that reports
 Fetch the release asset directly instead:
 
 ```sh
-# pick a release from https://github.com/joernio/joern/releases (4.0.606 is known-good)
-curl -L -o joern-cli.zip \
-  https://github.com/joernio/joern/releases/download/v4.0.606/joern-cli.zip
-mkdir -p ~/joern && unzip -q joern-cli.zip -d ~/joern
+# pick the asset for your platform from https://github.com/joernio/joern/releases
+# 4.0.606 is known-good; this example is macOS arm64.
+curl -L -o joern-cli-macos-arm64.zip \
+  https://github.com/joernio/joern/releases/download/v4.0.606/joern-cli-macos-arm64.zip
+mkdir -p ~/joern && unzip -q joern-cli-macos-arm64.zip -d ~/joern
 ~/joern/joern-cli/joern --version
 ```
 

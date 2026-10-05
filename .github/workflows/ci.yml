@@ -560,6 +560,7 @@ jobs:
     timeout-minutes: 120
     env:
       JOERN_VERSION: 4.0.606
+      JOERN_ASSET: joern-cli-linux-x86_64.zip
       JOERN_HOME: ${{ github.workspace }}/.joern/4.0.606
 
     steps:
@@ -602,15 +603,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .joern/${{ env.JOERN_VERSION }}
-          key: joern-${{ runner.os }}-${{ env.JOERN_VERSION }}
+          key: joern-${{ runner.os }}-${{ runner.arch }}-${{ env.JOERN_VERSION }}
 
       - name: Install Joern ${{ env.JOERN_VERSION }} from release asset
         if: steps.joern-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          mkdir -p "$JOERN_HOME"
-          curl -fL "https://github.com/joernio/joern/releases/download/v${JOERN_VERSION}/joern-cli.zip" -o "$RUNNER_TEMP/joern-cli.zip"
-          unzip -q "$RUNNER_TEMP/joern-cli.zip" -d "$JOERN_HOME"
+          mkdir -p "$JOERN_HOME" "$RUNNER_TEMP/target"
+          curl -fL "https://github.com/joernio/joern/releases/download/v${JOERN_VERSION}/${JOERN_ASSET}" -o "$RUNNER_TEMP/target/${JOERN_ASSET}"
+          curl -fL "https://github.com/joernio/joern/releases/download/v${JOERN_VERSION}/${JOERN_ASSET}.sha512" -o "$RUNNER_TEMP/${JOERN_ASSET}.sha512"
+          (cd "$RUNNER_TEMP" && sha512sum -c "${JOERN_ASSET}.sha512")
+          unzip -q "$RUNNER_TEMP/target/${JOERN_ASSET}" -d "$JOERN_HOME"
           test -x "$JOERN_HOME/joern-cli/joern"
           test -x "$JOERN_HOME/joern-cli/joern-parse"
 
