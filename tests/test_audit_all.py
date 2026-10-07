@@ -30,7 +30,7 @@ def _alive(pid: int) -> bool:
     try:
         with open(f"/proc/{pid}/stat") as fh:
             return fh.read().rsplit(")", 1)[1].split()[0] != "Z"
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return False
 
 
@@ -68,7 +68,10 @@ def test_plain_subprocess_run_does_leak_the_grandchild(tmp_path):
     try:
         assert _alive(pid), "expected the old code path to leak the grandchild"
     finally:
-        os.kill(pid, 9)
+        try:
+            os.kill(pid, 9)
+        except ProcessLookupError:
+            pass
 
 
 def test_run_in_group_returns_a_completed_process():
