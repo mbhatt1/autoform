@@ -28,6 +28,8 @@ autoform translate --target payments   # run a named target from autoform.toml
 autoform assure <src> <Module>         # run one assurance pipeline
 autoform plan                          # write a deterministic fleet execution plan
 autoform spec-plan <src> <Module>       # plan tests -> traces -> Lean behavior specs
+autoform seed-python-tests <src> <Module> \
+                                      # write pytest characterization tests
 autoform trace-python-tests <src> <Module> \
                                       # run Python tests and emit behavior trace/spec
 autoform spec-from-trace trace.jsonl Service \
@@ -50,7 +52,7 @@ autoform check --junit autoform-checks.xml --sarif autoform.sarif
 ```
 
 Every pipeline command accepts `--dry-run`, `--json`, `--repo-root`, `--lake`, `--run-id`, `--artifact-dir` and
-`--keep-work`. JSON mode is the preferred mode for CI systems and dashboards. `autoform spec-plan` is a planning command for test-first autoformalization: it records how a real test command will become runtime traces, Lean behavior specs, conformance checks and mutation gates before the expensive translation run starts. `autoform trace-python-tests` runs a Python test command under Autoform's behavior tracer, writes JSONL observations for project functions, and renders the same observations into a Lean behavior-spec module unless `--trace-only` is passed. `autoform spec-from-trace` reads behavior trace JSONL and writes a Lean module that imports `Autoform.Generated.<Module>` and records every runtime observation, including explicit skip reasons. Non-dry-run
+`--keep-work`. JSON mode is the preferred mode for CI systems and dashboards. `autoform spec-plan` is a planning command for test-first autoformalization: it records how a real test command will become runtime traces, Lean behavior specs, conformance checks and mutation gates before the expensive translation run starts. `autoform seed-python-tests` writes pytest characterization tests for Python project functions using provided sample cases and zero-argument functions, while leaving skipped TODO cases for functions that still need inputs. `autoform trace-python-tests` runs a Python test command under Autoform's behavior tracer, writes JSONL observations for project functions, and renders the same observations into a Lean behavior-spec module unless `--trace-only` is passed. `autoform spec-from-trace` reads behavior trace JSONL and writes a Lean module that imports `Autoform.Generated.<Module>` and records every runtime observation, including explicit skip reasons. Non-dry-run
 translate and assure executions write a manifest to `.autoform-runs/<run-id>/run.json` by
 default, with every planned command, return code and discovered artifact.
 Each manifest also records audit metadata: the config path, CLI version, repo commit and dirty flag, Python runtime, selected Lake executable, Joern home, and whether C/C++ defines were set.

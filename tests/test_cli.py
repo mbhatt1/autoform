@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -195,6 +196,7 @@ def test_spec_plan_turns_tests_into_behavior_contract_plan(capsys):
     assert payload["test_command"] == "pytest tests"
     phases = [phase["name"] for phase in payload["phases"]]
     assert phases == [
+        "seed-characterization-tests",
         "discover-tests",
         "trace-runtime-behavior",
         "translate-source",
@@ -202,6 +204,9 @@ def test_spec_plan_turns_tests_into_behavior_contract_plan(capsys):
         "check-conformance",
         "anti-vacuity",
     ]
+    assert "/srv/service/tests/test_autoform_characterization.py" in payload["artifacts"]
+    seed_phase = next(phase for phase in payload["phases"] if phase["name"] == "seed-characterization-tests")
+    assert seed_phase["command"] == "autoform seed-python-tests /srv/service Service --output /srv/service/tests/test_autoform_characterization.py"
     assert "Autoform/Specs/ServiceBehaviorSpec.lean" in payload["artifacts"]
     trace_phase = next(phase for phase in payload["phases"] if phase["name"] == "trace-runtime-behavior")
     assert trace_phase["command"].startswith("autoform trace-python-tests /srv/service Service --test-command 'pytest tests'")
@@ -352,6 +357,82 @@ def test_trace_python_tests_rejects_zero_observations(tmp_path, capsys):
     assert payload["returncode"] == 1
     assert payload["observations"] == 0
     assert payload["violations"][0]["message"] == "test command passed but no project function observations were recorded"
+
+
+def test_seed_python_tests_writes_runnable_characterization_tests(tmp_path, capsys):
+    src = tmp_path / "pkg"
+    src.mkdir()
+    (src / "mathy.py").write_text(
+        "def add(x, y):\n"
+        "    return x + y\n\n"
+        "def hello():\n"
+        "    return 'hi'\n\n"
+        "def needs_input(value):\n"
+        "    return value\n"
+    )
+    samples = tmp_path / "samples.json"
+    samples.write_text(json.dumps({"mathy.add": [{"args": [2, 3], "kwargs": {}}]}))
+    output = src / "tests" / "test_autoform_characterization.py"
+    rc = main([
+        "--json",
+        "seed-python-tests",
+        str(src),
+        "Mathy",
+        "--sample-cases",
+        str(samples),
+        "--output",
+        str(output),
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "seed-python-tests"
+    assert payload["written_cases"] == 2
+    assert payload["pending_functions"] == 1
+    generated = output.read_text()
+    assert "mathy.add#1" in generated
+    assert "mathy.hello#1" in generated
+    assert "mathy.needs_input" in generated
+    run = subprocess.run([sys.executable, "-m", "pytest", "-q", str(output)], cwd=src, text=True, capture_output=True, check=False)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "2 passed" in run.stdout
+    assert "1 skipped" in run.stdout
+
+
+def test_seed_python_tests_requires_runnable_cases(tmp_path, capsys):
+    src = tmp_path / "pkg"
+    src.mkdir()
+    (src / "mathy.py").write_text("def needs_input(value):\n    return value\n")
+    rc = main(["--json", "seed-python-tests", str(src), "Mathy", "--output", str(src / "tests" / "test_autoform.py")])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["written_cases"] == 0
+    assert payload["pending_functions"] == 1
+    assert "no runnable characterization cases" in payload["violations"][0]["message"]
+
+
+def test_seed_python_tests_pending_for_unencodable_return(tmp_path, capsys):
+    src = tmp_path / "pkg"
+    src.mkdir()
+    (src / "handles.py").write_text(
+        "def open_handle():\n"
+        "    return object()\n"
+    )
+    output = src / "tests" / "test_autoform.py"
+    rc = main([
+        "--json",
+        "seed-python-tests",
+        str(src),
+        "Handles",
+        "--output",
+        str(output),
+        "--allow-empty",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["written_cases"] == 0
+    assert payload["pending_functions"] == 1
+    generated = output.read_text()
+    assert "not JSON-serializable" in generated
 
 
 def test_schema_outputs_behavior_trace_observation_schema(capsys):

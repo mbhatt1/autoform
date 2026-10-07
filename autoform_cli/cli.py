@@ -7,6 +7,7 @@ machine-readable output, and preflight checks without changing the proof-produci
 from __future__ import annotations
 
 import argparse
+import ast
 import glob as glob_mod
 import json
 import os
@@ -1003,8 +1004,13 @@ def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
     default_trace_dir = _artifact_dir_for_target(args, getattr(args, "target", None) or module, args.run_id or module)
     trace_output = args.trace_output or str(default_trace_dir / "behavior-trace.jsonl")
     spec_output = args.spec_output or f"Autoform/Specs/{module}BehaviorSpec.lean"
+    seed_output = str(Path(source) / "tests" / "test_autoform_characterization.py")
     ast_output = f"ast-{module}.json"
     generated_output = f"Autoform/Generated/{module}.lean"
+    if (test_framework or "").lower() in {"pytest", "python", "unittest"}:
+        seed_command = f"autoform seed-python-tests {shlex.quote(str(source))} {module} --output {shlex.quote(seed_output)}"
+    else:
+        seed_command = None
     if (test_framework or "").lower() in {"pytest", "python", "unittest"}:
         trace_command = (
             f"autoform trace-python-tests {shlex.quote(str(source))} {module} "
@@ -1014,6 +1020,13 @@ def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
     else:
         trace_command = test_command
     phases: list[dict[str, Any]] = [
+        {
+            "name": "seed-characterization-tests",
+            "purpose": "Write or review executable tests for observable behavior before treating a codebase as formally characterized.",
+            "command": seed_command,
+            "outputs": [seed_output],
+            "rejects": ["no runnable characterization cases", "generated tests with no reviewed sample inputs"],
+        },
         {
             "name": "discover-tests",
             "purpose": "Find the tests that describe the codebase's public behavior before trusting a source-only translation.",
@@ -1067,7 +1080,7 @@ def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
         "test_framework": test_framework,
         "trace_format": "jsonl: function, args, kwargs, receiver_state, result|exception, side_effects, coverage",
         "phases": phases,
-        "artifacts": [trace_output, ast_output, generated_output, spec_output, "conformance.json", "mutation.json"],
+        "artifacts": [seed_output, trace_output, ast_output, generated_output, spec_output, "conformance.json", "mutation.json"],
         "anti_vacuity": [
             "Reject suites with zero runtime observations for translated functions.",
             "Reject Lean specs that only restate reflexive facts such as f(x) = f(x).",
@@ -1383,6 +1396,239 @@ def cmd_trace_python_tests(args: argparse.Namespace, config: Mapping[str, Any]) 
         print(f"Autoform traced {len(observations)} Python observation(s) to {trace_output}")
         if cp.returncode == 0 and observations and not args.trace_only:
             print(f"Autoform wrote {spec_output}")
+    return int(payload["returncode"])
+
+
+def _python_module_name(source: Path, path: Path) -> str | None:
+    rel = path.with_suffix("").relative_to(source)
+    parts = list(rel.parts)
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    if not parts:
+        return None
+    if any(part.startswith(".") or "-" in part for part in parts):
+        return None
+    return ".".join(parts)
+
+
+def _discover_python_functions(source: Path, *, include_private: bool = False, max_functions: int = 200) -> list[dict[str, Any]]:
+    discovered: list[dict[str, Any]] = []
+    for path in sorted(source.rglob("*.py")):
+        rel_parts = set(path.relative_to(source).parts)
+        if "__pycache__" in rel_parts or ".venv" in rel_parts or "venv" in rel_parts:
+            continue
+        if "tests" in rel_parts or path.name.startswith("test_") or path.name.endswith("_test.py"):
+            continue
+        module = _python_module_name(source, path)
+        if module is None:
+            continue
+        try:
+            tree = ast.parse(path.read_text(), filename=str(path))
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if len(discovered) >= max_functions:
+                return discovered
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if not include_private and node.name.startswith("_"):
+                continue
+            args = node.args
+            positional = list(args.posonlyargs) + list(args.args)
+            required_positional = positional[: len(positional) - len(args.defaults)]
+            required_kwonly = [arg for arg, default in zip(args.kwonlyargs, args.kw_defaults) if default is None]
+            discovered.append({
+                "function": f"{module}.{node.name}",
+                "module": module,
+                "name": node.name,
+                "path": str(path),
+                "line": node.lineno,
+                "required_args": [arg.arg for arg in required_positional],
+                "required_kwargs": [arg.arg for arg in required_kwonly],
+                "can_call_without_samples": not required_positional and not required_kwonly,
+            })
+    return discovered
+
+
+def _load_sample_cases(path: str | None) -> dict[str, list[dict[str, Any]]]:
+    if not path:
+        return {}
+    sample_path = Path(path).expanduser()
+    try:
+        raw = json.loads(sample_path.read_text())
+    except OSError as exc:
+        raise SystemExit(f"cannot read sample cases {sample_path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{sample_path}: invalid JSON sample cases: {exc.msg}") from exc
+    cases: dict[str, list[dict[str, Any]]] = {}
+    if isinstance(raw, Mapping):
+        iterator = []
+        for function, entries in raw.items():
+            if isinstance(entries, Mapping):
+                entries = [entries]
+            if not isinstance(entries, list):
+                raise SystemExit(f"{sample_path}: cases for {function!r} must be an object or array")
+            for entry in entries:
+                iterator.append({"function": function, **(entry if isinstance(entry, Mapping) else {})})
+    elif isinstance(raw, list):
+        iterator = raw
+    else:
+        raise SystemExit(f"{sample_path}: sample cases must be a JSON object or array")
+    for idx, entry in enumerate(iterator, start=1):
+        if not isinstance(entry, Mapping):
+            raise SystemExit(f"{sample_path}: sample case {idx} must be an object")
+        function = entry.get("function")
+        if not isinstance(function, str) or not function:
+            raise SystemExit(f"{sample_path}: sample case {idx} requires a non-empty function name")
+        args_value = entry.get("args", [])
+        kwargs_value = entry.get("kwargs", {})
+        if not isinstance(args_value, list):
+            raise SystemExit(f"{sample_path}: sample case {idx} args must be an array")
+        if not isinstance(kwargs_value, Mapping):
+            raise SystemExit(f"{sample_path}: sample case {idx} kwargs must be an object")
+        cases.setdefault(function, []).append({"args": args_value, "kwargs": dict(kwargs_value)})
+    return cases
+
+
+def _call_python_function(function: str, args_value: list[Any], kwargs_value: Mapping[str, Any]) -> dict[str, Any]:
+    module_name, _, attr = function.rpartition(".")
+    if not module_name or not attr:
+        return {"exception": "ImportError", "message": f"cannot split function name {function!r}"}
+    try:
+        module = __import__(module_name, fromlist=[attr])
+        target = getattr(module, attr)
+        result = target(*args_value, **dict(kwargs_value))
+    except BaseException as exc:  # characterization records current behavior, including exceptions
+        return {"exception": type(exc).__name__, "message": str(exc)}
+    try:
+        json.dumps(result)
+    except TypeError:
+        return {"skip_reason": f"return value from {function} is not JSON-serializable"}
+    return {"result": result}
+
+
+def _render_pytest_characterization(source: Path, runnable: Sequence[Mapping[str, Any]], pending: Sequence[Mapping[str, Any]]) -> str:
+    return "\n".join([
+        '"""Generated by Autoform. Review and keep the cases that describe intended behavior."""',
+        "from __future__ import annotations",
+        "",
+        "import importlib",
+        "import json",
+        "import sys",
+        "from pathlib import Path",
+        "",
+        "import pytest",
+        "",
+        f"PROJECT_ROOT = Path({str(source)!r})",
+        "if str(PROJECT_ROOT) not in sys.path:",
+        "    sys.path.insert(0, str(PROJECT_ROOT))",
+        "",
+        "CASES = json.loads(" + repr(json.dumps(list(runnable), indent=2, sort_keys=True)) + ")",
+        "PENDING = json.loads(" + repr(json.dumps(list(pending), indent=2, sort_keys=True)) + ")",
+        "",
+        "",
+        "def _call(function, args, kwargs):",
+        "    module_name, _, attr = function.rpartition('.')",
+        "    target = getattr(importlib.import_module(module_name), attr)",
+        "    return target(*args, **kwargs)",
+        "",
+        "",
+        "@pytest.mark.parametrize('case', CASES, ids=lambda case: case['id'])",
+        "def test_autoform_characterization(case):",
+        "    if 'exception' in case:",
+        "        with pytest.raises(Exception) as excinfo:",
+        "            _call(case['function'], case['args'], case['kwargs'])",
+        "        assert type(excinfo.value).__name__ == case['exception']",
+        "        assert str(excinfo.value) == case.get('message', '')",
+        "    else:",
+        "        assert _call(case['function'], case['args'], case['kwargs']) == case['expected']",
+        "",
+        "",
+        "@pytest.mark.parametrize('item', PENDING, ids=lambda item: item['function'])",
+        "def test_autoform_needs_samples(item):",
+        "    pytest.skip(item['reason'])",
+        "",
+    ])
+
+
+def cmd_seed_python_tests(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
+    source, module, project = _source_module_from_args(args, config)
+    source = source.resolve()
+    if not source.exists():
+        raise SystemExit(f"source path does not exist: {source}")
+    output = Path(args.output or project.get("generated_tests") or (source / "tests" / "test_autoform_characterization.py")).expanduser()
+    if output.exists() and not args.force and not args.dry_run:
+        raise SystemExit(f"{output} already exists; pass --force to overwrite")
+    discovered = _discover_python_functions(source, include_private=args.include_private, max_functions=args.max_functions)
+    samples = _load_sample_cases(args.sample_cases)
+    runnable: list[dict[str, Any]] = []
+    pending: list[dict[str, Any]] = []
+    old_path = list(sys.path)
+    sys.path.insert(0, str(source))
+    try:
+        for item in discovered:
+            function = str(item["function"])
+            cases = samples.get(function)
+            if not cases and item["can_call_without_samples"]:
+                cases = [{"args": [], "kwargs": {}}]
+            if not cases:
+                pending.append({
+                    "function": function,
+                    "reason": "sample inputs required before Autoform can characterize this function",
+                    "required_args": item["required_args"],
+                    "required_kwargs": item["required_kwargs"],
+                })
+                continue
+            for idx, case in enumerate(cases, start=1):
+                outcome = _call_python_function(function, list(case.get("args", [])), dict(case.get("kwargs", {})))
+                rendered = {
+                    "id": f"{function}#{idx}",
+                    "function": function,
+                    "args": list(case.get("args", [])),
+                    "kwargs": dict(case.get("kwargs", {})),
+                }
+                if "result" in outcome:
+                    rendered["expected"] = outcome["result"]
+                elif "exception" in outcome:
+                    rendered["exception"] = outcome["exception"]
+                    rendered["message"] = outcome.get("message", "")
+                else:
+                    pending.append({
+                        "function": function,
+                        "reason": outcome.get("skip_reason", "case could not be encoded as a characterization test"),
+                        "args": list(case.get("args", [])),
+                        "kwargs": dict(case.get("kwargs", {})),
+                    })
+                    continue
+                runnable.append(rendered)
+    finally:
+        sys.path[:] = old_path
+    payload = {
+        "kind": "seed-python-tests",
+        "source": str(source),
+        "module": module,
+        "output": str(output),
+        "discovered_functions": len(discovered),
+        "written_cases": len(runnable),
+        "pending_functions": len(pending),
+        "returncode": 0 if runnable or args.allow_empty else 1,
+    }
+    if runnable or args.allow_empty:
+        if not args.dry_run:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(_render_pytest_characterization(source, runnable, pending))
+    else:
+        payload["violations"] = [{
+            "path": str(source),
+            "message": "no runnable characterization cases; provide --sample-cases or pass --allow-empty",
+        }]
+    if args.json or args.dry_run:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        if runnable or args.allow_empty:
+            print(f"Autoform wrote {output} with {len(runnable)} characterization case(s)")
+        else:
+            print("Autoform found no runnable characterization cases")
     return int(payload["returncode"])
 
 def _plan_entry_key(entry: Mapping[str, Any]) -> str:
@@ -2170,6 +2416,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--include-tests", action="store_true", help="Also trace functions defined in test files")
     p.add_argument("--no-generated-import", action="store_true", help="Do not import Autoform.Generated.<Module> in the emitted spec")
     p.set_defaults(func=cmd_trace_python_tests)
+
+    p = sub.add_parser("seed-python-tests", help="Generate pytest characterization tests for Python project functions")
+    p.add_argument("source", nargs="?", help="Python source tree to characterize")
+    p.add_argument("module", nargs="?", help="Lean module name")
+    p.add_argument("--target", help="Configured [targets.<name>] entry to seed")
+    p.add_argument("--output", help="Output pytest file; defaults to <source>/tests/test_autoform_characterization.py")
+    p.add_argument("--sample-cases", help="JSON file mapping function names to args/kwargs cases")
+    p.add_argument("--max-functions", type=int, default=200, help="Maximum number of top-level functions to inventory")
+    p.add_argument("--include-private", action="store_true", help="Include functions whose names start with '_'")
+    p.add_argument("--allow-empty", action="store_true", help="Write a scaffold even when no runnable cases can be generated")
+    p.add_argument("--force", action="store_true", help="Overwrite an existing generated test file")
+    p.set_defaults(func=cmd_seed_python_tests)
 
     p = sub.add_parser("verify-plan", help="Check that a reviewed fleet plan still matches current config")
     p.add_argument("--plan", required=True, help="Path to autoform fleet-plan JSON")
