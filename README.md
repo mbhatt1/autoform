@@ -39,7 +39,7 @@ The legacy shell scripts remain supported:
 ./assure.sh   <source-dir> <ModuleName>   # the above, plus audit, mutation gate, SACM case
 ```
 
-See [`docs/cli.md`](docs/cli.md) for configuration, CI usage and command details.
+See [`docs/cli.md`](docs/cli.md) for configuration, CI usage and command details. For the test-first path from existing suites to Lean behavior specs, see [`docs/test-first-autoformalization.md`](docs/test-first-autoformalization.md).
 
 ```
 source ──Joern──▶ CPG ──▶ neutral JSON AST ──▶ Lean Core program ──▶ trust ledger

@@ -27,6 +27,7 @@ autoform translate <src> <Module>      # run one translation pipeline
 autoform translate --target payments   # run a named target from autoform.toml
 autoform assure <src> <Module>         # run one assurance pipeline
 autoform plan                          # write a deterministic fleet execution plan
+autoform spec-plan <src> <Module>       # plan tests -> traces -> Lean behavior specs
 autoform verify-plan --plan fleet-plan.json
 autoform batch                         # run or dry-run configured targets
 autoform validate                      # validate fleet configuration
@@ -44,7 +45,7 @@ autoform check --junit autoform-checks.xml --sarif autoform.sarif
 ```
 
 Every pipeline command accepts `--dry-run`, `--json`, `--repo-root`, `--lake`, `--run-id`, `--artifact-dir` and
-`--keep-work`. JSON mode is the preferred mode for CI systems and dashboards. Non-dry-run
+`--keep-work`. JSON mode is the preferred mode for CI systems and dashboards. `autoform spec-plan` is a planning command for test-first autoformalization: it records how a real test command will become runtime traces, Lean behavior specs, conformance checks and mutation gates before the expensive translation run starts. Non-dry-run
 translate and assure executions write a manifest to `.autoform-runs/<run-id>/run.json` by
 default, with every planned command, return code and discovered artifact.
 Each manifest also records audit metadata: the config path, CLI version, repo commit and dirty flag, Python runtime, selected Lake executable, Joern home, and whether C/C++ defines were set.

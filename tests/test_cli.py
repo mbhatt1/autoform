@@ -141,6 +141,19 @@ def test_validate_reports_bad_target_config(tmp_path, capsys):
     assert "targets.bad.mode" in paths
 
 
+def test_validate_rejects_non_string_test_metadata(tmp_path, capsys):
+    cfg = tmp_path / "autoform.toml"
+    cfg.write_text(
+        '[targets.api]\n'
+        'source = "/srv/api"\n'
+        'module = "Api"\n'
+        'test_command = ["pytest"]\n'
+    )
+    rc = main(["--config", str(cfg), "--json", "validate"])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert {item["path"] for item in payload["violations"]} == {"targets.api.test_command"}
+
 def test_validate_can_require_existing_sources(tmp_path, capsys):
     cfg = tmp_path / "autoform.toml"
     cfg.write_text('[targets.api]\nsource = "/definitely/not/here"\nmodule = "Api"\n')
@@ -159,14 +172,75 @@ def test_schema_outputs_run_manifest_schema(capsys):
 
 
 
+
+
+def test_spec_plan_turns_tests_into_behavior_contract_plan(capsys):
+    rc = main([
+        "--json",
+        "spec-plan",
+        "/srv/service",
+        "Service",
+        "--test-command",
+        "pytest tests",
+        "--test-framework",
+        "pytest",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "spec-plan"
+    assert payload["strategy"] == "test-first-autoformalization"
+    assert payload["source"] == "/srv/service"
+    assert payload["module"] == "Service"
+    assert payload["test_command"] == "pytest tests"
+    phases = [phase["name"] for phase in payload["phases"]]
+    assert phases == [
+        "discover-tests",
+        "trace-runtime-behavior",
+        "translate-source",
+        "emit-lean-behavior-specs",
+        "check-conformance",
+        "anti-vacuity",
+    ]
+    assert "Autoform/Specs/ServiceBehaviorSpec.lean" in payload["artifacts"]
+    assert any("tautological" in reject for phase in payload["phases"] for reject in phase.get("rejects", []))
+
+
+def test_spec_plan_uses_configured_target_metadata(tmp_path, capsys):
+    cfg = tmp_path / "autoform.toml"
+    cfg.write_text(
+        '[targets.api]\n'
+        'source = "/srv/api"\n'
+        'module = "Api"\n'
+        'test_command = "pytest tests/api"\n'
+        'test_framework = "pytest"\n'
+    )
+    rc = main(["--config", str(cfg), "--json", "spec-plan", "--target", "api"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["target"] == "api"
+    assert payload["source"] == "/srv/api"
+    assert payload["module"] == "Api"
+    assert payload["test_command"] == "pytest tests/api"
+    assert payload["test_framework"] == "pytest"
+
+def test_schema_outputs_spec_plan_schema(capsys):
+    rc = main(["--json", "schema", "spec-plan"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["title"] == "Autoform test-first specification plan"
+    assert payload["properties"]["strategy"]["const"] == "test-first-autoformalization"
+
+
 def test_schema_outputs_config_schema(capsys):
     rc = main(["--json", "schema", "config"])
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["title"] == "Autoform CLI configuration"
     assert "targets" in payload["properties"]
+    assert "test_command" in payload["properties"]["project"]["properties"]
     target_schema = payload["properties"]["targets"]["additionalProperties"]
     assert target_schema["required"] == ["source", "module"]
+    assert "test_command" in target_schema["properties"]
 
 
 def test_gate_fails_required_step(tmp_path, capsys):

@@ -198,6 +198,41 @@ FLEET_PLAN_SCHEMA: dict[str, Any] = {
 }
 
 
+SPEC_PLAN_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://autoform.local/schemas/spec-plan.json",
+    "title": "Autoform test-first specification plan",
+    "type": "object",
+    "required": ["kind", "source", "module", "strategy", "phases", "artifacts"],
+    "properties": {
+        "kind": {"type": "string", "const": "spec-plan"},
+        "source": {"type": "string"},
+        "module": {"type": "string"},
+        "strategy": {"type": "string", "const": "test-first-autoformalization"},
+        "test_command": {"type": ["string", "null"]},
+        "test_framework": {"type": ["string", "null"]},
+        "trace_format": {"type": "string"},
+        "phases": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "purpose", "outputs"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "purpose": {"type": "string"},
+                    "command": {"type": ["string", "null"]},
+                    "outputs": {"type": "array", "items": {"type": "string"}},
+                    "rejects": {"type": "array", "items": {"type": "string"}},
+                },
+                "additionalProperties": True,
+            },
+        },
+        "artifacts": {"type": "array", "items": {"type": "string"}},
+        "anti_vacuity": {"type": "array", "items": {"type": "string"}},
+    },
+    "additionalProperties": True,
+}
+
 CONFIG_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://autoform.local/schemas/autoform-config.json",
@@ -211,6 +246,8 @@ CONFIG_SCHEMA: dict[str, Any] = {
                 "module": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$"},
                 "ast": {"type": "string"},
                 "lean_output": {"type": "string"},
+                "test_command": {"type": "string"},
+                "test_framework": {"type": "string"},
             },
             "additionalProperties": True,
         },
@@ -240,6 +277,8 @@ CONFIG_SCHEMA: dict[str, Any] = {
                     "owner": {"type": "string"},
                     "tier": {"type": "string"},
                     "tags": {"type": "array", "items": {"type": "string"}},
+                    "test_command": {"type": "string"},
+                    "test_framework": {"type": "string"},
                     "joern_home": {"type": "string"},
                     "lake": {"type": "string"},
                     "cpp_defines": {
@@ -291,6 +330,9 @@ def _validate_config(config: Mapping[str, Any], *, require_existing_source: bool
         add("runtime.joern_home", "joern_home must be a string")
     if "lake" in runtime and not isinstance(runtime["lake"], str):
         add("runtime.lake", "lake must be a string")
+    for key in ("test_command", "test_framework"):
+        if key in project and not isinstance(project[key], str):
+            add(f"project.{key}", f"{key} must be a string")
 
     targets = _target_map(config)
     for raw_name, raw_target in targets.items():
@@ -320,6 +362,9 @@ def _validate_config(config: Mapping[str, Any], *, require_existing_source: bool
         joern_home = raw_target.get("joern_home")
         if joern_home is not None and not isinstance(joern_home, str):
             add(f"{path}.joern_home", "joern_home must be a string")
+        for key in ("test_command", "test_framework"):
+            if key in raw_target and not isinstance(raw_target[key], str):
+                add(f"{path}.{key}", f"{key} must be a string")
         lake = raw_target.get("lake")
         if lake is not None and not isinstance(lake, str):
             add(f"{path}.lake", "lake must be a string")
@@ -926,6 +971,90 @@ def cmd_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
     return 0
 
 
+
+def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
+    source, module, project = _source_module_from_args(args, config)
+    test_command = args.test_command or project.get("test_command") or None
+    test_framework = args.test_framework or project.get("test_framework") or None
+    default_trace_dir = _artifact_dir_for_target(args, getattr(args, "target", None) or module, args.run_id or module)
+    trace_output = args.trace_output or str(default_trace_dir / "behavior-trace.jsonl")
+    spec_output = args.spec_output or f"Autoform/Specs/{module}BehaviorSpec.lean"
+    ast_output = f"ast-{module}.json"
+    generated_output = f"Autoform/Generated/{module}.lean"
+    phases: list[dict[str, Any]] = [
+        {
+            "name": "discover-tests",
+            "purpose": "Find the tests that describe the codebase's public behavior before trusting a source-only translation.",
+            "command": test_command,
+            "outputs": ["test inventory", "entry points", "runtime dependencies"],
+            "rejects": ["no tests discovered", "tests that cannot run on the real runtime"],
+        },
+        {
+            "name": "trace-runtime-behavior",
+            "purpose": "Run the real tests and record concrete inputs, outputs, exceptions, receiver state and covered call paths.",
+            "command": test_command,
+            "outputs": [trace_output],
+            "rejects": ["tests pass without exercising translated functions", "unserializable observations without a named skip reason"],
+        },
+        {
+            "name": "translate-source",
+            "purpose": "Translate the same source tree through Joern and render the neutral AST into Lean.",
+            "command": f"autoform translate {source} {module}",
+            "outputs": [ast_output, generated_output, f"provenance/{ast_output}.prov.json"],
+            "rejects": ["unattributed AST", "generated Lean not rendered from the recorded AST"],
+        },
+        {
+            "name": "emit-lean-behavior-specs",
+            "purpose": "Turn runtime observations into Lean examples and contracts over Autoform.eval rather than copying test syntax blindly.",
+            "command": None,
+            "outputs": [spec_output],
+            "rejects": ["tautological specs", "tests that only assert determinism or implementation echoes"],
+        },
+        {
+            "name": "check-conformance",
+            "purpose": "Compare Lean execution against the recorded real-runtime behavior and keep every mismatch or skip reason explicit.",
+            "command": f"python3 scripts/differential.py {ast_output} {source} {module}",
+            "outputs": ["conformance.json"],
+            "rejects": ["zero compared cases", "silent skip", "stale .olean answer"],
+        },
+        {
+            "name": "anti-vacuity",
+            "purpose": "Mutate the source and specs so behavior constraints must fail when the implementation changes in relevant ways.",
+            "command": f"python3 scripts/mutate.py {generated_output} Autoform.Generated.{module}",
+            "outputs": ["mutation.json"],
+            "rejects": ["all mutants survive", "coverage-free examples", "specs proved only by rfl after erasing behavior"],
+        },
+    ]
+    payload: dict[str, Any] = {
+        "kind": "spec-plan",
+        "strategy": "test-first-autoformalization",
+        "source": str(source),
+        "module": module,
+        "target": getattr(args, "target", None),
+        "test_command": test_command,
+        "test_framework": test_framework,
+        "trace_format": "jsonl: function, args, kwargs, receiver_state, result|exception, side_effects, coverage",
+        "phases": phases,
+        "artifacts": [trace_output, ast_output, generated_output, spec_output, "conformance.json", "mutation.json"],
+        "anti_vacuity": [
+            "Reject suites with zero runtime observations for translated functions.",
+            "Reject Lean specs that only restate reflexive facts such as f(x) = f(x).",
+            "Require mutation or counterexample evidence before treating generated tests as specifications.",
+            "Keep unencodable values and unsupported side effects as named skip reasons, never as passes.",
+        ],
+    }
+    if args.output:
+        output = Path(args.output).expanduser()
+        payload["output"] = str(output)
+        if not args.dry_run:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    if args.json or args.dry_run or not args.output:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Autoform spec plan wrote {args.output} ({len(phases)} phase(s))")
+    return 0
+
 def _plan_entry_key(entry: Mapping[str, Any]) -> str:
     return str(entry.get("target", ""))
 
@@ -1190,7 +1319,7 @@ def cmd_validate(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
 
 
 def cmd_schema(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
-    schemas = {"run-manifest": RUN_MANIFEST_SCHEMA, "manifest-index": MANIFEST_INDEX_SCHEMA, "fleet-plan": FLEET_PLAN_SCHEMA, "config": CONFIG_SCHEMA}
+    schemas = {"run-manifest": RUN_MANIFEST_SCHEMA, "manifest-index": MANIFEST_INDEX_SCHEMA, "fleet-plan": FLEET_PLAN_SCHEMA, "spec-plan": SPEC_PLAN_SCHEMA, "config": CONFIG_SCHEMA}
     schema = schemas[args.name]
     if args.json:
         print(json.dumps(schema, indent=2, sort_keys=True))
@@ -1674,6 +1803,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output", help="Output JSON plan path")
     p.set_defaults(func=cmd_plan)
 
+    p = sub.add_parser("spec-plan", help="Plan test-first autoformalization from runtime tests to Lean specs")
+    p.add_argument("source", nargs="?", help="Source tree whose tests define the behavior to capture")
+    p.add_argument("module", nargs="?", help="Lean module name")
+    p.add_argument("--target", help="Configured [targets.<name>] entry to plan")
+    p.add_argument("--test-command", help="Command that runs the codebase's real tests, for example 'pytest tests' or 'npm test'")
+    p.add_argument("--test-framework", help="Name of the test framework or runner whose results will be traced")
+    p.add_argument("--trace-output", help="Behavior trace JSONL path to produce")
+    p.add_argument("--spec-output", help="Lean behavior spec module to produce")
+    p.add_argument("--output", help="Write the spec plan JSON to this path")
+    p.set_defaults(func=cmd_spec_plan)
+
     p = sub.add_parser("verify-plan", help="Check that a reviewed fleet plan still matches current config")
     p.add_argument("--plan", required=True, help="Path to autoform fleet-plan JSON")
     p.add_argument("--include-expected", action="store_true", help="Include the config-resolved expected plan in JSON output")
@@ -1696,7 +1836,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_validate)
 
     p = sub.add_parser("schema", help="Print machine-readable Autoform JSON schemas")
-    p.add_argument("name", choices=["run-manifest", "manifest-index", "fleet-plan", "config"])
+    p.add_argument("name", choices=["run-manifest", "manifest-index", "fleet-plan", "spec-plan", "config"])
     p.set_defaults(func=cmd_schema)
 
     p = sub.add_parser("gate", help="Evaluate a run manifest as a CI release gate")

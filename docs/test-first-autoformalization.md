@@ -1,0 +1,40 @@
+# Test-first autoformalization
+
+Autoform should use a target codebase's tests as the fastest route to useful formal artifacts, but it should not copy test syntax into Lean and call that a proof. The tests are evidence about the behavior the team already relies on. Autoform should run them on the real runtime, record what they prove by observation, and then emit Lean examples and contracts that constrain the translated program.
+
+The working model is:
+
+```text
+source tree ──Joern──▶ neutral AST ──▶ generated Lean program
+    │                                               ▲
+    └─ tests ──real runtime trace──▶ behavior specs ┘
+```
+
+A test-first run has six phases:
+
+1. **Discover tests.** Find the command that exercises the service or library in its real runtime: `pytest`, `npm test`, `go test`, Maven, a project shell script, or a service-specific smoke suite. A missing or non-runnable suite is an explicit gap, not a green result.
+2. **Trace runtime behavior.** Run those tests and record concrete observations: function, receiver state, arguments, return value or exception, side effects that can be represented, and covered call paths. Values that cannot be encoded must produce named skip reasons.
+3. **Translate the same source.** Run the normal Joern → neutral AST → Lean rendering path and record provenance for the AST.
+4. **Emit Lean behavior specs.** Convert observations into Lean examples or contracts over Autoform's evaluator. The generated theorem should say what the runtime did, not merely reproduce the shape of the original test.
+5. **Check conformance.** Compare Lean execution with the recorded runtime behavior. A run with zero compared cases fails because it established nothing.
+6. **Reject vacuity.** Run mutation and coverage checks so generated specs must break when relevant behavior changes.
+
+This design makes tests a source of behavioral contracts. It does not make tests sound by themselves. A source test such as `f(x) == f(x)` is weak in the original language and becomes worse in Lean, where purity can make it reflexive. The translator must reject or down-rank tests that only assert determinism, implementation echoes, or branch-free smoke behavior.
+
+`autoform spec-plan` records this strategy as JSON before the tracing implementation exists:
+
+```sh
+autoform --json spec-plan /repo/service Service \
+  --test-command 'pytest tests' \
+  --test-framework pytest
+```
+
+The output names the required artifacts, the phase ordering, and the anti-vacuity gates. CI can review that plan the same way it reviews `autoform plan`: before a team spends a long Joern/Lean run, it can see whether the target has a real test command, where traces will be written, and what Lean spec module will be produced.
+
+The next implementation step is a tracer per runtime family. Python can start first because `scripts/differential.py` already uses CPython and corpus tests. The tracer should produce a JSONL file with one observation per call:
+
+```json
+{"function":"pkg.mod.normalize","args":[" A "],"kwargs":{},"result":"a","exception":null,"coverage":["pkg/mod.py:12","pkg/mod.py:13"]}
+```
+
+That trace is then rendered into a Lean behavior module such as `Autoform/Specs/ServiceBehaviorSpec.lean`. Each generated spec should carry the observation id, the source test that produced it, and the skip or encoding reason if a value cannot yet be represented. This keeps Autoform honest: tests broaden reach, while provenance, conformance and mutation decide how much assurance the generated Lean actually provides.
