@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -202,6 +203,8 @@ def test_spec_plan_turns_tests_into_behavior_contract_plan(capsys):
         "anti-vacuity",
     ]
     assert "Autoform/Specs/ServiceBehaviorSpec.lean" in payload["artifacts"]
+    trace_phase = next(phase for phase in payload["phases"] if phase["name"] == "trace-runtime-behavior")
+    assert trace_phase["command"].startswith("autoform trace-python-tests /srv/service Service --test-command 'pytest tests'")
     emit_phase = next(phase for phase in payload["phases"] if phase["name"] == "emit-lean-behavior-specs")
     assert emit_phase["command"].startswith("autoform spec-from-trace ")
     assert emit_phase["command"].endswith("/.autoform-runs/Service/behavior-trace.jsonl Service --output Autoform/Specs/ServiceBehaviorSpec.lean")
@@ -282,6 +285,73 @@ def test_spec_from_trace_refuses_empty_trace(tmp_path):
     trace.write_text("\n")
     with pytest.raises(SystemExit, match="zero behavior observations"):
         main(["spec-from-trace", str(trace), "Service", "--output", str(tmp_path / "Spec.lean")])
+
+
+def test_trace_python_tests_runs_pytest_and_emits_spec(tmp_path, capsys):
+    src = tmp_path / "pkg"
+    tests_dir = src / "tests"
+    tests_dir.mkdir(parents=True)
+    (src / "mathy.py").write_text(
+        "def add(x, y):\n"
+        "    total = x + y\n"
+        "    return total\n"
+    )
+    (tests_dir / "test_mathy.py").write_text(
+        "from mathy import add\n\n"
+        "def test_add():\n"
+        "    assert add(2, 3) == 5\n"
+    )
+    trace = tmp_path / "trace.jsonl"
+    spec = tmp_path / "MathyBehaviorSpec.lean"
+    rc = main([
+        "--json",
+        "trace-python-tests",
+        str(src),
+        "Mathy",
+        "--test-command",
+        f"{sys.executable} -m pytest -q",
+        "--trace-output",
+        str(trace),
+        "--spec-output",
+        str(spec),
+        "--no-generated-import",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "trace-python-tests"
+    assert payload["returncode"] == 0
+    assert payload["observations"] >= 1
+    assert payload["usable_observations"] >= 1
+    observations = [json.loads(line) for line in trace.read_text().splitlines()]
+    assert any(obs["function"] == "mathy.add" and obs["result"] == 5 for obs in observations)
+    lean = spec.read_text()
+    assert "namespace Autoform.Specs.Trace.Mathy" in lean
+    assert 'functionName := "mathy.add"' in lean
+    assert "theorem usableObservationCount_eq" in lean
+
+
+def test_trace_python_tests_rejects_zero_observations(tmp_path, capsys):
+    src = tmp_path / "pkg"
+    tests_dir = src / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_smoke.py").write_text("def test_smoke():\n    assert True\n")
+    rc = main([
+        "--json",
+        "trace-python-tests",
+        str(src),
+        "Smoke",
+        "--test-command",
+        f"{sys.executable} -m pytest -q",
+        "--trace-output",
+        str(tmp_path / "trace.jsonl"),
+        "--trace-only",
+    ])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["test_returncode"] == 0
+    assert payload["returncode"] == 1
+    assert payload["observations"] == 0
+    assert payload["violations"][0]["message"] == "test command passed but no project function observations were recorded"
 
 
 def test_schema_outputs_behavior_trace_observation_schema(capsys):

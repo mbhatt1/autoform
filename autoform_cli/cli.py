@@ -10,10 +10,12 @@ import argparse
 import glob as glob_mod
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -1003,6 +1005,14 @@ def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
     spec_output = args.spec_output or f"Autoform/Specs/{module}BehaviorSpec.lean"
     ast_output = f"ast-{module}.json"
     generated_output = f"Autoform/Generated/{module}.lean"
+    if (test_framework or "").lower() in {"pytest", "python", "unittest"}:
+        trace_command = (
+            f"autoform trace-python-tests {shlex.quote(str(source))} {module} "
+            f"--test-command {shlex.quote(str(test_command or f'{sys.executable} -m pytest'))} "
+            f"--trace-output {shlex.quote(trace_output)} --spec-output {shlex.quote(spec_output)}"
+        )
+    else:
+        trace_command = test_command
     phases: list[dict[str, Any]] = [
         {
             "name": "discover-tests",
@@ -1014,7 +1024,7 @@ def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
         {
             "name": "trace-runtime-behavior",
             "purpose": "Run the real tests and record concrete inputs, outputs, exceptions, receiver state and covered call paths.",
-            "command": test_command,
+            "command": trace_command,
             "outputs": [trace_output],
             "rejects": ["tests pass without exercising translated functions", "unserializable observations without a named skip reason"],
         },
@@ -1291,6 +1301,89 @@ def cmd_spec_from_trace(args: argparse.Namespace, config: Mapping[str, Any]) -> 
     else:
         print(f"Autoform wrote {output} from {len(observations)} behavior observation(s)")
     return 0
+
+
+def _shell_join(command: Sequence[str]) -> str:
+    return " ".join(shlex.quote(part) for part in command)
+
+
+def cmd_trace_python_tests(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
+    source, module, project = _source_module_from_args(args, config)
+    source = source.resolve()
+    if not source.exists():
+        raise SystemExit(f"source path does not exist: {source}")
+    test_command = args.test_command or project.get("test_command") or f"{sys.executable} -m pytest"
+    try:
+        command = shlex.split(str(test_command))
+    except ValueError as exc:
+        raise SystemExit(f"test command is not shell-like syntax Autoform can split: {exc}") from exc
+    if not command:
+        raise SystemExit("test command is empty")
+    default_trace_dir = _artifact_dir_for_target(args, getattr(args, "target", None) or module, args.run_id or module)
+    trace_output = Path(args.trace_output or (default_trace_dir / "behavior-trace.jsonl")).expanduser()
+    spec_output = Path(args.spec_output or f"Autoform/Specs/{module}BehaviorSpec.lean").expanduser()
+    payload: dict[str, Any] = {
+        "kind": "trace-python-tests",
+        "source": str(source),
+        "module": module,
+        "target": getattr(args, "target", None),
+        "command": command,
+        "trace_output": str(trace_output),
+        "spec_output": None if args.trace_only else str(spec_output),
+        "dry_run": bool(args.dry_run),
+        "include_tests": bool(args.include_tests),
+    }
+    if args.dry_run:
+        print(json.dumps(payload, indent=2, sort_keys=True) if args.json else f"Autoform would run: {_shell_join(command)}")
+        return 0
+
+    with tempfile.TemporaryDirectory(prefix="autoform-trace-") as tmp:
+        sitecustomize = Path(tmp) / "sitecustomize.py"
+        sitecustomize.write_text("import autoform_cli.python_trace as _autoform_trace\n_autoform_trace.install()\n")
+        env = _env_from_args(args, config, project)
+        existing_pythonpath = env.get("PYTHONPATH")
+        pythonpath_parts = [tmp, str(ROOT)]
+        if existing_pythonpath:
+            pythonpath_parts.append(existing_pythonpath)
+        env["PYTHONPATH"] = os.pathsep.join(pythonpath_parts)
+        env["AUTOFORM_TRACE_SOURCE"] = str(source)
+        env["AUTOFORM_TRACE_OUTPUT"] = str(trace_output)
+        env["AUTOFORM_TRACE_INCLUDE_TESTS"] = "1" if args.include_tests else "0"
+        env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+        trace_output.parent.mkdir(parents=True, exist_ok=True)
+        cp = subprocess.run(
+            command,
+            cwd=source,
+            env=env,
+            text=True,
+            capture_output=bool(args.json),
+            check=False,
+        )
+    payload["test_returncode"] = int(cp.returncode)
+    if args.json:
+        payload["stdout_tail"] = (cp.stdout or "")[-4000:]
+        payload["stderr_tail"] = (cp.stderr or "")[-4000:]
+    observations = _load_behavior_trace(trace_output) if trace_output.exists() else []
+    payload["observations"] = len(observations)
+    payload["usable_observations"] = sum(1 for obs in observations if _observation_is_usable(obs))
+    payload["skipped_observations"] = sum(1 for obs in observations if obs.get("skip_reason"))
+    if cp.returncode == 0 and observations and not args.trace_only:
+        lean = _render_behavior_spec(module, observations, import_generated=not args.no_generated_import)
+        spec_output.parent.mkdir(parents=True, exist_ok=True)
+        spec_output.write_text(lean)
+    elif cp.returncode == 0 and not observations:
+        payload.setdefault("violations", []).append({
+            "path": str(trace_output),
+            "message": "test command passed but no project function observations were recorded",
+        })
+    payload["returncode"] = 1 if cp.returncode == 0 and not observations else int(cp.returncode)
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Autoform traced {len(observations)} Python observation(s) to {trace_output}")
+        if cp.returncode == 0 and observations and not args.trace_only:
+            print(f"Autoform wrote {spec_output}")
+    return int(payload["returncode"])
 
 def _plan_entry_key(entry: Mapping[str, Any]) -> str:
     return str(entry.get("target", ""))
@@ -2065,6 +2158,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output", help="Output Lean module path; defaults to Autoform/Specs/<Module>BehaviorSpec.lean")
     p.add_argument("--no-generated-import", action="store_true", help="Do not import Autoform.Generated.<Module>; use only for trace inventory bootstraps")
     p.set_defaults(func=cmd_spec_from_trace)
+
+    p = sub.add_parser("trace-python-tests", help="Run Python tests under a behavior tracer and optionally emit a Lean spec")
+    p.add_argument("source", nargs="?", help="Python source tree whose project functions should be traced")
+    p.add_argument("module", nargs="?", help="Lean module name")
+    p.add_argument("--target", help="Configured [targets.<name>] entry to trace")
+    p.add_argument("--test-command", help="Command that runs the codebase's Python tests; defaults to the configured command or 'python -m pytest'")
+    p.add_argument("--trace-output", help="Behavior trace JSONL path to write")
+    p.add_argument("--spec-output", help="Lean behavior spec module to write")
+    p.add_argument("--trace-only", action="store_true", help="Write only the behavior trace, without rendering a Lean spec")
+    p.add_argument("--include-tests", action="store_true", help="Also trace functions defined in test files")
+    p.add_argument("--no-generated-import", action="store_true", help="Do not import Autoform.Generated.<Module> in the emitted spec")
+    p.set_defaults(func=cmd_trace_python_tests)
 
     p = sub.add_parser("verify-plan", help="Check that a reviewed fleet plan still matches current config")
     p.add_argument("--plan", required=True, help="Path to autoform fleet-plan JSON")

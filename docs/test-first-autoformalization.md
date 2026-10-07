@@ -34,13 +34,18 @@ The output names the required artifacts, the phase ordering, and the anti-vacuit
 The trace-to-Lean conversion step is executable now:
 
 ```sh
+autoform trace-python-tests /repo/service Service \
+  --test-command 'python -m pytest tests' \
+  --trace-output .autoform-runs/Service/behavior-trace.jsonl \
+  --spec-output Autoform/Specs/ServiceBehaviorSpec.lean
+
 autoform spec-from-trace .autoform-runs/Service/behavior-trace.jsonl Service \
   --output Autoform/Specs/ServiceBehaviorSpec.lean
 ```
 
-The command refuses an empty trace, imports `Autoform.Generated.<Module>` by default, and emits a Lean inventory of the observed calls. That inventory is not a semantic proof yet. It makes the test evidence reviewable and kernel-checkable while keeping conformance, mutation, and coverage gates responsible for deciding whether the translated program really matches the runtime.
+`trace-python-tests` installs a temporary Python trace hook, runs the real test command from the source tree, records project function calls, and then renders the trace. `spec-from-trace` is the lower-level renderer for traces produced elsewhere. Both commands refuse an empty trace, import `Autoform.Generated.<Module>` by default, and emit a Lean inventory of the observed calls. That inventory is not a semantic proof yet. It makes the test evidence reviewable and kernel-checkable while keeping conformance, mutation, and coverage gates responsible for deciding whether the translated program really matches the runtime.
 
-The remaining implementation step is a tracer per runtime family. Python can start first because `scripts/differential.py` already uses CPython and corpus tests. The tracer should produce a JSONL file with one observation per call:
+The remaining implementation step is a tracer for non-Python runtime families. The trace format is JSONL with one observation per call:
 
 ```json
 {"function":"pkg.mod.normalize","args":[" A "],"kwargs":{},"result":"a","exception":null,"coverage":["pkg/mod.py:12","pkg/mod.py:13"]}
