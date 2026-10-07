@@ -28,12 +28,15 @@ autoform translate --target payments   # run a named target from autoform.toml
 autoform assure <src> <Module>         # run one assurance pipeline
 autoform plan                          # write a deterministic fleet execution plan
 autoform spec-plan <src> <Module>       # plan tests -> traces -> Lean behavior specs
+autoform spec-from-trace trace.jsonl Service \
+                                      # render test observations as a Lean spec module
 autoform verify-plan --plan fleet-plan.json
 autoform batch                         # run or dry-run configured targets
 autoform validate                      # validate fleet configuration
 autoform schema run-manifest           # print the run manifest JSON schema
 autoform schema manifest-index         # print the fleet index JSON schema
 autoform schema fleet-plan             # print the fleet plan JSON schema
+autoform schema behavior-trace-observation
 autoform schema config                 # print the autoform.toml JSON schema
 autoform gate --manifest out/run.json  # evaluate a CI run manifest
 autoform bundle --manifest out/run.json --output evidence.tar.gz
@@ -45,7 +48,7 @@ autoform check --junit autoform-checks.xml --sarif autoform.sarif
 ```
 
 Every pipeline command accepts `--dry-run`, `--json`, `--repo-root`, `--lake`, `--run-id`, `--artifact-dir` and
-`--keep-work`. JSON mode is the preferred mode for CI systems and dashboards. `autoform spec-plan` is a planning command for test-first autoformalization: it records how a real test command will become runtime traces, Lean behavior specs, conformance checks and mutation gates before the expensive translation run starts. Non-dry-run
+`--keep-work`. JSON mode is the preferred mode for CI systems and dashboards. `autoform spec-plan` is a planning command for test-first autoformalization: it records how a real test command will become runtime traces, Lean behavior specs, conformance checks and mutation gates before the expensive translation run starts. `autoform spec-from-trace` is the first executable conversion step: it reads behavior trace JSONL and writes a Lean module that imports `Autoform.Generated.<Module>` and records every runtime observation, including explicit skip reasons. Non-dry-run
 translate and assure executions write a manifest to `.autoform-runs/<run-id>/run.json` by
 default, with every planned command, return code and discovered artifact.
 Each manifest also records audit metadata: the config path, CLI version, repo commit and dirty flag, Python runtime, selected Lake executable, Joern home, and whether C/C++ defines were set.
@@ -128,7 +131,7 @@ Use `autoform check --junit autoform-checks.xml --sarif autoform.sarif` when CI 
 
 Use `autoform validate` before scheduling fleet jobs. It checks target tables, module names,
 allowed modes and optional source-path existence. Use `autoform schema config`,
-`autoform schema run-manifest`, `autoform schema manifest-index` and `autoform schema fleet-plan` to pin the config and manifest contracts in downstream systems. Use `autoform gate --manifest <run.json>` after
+`autoform schema run-manifest`, `autoform schema manifest-index`, `autoform schema fleet-plan` and `autoform schema behavior-trace-observation` to pin the config, manifest and trace contracts in downstream systems. Use `autoform gate --manifest <run.json>` after
 a single run, or `autoform gate --manifest fleet-index.json` after `autoform index`, to fail CI when a pipeline return code, required step, or indexed target failed; add
 `--require-artifacts` when the CI worker should also confirm listed artifacts exist before
 upload.

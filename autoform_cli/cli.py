@@ -233,6 +233,28 @@ SPEC_PLAN_SCHEMA: dict[str, Any] = {
     "additionalProperties": True,
 }
 
+BEHAVIOR_TRACE_OBSERVATION_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://autoform.local/schemas/behavior-trace-observation.json",
+    "title": "Autoform behavior trace observation",
+    "type": "object",
+    "required": ["function"],
+    "properties": {
+        "id": {"type": "string"},
+        "function": {"type": "string"},
+        "source_test": {"type": ["string", "null"]},
+        "args": {"type": "array"},
+        "kwargs": {"type": "object"},
+        "receiver_state": {},
+        "result": {},
+        "exception": {"type": ["string", "null"]},
+        "side_effects": {},
+        "coverage": {"type": "array", "items": {"type": "string"}},
+        "skip_reason": {"type": ["string", "null"]},
+    },
+    "additionalProperties": True,
+}
+
 CONFIG_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://autoform.local/schemas/autoform-config.json",
@@ -1006,7 +1028,7 @@ def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
         {
             "name": "emit-lean-behavior-specs",
             "purpose": "Turn runtime observations into Lean examples and contracts over Autoform.eval rather than copying test syntax blindly.",
-            "command": None,
+            "command": f"autoform spec-from-trace {trace_output} {module} --output {spec_output}",
             "outputs": [spec_output],
             "rejects": ["tautological specs", "tests that only assert determinism or implementation echoes"],
         },
@@ -1053,6 +1075,221 @@ def cmd_spec_plan(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(f"Autoform spec plan wrote {args.output} ({len(phases)} phase(s))")
+    return 0
+
+
+def _json_compact(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _lean_string(value: Any) -> str:
+    text = str(value)
+    out: list[str] = ['"']
+    for ch in text:
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ord(ch) < 32:
+            out.append("?")
+        else:
+            out.append(ch)
+    out.append('"')
+    return "".join(out)
+
+
+def _lean_option_string(value: Any) -> str:
+    if value is None:
+        return "none"
+    return f"some {_lean_string(value)}"
+
+
+def _lean_string_list(values: Sequence[Any]) -> str:
+    return "[" + ", ".join(_lean_string(value) for value in values) + "]"
+
+
+def _load_behavior_trace(path: Path) -> list[dict[str, Any]]:
+    observations: list[dict[str, Any]] = []
+    try:
+        lines = path.read_text().splitlines()
+    except OSError as exc:
+        raise SystemExit(f"cannot read behavior trace {path}: {exc}") from exc
+    for line_no, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            raw = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"{path}:{line_no}: invalid JSONL observation: {exc.msg}") from exc
+        if not isinstance(raw, dict):
+            raise SystemExit(f"{path}:{line_no}: observation must be a JSON object")
+        function = raw.get("function")
+        if not isinstance(function, str) or not function:
+            raise SystemExit(f"{path}:{line_no}: observation requires a non-empty string 'function'")
+        obs_id = raw.get("id")
+        if obs_id is not None and not isinstance(obs_id, str):
+            raise SystemExit(f"{path}:{line_no}: 'id' must be a string when present")
+        source_test = raw.get("source_test")
+        if source_test is not None and not isinstance(source_test, str):
+            raise SystemExit(f"{path}:{line_no}: 'source_test' must be a string when present")
+        args_value = raw.get("args", [])
+        if not isinstance(args_value, list):
+            raise SystemExit(f"{path}:{line_no}: 'args' must be an array when present")
+        kwargs_value = raw.get("kwargs", {})
+        if not isinstance(kwargs_value, Mapping):
+            raise SystemExit(f"{path}:{line_no}: 'kwargs' must be an object when present")
+        exception = raw.get("exception")
+        if exception is not None and not isinstance(exception, str):
+            raise SystemExit(f"{path}:{line_no}: 'exception' must be a string when present")
+        skip_reason = raw.get("skip_reason")
+        if skip_reason is not None and not isinstance(skip_reason, str):
+            raise SystemExit(f"{path}:{line_no}: 'skip_reason' must be a string when present")
+        coverage = raw.get("coverage", [])
+        if coverage is None:
+            coverage = []
+        if not isinstance(coverage, list) or not all(isinstance(item, str) for item in coverage):
+            raise SystemExit(f"{path}:{line_no}: 'coverage' must be an array of strings when present")
+        normalized = dict(raw)
+        normalized.setdefault("id", f"obs-{len(observations) + 1:04d}")
+        normalized["args"] = args_value
+        normalized["kwargs"] = dict(kwargs_value)
+        normalized["coverage"] = coverage
+        observations.append(normalized)
+    return observations
+
+
+def _observation_has_result(obs: Mapping[str, Any]) -> bool:
+    return "result" in obs and obs.get("exception") in (None, "")
+
+
+def _observation_is_usable(obs: Mapping[str, Any]) -> bool:
+    if obs.get("skip_reason"):
+        return False
+    return _observation_has_result(obs) or bool(obs.get("exception"))
+
+
+def _render_behavior_spec(module: str, observations: Sequence[Mapping[str, Any]], *, import_generated: bool) -> str:
+    usable = sum(1 for obs in observations if _observation_is_usable(obs))
+    skipped = sum(1 for obs in observations if obs.get("skip_reason"))
+    lines: list[str] = []
+    if import_generated:
+        lines.append(f"import Autoform.Generated.{module}")
+        lines.append("")
+    lines.extend([
+        "/-!",
+        f"Generated from an Autoform behavior trace for `{module}`.",
+        "",
+        "This module records concrete observations made by the target codebase's real tests.",
+        "The records are evidence inputs for conformance checks; by themselves they do not",
+        "claim that the translated program matches the runtime.",
+        "-/",
+        f"namespace Autoform.Specs.Trace.{module}",
+        "",
+        "structure RuntimeObservation where",
+        "  id : String",
+        "  functionName : String",
+        "  sourceTest : Option String",
+        "  argsJson : String",
+        "  kwargsJson : String",
+        "  receiverStateJson : Option String",
+        "  resultJson : Option String",
+        "  exception : Option String",
+        "  sideEffectsJson : Option String",
+        "  skipReason : Option String",
+        "  coverage : List String",
+        "deriving Repr, Inhabited",
+        "",
+        "def isUsableObservation (obs : RuntimeObservation) : Bool :=",
+        "  match obs.skipReason with",
+        "  | some _ => false",
+        "  | none =>",
+        "      match obs.resultJson, obs.exception with",
+        "      | some _, _ => true",
+        "      | none, some _ => true",
+        "      | none, none => false",
+        "",
+        "def observations : List RuntimeObservation := [",
+    ])
+    rendered: list[str] = []
+    for obs in observations:
+        args_json = _json_compact(obs.get("args", []))
+        kwargs_json = _json_compact(obs.get("kwargs", {}))
+        receiver_state_json = _json_compact(obs["receiver_state"]) if "receiver_state" in obs else None
+        result_json = _json_compact(obs["result"]) if _observation_has_result(obs) else None
+        exception = obs.get("exception")
+        side_effects_json = _json_compact(obs["side_effects"]) if "side_effects" in obs else None
+        skip_reason = obs.get("skip_reason")
+        source_test = obs.get("source_test")
+        coverage = obs.get("coverage", [])
+        rendered.append(
+            "  { "
+            f"id := {_lean_string(obs.get('id'))}, "
+            f"functionName := {_lean_string(obs.get('function'))}, "
+            f"sourceTest := {_lean_option_string(source_test)}, "
+            f"argsJson := {_lean_string(args_json)}, "
+            f"kwargsJson := {_lean_string(kwargs_json)}, "
+            f"receiverStateJson := {_lean_option_string(receiver_state_json)}, "
+            f"resultJson := {_lean_option_string(result_json)}, "
+            f"exception := {_lean_option_string(exception)}, "
+            f"sideEffectsJson := {_lean_option_string(side_effects_json)}, "
+            f"skipReason := {_lean_option_string(skip_reason)}, "
+            f"coverage := {_lean_string_list(coverage)} "
+            "}"
+        )
+    lines.append(",\n".join(rendered))
+    lines.extend([
+        "]",
+        "",
+        "def observationCount : Nat := observations.length",
+        "def usableObservationCount : Nat := (observations.filter isUsableObservation).length",
+        "",
+        f"theorem observationCount_eq : observationCount = {len(observations)} := by decide",
+        f"theorem usableObservationCount_eq : usableObservationCount = {usable} := by decide",
+        "",
+        "/-- Skipped observations are visible evidence gaps, not passing cases. -/",
+        f"def skippedObservationCount : Nat := {skipped}",
+        "",
+        f"end Autoform.Specs.Trace.{module}",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def cmd_spec_from_trace(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
+    target = getattr(args, "target", None)
+    project = _resolve_project(config, target)
+    module = _module_name(args.module or project.get("module"), "Translated")
+    trace = Path(args.trace).expanduser()
+    observations = _load_behavior_trace(trace)
+    if not observations:
+        raise SystemExit(f"{trace} contains zero behavior observations; refusing to emit a vacuous Lean spec")
+    output = Path(args.output or f"Autoform/Specs/{module}BehaviorSpec.lean").expanduser()
+    lean = _render_behavior_spec(module, observations, import_generated=not args.no_generated_import)
+    if not args.dry_run:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(lean)
+    payload = {
+        "kind": "spec-from-trace",
+        "module": module,
+        "target": target,
+        "trace": str(trace),
+        "output": str(output),
+        "dry_run": bool(args.dry_run),
+        "observations": len(observations),
+        "usable_observations": sum(1 for obs in observations if _observation_is_usable(obs)),
+        "skipped_observations": sum(1 for obs in observations if obs.get("skip_reason")),
+        "imports_generated_module": not args.no_generated_import,
+    }
+    if args.json or args.dry_run:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Autoform wrote {output} from {len(observations)} behavior observation(s)")
     return 0
 
 def _plan_entry_key(entry: Mapping[str, Any]) -> str:
@@ -1319,7 +1556,14 @@ def cmd_validate(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
 
 
 def cmd_schema(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
-    schemas = {"run-manifest": RUN_MANIFEST_SCHEMA, "manifest-index": MANIFEST_INDEX_SCHEMA, "fleet-plan": FLEET_PLAN_SCHEMA, "spec-plan": SPEC_PLAN_SCHEMA, "config": CONFIG_SCHEMA}
+    schemas = {
+        "run-manifest": RUN_MANIFEST_SCHEMA,
+        "manifest-index": MANIFEST_INDEX_SCHEMA,
+        "fleet-plan": FLEET_PLAN_SCHEMA,
+        "spec-plan": SPEC_PLAN_SCHEMA,
+        "behavior-trace-observation": BEHAVIOR_TRACE_OBSERVATION_SCHEMA,
+        "config": CONFIG_SCHEMA,
+    }
     schema = schemas[args.name]
     if args.json:
         print(json.dumps(schema, indent=2, sort_keys=True))
@@ -1814,6 +2058,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output", help="Write the spec plan JSON to this path")
     p.set_defaults(func=cmd_spec_plan)
 
+    p = sub.add_parser("spec-from-trace", help="Convert behavior trace JSONL into a Lean behavior-spec module")
+    p.add_argument("trace", help="Behavior trace JSONL produced by a runtime test tracer")
+    p.add_argument("module", nargs="?", help="Lean module name; defaults to configured project/target module")
+    p.add_argument("--target", help="Configured [targets.<name>] entry whose module owns the trace")
+    p.add_argument("--output", help="Output Lean module path; defaults to Autoform/Specs/<Module>BehaviorSpec.lean")
+    p.add_argument("--no-generated-import", action="store_true", help="Do not import Autoform.Generated.<Module>; use only for trace inventory bootstraps")
+    p.set_defaults(func=cmd_spec_from_trace)
+
     p = sub.add_parser("verify-plan", help="Check that a reviewed fleet plan still matches current config")
     p.add_argument("--plan", required=True, help="Path to autoform fleet-plan JSON")
     p.add_argument("--include-expected", action="store_true", help="Include the config-resolved expected plan in JSON output")
@@ -1836,7 +2088,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_validate)
 
     p = sub.add_parser("schema", help="Print machine-readable Autoform JSON schemas")
-    p.add_argument("name", choices=["run-manifest", "manifest-index", "fleet-plan", "spec-plan", "config"])
+    p.add_argument("name", choices=["run-manifest", "manifest-index", "fleet-plan", "spec-plan", "behavior-trace-observation", "config"])
     p.set_defaults(func=cmd_schema)
 
     p = sub.add_parser("gate", help="Evaluate a run manifest as a CI release gate")

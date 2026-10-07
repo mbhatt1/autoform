@@ -21,7 +21,7 @@ A test-first run has six phases:
 
 This design makes tests a source of behavioral contracts. It does not make tests sound by themselves. A source test such as `f(x) == f(x)` is weak in the original language and becomes worse in Lean, where purity can make it reflexive. The translator must reject or down-rank tests that only assert determinism, implementation echoes, or branch-free smoke behavior.
 
-`autoform spec-plan` records this strategy as JSON before the tracing implementation exists:
+`autoform spec-plan` records this strategy as JSON before a runtime-specific tracer runs:
 
 ```sh
 autoform --json spec-plan /repo/service Service \
@@ -31,10 +31,19 @@ autoform --json spec-plan /repo/service Service \
 
 The output names the required artifacts, the phase ordering, and the anti-vacuity gates. CI can review that plan the same way it reviews `autoform plan`: before a team spends a long Joern/Lean run, it can see whether the target has a real test command, where traces will be written, and what Lean spec module will be produced.
 
-The next implementation step is a tracer per runtime family. Python can start first because `scripts/differential.py` already uses CPython and corpus tests. The tracer should produce a JSONL file with one observation per call:
+The trace-to-Lean conversion step is executable now:
+
+```sh
+autoform spec-from-trace .autoform-runs/Service/behavior-trace.jsonl Service \
+  --output Autoform/Specs/ServiceBehaviorSpec.lean
+```
+
+The command refuses an empty trace, imports `Autoform.Generated.<Module>` by default, and emits a Lean inventory of the observed calls. That inventory is not a semantic proof yet. It makes the test evidence reviewable and kernel-checkable while keeping conformance, mutation, and coverage gates responsible for deciding whether the translated program really matches the runtime.
+
+The remaining implementation step is a tracer per runtime family. Python can start first because `scripts/differential.py` already uses CPython and corpus tests. The tracer should produce a JSONL file with one observation per call:
 
 ```json
 {"function":"pkg.mod.normalize","args":[" A "],"kwargs":{},"result":"a","exception":null,"coverage":["pkg/mod.py:12","pkg/mod.py:13"]}
 ```
 
-That trace is then rendered into a Lean behavior module such as `Autoform/Specs/ServiceBehaviorSpec.lean`. Each generated spec should carry the observation id, the source test that produced it, and the skip or encoding reason if a value cannot yet be represented. This keeps Autoform honest: tests broaden reach, while provenance, conformance and mutation decide how much assurance the generated Lean actually provides.
+That trace is rendered into a Lean behavior module such as `Autoform/Specs/ServiceBehaviorSpec.lean`. Each generated spec carries the observation id, the source test that produced it, and the skip or encoding reason if a value cannot yet be represented. This keeps Autoform honest: tests broaden reach, while provenance, conformance and mutation decide how much assurance the generated Lean actually provides.

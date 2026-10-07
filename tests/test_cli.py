@@ -202,6 +202,9 @@ def test_spec_plan_turns_tests_into_behavior_contract_plan(capsys):
         "anti-vacuity",
     ]
     assert "Autoform/Specs/ServiceBehaviorSpec.lean" in payload["artifacts"]
+    emit_phase = next(phase for phase in payload["phases"] if phase["name"] == "emit-lean-behavior-specs")
+    assert emit_phase["command"].startswith("autoform spec-from-trace ")
+    assert emit_phase["command"].endswith("/.autoform-runs/Service/behavior-trace.jsonl Service --output Autoform/Specs/ServiceBehaviorSpec.lean")
     assert any("tautological" in reject for phase in payload["phases"] for reject in phase.get("rejects", []))
 
 
@@ -229,6 +232,65 @@ def test_schema_outputs_spec_plan_schema(capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["title"] == "Autoform test-first specification plan"
     assert payload["properties"]["strategy"]["const"] == "test-first-autoformalization"
+
+
+def test_spec_from_trace_writes_lean_behavior_inventory(tmp_path, capsys):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        json.dumps({
+            "function": "pkg.mod.normalize",
+            "source_test": "tests/test_mod.py::test_normalize",
+            "args": [" A "],
+            "kwargs": {"lower": True},
+            "receiver_state": {"cache": []},
+            "result": "a",
+            "side_effects": {"writes": []},
+            "coverage": ["pkg/mod.py:12"],
+        }) + "\n" +
+        json.dumps({
+            "id": "obs-skip",
+            "function": "pkg.mod.external",
+            "args": [],
+            "kwargs": {},
+            "skip_reason": "unencodable socket side effect",
+        }) + "\n"
+    )
+    output = tmp_path / "ServiceBehaviorSpec.lean"
+    rc = main(["--json", "spec-from-trace", str(trace), "Service", "--output", str(output)])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "spec-from-trace"
+    assert payload["observations"] == 2
+    assert payload["usable_observations"] == 1
+    assert payload["skipped_observations"] == 1
+    assert payload["imports_generated_module"] is True
+    lean = output.read_text()
+    assert "import Autoform.Generated.Service" in lean
+    assert "namespace Autoform.Specs.Trace.Service" in lean
+    assert 'functionName := "pkg.mod.normalize"' in lean
+    assert 'sourceTest := some "tests/test_mod.py::test_normalize"' in lean
+    assert 'argsJson := "[\\" A \\"]"' in lean
+    assert 'receiverStateJson := some "{\\"cache\\":[]}"' in lean
+    assert 'sideEffectsJson := some "{\\"writes\\":[]}"' in lean
+    assert "theorem observationCount_eq : observationCount = 2 := by decide" in lean
+    assert "theorem usableObservationCount_eq : usableObservationCount = 1 := by decide" in lean
+    assert "Skipped observations are visible evidence gaps" in lean
+
+
+def test_spec_from_trace_refuses_empty_trace(tmp_path):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text("\n")
+    with pytest.raises(SystemExit, match="zero behavior observations"):
+        main(["spec-from-trace", str(trace), "Service", "--output", str(tmp_path / "Spec.lean")])
+
+
+def test_schema_outputs_behavior_trace_observation_schema(capsys):
+    rc = main(["--json", "schema", "behavior-trace-observation"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["title"] == "Autoform behavior trace observation"
+    assert payload["required"] == ["function"]
+    assert "skip_reason" in payload["properties"]
 
 
 def test_schema_outputs_config_schema(capsys):
