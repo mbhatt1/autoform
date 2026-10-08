@@ -1663,6 +1663,7 @@ def cmd_test_first_python(args: argparse.Namespace, config: Mapping[str, Any]) -
     default_trace_dir = _artifact_dir_for_target(args, getattr(args, "target", None) or module, args.run_id or module)
     trace_output = Path(args.trace_output or (default_trace_dir / "behavior-trace.jsonl")).expanduser()
     spec_output = Path(args.spec_output or f"Autoform/Specs/{module}BehaviorSpec.lean").expanduser()
+    manifest_output = Path(args.manifest_output or (default_trace_dir / "test-first-python.json")).expanduser()
     if args.test_command:
         test_command = args.test_command
     else:
@@ -1676,8 +1677,10 @@ def cmd_test_first_python(args: argparse.Namespace, config: Mapping[str, Any]) -
         "generated_tests": str(generated_tests),
         "trace_output": str(trace_output),
         "spec_output": str(spec_output),
+        "manifest": str(manifest_output),
         "test_command": test_command,
         "dry_run": bool(args.dry_run),
+        "artifacts": [str(generated_tests), str(trace_output), str(spec_output)],
     }
     if args.dry_run:
         payload["steps"] = [
@@ -1710,6 +1713,9 @@ def cmd_test_first_python(args: argparse.Namespace, config: Mapping[str, Any]) -
     payload["seed"] = seed_payload
     payload["trace"] = trace_payload
     payload["returncode"] = seed_rc or trace_rc
+    if not args.dry_run:
+        manifest_output.parent.mkdir(parents=True, exist_ok=True)
+        manifest_output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
@@ -2526,6 +2532,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--test-command", help="Override the command used for tracing; defaults to pytest on the generated tests")
     p.add_argument("--trace-output", help="Behavior trace JSONL path to write")
     p.add_argument("--spec-output", help="Lean behavior spec module to write")
+    p.add_argument("--manifest-output", help="Workflow manifest JSON path; defaults to the artifact directory")
     p.add_argument("--max-functions", type=int, default=200, help="Maximum number of top-level functions to inventory")
     p.add_argument("--include-private", action="store_true", help="Include functions whose names start with '_'")
     p.add_argument("--include-tests", action="store_true", help="Also trace functions defined in test files")

@@ -450,6 +450,7 @@ def test_test_first_python_seeds_traces_and_emits_lean(tmp_path, capsys):
     generated_tests = src / "tests" / "test_autoform_characterization.py"
     trace = tmp_path / "trace.jsonl"
     spec = tmp_path / "MathyBehaviorSpec.lean"
+    manifest = tmp_path / "test-first-python.json"
     rc = main([
         "--json",
         "test-first-python",
@@ -463,6 +464,8 @@ def test_test_first_python_seeds_traces_and_emits_lean(tmp_path, capsys):
         str(trace),
         "--spec-output",
         str(spec),
+        "--manifest-output",
+        str(manifest),
         "--no-generated-import",
     ])
     assert rc == 0
@@ -474,6 +477,10 @@ def test_test_first_python_seeds_traces_and_emits_lean(tmp_path, capsys):
     assert generated_tests.exists()
     assert any(json.loads(line)["function"] == "mathy.add" for line in trace.read_text().splitlines())
     assert "namespace Autoform.Specs.Trace.Mathy" in spec.read_text()
+    saved = json.loads(manifest.read_text())
+    assert saved["kind"] == "test-first-python"
+    assert saved["returncode"] == 0
+    assert saved["artifacts"] == [str(generated_tests), str(trace), str(spec)]
 
 
 def test_test_first_python_stops_when_seed_has_no_cases(tmp_path, capsys):
