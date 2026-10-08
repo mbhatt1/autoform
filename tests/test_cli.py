@@ -435,6 +435,58 @@ def test_seed_python_tests_pending_for_unencodable_return(tmp_path, capsys):
     assert "not JSON-serializable" in generated
 
 
+def test_test_first_python_seeds_traces_and_emits_lean(tmp_path, capsys):
+    src = tmp_path / "pkg"
+    src.mkdir()
+    (src / "mathy.py").write_text(
+        "def add(x, y):\n"
+        "    total = x + y\n"
+        "    return total\n\n"
+        "def hello():\n"
+        "    return 'hi'\n"
+    )
+    samples = tmp_path / "samples.json"
+    samples.write_text(json.dumps({"mathy.add": [{"args": [2, 3], "kwargs": {}}]}))
+    generated_tests = src / "tests" / "test_autoform_characterization.py"
+    trace = tmp_path / "trace.jsonl"
+    spec = tmp_path / "MathyBehaviorSpec.lean"
+    rc = main([
+        "--json",
+        "test-first-python",
+        str(src),
+        "Mathy",
+        "--sample-cases",
+        str(samples),
+        "--generated-tests",
+        str(generated_tests),
+        "--trace-output",
+        str(trace),
+        "--spec-output",
+        str(spec),
+        "--no-generated-import",
+    ])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "test-first-python"
+    assert payload["returncode"] == 0
+    assert payload["seed"]["written_cases"] == 2
+    assert payload["trace"]["observations"] >= 2
+    assert generated_tests.exists()
+    assert any(json.loads(line)["function"] == "mathy.add" for line in trace.read_text().splitlines())
+    assert "namespace Autoform.Specs.Trace.Mathy" in spec.read_text()
+
+
+def test_test_first_python_stops_when_seed_has_no_cases(tmp_path, capsys):
+    src = tmp_path / "pkg"
+    src.mkdir()
+    (src / "mathy.py").write_text("def needs_input(value):\n    return value\n")
+    rc = main(["--json", "test-first-python", str(src), "Mathy", "--generated-tests", str(src / "tests" / "test_autoform.py")])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["seed"]["written_cases"] == 0
+    assert payload["trace"] is None
+
+
 def test_schema_outputs_behavior_trace_observation_schema(capsys):
     rc = main(["--json", "schema", "behavior-trace-observation"])
     assert rc == 0

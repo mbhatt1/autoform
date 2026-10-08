@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import glob as glob_mod
+import io
 import json
 import os
 import shlex
@@ -1631,6 +1633,92 @@ def cmd_seed_python_tests(args: argparse.Namespace, config: Mapping[str, Any]) -
             print("Autoform found no runnable characterization cases")
     return int(payload["returncode"])
 
+
+def _run_json_subcommand(func: Any, args: argparse.Namespace, config: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
+    clone = argparse.Namespace(**vars(args))
+    clone.json = True
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = int(func(clone, config))
+    text = buf.getvalue().strip()
+    payload = json.loads(text) if text else {}
+    if not isinstance(payload, dict):
+        payload = {"raw": payload}
+    return rc, payload
+
+
+def _relative_or_absolute(path: Path, root: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(root.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def cmd_test_first_python(args: argparse.Namespace, config: Mapping[str, Any]) -> int:
+    source, module, project = _source_module_from_args(args, config)
+    source = source.resolve()
+    if not source.exists():
+        raise SystemExit(f"source path does not exist: {source}")
+    generated_tests = Path(args.generated_tests or project.get("generated_tests") or (source / "tests" / "test_autoform_characterization.py")).expanduser()
+    default_trace_dir = _artifact_dir_for_target(args, getattr(args, "target", None) or module, args.run_id or module)
+    trace_output = Path(args.trace_output or (default_trace_dir / "behavior-trace.jsonl")).expanduser()
+    spec_output = Path(args.spec_output or f"Autoform/Specs/{module}BehaviorSpec.lean").expanduser()
+    if args.test_command:
+        test_command = args.test_command
+    else:
+        test_path = _relative_or_absolute(generated_tests, source)
+        test_command = f"{sys.executable} -m pytest -q {shlex.quote(test_path)}"
+    payload: dict[str, Any] = {
+        "kind": "test-first-python",
+        "source": str(source),
+        "module": module,
+        "target": getattr(args, "target", None),
+        "generated_tests": str(generated_tests),
+        "trace_output": str(trace_output),
+        "spec_output": str(spec_output),
+        "test_command": test_command,
+        "dry_run": bool(args.dry_run),
+    }
+    if args.dry_run:
+        payload["steps"] = [
+            {"name": "seed-python-tests", "output": str(generated_tests)},
+            {"name": "trace-python-tests", "trace_output": str(trace_output), "spec_output": str(spec_output)},
+        ]
+        print(json.dumps(payload, indent=2, sort_keys=True) if args.json else f"Autoform would run test-first-python for {source}")
+        return 0
+
+    seed_args = argparse.Namespace(**vars(args))
+    seed_args.output = str(generated_tests)
+    seed_args.sample_cases = args.sample_cases
+    seed_args.max_functions = args.max_functions
+    seed_args.include_private = args.include_private
+    seed_args.allow_empty = args.allow_empty
+    seed_args.force = args.force
+    seed_rc, seed_payload = _run_json_subcommand(cmd_seed_python_tests, seed_args, config)
+
+    trace_payload: dict[str, Any] | None = None
+    trace_rc = 0
+    if seed_rc == 0:
+        trace_args = argparse.Namespace(**vars(args))
+        trace_args.test_command = test_command
+        trace_args.trace_output = str(trace_output)
+        trace_args.spec_output = str(spec_output)
+        trace_args.trace_only = False
+        trace_args.include_tests = args.include_tests
+        trace_args.no_generated_import = args.no_generated_import
+        trace_rc, trace_payload = _run_json_subcommand(cmd_trace_python_tests, trace_args, config)
+    payload["seed"] = seed_payload
+    payload["trace"] = trace_payload
+    payload["returncode"] = seed_rc or trace_rc
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        if payload["returncode"] == 0:
+            print(f"Autoform wrote {generated_tests}, {trace_output}, and {spec_output}")
+        else:
+            print(f"Autoform test-first-python failed with exit {payload['returncode']}")
+    return int(payload["returncode"])
+
 def _plan_entry_key(entry: Mapping[str, Any]) -> str:
     return str(entry.get("target", ""))
 
@@ -2428,6 +2516,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-empty", action="store_true", help="Write a scaffold even when no runnable cases can be generated")
     p.add_argument("--force", action="store_true", help="Overwrite an existing generated test file")
     p.set_defaults(func=cmd_seed_python_tests)
+
+    p = sub.add_parser("test-first-python", help="Seed Python characterization tests, trace them, and emit a Lean behavior spec")
+    p.add_argument("source", nargs="?", help="Python source tree to characterize and trace")
+    p.add_argument("module", nargs="?", help="Lean module name")
+    p.add_argument("--target", help="Configured [targets.<name>] entry to run")
+    p.add_argument("--sample-cases", help="JSON file mapping function names to args/kwargs cases")
+    p.add_argument("--generated-tests", help="Output pytest file; defaults to <source>/tests/test_autoform_characterization.py")
+    p.add_argument("--test-command", help="Override the command used for tracing; defaults to pytest on the generated tests")
+    p.add_argument("--trace-output", help="Behavior trace JSONL path to write")
+    p.add_argument("--spec-output", help="Lean behavior spec module to write")
+    p.add_argument("--max-functions", type=int, default=200, help="Maximum number of top-level functions to inventory")
+    p.add_argument("--include-private", action="store_true", help="Include functions whose names start with '_'")
+    p.add_argument("--include-tests", action="store_true", help="Also trace functions defined in test files")
+    p.add_argument("--allow-empty", action="store_true", help="Write a scaffold even when no runnable cases can be generated")
+    p.add_argument("--force", action="store_true", help="Overwrite an existing generated test file")
+    p.add_argument("--no-generated-import", action="store_true", help="Do not import Autoform.Generated.<Module> in the emitted spec")
+    p.set_defaults(func=cmd_test_first_python)
 
     p = sub.add_parser("verify-plan", help="Check that a reviewed fleet plan still matches current config")
     p.add_argument("--plan", required=True, help="Path to autoform fleet-plan JSON")

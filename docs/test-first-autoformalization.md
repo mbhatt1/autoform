@@ -48,7 +48,17 @@ autoform spec-from-trace .autoform-runs/Service/behavior-trace.jsonl Service \
   --output Autoform/Specs/ServiceBehaviorSpec.lean
 ```
 
-`seed-python-tests` writes pytest characterization tests from sample inputs and from zero-argument functions it can execute safely enough to snapshot. Functions that need inputs become skipped TODO cases rather than silent omissions. `trace-python-tests` installs a temporary Python trace hook, runs the real test command from the source tree, records project function calls, and then renders the trace. `spec-from-trace` is the lower-level renderer for traces produced elsewhere. The trace commands refuse an empty trace, import `Autoform.Generated.<Module>` by default, and emit a Lean inventory of the observed calls. That inventory is not a semantic proof yet. It makes the test evidence reviewable and kernel-checkable while keeping conformance, mutation, and coverage gates responsible for deciding whether the translated program really matches the runtime.
+For Python projects, the same executable path is available as one command:
+
+```sh
+autoform test-first-python /repo/service Service \
+  --sample-cases autoform-samples.json \
+  --generated-tests /repo/service/tests/test_autoform_characterization.py \
+  --trace-output .autoform-runs/Service/behavior-trace.jsonl \
+  --spec-output Autoform/Specs/ServiceBehaviorSpec.lean
+```
+
+`seed-python-tests` writes pytest characterization tests from sample inputs and from zero-argument functions it can execute safely enough to snapshot. Functions that need inputs become skipped TODO cases rather than silent omissions. `trace-python-tests` installs a temporary Python trace hook, runs the real test command from the source tree, records project function calls, and then renders the trace. `test-first-python` runs both steps as one workflow. `spec-from-trace` is the lower-level renderer for traces produced elsewhere. The trace commands refuse an empty trace, import `Autoform.Generated.<Module>` by default, and emit a Lean inventory of the observed calls. That inventory is not a semantic proof yet. It makes the test evidence reviewable and kernel-checkable while keeping conformance, mutation, and coverage gates responsible for deciding whether the translated program really matches the runtime.
 
 The remaining implementation step is a tracer for non-Python runtime families. The trace format is JSONL with one observation per call:
 
