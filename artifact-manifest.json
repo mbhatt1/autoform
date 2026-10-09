@@ -24,11 +24,11 @@
    "render_sha256": "85f6a8f851ff598fb1fe38dd289c4931e2890bee8b96093d145f95ad0d548885"
   },
   "Click": {
-   "ast_bytes": 4727704,
-   "ast_sha256": "061c0f8e79ed673e5a27410a74c397f68b2052cef0ad5c6a551f2d4e0906c5b7",
+   "ast_bytes": 4726613,
+   "ast_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
    "ast_tracked": true,
-   "render_bytes": 2061942,
-   "render_sha256": "5da9700801ae5080426e0e0cb8bd7009b773503b3f780cb8f7db0d3da4e43687"
+   "render_bytes": 2061729,
+   "render_sha256": "7e845e9e3978f0cc9b10c1a69d8d5abd17f6812ccc8e6ac6a6ba2ca235ba386d"
   },
   "Jinja2": {
    "ast_bytes": 6491674,
@@ -165,6 +165,11 @@
    "corpus": "Cachetools",
    "corpus_ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
    "source": "ast-Cachetools.json"
+  },
+  "SpecsGen/Click": {
+   "corpus": "Click",
+   "corpus_ast_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
+   "source": "ast-Click.json"
   },
   "SpecsGen/LinuxLib": {
    "corpus": "LinuxLibSample",

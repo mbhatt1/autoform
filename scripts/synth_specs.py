@@ -1346,6 +1346,10 @@ def staged_conformance(c, budget, execution_tactic):
     return tactic
 
 
+# Set by `main` from `--exclude-subjects`; `emit` names them in the module it writes.
+EXCLUDED_SUBJECTS = []
+
+
 def emit(cands, module, obligations_extra, ns=None):
     """`ns` overrides the namespace, for the mutation-gate sample module: two files that
     share a namespace also share declaration names, and importing both would clash."""
@@ -1423,6 +1427,16 @@ def emit(cands, module, obligations_extra, ns=None):
                                   json.dumps(r)) for n, s, sub, r in obs))
     out.append("#eval IO.println (renderObligations %s obligations)\n"
                % json.dumps(ns))
+    if EXCLUDED_SUBJECTS:
+        # Left out by `--exclude-subjects`: their by-computation proofs do not finish in
+        # the emission budget. Named here, in the tracked module, not only in the
+        # untracked JSON report -- an exclusion nobody can see is a silent one.
+        out.append("/-- Subjects left out of this module by `--exclude-subjects` (no "
+                   "statement about them is made here, true or open). -/\n"
+                   "def excludedSubjects : List String :=\n  [%s]\n"
+                   % ",\n   ".join(json.dumps(n) for n in EXCLUDED_SUBJECTS))
+        out.append('#eval IO.println s!"excluded subjects ─ %s ({excludedSubjects.length})"\n'
+                   % ns)
     out.append("/-! ## Anti-vacuity gate\n\n`#audit_depends` fails the build if a "
                "theorem's proof term never mentions the generated definition it claims "
                "to be about — the necessary half of the gate. The sufficient half is "
@@ -1750,6 +1764,7 @@ def main():
     if args.exclude_subjects:
         drop = [n.strip() for n in args.exclude_subjects.split(";") if n.strip()]
         excluded = [n for n in subjects if n in drop]
+        EXCLUDED_SUBJECTS[:] = excluded
         subjects = [n for n in subjects if n not in drop]
         print("   excluded %d subject(s) by --exclude-subjects: %s"
               % (len(excluded), ", ".join(excluded) or "(none matched)"))
