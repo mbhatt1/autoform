@@ -1,14 +1,20 @@
 {
  "artifact": "ast-Click.json",
- "artifact_bytes": 3722946,
- "artifact_sha256": "74726948e19319897d80aadb3650dbcb95f61082ea9d3e2c7b7a70674e07add7",
- "command": "scripts/reland_corpus.sh /private/tmp/corp_click Click",
+ "artifact_bytes": 4727704,
+ "artifact_sha256": "061c0f8e79ed673e5a27410a74c397f68b2052cef0ad5c6a551f2d4e0906c5b7",
+ "command": "scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/click-8.2.1-sdist Click",
  "cpg_schema_version": "1.7.70",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "b82b43eae510fdcb4d6a9b949ebe8c56cb1c86119fec9f0edf0d5bcc39e4b310",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "9970d8ab66a6a8f750db5e6a59066566ed8b641b6f77c1f58df9b8e32f3e6412",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
  "joern_version": "4.0.606",
  "recorded_by": "scripts/provenance.py record",
  "schema_version": 1,
- "source_path": "/private/tmp/corp_click",
+ "source_path": "/Users/mbhatt/.cache/autoform/corpora/click-8.2.1-sdist",
  "source_revision": "tree-sha256:42ee03eeaa468fcea0752aa8b1ed6e47cd9e96b07ee503ca8d490b398ce1ea99:17files"
 }

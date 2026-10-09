@@ -243,6 +243,14 @@ exception_bases = {name: [b.__name__ for b in value.__mro__[1:] if b is not obje
                    for name, value in exceptions.items()}
 tries, raises, class_refs, signatures, properties = {}, {}, {}, {}, set()
 genexpressions = {}
+# A bare annotation (`self.name: str`, no value) binds nothing. CPython evaluates the
+# target's sub-expressions but never its final load or store (Language Reference
+# §7.2.2), and the annotation itself only outside a function body and only without
+# `from __future__ import annotations`. Keyed like `raises`; the exporter lowers it.
+bare_annotations = {}
+postponed_annotations = any(
+    isinstance(s, ast.ImportFrom) and s.module == '__future__'
+    and any(a.name == 'annotations' for a in s.names) for s in tree.body)
 value_calls = {}
 global_names = {}
 global_value_calls = {}
@@ -1069,6 +1077,27 @@ def visit(node, scopes):
         else:
             info = {'kind': 'dynamic'}
         raises[f'{node.lineno}:{node.col_offset + 1}'] = info
+    if isinstance(node, ast.AnnAssign) and node.value is None:
+        target = node.target
+        kind = ('name' if isinstance(target, ast.Name) else
+                'attribute' if isinstance(target, ast.Attribute) else
+                'subscript' if isinstance(target, ast.Subscript) else 'other')
+        if scopes[-1].get_type() == 'function' or postponed_annotations:
+            annotation = 'unevaluated'
+        elif (isinstance(node.annotation, ast.Constant)
+              or (isinstance(node.annotation, ast.Name)
+                  and hasattr(builtins, node.annotation.id)
+                  and builtin_name(node.annotation.id, scopes))):
+            # Loading a constant or an unshadowed builtin cannot raise or write.
+            annotation = 'inert'
+        else:
+            annotation = 'evaluated'
+        # The name lets the exporter refuse a different node that shares the anchor
+        # (the frontend's synthetic `int = __builtins__.int` sits at 1:1 too).
+        name = (target.id if kind == 'name' else
+                target.attr if kind == 'attribute' else None)
+        bare_annotations[f'{node.lineno}:{node.col_offset + 1}'] = {
+            'target': kind, 'name': name, 'annotation': annotation}
     if isinstance(node, (ast.Try, getattr(ast, 'TryStar', ast.Try))):
         tries[f'{node.lineno}:{node.col_offset + 1}'] = {
             'star': type(node).__name__ == 'TryStar',
@@ -1079,6 +1108,7 @@ def visit(node, scopes):
 
 visit(tree, [symbols])
 print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
+                  'bareAnnotations': bare_annotations,
                   'signatures': signatures,
                   'genexpressions': genexpressions,
                   'value_calls': value_calls,
@@ -10374,6 +10404,33 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     } else holeS("assign:arity:go-shape")
   }
 
+  /** `target: annotation` with no value. The target's sub-expressions are evaluated in
+    * order and its final attribute or item access is not; a simple name evaluates
+    * nothing. The annotation is evaluated only outside a function body without
+    * `from __future__ import annotations`; a constant or unshadowed builtin there is
+    * inert, and anything else stays a named gap rather than being dropped. */
+  def bareAnnotation(n: AstNode): Option[ujson.Obj] = {
+    def evaluate(parts: List[AstNode]): ujson.Obj = seqOf(parts.flatMap { part =>
+      val (prelude, value) = exprV(part)
+      prelude :+ ujson.Obj("k" -> "exprS", "e" -> value)
+    })
+    def lowered(info: ujson.Value)(body: => ujson.Obj): ujson.Obj =
+      if (info("annotation").str == "evaluated") holeS("stmt:annotation-evaluation") else body
+    pythonSourceInfo(n, "bareAnnotations").flatMap { info =>
+      val name = info("name").strOpt
+      (info("target").str, n) match {
+        case ("name", i: Identifier) if name.contains(i.name) => Some(lowered(info)(skip))
+        case ("attribute", x) if asField(x).exists(f => name.contains(f._2) ||
+            name.exists(a => f._2.endsWith("__" + a.stripPrefix("__")))) =>
+          Some(lowered(info)(evaluate(List(asField(x).get._1))))
+        case ("subscript", x: Call) if isOp(x, "<operator>.indexAccess") && kidsOf(x).size == 2 =>
+          Some(lowered(info)(evaluate(kidsOf(x).toList)))
+        // Another node at the same anchor: not this annotation.
+        case _ => None
+      }
+    }
+  }
+
   def stmt(n: AstNode): ujson.Obj = unwrapMacro(n) match {
     case b: Block =>
       val kids = kidsOf(b)
@@ -10390,6 +10447,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       else forPattern(kids).getOrElse(seqOf(stmts(kids)))
     case l: Local => skip   // declarations carry no behaviour here
     case td: TypeDecl => skip   // a struct/union/typedef/class decl carries no behaviour either
+    // A bare annotation (`self.name: str`) is not a read of its target: Joern leaves only
+    // the target expression, which lowered as a load and raised AttributeError where
+    // CPython runs on (click's `Parameter.__init__`). Lower what §7.2.2 evaluates.
+    case a: AstNode if pyFile && bareAnnotation(a).isDefined => bareAnnotation(a).get
     // A module-level `class` statement whose body applies the program's decorators:
     // the class body runs them (§8.7), in source order, before the class exists.
     case c: Call if pyFile && moduleScope && classBodyDecorations(c).nonEmpty =>
