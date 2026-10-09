@@ -12,6 +12,7 @@
 #
 # Prerequisites: a clean tree (checked), the pinned Joern on JOERN_HOME or ~/joern,
 # elan on PATH, and the source runtime for the corpus (CPython for a Python corpus).
+# Optional: AUTOFORM_TESTS=<dir> (the corpus test suite), AUTOFORM_CASES, AUTOFORM_SPEC_EXCLUDE.
 set -euo pipefail
 
 if [ $# -ne 2 ]; then
@@ -103,7 +104,12 @@ echo "     see the RELAND annotations in Autoform/Specs/${MOD}Spec.lean)"
 lake build 2>&1 | tail -3
 
 echo "==> [7/9] conformance vs the real runtime"
-(cd "$REPORT" && "$PYTHON" "$ROOT/scripts/differential.py" "$ROOT/ast-$MOD.json" "$SRC" "$MOD" "${AUTOFORM_CASES:-5}") \
+# AUTOFORM_TESTS names the corpus's own test suite when it lives outside <source-dir>
+# (an sdist package exported without its tests); differential.py records it.
+TEST_ARGS=()
+if [ -n "${AUTOFORM_TESTS:-}" ]; then TEST_ARGS=(--tests "$(cd "$AUTOFORM_TESTS" && pwd -P)"); fi
+(cd "$REPORT" && "$PYTHON" "$ROOT/scripts/differential.py" "$ROOT/ast-$MOD.json" "$SRC" "$MOD" "${AUTOFORM_CASES:-5}" \
+   ${TEST_ARGS[@]+"${TEST_ARGS[@]}"}) \
   | tee "$REPORT/conformance.log" | tail -4
 [ -f "$REPORT/conformance.json" ] && cp "$REPORT/conformance.json" "$ROOT/conformance.json"
 
