@@ -2301,7 +2301,10 @@ def main():
         cases = observation_memo["cases"]
         stats = observation_memo["stats"]
         BASIS, BASIS_NOTE = observation_memo["basis"], observation_memo["basis_note"]
-        identities = observation_memo["identities"]
+        # Only whether class metadata was recovered matters past this point (the basis
+        # strings above already reflect it); the index itself keys on tuples and is
+        # not stored.
+        identities = {} if observation_memo["identities_recovered"] else None
         print("test suite: %s" % ", ".join(observation_memo["test_dirs"]) if observation_memo["test_dirs"]
               else "test suite: none")
         print("cases recorded from the test suite: %d (replayed from %s)"
@@ -2531,7 +2534,7 @@ def main():
             and not (observation_memo and "cases" in observation_memo)):
         observation_store.put(ast_fingerprint, "python-phase", {
             "cases": cases, "stats": stats, "basis": BASIS, "basis_note": BASIS_NOTE,
-            "identities": identities, "test_dirs": test_dirs})
+            "identities_recovered": identities is not None, "test_dirs": test_dirs})
 
     if not cases:
         print("module %s (%s, %s): NO COMPARABLE CASES — %s"

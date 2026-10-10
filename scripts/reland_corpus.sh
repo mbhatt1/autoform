@@ -96,7 +96,9 @@ mod = sys.argv[1]
 path = "provenance/unattributed.json"
 d = json.load(open(path), object_pairs_hook=collections.OrderedDict)
 removed = d["artifacts"].pop(f"ast-{mod}.json", None)
-json.dump(d, open(path, "w"), indent=1); open(path, "a").write("\n")
+# Written back in the file's own indentation (two spaces), so a re-land that removes
+# nothing leaves no whitespace-only diff behind.
+json.dump(d, open(path, "w"), indent=2); open(path, "a").write("\n")
 print("    backlog entry", "removed" if removed else "absent", f"for ast-{mod}.json")
 PYEOF
 # Other corpora can still carry the previous exporter pin while this one is being
