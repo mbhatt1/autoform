@@ -108,7 +108,10 @@ Each owns its flags; `autoform <cmd> --help` is the reference.
 `autoformalize` writes a language model's Lean model of each function and validates it
 against real executions and a second translation (`--deep` uses the Joern translation
 instead; `--deep-too` proves the two equal). It needs a model provider
-(`AUTOFORM_CLAUDE_AUTH=login|api-key`) and caps spend with `--budget-usd`.
+(`AUTOFORM_CLAUDE_AUTH=login|api-key`) and caps spend with `--budget-usd`. Its last stage
+writes the properties that survived checking as pytest tests into the analysed tree's
+`tests/autoform_generated/` and runs them (`--emit-dir DIR` relocates them, `--no-emit`
+skips the stage; `docs/autoformalize.md`, "The emit stage").
 `formalize` needs a translated module in the workspace and, for the default judge, a
 SemIf (OpenJev) installation. `machine` needs the `[machine]` extra; `--assemble`
 also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and

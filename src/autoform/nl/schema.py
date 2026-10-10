@@ -7,6 +7,7 @@
                ──formalize──► Statement per English property (untrusted, must elaborate)
                ──check──────► CheckResult: bounded kernel + real-runtime evidence
                ──prove──────► ProofResult (kernel re-checked)
+               ──emit───────► EmitResult: pytest tests in the target project's tests/autoform_generated/
                ──refine─────► L1: model = deep translation, kernel-checked   (--deep-too)
                ──report─────► report.json / report.md
 
@@ -28,6 +29,7 @@ FILES = {
     'statements': 'statements.json',
     'checks': 'checks.json',
     'proofs': 'proofs.json',
+    'emit': 'emit.json',                           # emitted pytest tests, per statement (emit.EmitResult)
     'report': 'report.json',
     'models': 'models.json',
     'deep_translation': 'deep-translation.json',   # --deep-too: the deep Translation
@@ -159,6 +161,9 @@ class Statement:
     # '' : r is the function's result; 'post' : a method statement about the receiver after
     # the call, `r` is `call "<function>#post" args` = `.val (.tuple [result, receiver'])`
     entry: str = ''
+    # llm.prompt_key of the formalize prompt that produced this statement (its first attempt);
+    # the emit stage writes it into every emitted test's docstring
+    prompt_hash: str = ''
 
 
 def call_name(statement) -> str:
@@ -207,6 +212,28 @@ class ProofResult:
     seconds: float = 0.0
     cost_usd: float = 0.0
     reason: str = ''
+
+
+@dataclass
+class EmitResult:
+    """What the emit stage did with one statement (autoform.nl.emit).
+
+    A statement that survived the check stage (BOUNDED_HOLDS, CPython agreed) and, when a
+    judge ran, adjudication, becomes pytest tests in the target project: one per concrete
+    domain point whose real outcome satisfies pre and post (asserting that outcome), and one
+    `hypothesis` property when every binder is Int/Nat/Bool/String and the Python form of
+    pre/post agreed with Lean on every concrete point. Every emitted test is run under the
+    real interpreter; a failure is recorded here, never dropped."""
+    statement: str
+    status: str               # EMITTED | NOT_EMITTED | FAILING (emitted, at least one test failed or errored)
+    reason: str = ''          # why nothing was emitted
+    tests: list = field(default_factory=list)   # [{"name", "file", "kind": concrete|hypothesis, "point", "result", "detail"}]
+    points: int = 0           # domain points of the check stage
+    points_tested: int = 0    # with an encodable real outcome, pre and post true in Lean: emitted
+    points_deduplicated: int = 0    # argument tuples the existing suite already produced (not emitted)
+    points_outside_pre: int = 0     # pre false in Lean (vacuous, not emitted)
+    points_unencodable: int = 0     # no faithful CPython outcome (timeout, unencodable value)
+    hypothesis: str = ''      # 'emitted' or why the property test was not written
 
 
 @dataclass

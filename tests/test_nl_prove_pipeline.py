@@ -78,6 +78,10 @@ class Stubs:
         return [ProofResult(s['id'], 'PROVED' if s['id'] == 'add__p1' else 'SKIPPED', cost_usd=0.5,
                             certificate='x.lean' if s['id'] == 'add__p1' else None) for s in statements]
 
+    def emit(self, translation, statements, checks, out, **kw):
+        self.emit_kw = kw
+        return {'counts': {'tests': 1, 'tests_passed': 1, 'emitted': 1, 'survivors': 1}, 'statements': []}
+
 
 def _src(tmp_path):
     src = tmp_path / 'src'
@@ -108,7 +112,10 @@ def test_pipeline_runs_every_stage_and_resumes(tmp_path, monkeypatch):
     assert run['cost_usd'] == 2.0      # resumed stages still count against the budget
     # A changed option reruns only the stages whose inputs changed.
     pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, deep=True)
-    assert stubs.calls == ['check']
+    assert stubs.calls == ['check', 'emit']       # emit asserts real outcomes: --no-runtime is one of its inputs
+    assert stubs.emit_kw['run_info']['id'] and stubs.emit_kw['runtime'] is False
+    run = json.loads((out / 'run.json').read_text())
+    assert run['stages']['emit']['summary']['tests_passed'] == 1 and run['id'] == stubs.emit_kw['run_info']['id']
     stubs.calls.clear()
     pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, functions=['add'], deep=True)
     assert stubs.calls == ['describe']        # same English out -> formalize and later resume
@@ -141,7 +148,7 @@ def test_pipeline_degrades_gracefully(tmp_path, monkeypatch):
     stubs.fail.clear()
     stubs.calls.clear()
     pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, deep=True)
-    assert stubs.calls == ['describe', 'formalize', 'check', 'prove']
+    assert stubs.calls == ['describe', 'formalize', 'check', 'prove', 'emit']
 
 
 def test_pipeline_check_failure_still_reports_statements_and_no_prove(tmp_path, monkeypatch):
