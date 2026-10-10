@@ -182,8 +182,9 @@ else
   # The .sha512 manifest names the zip as target/<asset>, so it is fetched there (ci.yml).
   mkdir -p "$dl/target" "$JOERN_HOME"
   echo "downloading $URL/$ASSET (about 1.7 GB)"
-  curl -fL --retry 5 --retry-all-errors "$URL/$ASSET" -o "$dl/target/$ASSET"
-  curl -fL --retry 5 --retry-all-errors "$URL/$ASSET.sha512" -o "$dl/$ASSET.sha512"
+  # -sS: no progress meter (a logged run is otherwise 60 KB of carriage returns), errors still shown.
+  curl -sSfL --retry 5 --retry-all-errors "$URL/$ASSET" -o "$dl/target/$ASSET"
+  curl -sSfL --retry 5 --retry-all-errors "$URL/$ASSET.sha512" -o "$dl/$ASSET.sha512"
   (cd "$dl" && "${SHA512_CHECK[@]}" "$ASSET.sha512") || die "sha512 of $ASSET does not match the release manifest"
   unzip -q "$dl/target/$ASSET" -d "$JOERN_HOME"
   rm -rf "$dl"
