@@ -67,6 +67,9 @@ def claude_auth() -> str:
     return mode
 
 
+_API_CLIENT = None
+
+
 def sdk_available() -> bool:
     return importlib.util.find_spec('anthropic') is not None
 
@@ -74,7 +77,9 @@ def sdk_available() -> bool:
 def available() -> bool:
     """Whether the configured backend can answer at all (no call is made)."""
     if os.environ.get('AUTOFORM_CLAUDE_AUTH', 'login').strip().lower() == 'api':
-        return bool(os.environ.get('ANTHROPIC_API_KEY')) and sdk_available()
+        # A client already built (or injected by a test over a fake transport) answers
+        # without the SDK being importable; otherwise both the key and the SDK are needed.
+        return _API_CLIENT is not None or (bool(os.environ.get('ANTHROPIC_API_KEY')) and sdk_available())
     return shutil.which('claude') is not None
 
 
@@ -99,21 +104,18 @@ def api_cost_usd(model: str, usage) -> float:
     return sum(n * price for n, price in zip(tokens, PRICES[model])) / 1e6
 
 
-_API_CLIENT = None
-
-
 def api_client():
     """The SDK client (built once). Tests replace this with a client over a fake transport."""
     global _API_CLIENT
     if _API_CLIENT is None:
-        try:
-            import anthropic
-        except ImportError:
-            raise LLMError('AUTOFORM_CLAUDE_AUTH=api needs the anthropic SDK: pip install "anthropic>=1,<2" '
-                           '(requirements.txt lists it as optional)')
         key = os.environ.get('ANTHROPIC_API_KEY')
         if not key:
             raise LLMError('AUTOFORM_CLAUDE_AUTH=api but ANTHROPIC_API_KEY is not set')
+        try:
+            import anthropic
+        except ImportError:
+            raise LLMError('AUTOFORM_CLAUDE_AUTH=api needs the anthropic SDK: pip install -e ".[llm]" '
+                           '(anthropic>=1,<2; optional, the default claude backend needs no package)')
         _API_CLIENT = anthropic.Anthropic(api_key=key)
     return _API_CLIENT
 

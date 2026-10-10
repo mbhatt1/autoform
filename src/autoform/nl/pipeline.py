@@ -428,6 +428,7 @@ def preflight(lean_root, *, budget_usd=None, domain_size=64, parallel=None, repa
     if not Path(lake()).is_file():
         errors.append('lake not found on PATH or in ~/.elan/bin; install Lean with elan')
     if needs_model:
+        from . import llm as _llm
         from .llm import LLMError, claude_auth, sdk_available
         try:
             mode = claude_auth()
@@ -435,7 +436,8 @@ def preflight(lean_root, *, budget_usd=None, domain_size=64, parallel=None, repa
             errors.append(str(exc))
             mode = None
         if mode == 'api':
-            if not sdk_available():
+            # A client already built (a test's fake transport) needs no importable SDK.
+            if not sdk_available() and _llm._API_CLIENT is None:
                 errors.append('AUTOFORM_CLAUDE_AUTH=api but the anthropic SDK is not installed '
                               '(pip install "anthropic>=1,<2")')
             if not os.environ.get('ANTHROPIC_API_KEY'):
