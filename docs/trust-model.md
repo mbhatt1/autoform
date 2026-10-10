@@ -296,8 +296,8 @@ the tool.
 
 Every process that runs the code under test — the differential oracle (which traces the
 corpus's own test suite in its own process, so it re-executes itself confined), its Node,
-JVM and Go drivers, the native C worker, and the nl tracer, runtime runner, coverage fuzzer
-and emitted-test `pytest` — is launched through one layer, `scripts/sandbox.py`. The
+JVM and Go drivers, the native C worker, the harness native replay (`verifier.native_replay`), the nl tracer,
+runtime runner, coverage fuzzer and emitted-test `pytest` — is launched through one layer, `scripts/sandbox.py`. The
 subject gets no network and a filesystem it can read but write only inside its work
 directory (plus, for the oracle, the report directory, `.lake` and the oracle cache); its
 `TMPDIR` is moved inside the work directory so the shared temp directory is not a hole.
@@ -311,8 +311,8 @@ its parent.
 
 What it does: stops the two things this document assumes the subject cannot do, reach the
 network and write outside its scratch tree, and makes the confinement part of the evidence.
-`conformance.json`, `native-build.json`, `emit.json`, `model.meta.json`, `fuzz.json` and
-`run.json` carry `sandbox: {mechanism, enforced, ...}`; a run entered without a mechanism
+`conformance.json`, `native-build.json`, `emit.json`, `model.meta.json`, `fuzz.json`,
+`run.json` and the harness replay record carry `sandbox: {mechanism, enforced, ...}`; a run entered without a mechanism
 **refuses** and says what to install; `AUTOFORM_SANDBOX=off` is the only way to run
 unconfined and it is written into every one of those artifacts as `enforced: false`.
 `tests/test_sandbox.py` is the exit criterion: a subject that connects to a listening

@@ -268,9 +268,11 @@ def go_backend(src_root, funcs, ncases, work):
         (target / "autoform_runtime_test.go").write_text(
             "package " + package + "\n" + GO_DRIVER.replace("__CALLS__", calls))
         env = dict(os.environ)
-        env.setdefault("GOCACHE", str(Path(work) / "go-cache"))
-        # No network inside the sandbox: a toolchain the go.mod asks for must already be local.
-        env.setdefault("GOTOOLCHAIN", "local")
+        # The build cache is forced into the work tree: a user GOCACHE outside it is not writable
+        # under the sandbox, and go then fails without a usable message. No network inside the
+        # sandbox either: a toolchain the go.mod asks for must already be local.
+        env["GOCACHE"] = str(Path(work) / "go-cache")
+        env["GOTOOLCHAIN"] = "local"
         launch = sandbox.sandboxed(["go", "test", "-run", "^TestAutoformRuntime$", "-v", "-count=1", "-timeout=30s", "."],
                                    cwd=str(target), env=env, work=work)
         r = launch.run(capture_output=True, text=True, timeout=180, start_new_session=True)
