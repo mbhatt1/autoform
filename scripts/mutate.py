@@ -782,6 +782,16 @@ def main():
                     if rc == 0 or timed_out or all_error_lines(out):
                         break
                     rc, out, timed_out = run_build(root, build_module, args.timeout)
+                # Keep every mutant's full build output when asked: a run where every
+                # mutant "survives" is indistinguishable from a build that never saw the
+                # mutant unless the output is on disk (AUTOFORM_MUTATE_LOG_DIR).
+                log_dir = os.environ.get("AUTOFORM_MUTATE_LOG_DIR")
+                if log_dir:
+                    os.makedirs(log_dir, exist_ok=True)
+                    with open(os.path.join(log_dir, f"mutant-{i:03d}.log"), "w", encoding="utf-8") as f:
+                        f.write(f"# {mut.op} L{mut.line} ({mut.decl}) rc={rc} timed_out={timed_out}\n")
+                        f.write(f"# old: {mut.old.rstrip()}\n# new: {mut.new.rstrip()}\n\n")
+                        f.write(out)
                 # Errors in the *mutated* file mean the mutant is not well-typed; errors in
                 # the *spec* file mean a theorem noticed. When the two are the same file
                 # these collapse to the original behaviour.
