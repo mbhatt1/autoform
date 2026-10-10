@@ -31,11 +31,11 @@
    "render_sha256": "27b4fe8cc814bb8fff1589ca08192c9ab0e54bca797b97a721ee986a726cbe1d"
   },
   "Jinja2": {
-   "ast_bytes": 7899504,
-   "ast_sha256": "c0978f07d574a127949eb1c046181569a58258eaba788fa9b063fd345c5ebd4f",
+   "ast_bytes": 7898905,
+   "ast_sha256": "f01eacec0541c62fae029a344746a5e828e61070d9950cc92f892ec1668e636d",
    "ast_tracked": true,
-   "render_bytes": 3475268,
-   "render_sha256": "fe4cde028b18f4d94c342c715d44e36110b5c3d878e79773499c6ba342ed8d3d"
+   "render_bytes": 3474668,
+   "render_sha256": "74b895388aed2d08c71573b5f24a285326a5d408623208ca7aaec5a4744862aa"
   },
   "LangC": {
    "ast_bytes": 175419,
@@ -173,7 +173,7 @@
   },
   "SpecsGen/Jinja2": {
    "corpus": "Jinja2",
-   "corpus_ast_sha256": "c0978f07d574a127949eb1c046181569a58258eaba788fa9b063fd345c5ebd4f",
+   "corpus_ast_sha256": "f01eacec0541c62fae029a344746a5e828e61070d9950cc92f892ec1668e636d",
    "source": "ast-Jinja2.json"
   },
   "SpecsGen/LinuxLib": {

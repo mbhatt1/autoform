@@ -179240,7 +179240,7 @@
     "name": "jinja2/lexer.py:<module>.Token",
     "shortName": "Token",
     "bases": [
-     "<unresolved-base>jinja2/lexer.py:<module>.Token:0"
+     "<external>typing.NamedTuple"
     ],
     "attributes": [
      {
@@ -179373,7 +179373,7 @@
     "name": "jinja2/lexer.py:<module>._Rule",
     "shortName": "_Rule",
     "bases": [
-     "<unresolved-base>jinja2/lexer.py:<module>._Rule:0"
+     "<external>typing.NamedTuple"
     ],
     "attributes": []
    },
@@ -181123,7 +181123,7 @@
     "name": "jinja2/utils.py:<module>._PassArg",
     "shortName": "_PassArg",
     "bases": [
-     "<unresolved-base>jinja2/utils.py:<module>._PassArg:0"
+     "<external>enum.Enum"
     ],
     "attributes": [
      {
@@ -183152,7 +183152,7 @@
     "name": "jinja2/idtracking.py:<module>.RootVisitor",
     "shortName": "RootVisitor",
     "bases": [
-     "<unresolved-base>jinja2/idtracking.py:<module>.RootVisitor:0"
+     "jinja2/visitor.py:<module>.NodeVisitor"
     ],
     "attributes": [
      {
@@ -183236,7 +183236,7 @@
     "name": "jinja2/idtracking.py:<module>.FrameSymbolVisitor",
     "shortName": "FrameSymbolVisitor",
     "bases": [
-     "<unresolved-base>jinja2/idtracking.py:<module>.FrameSymbolVisitor:0"
+     "jinja2/visitor.py:<module>.NodeVisitor"
     ],
     "attributes": [
      {
@@ -183560,7 +183560,7 @@
     "name": "jinja2/optimizer.py:<module>.Optimizer",
     "shortName": "Optimizer",
     "bases": [
-     "<unresolved-base>jinja2/optimizer.py:<module>.Optimizer:0"
+     "jinja2/visitor.py:<module>.NodeTransformer"
     ],
     "attributes": [
      {
@@ -185739,7 +185739,7 @@
     "name": "jinja2/compiler.py:<module>.DependencyFinderVisitor",
     "shortName": "DependencyFinderVisitor",
     "bases": [
-     "<unresolved-base>jinja2/compiler.py:<module>.DependencyFinderVisitor:0"
+     "jinja2/visitor.py:<module>.NodeVisitor"
     ],
     "attributes": [
      {
@@ -185768,7 +185768,7 @@
     "name": "jinja2/compiler.py:<module>.UndeclaredNameVisitor",
     "shortName": "UndeclaredNameVisitor",
     "bases": [
-     "<unresolved-base>jinja2/compiler.py:<module>.UndeclaredNameVisitor:0"
+     "jinja2/visitor.py:<module>.NodeVisitor"
     ],
     "attributes": [
      {
@@ -185800,7 +185800,7 @@
     "name": "jinja2/compiler.py:<module>.CodeGenerator",
     "shortName": "CodeGenerator",
     "bases": [
-     "<unresolved-base>jinja2/compiler.py:<module>.CodeGenerator:0"
+     "jinja2/visitor.py:<module>.NodeVisitor"
     ],
     "attributes": [
      {
@@ -186344,7 +186344,7 @@
     "name": "jinja2/compiler.py:<module>.CodeGenerator._FinalizeInfo",
     "shortName": "_FinalizeInfo",
     "bases": [
-     "<unresolved-base>jinja2/compiler.py:<module>.CodeGenerator._FinalizeInfo:0"
+     "<external>typing.NamedTuple"
     ],
     "attributes": []
    }
@@ -193826,7 +193826,7 @@
       "value": "<slot>jinja2/runtime.py:<module>.Undefined._undefined_exception"
      }
     ],
-    "definitionBarrier": "class-definition:custom-attribute-hook",
+    "definitionBarrier": "class-definition:special-method-descriptor",
     "slots": [
      "_undefined_hint",
      "_undefined_obj",
@@ -193898,7 +193898,6 @@
       "value": "jinja2/runtime.py:<module>.ChainableUndefined.__getitem__"
      }
     ],
-    "definitionBarrier": "class-definition:custom-attribute-hook",
     "slots": []
    },
    {
@@ -196167,7 +196166,7 @@
     "name": "jinja2/loaders.py:<module>._TemplateModule",
     "shortName": "_TemplateModule",
     "bases": [
-     "<unresolved-base>jinja2/loaders.py:<module>._TemplateModule:0"
+     "<external>types.ModuleType"
     ],
     "attributes": []
    },
@@ -197981,7 +197980,7 @@
     "name": "jinja2/sandbox.py:<module>.SandboxedEnvironment",
     "shortName": "SandboxedEnvironment",
     "bases": [
-     "<unresolved-base>jinja2/sandbox.py:<module>.SandboxedEnvironment:0"
+     "jinja2/environment.py:<module>.Environment"
     ],
     "attributes": [
      {
@@ -198079,7 +198078,7 @@
     "name": "jinja2/sandbox.py:<module>.SandboxedFormatter",
     "shortName": "SandboxedFormatter",
     "bases": [
-     "<unresolved-base>jinja2/sandbox.py:<module>.SandboxedFormatter:0"
+     "<external>string.Formatter"
     ],
     "attributes": [
      {
@@ -198099,7 +198098,7 @@
     "shortName": "SandboxedEscapeFormatter",
     "bases": [
      "jinja2/sandbox.py:<module>.SandboxedFormatter",
-     "<unresolved-base>jinja2/sandbox.py:<module>.SandboxedEscapeFormatter:1"
+     "<external>markupsafe.EscapeFormatter"
     ],
     "attributes": []
    }
@@ -203200,7 +203199,7 @@
     "name": "jinja2/filters.py:<module>._GroupTuple",
     "shortName": "_GroupTuple",
     "bases": [
-     "<unresolved-base>jinja2/filters.py:<module>._GroupTuple:0"
+     "<external>typing.NamedTuple"
     ],
     "attributes": [
      {
@@ -214430,7 +214429,7 @@
     "name": "jinja2/meta.py:<module>.TrackingCodeGenerator",
     "shortName": "TrackingCodeGenerator",
     "bases": [
-     "<unresolved-base>jinja2/meta.py:<module>.TrackingCodeGenerator:0"
+     "jinja2/compiler.py:<module>.CodeGenerator"
     ],
     "attributes": [
      {
@@ -215037,7 +215036,7 @@
     "name": "jinja2/nativetypes.py:<module>.NativeCodeGenerator",
     "shortName": "NativeCodeGenerator",
     "bases": [
-     "<unresolved-base>jinja2/nativetypes.py:<module>.NativeCodeGenerator:0"
+     "jinja2/compiler.py:<module>.CodeGenerator"
     ],
     "attributes": [
      {
@@ -215071,7 +215070,7 @@
     "name": "jinja2/nativetypes.py:<module>.NativeEnvironment",
     "shortName": "NativeEnvironment",
     "bases": [
-     "<unresolved-base>jinja2/nativetypes.py:<module>.NativeEnvironment:0"
+     "jinja2/environment.py:<module>.Environment"
     ],
     "attributes": [
      {
@@ -215090,7 +215089,7 @@
     "name": "jinja2/nativetypes.py:<module>.NativeTemplate",
     "shortName": "NativeTemplate",
     "bases": [
-     "<unresolved-base>jinja2/nativetypes.py:<module>.NativeTemplate:0"
+     "jinja2/environment.py:<module>.Template"
     ],
     "attributes": [
      {
