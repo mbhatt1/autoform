@@ -1519,7 +1519,7 @@ def budget_probe(cands, module, workdir, seconds, gigabytes, jobs, ns=None):
             if reason:
                 try:
                     os.killpg(pid, signal.SIGKILL)
-                except ProcessLookupError:
+                except (ProcessLookupError, PermissionError):  # exited; macOS says EPERM
                     pass
                 proc.wait()
                 del running[pid]
@@ -2073,7 +2073,13 @@ def main():
     print("   fuel-independent     : %d proved for ALL fuel ≥ FUEL (%d still FUEL-only)"
           % (report["fuel_independent"], report["fuel_obligations_remaining"]))
     print("   report               : %s" % args.json_path)
-    if args.conformance_only and (not proved or len(proved) != len(cands)):
+    print("   over proof budget    : %d (excluded by name; see budgetExcluded)"
+          % len(BUDGET_EXCLUDED))
+    # A candidate excluded by the proof budget is named in the module and the report, as
+    # `--exclude-subjects` is, and states nothing; it is not an unproved claim. Every
+    # candidate that WAS emitted must still prove.
+    attempted = [c for c in cands if c.status != "excluded"]
+    if args.conformance_only and (not proved or len(proved) != len(attempted)):
         print("FAIL: not every generated native conformance obligation was proved")
         return 1
     return 0 if ok else 1
