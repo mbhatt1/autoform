@@ -86,6 +86,14 @@ jobs:
           python3 cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.lean V8Base
           test -s Autoform/Generated/V8Base.lean
 
+      # Autoform/Generated/CommonsLang3.lean is a gitignored render of the tracked AST; the
+      # SpecsGen module and Autoform.CI import it, so `lake build` fails without this step.
+      - name: Regenerate Autoform/Generated/CommonsLang3.lean from the tracked AST
+        run: |
+          set -euo pipefail
+          python3 cartographer/render_lean.py ast-CommonsLang3.json Autoform/Generated/CommonsLang3.lean CommonsLang3
+          test -s Autoform/Generated/CommonsLang3.lean
+
       - name: Cache .lake
         uses: actions/cache@v4
         with:
