@@ -71,3 +71,62 @@ def model_digest(generated) -> str:
         h.update(("%s/%s\0%s\n" % (path.parent.name, path.name,
                                    hashlib.sha256(path.read_bytes()).hexdigest())).encode())
     return h.hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Split specification modules (`scripts/synth_specs.py --split-gb`)
+# ---------------------------------------------------------------------------
+#
+# A synthesized specification module whose predicted single-process peak exceeds the
+# split threshold is emitted the way `Autoform/SpecsGen/V8Base` was split by hand: an
+# umbrella `Autoform/SpecsGen/<M>.lean` importing `<M>/Base.lean` (the context, the
+# frozen globals heap and every domain) and `<M>/PartN.lean` (theorems only). One Lean
+# process retains every `rfl`/`decide +kernel` term it elaborates, so the parts are what
+# bound the memory of a build. Everything that digests, mutates or counts "the proof
+# module" has to see all of its files, exactly as for a sharded render above.
+
+SPECSGEN = Path("Autoform") / "SpecsGen"
+
+
+def spec_part_names(umbrella: Path, module: str) -> list[str]:
+    """`Base` and `PartN` names imported by a split specification umbrella, in order."""
+    if not umbrella.is_file():
+        return []
+    pattern = re.compile(r"import Autoform\.SpecsGen\.%s\.(Base|Part\d+)\s*$" % re.escape(module))
+    parts = []
+    for line in umbrella.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("import "):
+            if line.strip():
+                break
+            continue
+        match = pattern.match(line)
+        if match:
+            parts.append(match.group(1))
+    return parts
+
+
+def spec_files(spec) -> list[Path]:
+    """The specification `.lean` followed by `Base` and every part it imports; a single
+    file when the module is not split."""
+    spec = Path(spec)
+    module = spec.stem
+    return [spec] + [spec.parent / module / (p + ".lean") for p in spec_part_names(spec, module)]
+
+
+def is_split_spec(spec) -> bool:
+    return len(spec_files(spec)) > 1
+
+
+def spec_digest(spec) -> str:
+    """The digest proof evidence is bound to. Unsplit: the file's SHA-256, exactly as
+    before splitting existed. Split: the SHA-256 of each file's name and digest in import
+    order, so changing any part changes it."""
+    import hashlib
+    files = spec_files(spec)
+    if len(files) == 1:
+        return hashlib.sha256(files[0].read_bytes()).hexdigest()
+    h = hashlib.sha256()
+    for path in files:
+        h.update(("%s/%s\0%s\n" % (path.parent.name, path.name,
+                                   hashlib.sha256(path.read_bytes()).hexdigest())).encode())
+    return h.hexdigest()

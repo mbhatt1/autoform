@@ -159,7 +159,11 @@ def axiom_sweep(module: str = "Autoform") -> dict:
     payload = out.split("AUTOFORM_AUDIT_BEGIN", 1)[1].split("AUTOFORM_AUDIT_END", 1)[0]
     decls = json.loads(payload.strip())
     result["declarations"] = len(decls)
-    root_theorems = [d for d in decls if d["module"] == module and d["kind"] == "theorem"]
+    # An umbrella module (`Autoform.SpecsGen.<M>` split into `<M>.Base` + `<M>.PartN` by
+    # `synth_specs.py --split-gb`) declares its theorems in its parts; they are the
+    # root's theorems in every sense the sweep reports (same namespace, same names).
+    root_theorems = [d for d in decls if d["kind"] == "theorem"
+                     and (d["module"] == module or d["module"].startswith(module + "."))]
     result["root_theorems"] = len(root_theorems)
     result["root_theorem_names"] = sorted(d["name"] for d in root_theorems)
     result["root_axioms"] = sorted({a for d in root_theorems for a in d["axioms"]})

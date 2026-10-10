@@ -26,13 +26,14 @@ not actually compared is never reported as passing — that is the cardinal sin 
 
 Usage: differential.py <ast.json> <source-dir> <lean-module> [n-cases] [--tests DIR]
 """
-import os, sys
+import os, sys, time
 import json, subprocess, random, importlib.util, re, glob, io
 import contextlib, inspect, functools, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wasm_backend
 import generated_module
 import runtime_backends
+import work_cache                      # .autoform-work/cache: verdicts keyed by AST digest
 import external_bases
 import deep_json
 import struct
@@ -2087,6 +2088,27 @@ def main():
     cases = []
     C_WASM_REPORT = []      # filled by the C backend below; surfaced in conformance.json
 
+    # `.autoform-work/cache`: the Python observation phase (suite trace, random calls,
+    # constructed instances) is memoized as a whole under the AST's digest -- the suite
+    # runs as one process, so it cannot be replayed one function at a time -- keyed by
+    # every input it reads. Lean's answers are memoized per CASE under each function's
+    # digest further below, so an unchanged function's cases are never re-evaluated.
+    observation_store = observation_memo = None
+    if lang == "python" and not wasm_mode:
+        test_dirs_key = [tests_override] if tests_override else None
+        # Fingerprint the tree the cases are recorded from: the corrected root (see the
+        # python branch below), not the directory named on the command line.
+        key_root = resolve_src_root(src_root, sorted(set(f.get("file", "") for f in funcs)))
+        observation_store = work_cache.Store("observe", work_cache.environment_key(
+            source=runtime_backends.source_fingerprints(key_root, funcs), tests=[work_cache.tree_digest(d) for d in
+                                       ([tests_override] if tests_override else find_tests(src_root))],
+            tests_override=test_dirs_key, ncases=ncases, python=sys.version,
+            harness=work_cache.scripts_digest(["scripts/differential.py", "scripts/runtime_backends.py",
+                                               "scripts/native_heap.py", "scripts/deep_json.py",
+                                               "scripts/work_cache.py"]),
+            max_total_cases=MAX_TOTAL_CASES))
+        observation_memo = observation_store.get(ast_fingerprint, "python-phase")
+
     backend_info, backend_skipped, backend_status = {}, {}, "available"
     if missing:
         backend_status = "UNSUPPORTED: toolchain absent (%s)" % ", ".join(missing)
@@ -2271,7 +2293,23 @@ def main():
                   % (wasm_report["status"], len(plan), json.dumps(wtally),
                      len(ub_findings)))
             C_WASM_REPORT.append(wasm_report)
+    elif lang == "python" and observation_memo is not None and "cases" in observation_memo:
+        # Replayed: the suite trace, the random calls and the constructed cases are a
+        # function of the corpus tree, its tests, the AST and this harness, all of which
+        # `observation_key` digests. The basis strings are restored with the cases so
+        # that conformance.json reads exactly as a fresh run's would.
+        cases = observation_memo["cases"]
+        stats = observation_memo["stats"]
+        BASIS, BASIS_NOTE = observation_memo["basis"], observation_memo["basis_note"]
+        identities = observation_memo["identities"]
+        print("test suite: %s" % ", ".join(observation_memo["test_dirs"]) if observation_memo["test_dirs"]
+              else "test suite: none")
+        print("cases recorded from the test suite: %d (replayed from %s)"
+              % (sum(1 for c in cases if c.get("origin") == "test-suite"), observation_store.root))
+        print("cases constructed for methods the suite never called: %d (replayed)"
+              % sum(1 for c in cases if c.get("origin") == "constructed"))
     elif lang == "python":
+        phase_t0 = time.time()
         wanted, methods, modlevel = set(), [], []
         candidates = python_sampling_candidates(funcs)
         raw_bodies = undecorated_bodies(funcs)
@@ -2399,6 +2437,7 @@ def main():
         reached = set(c["name"] for c in cases)
         stats["skip_no_instance"] = sum(1 for f, _, _ in methods
                                         if f["name"] not in reached)
+        print("  python observation phase: %.0f s" % (time.time() - phase_t0))
 
     if len(cases) > MAX_TOTAL_CASES:
         random.shuffle(cases)
@@ -2487,6 +2526,12 @@ def main():
                   "compared_fraction_of_hole_free": 0.0,
                   "compared_hole_free": 0, "compared_with_holes": 0,
                   "by_status": {}, "status_counts": {}}}
+
+    if (observation_store is not None and observation_store.enabled and cases
+            and not (observation_memo and "cases" in observation_memo)):
+        observation_store.put(ast_fingerprint, "python-phase", {
+            "cases": cases, "stats": stats, "basis": BASIS, "basis_note": BASIS_NOTE,
+            "identities": identities, "test_dirs": test_dirs})
 
     if not cases:
         print("module %s (%s, %s): NO COMPARABLE CASES — %s"
@@ -2767,7 +2812,41 @@ def main():
         return h.hexdigest()
 
     CHUNK = 20
-    order = list(range(len(cases)))
+    # Lean's answer to a case is a function of the case literal, the rendered model, the
+    # semantics and this harness's header: memoized per case under the digest of the
+    # function the case calls (`.autoform-work/cache/<function digest>/lean-*.json`).
+    # A case with a memoized answer is not sent to Lean at all; the olean-stability loop
+    # below still guards the ones that are.
+    lean_store = work_cache.Store("lean", work_cache.environment_key(
+        model=generated_module.model_digest(generated), semantics=semantics_fingerprint,
+        header=work_cache.sha256_text("\n".join(header + footer)),
+        harness=work_cache.scripts_digest(["scripts/differential.py", "scripts/work_cache.py"])))
+    fn_by_name = {f["name"]: f for f in funcs}
+    fn_digest_cache = {}
+
+    def fn_digest(name):
+        if name not in fn_digest_cache:
+            f = fn_by_name.get(name)
+            fn_digest_cache[name] = work_cache.function_digest(f) if f is not None else None
+        return fn_digest_cache[name]
+
+    case_keys = [work_cache.sha256_text(case_lit(0, c)) for c in cases]
+    memo_by_fn, replayed = {}, {}
+    if lean_store.enabled:
+        for i, c in enumerate(cases):
+            d = fn_digest(c["name"])
+            if d is None:
+                continue
+            if d not in memo_by_fn:
+                memo_by_fn[d] = lean_store.load(d)
+            hit = memo_by_fn[d].get(case_keys[i])
+            if isinstance(hit, dict) and "result" in hit:
+                replayed[i] = hit
+    order = [i for i in range(len(cases)) if i not in replayed]
+    if replayed:
+        print("lean answers replayed for %d/%d cases from %s; %d to evaluate"
+              % (len(replayed), len(cases), lean_store.root, len(order)))
+    lean_t0 = time.time()
     got, stable = {}, False
     for attempt in range(3):
         before = olean_fingerprint()
@@ -2779,7 +2858,26 @@ def main():
             stable = True; break
         print("WARNING: the compiled Lean artifacts changed while the cases were being "
               "evaluated (a concurrent build). Discarding and re-running.")
+    print("  lean evaluation: %.0f s for %d case(s)" % (time.time() - lean_t0, len(order)))
+    if stable and not mutating and lean_store.enabled:
+        fresh = {}
+        for i in order:
+            if i in got:
+                d = fn_digest(cases[i]["name"])
+                if d is not None:
+                    fresh.setdefault(d, {})[case_keys[i]] = {
+                        "result": got[i], "heap": graph_answers.get(i)}
+        for d, entries in fresh.items():
+            lean_store.put_many(d, entries)
+    for i, hit in replayed.items():
+        got[i] = hit["result"]
+        if hit.get("heap") is not None:
+            graph_answers[i] = hit["heap"]
     result["build_stable"] = stable and not mutating
+    result["cache"] = {"observation_phase_replayed": bool(observation_memo and "cases" in observation_memo),
+                       "lean_answers_replayed": len(replayed),
+                       "lean_answers_evaluated": len(order),
+                       "root": str(lean_store.root or "")}
     result["provenance"] = {
         "ast_sha256": ast_fingerprint,
         "generated_sha256": generated_module.model_digest(generated),
