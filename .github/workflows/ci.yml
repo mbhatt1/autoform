@@ -14,6 +14,14 @@ concurrency:
   group: ${{ github.workflow }}-repository-${{ github.ref }}
   cancel-in-progress: true
 
+# AUTOFORM_SANDBOX=off on these Linux runners: the sandbox is on by default and fails closed
+# when no mechanism works, and GitHub's runners have neither bubblewrap nor unprivileged user
+# namespaces (unshare --map-user fails). Every artifact this job writes records the opt-out
+# (`sandbox: {enforced: false}`). Linux confinement is NOT verified; enabling it on the runner
+# is a follow-up that needs a Linux host to test.
+env:
+  AUTOFORM_SANDBOX: off
+
 jobs:
   # ------------------------------------------------------------------ #
   # The real gate: it must build, the trust audit must find no leak,
