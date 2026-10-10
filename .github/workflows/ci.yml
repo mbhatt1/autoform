@@ -96,8 +96,13 @@ jobs:
       # doesn't change what it tries to schedule -- pinning affinity does). Trades wall-
       # clock time for peace under the fixed memory ceiling, verified locally to keep
       # memory well under the cap through the same V8Base phase that previously OOM'd.
+      # `Autoform.CI` is `Autoform.lean` minus `Autoform.SpecsGen.V8Base`: even on one
+      # core the V8Base parts killed this job (exit 143 after Part4 on 2026-10-10), and the
+      # heaviest by-computation spec modules hold more than this runner's memory. The
+      # umbrella says which modules the runner proves; V8Base is gated by check_specs.py
+      # and by the release checklist's full build.
       - name: lake build
-        run: taskset -c 0 lake build
+        run: taskset -c 0 lake build Autoform.CI
 
       - uses: actions/setup-python@v5
         with:
@@ -112,7 +117,7 @@ jobs:
       # re-check can never be silently skipped in CI: an oracle that no-ops is
       # worse than no oracle (STRATEGY.md 19).
       - name: Trust audit sweep (incl. kernel re-verification)
-        run: python3 scripts/audit_all.py --strict
+        run: python3 scripts/audit_all.py --strict --module Autoform.CI
 
       - name: Upload audit.json
         if: always()
@@ -457,9 +462,14 @@ jobs:
         if: steps.joern.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/joern-cli.zip" -o /tmp/joern.zip
+          # The release ships per-platform zips (joern-cli-linux-x86_64.zip, ...); there is
+          # no joern-cli.zip, so that URL was a 404 that failed every Joern-gated job.
+          ASSET="joern-cli-linux-x86_64.zip"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}" -o "/tmp/${ASSET}"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}.sha512" -o "/tmp/${ASSET}.sha512"
+          (cd /tmp && sha512sum -c "${ASSET}.sha512")
           mkdir -p "$HOME/joern"
-          unzip -q /tmp/joern.zip -d "$HOME/joern"
+          unzip -q "/tmp/${ASSET}" -d "$HOME/joern"
 
       # Reads the version out of the jar names on disk, as provenance.py does. This is
       # what catches an installer that "exited 0" having installed nothing.

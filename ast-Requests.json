@@ -67308,7 +67308,7 @@
     "shortName": "ContentDecodingError",
     "bases": [
      "requests/exceptions.py:<module>.RequestException",
-     "<unresolved-base>requests/exceptions.py:<module>.ContentDecodingError:1"
+     "<external>urllib3.exceptions.HTTPError"
     ],
     "attributes": []
    },

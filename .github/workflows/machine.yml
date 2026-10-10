@@ -29,7 +29,10 @@ jobs:
           sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Build semantics and kernel-check regression properties
-        run: lake build Autoform.Lang.PCode.Properties
+        # The source-tooling tests below generate Lean files that import the spec
+        # vocabulary and the audit commands; building only PCode left
+        # Autoform/Harness/Audit.olean missing and three tests failing on a missing object.
+        run: lake build Autoform.Lang.PCode.Properties Autoform.SpecsGen.Basis Autoform.Harness.Audit Autoform.Lang.Core.Observation
       - name: Source tooling, machine execution, and native conformance
         env:
           AUTOFORM_REQUIRE_LEAN: '1'

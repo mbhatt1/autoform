@@ -456,8 +456,11 @@ theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val)
        match seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with
        | .inl l     => (h, .hole l)
        | .inr base' =>
-       let ρ' := bindParams fn base' vs kws
-       match execStmt ctx k h ρ' fn.body with
+       -- `**kwargs` is boxed into a dict object before the body runs (`boxKwargs`); for a
+       -- function without a collector the heap and environment pass through.
+       match boxKwargs ctx fn h (bindParams fn base' vs kws) with
+       | (h₀, ρ') =>
+       match execStmt ctx k h₀ ρ' fn.body with
        | (h₁, .ret v _)   => (h₁, .val v)
        | (h₁, .normal _)  => (h₁, .val .unit)
        | (h₁, .exn v _)   => (h₁, .exn v)
@@ -2004,7 +2007,7 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
     simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
       Bool.false_eq_true, if_false,
-      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, bindParams_mk,
+      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, boxKwargs, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
     rw [hbody]
   have hmc : evalExpr ctxT (j+7) h ρ (.mcall (.name "c") "bump" [(.name "x")])
@@ -2107,7 +2110,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
     simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
       Bool.false_eq_true, if_false,
-      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, bindParams_mk,
+      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, boxKwargs, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
     rw [hinitbody]
   have halloc : evalExpr ctxT (G+10) [] [("xs", Val.list (ys.map Val.int))]
@@ -2171,7 +2174,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
   simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
     List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
     Bool.false_eq_true, if_false,
-      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, bindParams_mk,
+      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, boxKwargs, bindParams_mk,
     List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
   rw [hbody]
 

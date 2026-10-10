@@ -2102,6 +2102,31 @@ def evalTruthWith (ctx : Ctx) (h : Heap) (value : Val)
     evalTruthWith ctx h v apply = (h, .val (.bool v.truthy)) := by
   simp [evalTruthWith, hd]
 
+/-- `**kwargs` is a fresh dict OBJECT in CPython (Language Reference §4.8.2: "a new empty
+mapping ... of the same type as the dict" receives the surplus keywords), with identity:
+`self._info = kwargs` stores a reference, and a later write through either name is seen by
+both. Under a dialect that boxes containers the collector is allocated here, exactly as a
+dict display is (`Expr.dictE`); `bindParams` stays heap-free. The oracle made the gap
+visible on click's `CompletionItem.__init__`, whose post-heap holds `_info → dict object`.
+-/
+def boxKwargs (ctx : Ctx) (fn : Func) (h : Heap) (ρ : Env) : Heap × Env :=
+  match fn.kwarg with
+  | some k =>
+      if ctx.dialect.boxesContainers then
+        match ρ.get k with
+        | .dict kvs =>
+            let (h', r) := h.alloc { cls := "dict", fields := [], payload := .dict kvs }
+            (h', ρ.set k (.ref r))
+        | _ => (h, ρ)
+      else (h, ρ)
+  | none => (h, ρ)
+
+/-- A function without a `**` collector binds exactly what `bindParams` bound: the
+heap is untouched. `simp` discharges the premise from the function literal. -/
+@[simp] theorem boxKwargs_of_no_kwarg {ctx : Ctx} {fn : Func} {h : Heap} {ρ : Env}
+    (hk : fn.kwarg = none) : boxKwargs ctx fn h ρ = (h, ρ) := by
+  unfold boxKwargs; rw [hk]
+
 mutual
 
 /-- Evaluate an expression, threading the heap. -/
@@ -3018,8 +3043,9 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
       match seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with
       | .inl l     => (h, .hole l)
       | .inr base' =>
-      let ρ := bindParams fn base' vs kws
-      match execStmt ctx n h ρ fn.body with
+      match boxKwargs ctx fn h (bindParams fn base' vs kws) with
+      | (h₀, ρ) =>
+      match execStmt ctx n h₀ ρ fn.body with
       | (h₁, .ret v _)  => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
       | (h₁, .exn v _)  => (h₁, .exn v)
@@ -3043,8 +3069,9 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
       match seedClassAttrDefaults ctx h fn cap vs kws with
       | .inl l     => (h, .hole l)
       | .inr base' =>
-      let ρ : Env := bindParams fn base' vs kws
-      match execStmt ctx n h ρ fn.body with
+      match boxKwargs ctx fn h (bindParams fn base' vs kws) with
+      | (h₀, ρ) =>
+      match execStmt ctx n h₀ ρ fn.body with
       | (h₁, .ret v _)   => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)
       | (h₁, .exn v _)   => (h₁, .exn v)
@@ -4661,12 +4688,17 @@ private def collCtx : Ctx := { dialect := .python, table := collProg.table }
 private def collCall (args : List Expr) : Heap × EResult :=
   evalExpr collCtx 60 [{ cls := "C", fields := [] }] [("o", .ref 0)] (.mcall (.name "o") "f" args)
 
--- o.f(1, 2, x=3)   CPython ((1, 2), {'x': 3}) -- `self` is the receiver, not consumed by `*a`
-#guard match (collCall [.lit (.int 1), .lit (.int 2), .kwargE "x" (.lit (.int 3))]).2 with
-       | .val (.tuple [.tuple [.int 1, .int 2], .dict [(.str "x", .int 3)]]) => true | _ => false
+-- o.f(1, 2, x=3)   CPython ((1, 2), {'x': 3}) -- `self` is the receiver, not consumed by `*a`;
+--                  `k` is a dict OBJECT (`boxKwargs`), allocated after the receiver at 1
+#guard match collCall [.lit (.int 1), .lit (.int 2), .kwargE "x" (.lit (.int 3))] with
+       | (h, .val (.tuple [.tuple [.int 1, .int 2], .ref 1])) =>
+           (match h.payload 1 with | .dict kvs => kvs == [(.str "x", .int 3)] | _ => false)
+       | _ => false
 -- o.f()            CPython ((), {})
-#guard match (collCall []).2 with
-       | .val (.tuple [.tuple [], .dict []]) => true | _ => false
+#guard match collCall [] with
+       | (h, .val (.tuple [.tuple [], .ref 1])) =>
+           (match h.payload 1 with | .dict kvs => kvs == [] | _ => false)
+       | _ => false
 -- o.f(self=1)      CPython TypeError: f() got multiple values for argument 'self'
 #guard match (collCall [.kwargE "self" (.lit (.int 1))]).2 with
        | .exn (.str "TypeError") => true | _ => false
@@ -5367,6 +5399,30 @@ private def getattrHookProg : Program :=
        | .val (.int 4) => true | _ => false
 #guard match runFunc getattrHookProg 100 "m.py:<module>.missing" [] with
        | .hole "field:zzz:__getattr__-hook" => true | _ => false
+
+/-- `**kwargs` has identity: it is a dict object, so returning it returns a reference to the
+object holding the surplus keywords, and the same object is what the callee passed on. -/
+private def kwargsBoxProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.collect", params := ["kw"], kwarg := some "kw"
+      , body := .ret (.name "kw") }
+    , { name := "m.py:<module>.keep", params := ["kw"], kwarg := some "kw"
+      , body := .ret (.call "m.py:<module>.collect" [.dstarred (.name "kw")]) } ] }
+
+-- `collect(z=9)` from the empty heap: the dict object is at address 0 and holds `z`.
+#guard match applyFunc { dialect := .python, table := kwargsBoxProg.table } 50 []
+          (kwargsBoxProg.funcs[0]!) none [] [("z", .int 9)] with
+       | ([o], .val (.ref 0)) =>
+           o.cls == "dict" && (match o.payload with | .dict kvs => kvs == [(.str "z", .int 9)] | _ => false)
+       | _ => false
+-- `keep(z=9)` splats its collector into `collect`, which gets its own fresh dict: two
+-- objects, the inner one returned.
+#guard match applyFunc { dialect := .python, table := kwargsBoxProg.table } 50 []
+          (kwargsBoxProg.funcs[1]!) none [] [("z", .int 9)] with
+       | ([_, o], .val (.ref 1)) =>
+           (match o.payload with | .dict kvs => kvs == [(.str "z", .int 9)] | _ => false)
+       | _ => false
 
 /-- A bare call never resolves to a method (`Ctx.resolveCall`). `set()` beside a class
 whose only `….set` is a method: CPython builds an empty set, which Core does not model,

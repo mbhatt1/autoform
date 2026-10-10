@@ -627,6 +627,29 @@ def methodkeyWith (e : Expr) : Func :=
 def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
 
+/-- The fragment is Python, which boxes containers: `boxKwargs` allocates the `**kwargs`
+collector, which is why `methodkey`'s `_HashedTuple` lands at address 2. -/
+theorem boxes_keysProgramWith (e : Expr) : (keysProgramWith e).dialect.boxesContainers = true := rfl
+/-- As a proposition, so `simp` decides the dialect test without rewriting the `.dialect`
+term inside the context literal (which would unmatch the `resolve_*` lemmas). -/
+theorem dialect_keysProgramWith_eq (e : Expr) :
+    ((keysProgramWith e).dialect = Dialect.python) = True := by simp [keysProgramWith]
+/-- A boxed dict is a builtin container: no class of the fragment defines `__bool__` or
+`__len__` for it, so a truth test reads its payload (`Iteration.truthValue`). -/
+theorem classDefines_dict_bool (e : Expr) :
+    (ctxOf (keysProgramWith e)).classDefines "dict" "__bool__" = false := by
+  simp [Ctx.classDefines, ctxOf, keysProgramWith, Ctx.usesClassMetadata, Iteration.resolveMethod,
+    Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass, Iteration.dataClass,
+    Iteration.sequenceClass, Iteration.callableClass, Program.table, methodkeyWith,
+    f_cachetools_keys_py__module__hashkey, stripSig] <;> decide
+theorem classDefines_dict_len (e : Expr) :
+    (ctxOf (keysProgramWith e)).classDefines "dict" "__len__" = false := by
+  simp [Ctx.classDefines, ctxOf, keysProgramWith, Ctx.usesClassMetadata, Iteration.resolveMethod,
+    Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass, Iteration.dataClass,
+    Iteration.sequenceClass, Iteration.callableClass, Program.table, methodkeyWith,
+    f_cachetools_keys_py__module__hashkey, stripSig] <;> decide
+theorem python_boxesContainers : Dialect.python.boxesContainers = true := rfl
+
 /-- The fragment declares no classes, so a by-name call here is never refused as a bare
 method reference (`Ctx.resolveCall`). -/
 @[simp] theorem exists_classDecl_keysProgramWith (e : Expr) (P : ClassDecl → Prop) :
@@ -835,10 +858,12 @@ Note what is *not* assumed: nothing about which value the hole produces. The con
 uniform over all implementations meeting the contract, which is the strongest form this
 mechanism can deliver — and here it happens to be available, because `_HashedTuple` has no
 `__init__` in the translated program, so the unpacked arguments are not observable in the
-result. That is a fact about `cachetools`'s translation, discovered by the proof. -/
+result. That is a fact about `cachetools`'s translation, discovered by the proof.
+(Address 2, not 0, since `**kwargs` is a dict object: `methodkey`'s collector is allocated
+at 0 and `hashkey`'s at 1 before the `_HashedTuple`.) -/
 theorem methodkey_refinesUnder_value :
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun args => args ≠ []) (fun _ => .ret (.ref 0)) := by
+      (fun args => args ≠ []) (fun _ => .ret (.ref 2)) := by
   intro σ hc ht
   have hmem : pureValueContract "op:starredUnpack" ∈ [pureValueContract "op:starredUnpack"] := by
     simp
@@ -878,7 +903,7 @@ theorem methodkey_refinesUnder_value :
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, ctx_fold, Ctx.resolveCall, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, resolveCtor_hashedTuple, methodkeyWith,
-    f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal,
+    f_cachetools_keys_py__module__hashkey, applyFunc, boxKwargs, boxes_keysProgramWith, python_boxesContainers, dialect_keysProgramWith_eq, classDefines_dict_bool, classDefines_dict_len, evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth, Iteration.truthConsumer, Heap.get, Val.truthy, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
 
 set_option maxHeartbeats 2000000 in
@@ -917,14 +942,14 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, he, Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
-    applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, hpost]
+    applyFunc, boxKwargs, boxes_keysProgramWith, python_boxesContainers, dialect_keysProgramWith_eq, classDefines_dict_bool, classDefines_dict_len, evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth, Iteration.truthConsumer, Heap.get, Val.truthy, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, hpost]
 
 /-- The contract-relative theorem plus its satisfiability proof, which is the pair a
 reader is entitled to demand. Stated as one declaration so the two cannot drift apart. -/
 theorem methodkey_value_result :
     Satisfiable [pureValueContract "op:starredUnpack"] keysProgramHoled ∧
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun args => args ≠ []) (fun _ => .ret (.ref 0)) :=
+      (fun args => args ≠ []) (fun _ => .ret (.ref 2)) :=
   ⟨satisfiable_pureValue, methodkey_refinesUnder_value⟩
 
 /-- The raising contract, paired with the payload for which satisfiability is proved.
@@ -1013,7 +1038,7 @@ theorem methodkey_holes (k : Nat) (args : List Val) :
     f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,
-    applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, Env.get, Val.truthy,
+    applyFunc, boxKwargs, boxes_keysProgramWith, python_boxesContainers, dialect_keysProgramWith_eq, classDefines_dict_bool, classDefines_dict_len, evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth, Iteration.truthConsumer, Heap.get, Val.truthy, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, Env.get, Val.truthy,
     Heap.get, Heap.alloc]
 
 /-- **An unconstrained contract proves nothing.**
