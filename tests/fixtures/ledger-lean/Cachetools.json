@@ -1,0 +1,46 @@
+{
+ "ast": "ast-Cachetools.json",
+ "astSha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
+ "ledger": {
+  "closedByContract": 0,
+  "closedByTranslation": 150,
+  "contractsUsed": [
+   {
+    "callee": ".clear",
+    "sites": 7
+   },
+   {
+    "callee": ".pop",
+    "sites": 2
+   },
+   {
+    "callee": ".setdefault",
+    "sites": 1
+   },
+   {
+    "callee": ".get",
+    "sites": 1
+   }
+  ],
+  "dialect": "python",
+  "dynamicHoleRisk": 1449,
+  "functions": 209,
+  "holeFree": 204,
+  "holes": 5,
+  "holesByLabel": [
+   {
+    "count": 4,
+    "label": "class-construction:unresolved-lexical-identity:OrderedDict"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:WeakKeyDictionary"
+   }
+  ],
+  "module": "Cachetools",
+  "nodes": 6625,
+  "verifiableCore": 150
+ },
+ "module": "Cachetools",
+ "producedBy": "scripts/ledger.lean.tmpl via `lake env lean` (Program.ledgerJson)"
+}

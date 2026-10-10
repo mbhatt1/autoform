@@ -10,6 +10,11 @@ The source-tooling tests require no plugins, fixtures directory, network, or `la
 They run a script from `scripts/`/`cartographer/` in a throwaway directory or import it by path
 (`tests/conftest.py::load`).
 
+`test_ledger_py.py` holds `scripts/ledger.py` (the ledger computed from the AST, no Lean)
+equal to the ledger Lean wrote: `tests/fixtures/ledger-lean/*.json` are Lean ledgers pinned
+to their AST's sha256 by `scripts/ledger_fixture.py`, and the Django part check skips by
+name unless `ast-Django.json` is on disk (`scripts/ledger_corpus.sh`).
+
 `test_source_numeric.py` additionally checks typed operators in the Lean kernel.
 Set `AUTOFORM_TEST_JOERN=1` to run its source → Joern → Lean comparisons against
 CPython, Java, Go, C, and Node; these require the corresponding runtimes and Joern.

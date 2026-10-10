@@ -1,0 +1,366 @@
+{
+ "ast": "ast-Jinja2.json",
+ "astSha256": "f01eacec0541c62fae029a344746a5e828e61070d9950cc92f892ec1668e636d",
+ "ledger": {
+  "closedByContract": 2,
+  "closedByTranslation": 438,
+  "contractsUsed": [
+   {
+    "callee": ".items",
+    "sites": 1
+   },
+   {
+    "callee": ".add",
+    "sites": 1
+   },
+   {
+    "callee": ".remove",
+    "sites": 1
+   },
+   {
+    "callee": ".get",
+    "sites": 1
+   }
+  ],
+  "dialect": "python",
+  "dynamicHoleRisk": 9632,
+  "functions": 817,
+  "holeFree": 662,
+  "holes": 211,
+  "holesByLabel": [
+   {
+    "count": 16,
+    "label": "op:raise-cause"
+   },
+   {
+    "count": 15,
+    "label": "control:TRY-handler-type"
+   },
+   {
+    "count": 13,
+    "label": "class-construction:unresolved-lexical-identity:TypeVar"
+   },
+   {
+    "count": 12,
+    "label": "call:python-defaults"
+   },
+   {
+    "count": 9,
+    "label": "expr:genExp"
+   },
+   {
+    "count": 8,
+    "label": "class-construction:unresolved-lexical-identity:Const"
+   },
+   {
+    "count": 7,
+    "label": "genexpr:free-variable-cells"
+   },
+   {
+    "count": 7,
+    "label": "lit:ellipsis"
+   },
+   {
+    "count": 6,
+    "label": "expr:comprehension-position"
+   },
+   {
+    "count": 6,
+    "label": "class-construction:unresolved-lexical-identity:Name"
+   },
+   {
+    "count": 5,
+    "label": "call:python-receiver-signature"
+   },
+   {
+    "count": 4,
+    "label": "class-construction:unresolved-lexical-identity:Output"
+   },
+   {
+    "count": 4,
+    "label": "generator:async"
+   },
+   {
+    "count": 3,
+    "label": "function:python-default-evaluation"
+   },
+   {
+    "count": 3,
+    "label": "op:starredUnpack"
+   },
+   {
+    "count": 3,
+    "label": "expr:BLOCK-prelude"
+   },
+   {
+    "count": 3,
+    "label": "op:exponentiation"
+   },
+   {
+    "count": 3,
+    "label": "class-construction:unresolved-lexical-identity:Call"
+   },
+   {
+    "count": 3,
+    "label": "lit:bytes"
+   },
+   {
+    "count": 3,
+    "label": "class-construction:unresolved-lexical-identity:Operand"
+   },
+   {
+    "count": 3,
+    "label": "class-construction:unresolved-lexical-identity:Assign"
+   },
+   {
+    "count": 3,
+    "label": "class-construction:unresolved-lexical-identity:Keyword"
+   },
+   {
+    "count": 3,
+    "label": "generator:yieldFromS"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Pair"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Impossible"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Getitem"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Markup"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:S_IMODE"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Tuple"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:S_ISDIR"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:If"
+   },
+   {
+    "count": 2,
+    "label": "genexpr:yield-shape"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Not"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Pos"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Include"
+   },
+   {
+    "count": 1,
+    "label": "lit:unquoted"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Or"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Import"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Compare"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Break"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Test"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Slice"
+   },
+   {
+    "count": 1,
+    "label": "decorator:external:contextmanager"
+   },
+   {
+    "count": 1,
+    "label": "decorator:external:functools.wraps"
+   },
+   {
+    "count": 1,
+    "label": "expr:BLOCK-impure"
+   },
+   {
+    "count": 1,
+    "label": "decorator:external:lru_cache"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:FilterBlock"
+   },
+   {
+    "count": 1,
+    "label": "decorator:external:wraps"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:CondExpr"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:MarkSafeIfAutoescape"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:AssignBlock"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Neg"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Template"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:List"
+   },
+   {
+    "count": 1,
+    "label": "exception:payload:str"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:TemplateData"
+   },
+   {
+    "count": 1,
+    "label": "generator:closure-frame"
+   },
+   {
+    "count": 1,
+    "label": "call:python-private-parameters"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Dict"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Macro"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ContextReference"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:FromImport"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Filter"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ScopedEvalContextModifier"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Getattr"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Block"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Concat"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:NSRef"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Mod"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Extends"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:CallBlock"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:And"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ExtensionAttribute"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:NamedTemporaryFile"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Scope"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:With"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:For"
+   },
+   {
+    "count": 1,
+    "label": "control:TRY-handler-binding"
+   },
+   {
+    "count": 1,
+    "label": "decorator:class-body:redefined-member"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Continue"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Pow"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ExprStmt"
+   }
+  ],
+  "module": "Jinja2",
+  "nodes": 39429,
+  "verifiableCore": 438
+ },
+ "module": "Jinja2",
+ "producedBy": "scripts/ledger.lean.tmpl via `lake env lean` (Program.ledgerJson)"
+}

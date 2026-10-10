@@ -1,0 +1,29 @@
+{
+ "ast": "ast-LinuxLcm.json",
+ "astSha256": "fa1ccfd0c96f7b359b5dbf0c1df68ddf1c88f3181d1dc296fc312d7f26b11f38",
+ "ledger": {
+  "closedByContract": 0,
+  "closedByTranslation": 3,
+  "contractsUsed": [],
+  "dialect": "c-like",
+  "dynamicHoleRisk": 19,
+  "functions": 6,
+  "holeFree": 3,
+  "holes": 3,
+  "holesByLabel": [
+   {
+    "count": 2,
+    "label": "control:FOR:elided-clause"
+   },
+   {
+    "count": 1,
+    "label": "op:conditional"
+   }
+  ],
+  "module": "LinuxLcm",
+  "nodes": 114,
+  "verifiableCore": 3
+ },
+ "module": "LinuxLcm",
+ "producedBy": "scripts/ledger.lean.tmpl via `lake env lean` (Program.ledgerJson)"
+}

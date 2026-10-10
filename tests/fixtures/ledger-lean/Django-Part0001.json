@@ -1,0 +1,216 @@
+{
+ "ast": "ast-Django.json",
+ "astSha256": "d8a2eaba8e80bf7dfc495727d0847be9785bcf6108f63a724d74375b7c6d7cf5",
+ "ledger": {
+  "closedByContract": 0,
+  "closedByTranslation": 416,
+  "contractsUsed": [
+   {
+    "callee": ".get",
+    "sites": 5
+   },
+   {
+    "callee": ".add",
+    "sites": 1
+   },
+   {
+    "callee": ".copy",
+    "sites": 1
+   }
+  ],
+  "dialect": "python",
+  "dynamicHoleRisk": 10239,
+  "functions": 1000,
+  "holeFree": 752,
+  "holes": 425,
+  "holesByLabel": [
+   {
+    "count": 135,
+    "label": "expr:BLOCK-prelude"
+   },
+   {
+    "count": 58,
+    "label": "op:starredUnpack"
+   },
+   {
+    "count": 56,
+    "label": "class-construction:unresolved-lexical-identity:Error"
+   },
+   {
+    "count": 39,
+    "label": "genexpr:free-variable-cells"
+   },
+   {
+    "count": 23,
+    "label": "call:python-defaults"
+   },
+   {
+    "count": 23,
+    "label": "control:TRY-handler-type"
+   },
+   {
+    "count": 11,
+    "label": "class-construction:unresolved-lexical-identity:Count"
+   },
+   {
+    "count": 8,
+    "label": "control:TRY-handler-binding"
+   },
+   {
+    "count": 6,
+    "label": "expr:genExp"
+   },
+   {
+    "count": 5,
+    "label": "op:raise-cause"
+   },
+   {
+    "count": 4,
+    "label": "expr:setComp"
+   },
+   {
+    "count": 4,
+    "label": "expr:comprehension-position"
+   },
+   {
+    "count": 4,
+    "label": "class-construction:unresolved-lexical-identity:TemplateSyntaxError"
+   },
+   {
+    "count": 4,
+    "label": "class-construction:unresolved-lexical-identity:Media"
+   },
+   {
+    "count": 4,
+    "label": "class-construction:unresolved-lexical-identity:Counter"
+   },
+   {
+    "count": 3,
+    "label": "decorator:external:csrf_protect_m"
+   },
+   {
+    "count": 2,
+    "label": "call:python-property-access"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Critical"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Q"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:AdminForm"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:AdminRadioSelect"
+   },
+   {
+    "count": 2,
+    "label": "decorator:external:functools.lru_cache"
+   },
+   {
+    "count": 2,
+    "label": "call:no-callee-name"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:Warning"
+   },
+   {
+    "count": 2,
+    "label": "call:python-receiver-signature"
+   },
+   {
+    "count": 1,
+    "label": "exception:payload:messages"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:RelatedFieldWidgetWrapper"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:FilteredSelectMultiple"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:CharField"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:StrictBooleanField"
+   },
+   {
+    "count": 1,
+    "label": "decorator:external:contextmanager"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ForeignKeyRawIdWidget"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Parameters"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:AdminErrorList"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ChoiceField"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ManyToManyRawIdWidget"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:StrictNullBooleanField"
+   },
+   {
+    "count": 1,
+    "label": "op:exponentiation"
+   },
+   {
+    "count": 1,
+    "label": "decorator:class-body:redefined-member"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:PasswordHasher"
+   },
+   {
+    "count": 1,
+    "label": "genexpr:yield-shape"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:CheckboxInput"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Min"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:InlineAdminFormSet"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Max"
+   }
+  ],
+  "module": "Django",
+  "nodes": 49176,
+  "verifiableCore": 416
+ },
+ "module": "Django",
+ "part": 1,
+ "producedBy": "scripts/ledger_corpus.sh <sdist>/django Django --lean-part 1 (lake build Autoform.Generated.Django.Part0001; lake env lean on scripts/ledger.py --emit-lean-check; Program.ledgerJson)",
+ "shardFunctions": 1000
+}

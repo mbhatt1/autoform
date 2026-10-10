@@ -142,6 +142,13 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
                  "click 8.2.1 — 475/549, core 265, 135 / 0, 3 specs, 1 over the proof "
                  "budget;\njinja2 3.1.6 — 662/817, core 438, 133 / 0, 1 specs, 0 over the "
                  "proof budget.\n")
+    # The OPTIONAL rows (Django's ledger, which CI never regenerates) need their doc
+    # present too: the doc is the claim, and a missing doc is MISSING, not unbound. The
+    # artifact is deliberately absent here, so these figures come out UNBOUND and rc 0.
+    with open(os.path.join(d, "docs", "GOAL-arbitrary-codebases.md"), "w") as fh:
+        fh.write("`ledger-Django.json` is produced in 7 s: 10,658 functions, 2,900 holes "
+                 "under 209 labels, 8,637 hole-free (81 %), 6,079 in the verifiable core "
+                 "(57 %). The top hole labels: `expr:BLOCK-prelude` 446, x 1.\n")
     os.makedirs(os.path.join(d, "Autoform", "SpecsGen"), exist_ok=True)
     for mod, n, excluded in (("Requests", 2, []), ("Click", 3, ["conform_x"]),
                              ("Jinja2", 1, [])):

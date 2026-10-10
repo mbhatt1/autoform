@@ -212,6 +212,19 @@ Eight stages, each announced:
 then instantiates `scripts/ledger.lean.tmpl` and `#eval`s it, which prints the ledger and
 writes `ledger-<Module>.json`.
 
+**The ledger without elaborating the module.** `scripts/ledger.py ast-<M>.json <M>` writes
+the same `ledger-<M>.json` from the AST alone, in seconds, mirroring `Autoform/Ledger.lean`
+arm for arm (it runs the renderer's own lowering passes and walks the renderer's node
+tables). It exists for corpora too large to elaborate before reading a number off them —
+Django's 10,658 functions ledger in 7 s this way (docs/GOAL-arbitrary-codebases.md,
+milestone 5) — and it is held equal to the Lean ledger by `tests/test_ledger_py.py` on
+five pinned corpora and on one Django part; a disagreement is a test failure, not a note.
+The Lean ledger stays the reference. `scripts/ledger_corpus.sh <source-dir> <M>
+[--lean-part K]` runs parse, export, sharded render and this ledger with each stage timed,
+and with `--lean-part K` builds one part of the render and compares Lean's ledger of that
+part with the script's. The output carries `producer: scripts/ledger.py` so the two
+products are never confused.
+
 **Large models render in parts.** With `AUTOFORM_SHARD_FUNCTIONS=N` (the installed CLI's
 `--shard-functions N`, default 1000; `0` disables it), stage 4 writes definitions into
 `Autoform/Generated/<Module>/PartNNNN.lean`, at most N functions each. The parts import
