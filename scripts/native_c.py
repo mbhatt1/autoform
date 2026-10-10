@@ -252,7 +252,12 @@ def compile_sources(source, funcs, work):
         # they supply definitions, not entry points.
         inputs += [arg for p in partners for arg in
                    ('-x', 'c++' if p.suffix != '.c' else 'c', str(p))]
-        command = [compiler, '-shared', '-fPIC', '-O0', *arch, *flags,
+        # Linux links a shared object with undefined symbols and fails only at dlopen, which
+        # is classified as a load failure, not a link failure, so the sibling retry never
+        # ran there (lcm -> gcd: `undefined symbol: gcd` on CI). Make the linker reject them,
+        # as Apple's linker already does, so the retry with link partners applies.
+        undefined = [] if sys.platform == 'darwin' else ['-Wl,--no-undefined']
+        command = [compiler, '-shared', '-fPIC', '-O0', *arch, *flags, *undefined,
                    '-MMD', '-MF', str(deps), '-MT', 'autoform', '-o', str(output),
                    *inputs]
         record = dict(files=[str(p.relative_to(source)) for _, p, _ in selected], command=command)
