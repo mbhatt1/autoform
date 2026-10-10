@@ -101,15 +101,15 @@ recursion, which the kernel cannot unfold.
 (`FIFOCache.__init__`, `LRUCache.__init__`, `RRCache.__init__`) prove by computation;
 Django's ledger runs under 60 s; the `--exclude-subjects` list for cachetools is empty.
 
-*Status, 2026-10-10 (the ledger half):* `ledger-Django.json` is produced in **7.1 s** wall
-clock by `scripts/ledger.py` from the exported AST of Django 6.1.1's `django/` package
+*Status, 2026-10-10 (the ledger half):* `ledger-Django.json` is produced in **6.98 s** wall
+clock (7.1 s on the earlier run) by `scripts/ledger.py` from the exported AST of Django 6.1.1's `django/` package
 (`~/.cache/autoform/corpora/django-6.1.1-sdist/django`, tree-sha256
 `bd78f6d3f89842d3f5090f817d6bb776cdd34d9e2dd1e2e806b80af49a240b32`, 3,687 files), not by
 elaborating the module: 10,658 functions, 2,900 holes under 209 labels, 8,637 hole-free
 (81 %), 6,079 in the verifiable core (57 %). The stages before it are outside that budget
-and are reported separately: `joern-parse` 39 s (5.7 GB peak), `export_ast.sc` 220 s
-(6.6 GB), the sharded render 13 s (0.8 GB); one part of twelve then builds in 15 s at
-2.5 GB, and the Lean ledger of that part — the full class table and the part's functions
+and are reported separately: `joern-parse` 39 s (5.7 GB peak) and `export_ast.sc` 220 s
+(6.6 GB) from the earlier run, not re-run; the sharded render 12.5 s, re-run on the merged
+tree (12 parts); one part of twelve then builds in 15 s at 2.5 GB, and the Lean ledger of that part — the full class table and the part's functions
 — takes 114 s at 2.1 GB, most of it elaborating the 1,970-row class table. Reproduce with
 `scripts/ledger_corpus.sh <sdist>/django Django --lean-part 1`. The Python ledger is a mirror of `Autoform/Ledger.lean`, not a second
 definition: `tests/test_ledger_py.py` holds it equal, field for field, to the Lean ledger
@@ -121,7 +121,9 @@ part 1, and holds its copied name lists equal to the Lean sources. The top hole 
 `call:python-property-access` 118, `control:TRY-handler-binding` 113, `lit:bytes` 85.
 The Django figures here are bound by `scripts/check_docs.py` only when
 `ledger-Django.json` is on disk; CI does not export Django, so there the checker names
-them as unbound rather than checked. The `--exclude-subjects` list for cachetools is
+them as unbound rather than checked. Bound: the function, hole, label, hole-free and
+core counts and the `expr:BLOCK-prelude` count. Unbound: the seconds (wall clock varies
+between runs), the parse and export times, and labels 2-10 of the top-ten list. The `--exclude-subjects` list for cachetools is
 empty: `Autoform/SpecsGen/Cachetools.lean` records no excluded subject and no budget
 exclusion (`scripts/reland_corpus.sh` passes the flag only when `AUTOFORM_SPEC_EXCLUDE`
 is set, and the 2026-10-09 re-land set nothing). The three constructors are not
