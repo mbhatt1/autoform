@@ -626,12 +626,20 @@ def main():
     # is a machine-generated module, which by construction contains no theorems at all.
     spec_path = os.path.abspath(args.spec_file) if args.spec_file else path
     spec_base = os.path.basename(spec_path)
+    # A split specification module (`synth_specs.py --split-gb`) keeps its theorems in
+    # `<M>/PartN.lean` files the umbrella imports; the gate reads all of them, and an
+    # error in any of them is a theorem noticing (never a "foreign" failure).
+    spec_paths = [os.path.abspath(str(p)) for p in generated_module.spec_files(spec_path)]
+    spec_file_decls = {}
     if spec_path == path:
         spec_lines, spec_decls = lines, decls
+        spec_file_decls[spec_path] = decls
     else:
-        with open(spec_path, "r", encoding="utf-8") as f:
-            spec_lines = f.read().splitlines(keepends=True)
-        spec_decls = parse_decls(spec_lines)
+        spec_decls = []
+        for sp in spec_paths:
+            with open(sp, "r", encoding="utf-8") as f:
+                spec_file_decls[sp] = parse_decls(f.read().splitlines(keepends=True))
+            spec_decls += spec_file_decls[sp]
     build_module = args.spec_module or args.module
     generated = args.generated or ("Autoform/Generated/" in path.replace(os.sep, "/"))
 
@@ -644,7 +652,7 @@ def main():
             ap.error("specification report does not match the built subject and proof module")
         bindings = evidence.get('artifact_hashes', {})
         if (bindings.get('model') != generated_module.model_digest(path)
-                or bindings.get('proof') != proof_artifacts.digest(spec_path)):
+                or bindings.get('proof') != generated_module.spec_digest(spec_path)):
             ap.error('specification report does not match the current model and proof source')
         proven = [s for s in evidence.get("specs", []) if s.get("proved") and s.get("definition")]
         if not proven:
@@ -734,7 +742,8 @@ def main():
         print(f"module    : {args.module}")
         print(f"operators : {'translated-module (AST literal)' if generated else 'Lean definition'}")
         if spec_path != path:
-            print(f"spec file : {spec_path}")
+            print(f"spec file : {spec_path}" + (
+                f" (+ {len(spec_paths) - 1} split part file(s))" if len(spec_paths) > 1 else ""))
             print(f"built     : {build_module}")
         print(f"theorems  : {', '.join(targets)}")
         print(f"mutants   : {len(mutants)} of {len(all_mutants)} generated\n")
@@ -799,21 +808,23 @@ def main():
                 with open(mut.file, "w", encoding="utf-8") as f:
                     f.write(originals[mut.file])
                 errs = error_lines(out, mut.file, root)
-                spec_errs = errs if spec_path == mut.file else error_lines(out, spec_path, root)
+                spec_hits = ([(mut.file, l) for l in errs] if spec_path == mut.file else
+                             [(sp, l) for sp in spec_paths for l in error_lines(out, sp, root)])
+                spec_errs = [l for _, l in spec_hits]
                 # Errors in files that are neither the mutated file nor the spec file are
                 # somebody else's problem: a broken dependency, a concurrent edit, a stale
                 # cache. Counting such a build failure as a "kill" would credit the theorem
                 # with catching a bug it never saw — the exact self-deception this gate
                 # exists to prevent — so those mutants are reported INCONCLUSIVE and left
                 # out of the score entirely.
-                foreign = [l for l in all_error_lines(out, root)
-                           if l[0] not in (os.path.realpath(mut.file), os.path.realpath(spec_path))]
+                own = {os.path.realpath(mut.file)} | {os.path.realpath(sp) for sp in spec_paths}
+                foreign = [l for l in all_error_lines(out, root) if l[0] not in own]
                 hit_defs = {decl_at(file_decls[mut.file], l).name for l in errs
                             if decl_at(file_decls[mut.file], l)
                             and decl_at(file_decls[mut.file], l).kind in DEF_KINDS}
-                hit_thms = {decl_at(spec_decls, l).name for l in spec_errs
-                            if decl_at(spec_decls, l)
-                            and decl_at(spec_decls, l).kind in THEOREM_KINDS}
+                hit_thms = {decl_at(spec_file_decls[sp], l).name for sp, l in spec_hits
+                            if decl_at(spec_file_decls[sp], l)
+                            and decl_at(spec_file_decls[sp], l).kind in THEOREM_KINDS}
                 # An error in the spec file that lands on no theorem is (almost always) a
                 # `#guard_msgs` pin: the mutant WAS caught, but not by a theorem. Crediting it
                 # to every theorem would be the coarse fallback wearing a disguise, so it is

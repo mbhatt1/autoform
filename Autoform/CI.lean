@@ -18,8 +18,8 @@ import Autoform.SpecsGen.Basis
 import Autoform.NL.Basis
 import Autoform.BuiltinBase
 import Autoform.Contracts
-import Autoform.Specs.CachetoolsSpec
-import Autoform.SpecsGen.Cachetools
+import Autoform.Specs.CachetoolsSpec  -- umbrella over CachetoolsSpec/Base + Part1..6 (split by hand, see Autoform.lean)
+import Autoform.SpecsGen.Cachetools  -- umbrella over Cachetools/Base + Part1..9 (split, see Autoform.lean)
 import Autoform.Specs.V8Spec
 import Autoform.SpecsGen.V8BaseSample
 import Autoform.SpecsGen.LinuxLib

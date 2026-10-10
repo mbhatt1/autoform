@@ -73,7 +73,9 @@ sys.path.insert(0, os.path.join(REPO, "cartographer"))
 
 import differential as D                                  # noqa: E402  (trace + encoder)
 import runtime_backends
+import generated_module
 import mutate as M                                        # noqa: E402  (decl parser)
+import work_cache                                         # noqa: E402  (.autoform-work/cache)
 from render_lean import ident as lean_ident               # noqa: E402  (name mangling)
 
 random.seed(20260819)
@@ -86,6 +88,11 @@ OUTDIR = os.path.join(REPO, "Autoform", "SpecsGen")
 SCRATCH = tempfile.mkdtemp(prefix="autoform-synth-", dir=os.environ.get("AUTOFORM_SCRATCH", "/tmp"))
 GLOBALS = ("[]", "0")   # filled in by `globals_literal` once the module is known
 ENV = dict(os.environ, PATH=os.path.expanduser("~/.elan/bin") + ":" + os.environ["PATH"])
+# One Lean process retains every by-computation proof term it elaborates, so a module's
+# peak memory is roughly the sum of its theorems' (commit e36b8f1, V8Base). Above this
+# predicted peak the module is emitted split -- `<M>/Base.lean` + `<M>/PartN.lean` under an
+# umbrella `<M>.lean` -- so that no single `lake build` process exceeds it.
+SPLIT_GB_DEFAULT = float(os.environ.get("AUTOFORM_SPLIT_GB", "4"))
 
 
 # ---------------------------------------------------------------------------
@@ -621,6 +628,41 @@ class Cand:
                 "kind": self.kind, "domain": len(self.dom),
                 "status": self.status, "reason": self.reason, "proved": self.proved,
                 "checked": self.checked, "note": self.note}
+
+
+def cand_key(c):
+    """What a candidate's verdicts are a function of, besides the environment: its
+    statement (law, subject definition, domain) and the generation-time extras."""
+    extra = {k: v for k, v in c.extra.items()
+             if k in ("try_finally", "heap_graph", "argument_insensitive",
+                      "structurally_trivial", "shape", "lit", "field", "documented",
+                      "self_recorded")}
+    return work_cache.sha256_json({"id": c.id, "family": c.family, "kind": c.kind,
+                                   "dom_kind": c.dom_kind, "law": c.law, "fdef": c.fdef,
+                                   "dom": c.dom, "extra": extra})
+
+
+def cand_record(c):
+    return {"status": c.status, "reason": c.reason, "checked": c.checked,
+            "proved": c.proved, "extra": c.extra}
+
+
+def replay_candidate(c, store, fn_digest):
+    """Replay a cached verdict onto `c`. A cached `proved` is only a hint that the same
+    text will be emitted: the status goes back to `candidate` and the compile decides."""
+    digest = fn_digest.get(c.subject)
+    if digest is None or not store.enabled:
+        return False
+    rec = store.get(digest, cand_key(c))
+    if not isinstance(rec, dict) or "status" not in rec:
+        return False
+    c.checked = rec.get("checked")
+    c.extra = dict(rec.get("extra") or {})
+    if rec["status"] in ("refuted", "not_checked", "vacuous", "excluded", "unproved"):
+        c.status, c.reason = rec["status"], rec.get("reason", "")
+    else:
+        c.status, c.reason, c.proved = "candidate", "", False
+    return True
 
 
 GUARD = {"conform": "gRunObs", "charact": "gRunObs", "runs": "gRun", "returns": "gRun",
@@ -1199,7 +1241,7 @@ def select_proof_fuel(cands, module):
     unused reductions even for a function that terminates after four steps.
     """
     live = [c for c in cands if c.kind == "law" and c.status == "candidate"
-            and c.extra.get("fuel_mono")]
+            and c.extra.get("fuel_mono") and "proof_fuel" not in c.extra]
     if not live:
         return
     budgets, n = [], 1
@@ -1232,7 +1274,8 @@ def execution_hints(cands, module):
     the emitted theorem checks the interpreter result in the kernel and separately
     compares it with the unchanged result recorded from the source runtime.
     """
-    live = [c for c in cands if c.family == "conform" and c.status == "candidate"]
+    live = [c for c in cands if c.family == "conform" and c.status == "candidate"
+            and "execution_results" not in c.extra]
     if not live:
         return
     src = [HEADER % (module, module, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL, module)]
@@ -1354,75 +1397,116 @@ EXCLUDED_SUBJECTS = []
 BUDGET_EXCLUDED = []
 
 
-def emit(cands, module, obligations_extra, ns=None):
-    """`ns` overrides the namespace, for the mutation-gate sample module: two files that
-    share a namespace also share declaration names, and importing both would clash."""
-    ns = ns or module
-    survivors = [c for c in cands if c.status in ("candidate", "proved")]
-    out = [HEADER % (module, ns, module, INIT_FUEL, GLOBALS[0], GLOBALS[1],
-                     FUEL, module)]
-    out.insert(1, DOC % {"module": module})
-    obs = []
-    thms = []
-    for c in survivors:
-        if c.kind == "law":
-            out.append(domain_defs(c))
-            lawfuel = c.law.replace("C FUEL", "C fuel")
+PART_HEADER = """import Autoform.SpecsGen.Basis
+import Autoform.Harness.Audit
+import Autoform.Generated.%(module)s
+import Autoform.SpecsGen.%(ns)s.Base
+
+/-! Generated by `scripts/synth_specs.py`. Do not edit by hand.
+
+Part %(n)d of %(parts)d of `Autoform/SpecsGen/%(ns)s.lean`: theorems only. The context, the
+frozen globals heap and every domain are in `Autoform/SpecsGen/%(ns)s/Base.lean`; the
+parts share one namespace, so every name is the one the unsplit module would have had.
+Predicted peak of this part alone: %(predicted_gb).2f GB (base %(base_gb).2f GB + the
+probe-measured cost of each theorem), %(verdict)s the %(limit_gb)g GB split threshold%(oversize_note)s. -/
+namespace Autoform.SpecsGen.%(ns)s
+
+open Autoform.Core Autoform.Refine Autoform.SpecsGen
+
+set_option maxRecDepth 100000
+set_option maxHeartbeats 10000000
+set_option cbv.warning false
+set_option exponentiation.threshold 4096
+
+open Autoform.Generated.%(module)s
+
+"""
+
+UMBRELLA_DOC = """
+/-! ## Build shape: split into `Base` + %(parts)d parts
+
+One Lean process retains every by-computation proof term it elaborates (commit e36b8f1,
+`Autoform/SpecsGen/V8Base`), so the single-file form of this module was predicted to peak
+at %(total_gb).2f GB -- base %(base_gb).2f GB (imports, `h0`, the domains) plus the
+probe-measured cost of every theorem -- against a `--split-gb %(limit_gb)g` threshold.
+`scripts/synth_specs.py` therefore emitted it as `%(ns)s/Base.lean` (context and domains,
+elaborated once) and `%(ns)s/Part1.lean` .. `Part%(parts)d.lean` (theorems only, packed
+next-fit under the threshold), all in this namespace, and this umbrella imports them.
+No statement was weakened: the parts are a partition of the same theorems.
+
+Per-part prediction (GB): %(table)s.
+%(oversize)s
+The `#audit_depends` / `#audit_axioms` gates are at the end of each part, for the theorems
+that part states; `obligations`, `excludedSubjects` and `budgetExcluded` are declared
+here, once, for the whole module. -/
+"""
+
+
+def _theorem_text(c):
+    """The Lean text for one surviving candidate, plus its `(theorem, subject)` entry and
+    the open obligation it leaves (or None)."""
+    out, ob = [], None
+    if c.kind == "law":
+        lawfuel = c.law.replace("C FUEL", "C fuel")
+        budget = c.extra.get("proof_fuel", FUEL)
+        checked = "by rfl"
+        prepare = ""
+        tactic = "  rfl\n"
+        if c.family == "conform":
+            execution_tactic = c.extra.get("execution_tactic", "decide +kernel")
+            checked = "hchecked"
+            if execution_tactic == "decide +kernel":
+                # The kernel reduces the Boolean law directly. Elaborator
+                # reduction of an EResult equality can spend minutes on
+                # nested calls/loops that the kernel checks in seconds.
+                # This checks the unchanged native observation; VM execution
+                # hints are irrelevant to this proof path.
+                tactic = "  " + KERNEL_COMPUTE + "\n"
+            else:
+                tactic = staged_conformance(c, budget, execution_tactic)
+            # Keep the check inside the public theorem, so a mutation failure
+            # is attributed to the theorem whose claim it refutes.
+            prepare = ("  have hchecked : (dom_%s).all (%s) = true := by\n" %
+                       (c.id, c.law.replace("C FUEL", "C %d" % budget)))
+            prepare += "".join("  " + line for line in tactic.splitlines(keepends=True))
+        if c.extra.get("fuel_mono"):
+            # the general statement, proved: FuelMono transports it off FUEL
             budget = c.extra.get("proof_fuel", FUEL)
-            checked = "by rfl"
-            prepare = ""
-            tactic = "  rfl\n"
-            if c.family == "conform":
-                execution_tactic = c.extra.get("execution_tactic", "decide +kernel")
-                checked = "hchecked"
-                if execution_tactic == "decide +kernel":
-                    # The kernel reduces the Boolean law directly. Elaborator
-                    # reduction of an EResult equality can spend minutes on
-                    # nested calls/loops that the kernel checks in seconds.
-                    # This checks the unchanged native observation; VM execution
-                    # hints are irrelevant to this proof path.
-                    tactic = "  " + KERNEL_COMPUTE + "\n"
-                else:
-                    tactic = staged_conformance(c, budget, execution_tactic)
-                # Keep the check inside the public theorem, so a mutation failure
-                # is attributed to the theorem whose claim it refutes.
-                prepare = ("  have hchecked : (dom_%s).all (%s) = true := by\n" %
-                           (c.id, c.law.replace("C FUEL", "C %d" % budget)))
-                prepare += "".join("  " + line for line in tactic.splitlines(keepends=True))
-            if c.extra.get("fuel_mono"):
-                # the general statement, proved: FuelMono transports it off FUEL
-                budget = c.extra.get("proof_fuel", FUEL)
-                out.append(FUEL_THM % {"id": c.id, "law": c.law.replace("C FUEL", "C %d" % budget),
-                                       "budget": budget, "lawfuel": lawfuel,
-                                       "guard": GUARD[c.family], "fdef": c.fdef,
-                                       "mono": MONO[c.family], "checked": checked,
-                                       "prepare": prepare, "compute": KERNEL_COMPUTE})
-            else:
-                out.append("theorem %s : ((dom_%s).all (%s)) = true := by\n%s"
-                           % (c.id, c.id, c.law, tactic))
-                # the honest generalization: stated, and not proved
-                out.append("/-- Open: the same statement at **every** fuel budget ≥ "
-                           "`FUEL`. Proved only at `FUEL`; %s -/\ndef ob_%s : Prop :=\n"
-                           "  ∀ fuel, FUEL ≤ fuel → ((dom_%s).all (%s)) = true\n"
-                           % (c.extra.get("fuel_mono_reason", "not transportable"),
-                              c.id, c.id, lawfuel))
-                obs.append((("ob_" + c.id), c.source, c.subject,
-                            "proved at FUEL only; fuel-independence unproved (%s)"
-                            % c.extra.get("fuel_mono_reason", "unknown")))
-            thms.append((c.id, c.fdef))
-        elif c.kind == "universal":
-            d = {"id": c.id, "name": json.dumps(c.subject), "fdef": c.fdef,
-                 "lit": c.extra.get("lit", ""),
-                 "field": json.dumps(c.extra.get("field", ""))}
-            if c.extra["shape"] == "const":
-                out.append(PROOF_CONST % d)
-            elif c.extra.get("documented"):
-                out.append(PROOF_PROJ_DOC % d)
-            else:
-                out.append(PROOF_PROJ % d)
-            thms.append((c.id, c.fdef))
-    for name, source, subject, reason in obligations_extra:
-        obs.append((name, source, subject, reason))
+            out.append(FUEL_THM % {"id": c.id, "law": c.law.replace("C FUEL", "C %d" % budget),
+                                   "budget": budget, "lawfuel": lawfuel,
+                                   "guard": GUARD[c.family], "fdef": c.fdef,
+                                   "mono": MONO[c.family], "checked": checked,
+                                   "prepare": prepare, "compute": KERNEL_COMPUTE})
+        else:
+            out.append("theorem %s : ((dom_%s).all (%s)) = true := by\n%s"
+                       % (c.id, c.id, c.law, tactic))
+            # the honest generalization: stated, and not proved
+            out.append("/-- Open: the same statement at **every** fuel budget ≥ "
+                       "`FUEL`. Proved only at `FUEL`; %s -/\ndef ob_%s : Prop :=\n"
+                       "  ∀ fuel, FUEL ≤ fuel → ((dom_%s).all (%s)) = true\n"
+                       % (c.extra.get("fuel_mono_reason", "not transportable"),
+                          c.id, c.id, lawfuel))
+            ob = (("ob_" + c.id), c.source, c.subject,
+                  "proved at FUEL only; fuel-independence unproved (%s)"
+                  % c.extra.get("fuel_mono_reason", "unknown"))
+        return out, (c.id, c.fdef), ob
+    if c.kind == "universal":
+        d = {"id": c.id, "name": json.dumps(c.subject), "fdef": c.fdef,
+             "lit": c.extra.get("lit", ""),
+             "field": json.dumps(c.extra.get("field", ""))}
+        if c.extra["shape"] == "const":
+            out.append(PROOF_CONST % d)
+        elif c.extra.get("documented"):
+            out.append(PROOF_PROJ_DOC % d)
+        else:
+            out.append(PROOF_PROJ % d)
+        return out, (c.id, c.fdef), None
+    return out, None, None
+
+
+def _declarations_text(ns, obs):
+    """`obligations`, `excludedSubjects`, `budgetExcluded`: declared once per module."""
+    out = []
     out.append("/-- Everything this module states but does not prove. A `Prop`-valued "
                "`def` asserts nothing, so nothing here is admitted. -/\n"
                "def obligations : List OpenObligation :=\n  [%s]\n"
@@ -1450,10 +1534,14 @@ def emit(cands, module, obligations_extra, ns=None):
                                    for t, sj, r in BUDGET_EXCLUDED))
         out.append('#eval IO.println s!"over the proof budget ─ %s ({budgetExcluded.length})"\n'
                    % ns)
-    out.append("/-! ## Anti-vacuity gate\n\n`#audit_depends` fails the build if a "
-               "theorem's proof term never mentions the generated definition it claims "
-               "to be about — the necessary half of the gate. The sufficient half is "
-               "`scripts/mutate.py`, run against this file. -/\n")
+    return out
+
+
+def _gates_text(thms):
+    out = ["/-! ## Anti-vacuity gate\n\n`#audit_depends` fails the build if a "
+           "theorem's proof term never mentions the generated definition it claims "
+           "to be about — the necessary half of the gate. The sufficient half is "
+           "`scripts/mutate.py`, run against this file. -/\n"]
     for tid, fdef in thms:
         out.append("#audit_depends %s on %s" % (tid, fdef))
     out.append("\n/-! ## Axiom basis\n\n`#audit_axioms` fails the build on `sorryAx`, "
@@ -1461,8 +1549,140 @@ def emit(cands, module, obligations_extra, ns=None):
                "`native_decide`\" is checked here rather than asserted in prose. -/\n")
     for tid, _fdef in thms:
         out.append("#audit_axioms %s" % tid)
+    return out
+
+
+def emit(cands, module, obligations_extra, ns=None):
+    """`ns` overrides the namespace, for the mutation-gate sample module: two files that
+    share a namespace also share declaration names, and importing both would clash."""
+    ns = ns or module
+    survivors = [c for c in cands if c.status in ("candidate", "proved")]
+    out = [HEADER % (module, ns, module, INIT_FUEL, GLOBALS[0], GLOBALS[1],
+                     FUEL, module)]
+    out.insert(1, DOC % {"module": module})
+    obs = []
+    thms = []
+    for c in survivors:
+        if c.kind == "law":
+            out.append(domain_defs(c))
+        text, thm, ob = _theorem_text(c)
+        out.extend(text)
+        if thm:
+            thms.append(thm)
+        if ob:
+            obs.append(ob)
+    for name, source, subject, reason in obligations_extra:
+        obs.append((name, source, subject, reason))
+    out.extend(_declarations_text(ns, obs))
+    out.extend(_gates_text(thms))
     out.append("\nend Autoform.SpecsGen.%s\n" % ns)
     return "\n".join(out), thms, obs
+
+
+def emit_split(cands, module, obligations_extra, plan, ns=None):
+    """The split form of `emit`: `{relative path: text}` for `<ns>/Base.lean`,
+    `<ns>/PartN.lean` and the umbrella `<ns>.lean`, plus the same `(thms, obs)`.
+
+    `plan` is `plan_parts`' result: the candidate ids of each part, in order, with the
+    prediction that justified the split. Every file declares `namespace
+    Autoform.SpecsGen.<ns>`, so the names are exactly those of the unsplit module."""
+    ns = ns or module
+    survivors = {c.id: c for c in cands if c.status in ("candidate", "proved")}
+    files, thms, obs = {}, [], []
+    # Base: context + every domain. The domains are plain `def`s (no kernel evaluation),
+    # so this is cheap to elaborate once and cheap to import.
+    base = [HEADER % (module, ns, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL, module)]
+    base.append("/-! Shared context of the split module `Autoform/SpecsGen/%s.lean`: every\n"
+                "domain the parts quantify over, elaborated once here rather than once per\n"
+                "part. No theorem lives in this file. -/\n" % ns)
+    for part in plan["parts"]:
+        for cid in part["ids"]:
+            c = survivors.get(cid)
+            if c is not None and c.kind == "law":
+                base.append(domain_defs(c))
+    base.append("\nend Autoform.SpecsGen.%s\n" % ns)
+    files["%s/Base.lean" % ns] = "\n".join(base)
+    nparts = len(plan["parts"])
+    for n, part in enumerate(plan["parts"], 1):
+        over = part["predicted_kb"] > plan["limit_kb"]
+        out = [PART_HEADER % {"module": module, "ns": ns, "n": n, "parts": nparts,
+                              "predicted_gb": part["predicted_kb"] / 1048576.0,
+                              "base_gb": plan["base_kb"] / 1048576.0,
+                              "limit_gb": plan["limit_kb"] / 1048576.0,
+                              "verdict": "OVER" if over else "under",
+                              "oversize_note": (": this one theorem alone exceeds it, so no "
+                                                "split bounds it; a cheaper proof or a tighter "
+                                                "`--theorem-memory-gb` would") if over else ""}]
+        part_thms = []
+        for cid in part["ids"]:
+            c = survivors.get(cid)
+            if c is None:
+                continue
+            text, thm, ob = _theorem_text(c)
+            out.extend(text)
+            if thm:
+                part_thms.append(thm)
+            if ob:
+                obs.append(ob)
+        out.extend(_gates_text(part_thms))
+        out.append("\nend Autoform.SpecsGen.%s\n" % ns)
+        files["%s/Part%d.lean" % (ns, n)] = "\n".join(out)
+        thms.extend(part_thms)
+    for name, source, subject, reason in obligations_extra:
+        obs.append((name, source, subject, reason))
+    umb = ["import Autoform.SpecsGen.%s.Base" % ns]
+    umb += ["import Autoform.SpecsGen.%s.Part%d" % (ns, n) for n in range(1, nparts + 1)]
+    umb.append("\n/-! Generated by `scripts/synth_specs.py`. Do not edit by hand. -/")
+    umb.append(DOC % {"module": module})
+    table = ", ".join("Part%d %.2f (%d theorem%s)" % (n, p["predicted_kb"] / 1048576.0,
+                                                      len(p["ids"]), "" if len(p["ids"]) == 1 else "s")
+                      for n, p in enumerate(plan["parts"], 1))
+    oversize = ""
+    if plan.get("oversize"):
+        oversize = ("\nNOT bounded by the split: %s -- each of these theorems alone is predicted over "
+                    "the threshold and sits in a part of its own. The split cannot bring a single "
+                    "kernel evaluation under the limit; only a cheaper proof or an exclusion "
+                    "(`--theorem-memory-gb`, which names it in `budgetExcluded`) can.\n"
+                    % ", ".join("`%s`" % cid for cid in plan["oversize"]))
+    umb.append(UMBRELLA_DOC % {"parts": nparts, "total_gb": plan["total_kb"] / 1048576.0,
+                               "base_gb": plan["base_kb"] / 1048576.0,
+                               "limit_gb": plan["limit_kb"] / 1048576.0, "ns": ns,
+                               "table": table, "oversize": oversize})
+    umb.append("namespace Autoform.SpecsGen.%s\n" % ns)
+    umb.append("open Autoform.Core Autoform.Refine Autoform.SpecsGen\n")
+    umb.extend(_declarations_text(ns, obs))
+    umb.append("\nend Autoform.SpecsGen.%s\n" % ns)
+    files["%s.lean" % ns] = "\n".join(umb)
+    return files, thms, obs
+
+
+def write_split(files, ns, outdir=None):
+    """Write `emit_split`'s files under `outdir` and remove stale parts of an earlier,
+    larger split (a part left on disk would be a tracked file nothing imports)."""
+    outdir = outdir or OUTDIR
+    part_dir = os.path.join(outdir, ns)
+    os.makedirs(part_dir, exist_ok=True)
+    for rel, text in files.items():
+        with open(os.path.join(outdir, rel), "w", encoding="utf-8") as f:
+            f.write(text)
+    keep = {os.path.basename(rel) for rel in files if rel.startswith(ns + "/")}
+    for fn in os.listdir(part_dir):
+        if re.fullmatch(r"(Base|Part\d+)\.lean", fn) and fn not in keep:
+            os.remove(os.path.join(part_dir, fn))
+    return [os.path.join(outdir, rel) for rel in files]
+
+
+def unsplit(ns, outdir=None):
+    """A module that fits in one process again: drop the `<ns>/` directory of an earlier
+    split so that `lake build` and git see one file."""
+    outdir = outdir or OUTDIR
+    part_dir = os.path.join(outdir, ns)
+    if os.path.isdir(part_dir):
+        for fn in os.listdir(part_dir):
+            if re.fullmatch(r"(Base|Part\d+)\.lean", fn):
+                os.remove(os.path.join(part_dir, fn))
+        if not os.listdir(part_dir):
+            os.rmdir(part_dir)
 
 
 def _group_rss_kb(pgids):
@@ -1476,41 +1696,54 @@ def _group_rss_kb(pgids):
     return total
 
 
+BASELINE_ID = "__baseline__"
+
+
 def budget_probe(cands, module, workdir, seconds, gigabytes, jobs, ns=None):
-    """Compile each candidate alone and exclude, by name, those over budget.
+    """Compile each candidate alone and exclude, by name, those over budget; measure the
+    rest.
 
     One by-computation theorem whose kernel evaluation explodes takes the whole module
     with it: on click a 59-theorem module held 63 GB and pushed the machine into swap for
     90 minutes, while 47 of the 59 proved alone in seconds. Probing each candidate in its
     own process, under a wall-clock and resident-memory budget, turns that into a named
     exclusion with a reason. A probe that merely FAILS to prove is left alone: the
-    repair rounds demote it to an open obligation, which is a different statement."""
-    live = [c for c in cands if c.status == "candidate"]
+    repair rounds demote it to an open obligation, which is a different statement.
+
+    The probe is also the per-theorem memory profile: every probed candidate records
+    its peak resident size (`probe_peak_kb`) and wall time (`probe_seconds`), and one
+    extra probe of the empty module measures the base cost every process pays (imports,
+    `h0`, the domains). `plan_parts` reads those to decide whether and how to split the
+    module. Returns `(over, base_kb)`; `base_kb` is None when nothing was probed."""
+    live = [c for c in cands if c.status == "candidate" and "probe_peak_kb" not in c.extra]
     if not live or seconds <= 0:
-        return []
+        return [], None
     os.makedirs(workdir, exist_ok=True)
-    pending, running, over = list(enumerate(live)), {}, []
     limit_kb = int(gigabytes * 1024 * 1024)
+    jobs_pending = [(BASELINE_ID, None)] + [(c.id, c) for c in live]
+    byid = {c.id: c for c in live}
+    pending, running, over, measured = jobs_pending, {}, [], {}
     while pending or running:
         while pending and len(running) < max(1, jobs):
-            i, c = pending.pop(0)
-            src, _thms, _obs = emit([c], module, [], ns=ns)
-            path = os.path.join(workdir, "probe%04d.lean" % i)
+            cid, c = pending.pop(0)
+            src, _thms, _obs = emit([c] if c is not None else [], module, [], ns=ns)
+            path = os.path.join(workdir, "probe-%s.lean" % re.sub(r"[^A-Za-z0-9_]", "_", cid)[:80])
             with open(path, "w", encoding="utf-8") as f:
                 f.write(src)
             proc = subprocess.Popen(["lake", "env", "lean", path], cwd=REPO, env=ENV,
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     start_new_session=True)
-            running[proc.pid] = (proc, c, time.time(), 0)
+            running[proc.pid] = (proc, cid, time.time(), 0)
         time.sleep(1)
         rss = _group_rss_kb(list(running))
         for pid in list(running):
-            proc, c, start, peak = running[pid]
+            proc, cid, start, peak = running[pid]
             peak = max(peak, rss.get(pid, 0))
-            running[pid] = (proc, c, start, peak)
+            running[pid] = (proc, cid, start, peak)
             reason = None
             if proc.poll() is not None:
                 del running[pid]
+                measured[cid] = (peak, time.time() - start, proc.returncode)
                 continue
             if peak > limit_kb:
                 reason = "kernel evaluation exceeded %g GB resident" % gigabytes
@@ -1523,18 +1756,176 @@ def budget_probe(cands, module, workdir, seconds, gigabytes, jobs, ns=None):
                     pass
                 proc.wait()
                 del running[pid]
+                measured[cid] = (peak, time.time() - start, None)
+                if cid == BASELINE_ID:
+                    print("   budget: the EMPTY module is over budget (%s); no theorem can "
+                          "be emitted under it" % reason, flush=True)
+                    continue
+                c = byid[cid]
                 c.status, c.reason = "excluded", "over the proof budget: " + reason
                 over.append(c)
                 print("   budget: excluded %s (%s): %s" % (c.id, c.subject, reason), flush=True)
-    return over
+    base_kb = measured.get(BASELINE_ID, (None,))[0]
+    for cid, (peak, secs, rc) in measured.items():
+        if cid == BASELINE_ID:
+            continue
+        c = byid[cid]
+        c.extra["probe_peak_kb"] = int(peak)
+        c.extra["probe_seconds"] = round(secs, 1)
+        if rc is not None:
+            c.extra["probe_rc"] = rc
+    if base_kb is not None:
+        print("   budget: base cost of the empty module %.2f GB; per-theorem cost measured "
+              "for %d candidate(s)" % (base_kb / 1048576.0, len(measured) - 1), flush=True)
+    return over, base_kb
 
 
-def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
+def plan_parts(cands, base_kb, limit_kb):
+    """Decide the build shape from the per-theorem profile.
+
+    The predicted peak of one process holding theorems T is `base + sum(cost(t))`, with
+    `cost(t) = max(peak(t) - base, 0)` from the probe -- the additive model commit
+    e36b8f1 measured on V8Base (one process retains every proof term). When the whole
+    module is predicted under `limit_kb` the result is None: one file, as before.
+    Otherwise the survivors are packed next-fit, in emission order, into parts each
+    predicted under the limit; a single theorem that alone exceeds the limit gets a part
+    of its own and is NAMED, because no split brings it under.
+
+    Returns `{"base_kb", "limit_kb", "total_kb", "parts": [{"ids", "predicted_kb"}],
+    "oversize": [ids]}` or None. Candidates without a measurement (the probe was
+    disabled, or they were added after it) make the prediction impossible; that is
+    reported and the module stays whole."""
+    live = [c for c in cands if c.status in ("candidate", "proved")]
+    if not live or base_kb is None or limit_kb <= 0:
+        return None
+    unknown = [c.id for c in live if "probe_peak_kb" not in c.extra]
+    if unknown:
+        print("   split: %d emitted candidate(s) carry no memory measurement (%s%s); the "
+              "module is emitted whole and its peak is NOT bounded by --split-gb"
+              % (len(unknown), ", ".join(unknown[:3]), ", ..." if len(unknown) > 3 else ""),
+              flush=True)
+        return None
+    # Costs are rounded UP to a quarter of a GB before packing. The probe's peak RSS
+    # moves by a few percent from run to run (sampling at 1 s, allocator noise), and a
+    # plan that re-packed every time a part sat within that noise of the threshold
+    # would churn the tracked part files on every regeneration. Rounding up keeps the
+    # prediction conservative and the plan stable under that noise.
+    quantum = 256 * 1024
+    cost = {c.id: ((max(c.extra["probe_peak_kb"] - base_kb, 0) + quantum - 1) // quantum) * quantum
+            for c in live}
+    base_kb = ((base_kb + quantum - 1) // quantum) * quantum
+    total = base_kb + sum(cost.values())
+    if total <= limit_kb:
+        print("   split: predicted single-process peak %.2f GB <= %.2f GB; one file"
+              % (total / 1048576.0, limit_kb / 1048576.0), flush=True)
+        return None
+    parts, current, current_kb, oversize = [], [], base_kb, []
+    for c in live:
+        k = cost[c.id]
+        if base_kb + k > limit_kb:
+            oversize.append(c.id)
+        if current and current_kb + k > limit_kb:
+            parts.append({"ids": current, "predicted_kb": current_kb})
+            current, current_kb = [], base_kb
+        current.append(c.id)
+        current_kb += k
+    if current:
+        parts.append({"ids": current, "predicted_kb": current_kb})
+    plan = {"base_kb": int(base_kb), "limit_kb": int(limit_kb), "total_kb": int(total),
+            "parts": parts, "oversize": oversize}
+    print("   split: predicted single-process peak %.2f GB > %.2f GB; %d part(s): %s"
+          % (total / 1048576.0, limit_kb / 1048576.0, len(parts),
+             ", ".join("%.2f GB/%d" % (p["predicted_kb"] / 1048576.0, len(p["ids"])) for p in parts)),
+          flush=True)
+    for cid in oversize:
+        print("   split: %s alone is predicted at %.2f GB, over the threshold; it is in a "
+              "part of its own and no split bounds it" % (cid, (base_kb + cost[cid]) / 1048576.0),
+              flush=True)
+    return plan
+
+
+def _errors_in(output, path):
+    """Line numbers of the errors `lean` or `lake build` reported in `path`.
+
+    `lake env lean file` prints `file:line:col: error: ...`; `lake build` prints
+    `error: ./././file:line:col: ...` with the path relative to the workspace. Both name
+    the file and the line, and that pair is all the attribution needs."""
+    rel = os.path.relpath(path, REPO).replace(os.sep, "/")
+    lines = set()
+    for m in re.finditer(r'(?:^|[\s:])(?:\./)*(%s|%s):(\d+):\d+:' % (re.escape(path), re.escape(rel)),
+                         output, re.M):
+        lines.add(int(m.group(2)))
+    return sorted(lines)
+
+
+def _attribute(path, src, output):
+    """Theorems of `src` (written at `path`) that carry an error in `output`."""
+    decls = M.parse_decls(src.splitlines(keepends=True))
+    bad = set()
+    for ln in _errors_in(output, path):
+        for d in decls:
+            if d.start <= ln <= d.end and d.kind in ("theorem", "lemma"):
+                bad.add(d.name)
+    return bad
+
+
+def _demote(cands, bad, demoted):
+    """Demote the failed theorems to open obligations, except conformance proofs that
+    still have a fallback execution tactic to try. Returns the ids retried."""
+    retried = {}
+    for c in cands:
+        if c.id in bad and c.status == "candidate":
+            # Recursion-limit errors are not reliably recoverable inside Lean's
+            # `first` tactic. Retry the whole declaration with staged execution
+            # before recording an open obligation. Every rung is kernel checked.
+            if c.family == "conform":
+                current = c.extra.get("execution_tactic", "decide +kernel")
+                fallback = {"decide +kernel": "rfl", "rfl": "cbv"}.get(current)
+                if fallback:
+                    c.extra["execution_tactic"] = fallback
+                    retried[c.id] = fallback
+                    continue
+            c.status = "unproved"
+            c.reason = "no proof found by the generated portfolio"
+            demoted.append(("stmt_" + c.id, c.source, c.subject,
+                            "statement survived refutation; the generated proof "
+                            "portfolio could not close it"))
+    if retried:
+        print("  retrying execution proofs: %s" % ", ".join(
+            "%s (%s)" % (name, tactic) for name, tactic in sorted(retried.items())))
+    demoted_now = bad - set(retried)
+    if demoted_now:
+        print("  demoted to open obligations: %s" % ", ".join(sorted(demoted_now)))
+    return retried
+
+
+def _lake_build(target, timeout):
+    """`lake build <target>`; (rc, output, timed_out). Lake rebuilds only what its traces
+    say changed, so an unchanged module is a few seconds and a verified no-op."""
+    try:
+        r = subprocess.run(["lake", "build", target], capture_output=True, text=True,
+                           env=ENV, cwd=REPO, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return 124, "lake build %s exceeded %d s" % (target, timeout), True
+    return r.returncode, r.stdout + r.stderr, False
+
+
+def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None, plan=None):
     """Emit, compile, and demote whatever will not prove to an open obligation.
 
     A generator that cannot prove a statement has exactly two honest options: state it
-    without proof, or drop it. `sorry` is neither."""
-    demoted = []
+    without proof, or drop it. `sorry` is neither.
+
+    With `plan` (from `plan_parts`) the module is emitted split and compiled part by
+    part with `lake build`, one Lean process at a time, so the peak is the largest part's
+    rather than the sum; Lake's own traces make a part whose text and imports did not
+    change a no-op, which is what lets a re-land of an unchanged corpus finish quickly."""
+    # A candidate replayed from the cache as `unproved` keeps its obligation.
+    demoted = [("stmt_" + c.id, c.source, c.subject,
+                "statement survived refutation; the generated proof portfolio could not "
+                "close it") for c in cands if c.status == "unproved"]
+    if plan is not None:
+        return _compile_repair_split(cands, module, path, rounds, timeout, ns, plan, demoted)
     for _ in range(rounds):
         src, thms, _obs = emit(cands, module, demoted, ns=ns)
         with open(path, "w", encoding="utf-8") as f:
@@ -1558,15 +1949,7 @@ def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
         diagnostic = "Lean exited with status %d\n%s%s" % (r.returncode, r.stdout, r.stderr)
         with open(path + ".compile.log", "w", encoding="utf-8") as f:
             f.write(diagnostic)
-        lines = src.splitlines(keepends=True)
-        decls = M.parse_decls(lines)
-        bad = set()
-        for m in re.finditer(r'^%s:(\d+):\d+: error' % re.escape(path),
-                             r.stdout + r.stderr, re.M):
-            ln = int(m.group(1))
-            for d in decls:
-                if d.start <= ln <= d.end and d.kind in ("theorem", "lemma"):
-                    bad.add(d.name)
+        bad = _attribute(path, src, r.stdout + r.stderr)
         if not bad:
             print("  build failed with no attributable theorem:\n%s"
                   % diagnostic[:1200])
@@ -1575,30 +1958,70 @@ def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
         if infrastructure:
             print("  proof infrastructure failed: %s" % ", ".join(sorted(infrastructure)))
             return False, demoted, diagnostic
-        retried = {}
-        for c in cands:
-            if c.id in bad and c.status == "candidate":
-                # Recursion-limit errors are not reliably recoverable inside Lean's
-                # `first` tactic. Retry the whole declaration with staged execution
-                # before recording an open obligation. Every rung is kernel checked.
-                if c.family == "conform":
-                    current = c.extra.get("execution_tactic", "decide +kernel")
-                    fallback = {"decide +kernel": "rfl", "rfl": "cbv"}.get(current)
-                    if fallback:
-                        c.extra["execution_tactic"] = fallback
-                        retried[c.id] = fallback
-                        continue
-                c.status = "unproved"
-                c.reason = "no proof found by the generated portfolio"
-                demoted.append(("stmt_" + c.id, c.source, c.subject,
-                                "statement survived refutation; the generated proof "
-                                "portfolio could not close it"))
-        if retried:
-            print("  retrying execution proofs: %s" % ", ".join(
-                "%s (%s)" % (name, tactic) for name, tactic in sorted(retried.items())))
-        demoted_now = bad - set(retried)
-        if demoted_now:
-            print("  demoted to open obligations: %s" % ", ".join(sorted(demoted_now)))
+        _demote(cands, bad, demoted)
+    return False, demoted, "gave up after %d repair rounds" % rounds
+
+
+def _compile_repair_split(cands, module, path, rounds, timeout, ns, plan, demoted):
+    ns = ns or module
+    outdir = os.path.dirname(path)
+    log = []
+    for _ in range(rounds):
+        files, thms, _obs = emit_split(cands, module, demoted, plan, ns=ns)
+        write_split(files, ns, outdir)
+        rc, out, timed_out = _lake_build("Autoform.SpecsGen.%s.Base" % ns, timeout)
+        if rc != 0:
+            diagnostic = "Base did not build (%d)\n%s" % (rc, out)
+            with open(path + ".compile.log", "w", encoding="utf-8") as f:
+                f.write(diagnostic)
+            print("  the shared Base module failed to build; nothing below it was tried:\n%s"
+                  % out[-1200:])
+            return False, demoted, diagnostic
+        log.append(out)
+        bad, failed_parts = set(), []
+        for n, part in enumerate(plan["parts"], 1):
+            rel = "%s/Part%d.lean" % (ns, n)
+            ppath = os.path.join(outdir, rel)
+            t0 = time.time()
+            rc, out, timed_out = _lake_build("Autoform.SpecsGen.%s.Part%d" % (ns, n), timeout)
+            log.append(out)
+            # Lake prints `Built <module>` (or `Building` on a failure line) only for a
+            # module it rebuilt; an up-to-date part is not mentioned at all.
+            built = re.search(r"Buil(?:t|ding) Autoform\.SpecsGen\.%s\.Part%d\b"
+                              % (re.escape(ns), n), out) is not None
+            print("   part %d/%d: %s in %.0f s (%d theorem%s)"
+                  % (n, len(plan["parts"]),
+                     "FAILED" if rc else ("built" if built else "up to date"),
+                     time.time() - t0, len(part["ids"]), "" if len(part["ids"]) == 1 else "s"),
+                  flush=True)
+            if timed_out:
+                print("  part %d exceeded %d s; the module is left on disk but is NOT "
+                      "proved." % (n, timeout))
+                return False, demoted, "compile timeout after %d s (part %d)" % (timeout, n)
+            if rc != 0:
+                failed_parts.append(n)
+                with open(ppath + ".compile.log", "w", encoding="utf-8") as f:
+                    f.write(out)
+                hit = _attribute(ppath, files[rel], out)
+                if not hit:
+                    print("  part %d failed with no attributable theorem:\n%s" % (n, out[-1200:]))
+                    return False, demoted, out
+                bad |= hit
+        if not failed_parts:
+            rc, out, _ = _lake_build("Autoform.SpecsGen.%s" % ns, timeout)
+            log.append(out)
+            if rc != 0:
+                print("  the umbrella failed to build:\n%s" % out[-1200:])
+                return False, demoted, out
+            for c in cands:
+                if c.status == "candidate":
+                    c.status, c.proved = "proved", True
+            return True, demoted, "\n".join(log)
+        infrastructure = bad - {c.id for c in cands}
+        if infrastructure:
+            print("  proof infrastructure failed: %s" % ", ".join(sorted(infrastructure)))
+            return False, demoted, "\n".join(log)
+        _demote(cands, bad, demoted)
     return False, demoted, "gave up after %d repair rounds" % rounds
 
 
@@ -1679,11 +2102,22 @@ def main():
                          "for (0 = no cap). The cap is recorded in the report: a corpus "
                          "with 1,000 analysable functions is not a corpus with as many "
                          "as this run looked at")
+    ap.add_argument("--split-gb", type=float, default=SPLIT_GB_DEFAULT,
+                    help="emit the module as <M>/Base.lean + <M>/PartN.lean + an umbrella "
+                         "when its predicted single-process peak (base cost plus the "
+                         "probe-measured cost of every theorem) exceeds this many GB, so "
+                         "that no `lake build` process exceeds it (default %g; 0 disables; "
+                         "needs the budget probe)" % SPLIT_GB_DEFAULT)
+    ap.add_argument("--no-cache", action="store_true",
+                    help="ignore .autoform-work/cache: refute, guard, probe and prove every "
+                         "candidate even when its inputs are unchanged since a previous run")
     ap.add_argument("--json", dest="json_path",
                     default=os.path.join(OUTDIR, "report.json"))
     args = ap.parse_args()
     if args.conformance_only:
         args.characterize = False
+    if args.no_cache:
+        os.environ["AUTOFORM_NO_CACHE"] = "1"
 
     globals()["MAX_DOMAIN"] = args.domain
     os.makedirs(OUTDIR, exist_ok=True)
@@ -1742,12 +2176,23 @@ def main():
         return 2
     global GLOBALS, FUEL, INIT_FUEL
     FUEL, INIT_FUEL = 400, D.FUEL
-    core = core_names(args.module)
-    if core is None:
-        return 2
     artifact_hashes = {'ast': runtime_backends.sha256(args.ast),
                        # every part of a sharded model, not just its root
                        'model': runtime_backends.generated_module.model_digest(gen_path)}
+    # Per-model memo (`.autoform-work/cache/<model digest>/model-*.json`): the call-closed
+    # core and the frozen globals heap are `#eval`s over the rendered program and the
+    # Lean semantics, nothing else, so they are keyed on exactly those.
+    model_store = work_cache.Store("model", work_cache.environment_key(
+        model=artifact_hashes['model'], lean=work_cache.lean_sources_digest(),
+        init_fuel=D.FUEL))
+    core = model_store.get(artifact_hashes['model'], "core")
+    if core is None:
+        core = core_names(args.module)
+        if core is None:
+            return 2
+        model_store.put(artifact_hashes['model'], "core", core)
+    else:
+        print("   (call-closed core replayed from %s)" % model_store.summary().split(" under ")[-1])
     if args.conformance:
         artifact_hashes['conformance'] = runtime_backends.sha256(args.conformance)
     funcs = deep_json.load(args.ast)
@@ -1814,7 +2259,12 @@ def main():
         if args.obs_cache:
             json.dump({"recs": recs, "stats": stats, "tests": tests},
                       open(args.obs_cache, "w"))
-    GLOBALS = globals_literal(args.module)
+    cached_globals = model_store.get(artifact_hashes['model'], "globals-%d" % INIT_FUEL)
+    if cached_globals is None:
+        GLOBALS = globals_literal(args.module)
+        model_store.put(artifact_hashes['model'], "globals-%d" % INIT_FUEL, list(GLOBALS))
+    else:
+        GLOBALS = tuple(cached_globals)
     incore = [r for r in recs if r["name"] in set(core)]
     if not args.synthetic and not recs:
         print("REFUSING TO RUN: the trace step recorded zero calls, so every mined law "
@@ -1865,15 +2315,37 @@ def main():
                            conformance_only=args.conformance_only)
     print("   %d candidates" % len(cands))
 
+    # Every verdict below (refutation, guard, proof fuel, execution hints, budget probe,
+    # and whether the generated proof closed) is a function of the candidate's text, the
+    # rendered model and the Lean sources a proof can reach. `.autoform-work/cache/
+    # <function digest>/synth-*.json` memoizes them per subject, so a re-land of an
+    # unchanged function replays instead of re-running Lean; the proof itself is still
+    # re-verified by `lake build`, which is a no-op when nothing changed.
+    synth_store = work_cache.Store("synth", work_cache.environment_key(
+        model=artifact_hashes['model'], lean=work_cache.lean_sources_digest(),
+        harness=work_cache.scripts_digest(["scripts/synth_specs.py", "scripts/differential.py",
+                                           "scripts/runtime_backends.py", "scripts/work_cache.py"]),
+        fuel=FUEL, init_fuel=INIT_FUEL, globals=work_cache.sha256_text("\n".join(GLOBALS)),
+        domain=MAX_DOMAIN, synthetic=bool(args.synthetic),
+        theorem_timeout=args.theorem_timeout, theorem_memory_gb=args.theorem_memory_gb))
+    fn_digest = {}
+    for c in cands:
+        if c.subject in byname and c.subject not in fn_digest:
+            fn_digest[c.subject] = work_cache.function_digest(byname[c.subject])
+    replayed = [c for c in cands if replay_candidate(c, synth_store, fn_digest)]
+    if synth_store.enabled:
+        print("   cache: %d of %d candidate verdicts replayed from %s"
+              % (len(replayed), len(cands), synth_store.root))
+
     print("== 4. refutation (fuzz every candidate before emitting anything)")
     cache = {}
     if args.refute_cache and os.path.exists(args.refute_cache):
         cache = deep_json.load(args.refute_cache)
-    hit = [c for c in cands if c.id in cache]
+    hit = [c for c in cands if c.id in cache and c not in replayed]
     for c in hit:
         v = cache[c.id]
         c.status, c.reason, c.checked = v["status"], v["reason"], v["checked"]
-    miss = [c for c in cands if c.id not in cache]
+    miss = [c for c in cands if c.id not in cache and c not in replayed]
     if hit:
         print("   (%d verdicts replayed from %s, %d to check)"
               % (len(hit), args.refute_cache, len(miss)))
@@ -1947,17 +2419,39 @@ def main():
         return 6
     ns_override = (os.path.splitext(os.path.basename(path))[0]
                    if args.out else args.module)
-    over = budget_probe(cands, args.module, os.path.join(SCRATCH, "budget-probe"),
-                        args.theorem_timeout, args.theorem_memory_gb, args.probe_jobs,
-                        ns=ns_override)
-    BUDGET_EXCLUDED[:] = [(c.id, c.subject, c.reason) for c in over]
+    over, base_kb = budget_probe(cands, args.module, os.path.join(SCRATCH, "budget-probe"),
+                                 args.theorem_timeout, args.theorem_memory_gb, args.probe_jobs,
+                                 ns=ns_override)
+    # The base cost is a property of the model and the semantics, not of any candidate,
+    # so it is memoized with them: a run whose candidates all replayed still needs it to
+    # plan the split.
+    if base_kb is None:
+        base_kb = model_store.get(artifact_hashes['model'], "probe-baseline-kb")
+    else:
+        model_store.put(artifact_hashes['model'], "probe-baseline-kb", int(base_kb))
+    BUDGET_EXCLUDED[:] = [(c.id, c.subject, c.reason) for c in cands if c.status == "excluded"]
     print("   budget probe: %d candidate(s) over %d s / %g GB, excluded by name"
-          % (len(over), args.theorem_timeout, args.theorem_memory_gb))
-    ok, demoted, log = compile_repair(cands, args.module, path, ns=ns_override)
+          % (len(BUDGET_EXCLUDED), args.theorem_timeout, args.theorem_memory_gb))
+    plan = None
+    if args.split_gb > 0 and not args.out:
+        plan = plan_parts(cands, base_kb, int(args.split_gb * 1048576))
+        if plan is None:
+            unsplit(ns_override)
+    elif args.split_gb > 0:
+        print("   split: --out names a single file, so the module is emitted whole")
+    ok, demoted, log = compile_repair(cands, args.module, path, ns=ns_override, plan=plan)
     proved = [c for c in cands if c.proved]
     unproved = [c for c in cands if c.status == "unproved"]
-    print("   %s: %d theorems proved, %d statements left open"
-          % ("clean" if ok else "BUILD FAILED", len(proved), len(unproved)))
+    print("   %s: %d theorems proved, %d statements left open%s"
+          % ("clean" if ok else "BUILD FAILED", len(proved), len(unproved),
+             "" if plan is None else "; split into Base + %d part(s)" % len(plan["parts"])))
+    stored = 0
+    for c in cands:
+        if c.subject in fn_digest and (ok or c.status != "candidate"):
+            synth_store.put(fn_digest[c.subject], cand_key(c), cand_record(c))
+            stored += 1
+    if synth_store.enabled:
+        print("   cache: %d candidate verdict(s) recorded; %s" % (stored, synth_store.summary()))
 
     # ---- the mutation-gate target
     #
@@ -2037,7 +2531,16 @@ def main():
                                                  if c.proved and c.kind == "law"
                                                  and not c.extra.get("fuel_mono")]),
         "build_clean": ok,
-        "artifact_hashes": dict(artifact_hashes, proof=runtime_backends.sha256(path)),
+        "artifact_hashes": dict(artifact_hashes, proof=generated_module.spec_digest(path)),
+        # The memory profile the build shape rests on: every probed theorem's peak RSS
+        # and the empty module's; `split` is the plan `emit_split` followed, or None.
+        "memory_profile": {"probe_base_kb": base_kb, "split_gb": args.split_gb,
+                           "theorems": {c.id: {"peak_kb": c.extra.get("probe_peak_kb"),
+                                               "seconds": c.extra.get("probe_seconds")}
+                                        for c in cands if "probe_peak_kb" in c.extra}},
+        "split": plan,
+        "cache": {"enabled": synth_store.enabled, "replayed": len(replayed),
+                  "recorded": stored, "root": str(synth_store.root or "")},
         "mutation_sample": sample_info,
         "fuel_independent": len([c for c in cands
                                  if c.proved and c.extra.get("fuel_mono")]),
