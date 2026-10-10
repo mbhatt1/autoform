@@ -55,9 +55,17 @@ jobs:
           python -m pip install "$wheel"
       - name: Install Lean
         run: |
-          curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          curl -sSfL --retry 5 --retry-all-errors https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
           sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          # elan defers the toolchain download to the first `lean` call; a transient
+          # TLS failure there (2026-10-10, releases.lean-lang.org) killed the job
+          # before anything was built. Fetch the toolchain here and retry.
+          for attempt in 1 2 3 4 5; do
+            "$HOME/.elan/bin/elan" run "$(cat lean-toolchain)" lean --version && break
+            [ "$attempt" = 5 ] && exit 1
+            sleep $((attempt * 30))
+          done
       - uses: actions/cache@v4
         id: joern
         with:
