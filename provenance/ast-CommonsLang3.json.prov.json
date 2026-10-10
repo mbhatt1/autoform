@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-CommonsLang3.json",
+ "artifact_bytes": 1597749,
+ "artifact_sha256": "d6e4354775d00705a054a7e63306c709493eee148e0326e5d38ad6195ca4959e",
+ "command": "AUTOFORM_JAVA_SOURCEPATH=/Users/mbhatt/.cache/autoform/corpora/commons-lang3-3.17.0/src/commons-lang3-3.17.0-src/src/main/java scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/commons-lang3-3.17.0/subset CommonsLang3",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "26a141ceac8506a6885e4ee7c6013e53d2e6774dd90b9a6c0c3a95491dab1497",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/Users/mbhatt/.cache/autoform/corpora/commons-lang3-3.17.0/subset",
+ "source_revision": "tree-sha256:826d725e0363f8f05098e6c230be612f6a745cf3852dfe021b1c324ee6198ef0:9files"
+}

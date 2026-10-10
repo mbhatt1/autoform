@@ -12,7 +12,10 @@
 #
 # Prerequisites: a clean tree (checked), the pinned Joern on JOERN_HOME or ~/joern,
 # elan on PATH, and the source runtime for the corpus (CPython for a Python corpus).
-# Optional: AUTOFORM_TESTS=<dir> (the corpus test suite), AUTOFORM_CASES, AUTOFORM_SPEC_EXCLUDE.
+# Optional: AUTOFORM_TESTS=<dir> (the corpus test suite), AUTOFORM_CASES, AUTOFORM_SPEC_EXCLUDE,
+# AUTOFORM_JAVA_SOURCEPATH=<dir[:dir]> (a Java corpus exported as a subset of a larger source
+# tree: the rest of that tree, for javac to resolve the subset's same-package references;
+# recorded in conformance.json under backend_info.extra_source_roots).
 set -euo pipefail
 
 if [ $# -ne 2 ]; then

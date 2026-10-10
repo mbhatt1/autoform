@@ -133,6 +133,23 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
                  % doc_functions)
     with open(os.path.join(d, "README.md"), "w") as fh:
         fh.write("| 0 holes, all named |\n")
+    # The Java corpus rows (commons-lang3, 2026-10-10) are bound too. They are internally
+    # consistent here (ledger and oracle population equal the AST's), so this fixture
+    # still isolates the cachetools staleness it is about.
+    n = ast_functions
+    with open(os.path.join(d, "ledger-CommonsLang3.json"), "w") as fh:
+        json.dump({"functions": n, "holeFree": 100, "verifiableCore": 45, "holes": 7}, fh)
+    write_ast(os.path.join(d, "ast-CommonsLang3.json"), [fn(name="j%d" % i) for i in range(n)])
+    with open(os.path.join(d, "evidence-CommonsLang3.json"), "w") as fh:
+        json.dump({"population": n, "compared_functions": 1, "agree": 1, "total": 1,
+                   "divergences": 0, "inconclusive": 2}, fh)
+    with open(os.path.join(d, "docs", "languages.md"), "a") as fh:
+        fh.write("| Java (commons-lang3) | yes | yes | yes | `.java` | %d | 100 (48%%) "
+                 "| 45 (21%%) | 0.7%% | **yes** |\n" % n)
+        fh.write("Ledger (`ledger-CommonsLang3.json`): %d functions, 100 hole-free (48%%), "
+                 "45 in the verifiable core, 7 holes in 5 functions (table above).\n" % n)
+        fh.write("**1 functions compared, 1/1 cases agree, 0 divergences, "
+                 "2 cases inconclusive**\n")
     return d
 
 

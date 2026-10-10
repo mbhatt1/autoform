@@ -35,6 +35,7 @@ pipeline; where a document and an artifact disagree, the artifact wins.
 | Kotlin | `Kotlin/kotlinx-datetime` `core/common/src` | 20 | real Kotlin, 7.4k lines |
 | Kotlin (toy) | hand-written `gcd`/`addAll` | 1 | control experiment |
 | Python (baseline) | `cachetools` | — | the previously measured corpus |
+| Java (re-landed 2026-10-10) | Apache Commons Lang 3.17.0, `org/apache/commons/lang3/{StringUtils,CharUtils,BooleanUtils,CharSequenceUtils,RegExUtils,Validate,CharRange,math/NumberUtils,math/IEEE754rUtils}.java` | 9 | a real, pure utility library: static methods over primitives, `String` and `CharSequence`; source release verified by its Apache SHA-512, `provenance/ast-CommonsLang3.json.prov.json` |
 
 Joern 4.0.606, `joern-cli/frontends/` has `c2cpg`, `javasrc2cpg`, `jimple2cpg`,
 `jssrc2cpg`, `gosrc2cpg`, `kotlin2cpg`, `pysrc2cpg`, `ghidra2cpg`, and others.
@@ -47,6 +48,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 | Python | yes | yes | yes | `.python` ✅ | 209 | 97% | 150 (71%) | 0.08% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| Java (commons-lang3 3.17.0, tracked `ast-CommonsLang3.json`) | yes | yes | yes | `.java` ✅ | 488 | 422 (86%) | 196 (40%) | 0.7% | **yes** (JVM, `jvm-primitive-static-v2`, 2026-10-10): 32 functions compared, 87/87 cases agree, 0 divergences, 513 inconclusive on named dynamic holes (`evidence-CommonsLang3.json`) |
 | Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | TypeScript | yes | yes | yes | `.javascript` ✅ | 86 | 44 (51%) | 18 (20%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
 | JavaScript | yes | yes | yes | `.javascript` ✅ | 14 | 5 (35%) | 1 (7%) | 5% | Node backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
@@ -58,13 +60,17 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 **On the "Differential oracle" column.** `scripts/differential.py` now carries a runtime
 backend for Node (JS/TS), the JVM (Java, and Kotlin through a `@JvmStatic` thunk) and Go,
 each with its own recorded `measurement_basis` (`node-numeric-pool-v1`,
-`jvm-primitive-static-v1`, `go-package-func-v1`) and `runtime_version`, selectable with
+`jvm-primitive-static-v2`, `go-package-func-v1`) and `runtime_version`, selectable with
 `--language`. "Backend present; ran on the fixture" means exactly that: the oracle was
 executed end to end -- runtime, `lake build`, Lean evaluation, comparison -- on a
 three-function fixture per language and agreed with Core with 0 divergences. It is NOT a
 statement about the corpora in this table, whose sources are not in the repository; the
 day one is re-exported with `scripts/reland_corpus.sh` its conformance row goes here with
-the counts, and until then the column says "not yet on this corpus".
+the counts, and until then the column says "not yet on this corpus". The first such row is
+the commons-lang3 one (2026-10-10): a tracked AST, a provenance record, a ledger, a JVM
+oracle run and a synthesized specification module (`Autoform/SpecsGen/CommonsLang3.lean`,
+imported from `Autoform.lean` and `Autoform/CI.lean`). See "Java at scale" below for what
+the 513 inconclusive cases are and why the compared count is 32 of 422 hole-free functions.
 
 Percentages are from the ledger the pipeline printed (`ledger-Lang*.json`);
 `scripts/lang_matrix.py` recomputes them from the exported AST independently and agrees
@@ -116,6 +122,7 @@ translation. They are not the same set across languages, which is direct evidenc
 |---|---|
 | C | `op:indirection` 28, `op:cast` 18, `control:SWITCH` 14, `assign:lhs:indirectIndexAccess` 12, `op:indirectIndexAccess` 12, `assign:lhs:indirection` 12, `cstr:address-equality` 11, `op:postIncrement` 11, `op:postDecrement` 8, `control:FOR` 7, `control:GOTO` 5, `op:sizeOf` 5 |
 | Java | `op:alloc` 166, `control:THROW` 125, `op:cast` 123, `op:instanceOf` 90, `op:arrayInitializer` 43, `control:FOR` 30, `expr:BLOCK-impure` 20, `control:SWITCH` 15, `op:postIncrement` 15, `op:sizeOf` 13, `control:TRY-multiCatch` 4 |
+| Java (commons-lang3, current exporter, `ledger-CommonsLang3.json`) | `op:alloc:ctor-shape` 26, `op:alloc:array-decl` 20, `op:instanceOf` 18, `op:alloc:ctor-unresolved-class` 15, `control:TRY-handler-language` 13, `lit:unquoted` 8, `stmt:empty-ast-children` 6, `op:cast:opaque-type` 4, `expr:BLOCK-impure` 4, `op:cast:object` 1 (115 holes in 66 functions) |
 | Go | `op:addressOf` 44, `stmt:IMPORT` 39, `lit:unquoted` 17, `stmt:TYPE_DECL` 13, `op:indirection` 12, `assign:arity` 7 (multi-return `a, b := f()`), `control:FOR` 6 |
 | TypeScript | `op:assignment` 26, `op:notNullAssert` 11, `control:THROW` 10, `stmt:TYPE_DECL` 9, `op:alloc` 7, `op:await` 7, `op:instanceOf` 5, `op:spread` 2 |
 | JavaScript (lodash) | `op:assignment` 111, `op:instanceOf` 100, `op:preIncrement` 91, `expr:BLOCK-impure` 44, `op:postIncrement` 44, `op:alloc` 27, `op:and` 23, `control:THROW` 16, `op:iterator` 6 |
@@ -758,6 +765,87 @@ The cheapest change to the verdict is not more front ends. It is
 (b) making `infer_dialect` refuse instead of defaulting to Python, and
 (c) a `java`/`node`/`go run` backend for `differential.py` — after which the oracle can
 find the rest of this list without a human predicting it.
+
+## Java at scale — commons-lang3 (2026-10-10)
+
+The first non-Python corpus through the whole chain, chosen because Java is the language
+with its own `Dialect` constructor, 64-bit `long` modelled, and a JVM backend already
+wired into `scripts/differential.py`. The corpus is nine files of Apache Commons Lang
+3.17.0 (the source release, SHA-512 checked against `archive.apache.org`), copied into a
+subset tree under `~/.cache/autoform/corpora/commons-lang3-3.17.0/subset/` so the export
+is bounded (488 functions, 1.6 MB AST, tracked) while `javac` resolves the subset's
+same-package references (`ArrayUtils`, `ObjectUtils`, ...) against the full release through
+`AUTOFORM_JAVA_SOURCEPATH` (recorded in `backend_info.extra_source_roots`).
+
+What the chain produced, each figure bound by `scripts/check_docs.py`:
+
+* Ledger (`ledger-CommonsLang3.json`): 488 functions, 422 hole-free (86%), 196 in the
+  verifiable core, 115 holes in 66 functions (table above).
+* Oracle (`evidence-CommonsLang3.json`, basis `jvm-primitive-static-v2`, OpenJDK 17
+  locally; CI installs 21): 199 static primitive-or-String candidates, 980 cases built,
+  195 functions exercised, **32 functions compared, 87/87 cases agree, 0 divergences,
+  513 cases inconclusive**. 35 hole-free functions were skipped as `non-primitive
+  signature` (arrays, `Boolean`, `Object`...) and 5 as instance methods.
+* Specification module: `Autoform/SpecsGen/CommonsLang3.lean`, observation theorems from
+  the agreeing cases, elaborated in `lake build Autoform.CI`.
+
+Two exporter and two backend gaps were closed on the way, each with a test:
+
+* `throw new IllegalArgumentException(...)` -- 70 `expr:BLOCK-impure` holes, the single
+  largest label, every one of them this shape. javasrc2cpg lowers the instance creation to
+  a BLOCK in the throw's expression position; for a class the corpus does not declare, the
+  exporter now evaluates the constructor arguments and raises the class's simple name,
+  which is exactly what the JVM oracle observes (`getSimpleName()`) and the payload Core
+  already uses for `ArithmeticException` (`tests/test_source_java_throw.py`, which runs the
+  JVM and Core on the same inputs). Corpus-declared exception classes keep their
+  constructor and their hole.
+* The Python handler sidecar was being run on `.java` files and warning that their
+  "builtin/class/global metadata is ABSENT"; it is Python-only and now says nothing for
+  other languages (same bytes out: the parse never succeeded).
+* `CharSequence` parameters receive a String (`StringUtils` is almost entirely
+  `CharSequence`-typed); the measurement basis moved to `jvm-primitive-static-v2` because
+  the attempted population changed. `AUTOFORM_JAVA_SOURCEPATH` for subset corpora.
+
+What is still open, by name and count (the "inconclusive" column), all of them *dynamic*
+holes -- the function translated without a static hole and the interpreter reached a
+construct Core does not model under `.java`:
+
+* `call:length` 299 cases / 102 functions: `String.length()` / `CharSequence.length()`.
+  Core has string indexing by UTF-16 unit for `.javascript` only; Java `String` methods
+  (`length`, `charAt`, `trim`, `toCharArray`, `toString`, `replaceFirst`) have no model.
+  This is a `Semantics.lean` change (every proof module rebuilds) and was not made here.
+* `field:EMPTY:non-object` 31, `field:ROOT:non-object` 7, `field:TRUE:non-object` 5:
+  reads of `static final` constants (`StringUtils.EMPTY`) -- Java class initializers
+  (`<clinit>`) are not exported as module initializers.
+* `call:isNaN` 26, `call:anyNull` 11, `call:max` 5, `call:requireNonNull` 4: static
+  calls into `java.lang.Float/Math/Objects` and into `ObjectUtils`, outside the subset.
+* `str:reference-equality` 25: `==` on two `String`s is identity in Java and a hole on
+  purpose (§6 above).
+* `control:TRY-handler-language` 20 and `op:instanceOf` 15 are the static labels of the
+  same name reached at run time through callees.
+* Java `String + int` (JLS §5.1.11 string conversion) is a `binop:+` hole; it did not
+  occur in this corpus's compared cases and is named in `tests/test_source_java_throw.py`.
+
+**The export is not byte-stable, and the pin says so.** Re-exporting the same CPG three
+times gave three different ASTs in three functions: Joern's overload resolution for one
+call alternates between `join(byte[],char,int,int)` and `join(short[],char,int,int)`
+(`StringUtils.join`, `Validate.notEmpty`, `Validate.validIndex`). None of the three is
+among the 32 compared functions, and none of the 31 specification theorems mentions them,
+so the oracle figures above do not depend on the choice; the tracked AST carries one of the
+two resolutions, and a fresh export may carry the other. The same happens on Jinja2: the
+first export of a fresh CPG reorders two `fnref` arguments in `TemplateModule.__init__`,
+and later exports of that CPG match the tracked file (and the HEAD exporter reproduces the
+first-run output, so the cause is upstream of the exporter change). The provenance records
+name the command; they do not promise a byte-identical regeneration, and that is an open
+item (the fix belongs in the frontend pass that orders overload candidates, not in the
+renderer).
+
+Reproduce (the command is the provenance record's `command` field):
+
+```sh
+AUTOFORM_JAVA_SOURCEPATH=~/.cache/autoform/corpora/commons-lang3-3.17.0/src/commons-lang3-3.17.0-src/src/main/java \
+  scripts/reland_corpus.sh ~/.cache/autoform/corpora/commons-lang3-3.17.0/subset CommonsLang3
+```
 
 ## Reproducing
 

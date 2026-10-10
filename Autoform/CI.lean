@@ -26,6 +26,7 @@ import Autoform.SpecsGen.LinuxLib
 import Autoform.SpecsGen.LinuxLibSample
 import Autoform.Specs.CppCastSpec
 import Autoform.Specs.DoWhileSpec
+import Autoform.SpecsGen.CommonsLang3
 
 /-!
 # `Autoform.CI` — the import closure the CI build job elaborates

@@ -1254,7 +1254,15 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                  sort_keys=True))
 """
   val pythonHandlerCache = collection.mutable.Map.empty[String, Option[ujson.Value]]
+  // The sidecar parses PYTHON source with CPython's `ast`. Several of its callers
+  // (`pythonSourceInfo`, `pythonSignatureInfo`, the corpus-exception test in `raise`)
+  // are reached from every language, and on a Java corpus each file was handed to the
+  // parser, failed with `SyntaxError`, and logged a WARNING that the file's "builtin/
+  // class/global metadata is ABSENT" -- a Python-only notion reported as a defect of a
+  // Java export. A non-Python file has no such metadata to lose: answer `None` before
+  // spawning anything. (The result is byte-identical: the parse never succeeded.)
   def pythonHandlers(file: String): Option[ujson.Value] =
+    if (!file.toLowerCase.endsWith(".py") && !file.toLowerCase.endsWith(".pyi")) None else
     pythonHandlerCache.getOrElseUpdate(file, fileText(file).flatMap { source =>
       val python = sys.env.getOrElse("AUTOFORM_PYTHON", "python3")
       try {
@@ -10813,6 +10821,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // reference is thrown; Core's `.raise` under `.java` raises the value as-is, the
         // same non-Python path JavaScript uses. Which `catch` receives it (§14.20) is
         // the handler dispatch's business, not the throw's.
+        // Java `throw new C(args)` with `C` outside the corpus -- `throw new
+        // IllegalArgumentException("...")`, the single largest hole on commons-lang3
+        // (70 `expr:BLOCK-impure`, every one of them this shape). See `javaThrowNew`.
+        case "THROW" if javaFile && kids.size == 1 && javaThrowNew(kids.head).isDefined =>
+          javaThrowNew(kids.head).get
         case "THROW" if (jsLikeFile || javaFile) && kids.size == 1 =>
           val (prelude, value) = exprV(kids.head)
           seqOf(prelude :+ ujson.Obj("k" -> "raise", "e" -> value))
@@ -10985,6 +10998,52 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * CPG CATCH nodes contain only bodies. Builtin exception inheritance is expanded
     * into dispatch over Core's named exception representation. Unsupported dynamic
     * classes, aliases and payload inspection remain explicit holes, not catch-alls. */
+  /** Types the corpus itself declares, by JVM full name (`org.apache.commons.lang3.CharRange`). */
+  lazy val javaCorpusTypes: Set[String] = cpg.typeDecl.isExternal(false).fullName.toSet
+
+  /** Java `throw new C(args)` for a `C` the corpus does not declare.
+    *
+    * javasrc2cpg lowers the class instance creation (JLS §15.9.4) into a BLOCK in the
+    * throw's expression position -- `$objN = <operator>.alloc`, `C.<init>($objN, args...)`,
+    * `$objN` -- and the BLOCK holed as `expr:BLOCK-impure`: the prelude allocates, so it is
+    * not a pure renaming `blockExpr` may inline. For a class the corpus declares, the
+    * allocation and the constructor body are the program's own and stay on the ordinary
+    * path. For a class it does not (`java.lang.IllegalArgumentException`, essentially every
+    * `throw` in a utility library), Core has no constructor to run, and what the JVM oracle
+    * observes of a thrown exception is its class's simple name (`AutoformDriver`:
+    * `getCause().getClass().getSimpleName()`) -- the same payload Core already gives a
+    * builtin exception, `.exn (.str "ArithmeticException")` for Java `/` by zero
+    * (TypedNumeric.lean). So: the constructor arguments are evaluated for their effects, in
+    * order (§15.9.4 step 2 precedes the constructor), then `Stmt.raise (.str <SimpleName>)`.
+    * The message is not modelled, and a `catch` of a Java exception is still
+    * `control:TRY-handler-language`, so nothing downstream reads the payload that is gone. */
+  def javaThrowNew(n: AstNode): Option[ujson.Obj] = n match {
+    case b: Block =>
+      kidsOf(b).filterNot(_.isInstanceOf[Local]) match {
+        case (asg: Call) :: (init: Call) :: (last: Identifier) :: Nil
+            if callName(asg) == "<operator>.assignment" && init.name == "<init>" =>
+          val cls = init.methodFullName.takeWhile(_ != ':').stripSuffix(".<init>")
+          val target = kidsOf(asg) match {
+            case (i: Identifier) :: rhs :: Nil if isOp(rhs, "<operator>.alloc") && kidsOf(rhs).isEmpty =>
+              Some(i.name)
+            case _ => None
+          }
+          val receiver = kidsOf(init).find(aidx(_) == 0).collect { case i: Identifier => i.name }
+          if (target.isEmpty || target != receiver || target.get != last.name ||
+              cls.isEmpty || cls == "ANY" || javaCorpusTypes.contains(cls)) None
+          else {
+            val simple = cls.split('.').last.split('$').last
+            val evaluated = kidsOf(init).filter(aidx(_) >= 1).map(exprV).flatMap {
+              case (prelude, v) => prelude :+ ujson.Obj("k" -> "exprS", "e" -> v)
+            }
+            Some(seqOf(evaluated :+ ujson.Obj("k" -> "raise",
+                                              "e" -> ujson.Obj("k" -> "str", "v" -> simple))))
+          }
+        case _ => None
+      }
+    case _ => None
+  }
+
   def tryStmt(cs: ControlStructure): ujson.Obj = {
     val kids = kidsOf(cs)
     def of(t: String) = kids.collect {
