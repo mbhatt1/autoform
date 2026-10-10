@@ -17,25 +17,25 @@
    "render_sha256": "d3a662ae60f3eb5133ea14d12d4d5f99afc5d7bd066eff2b7e3d8297d4a86cb2"
   },
   "Cachetools": {
-   "ast_bytes": 684314,
-   "ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
+   "ast_bytes": 766819,
+   "ast_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
    "ast_tracked": true,
-   "render_bytes": 355919,
-   "render_sha256": "85f6a8f851ff598fb1fe38dd289c4931e2890bee8b96093d145f95ad0d548885"
+   "render_bytes": 496247,
+   "render_sha256": "6beadfba44d21abde8c14f92168088d635bbd7c0eabfc84d805bc23f2140902e"
   },
   "Click": {
-   "ast_bytes": 4727704,
-   "ast_sha256": "061c0f8e79ed673e5a27410a74c397f68b2052cef0ad5c6a551f2d4e0906c5b7",
+   "ast_bytes": 4726613,
+   "ast_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
    "ast_tracked": true,
-   "render_bytes": 2061942,
-   "render_sha256": "5da9700801ae5080426e0e0cb8bd7009b773503b3f780cb8f7db0d3da4e43687"
+   "render_bytes": 2061729,
+   "render_sha256": "7e845e9e3978f0cc9b10c1a69d8d5abd17f6812ccc8e6ac6a6ba2ca235ba386d"
   },
   "Jinja2": {
-   "ast_bytes": 6491674,
-   "ast_sha256": "5a3fdf3ccafd361896f5d255838ad31d3d08ad7a3b9811ffbbf564ea73cb81e2",
+   "ast_bytes": 7899504,
+   "ast_sha256": "c0978f07d574a127949eb1c046181569a58258eaba788fa9b063fd345c5ebd4f",
    "ast_tracked": true,
-   "render_bytes": 2011983,
-   "render_sha256": "f1b961305c126a14575fae10488e8a01cbab4cd0201ce8f3fefbfbeadd4672f5"
+   "render_bytes": 3475268,
+   "render_sha256": "fe4cde028b18f4d94c342c715d44e36110b5c3d878e79773499c6ba342ed8d3d"
   },
   "LangC": {
    "ast_bytes": 175419,
@@ -153,7 +153,7 @@
  "specs": {
   "Specs/CachetoolsSpec": {
    "corpus": "Cachetools",
-   "corpus_ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
+   "corpus_ast_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
    "source": "ast-Cachetools.json"
   },
   "Specs/V8Spec": {
@@ -163,8 +163,18 @@
   },
   "SpecsGen/Cachetools": {
    "corpus": "Cachetools",
-   "corpus_ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
+   "corpus_ast_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
    "source": "ast-Cachetools.json"
+  },
+  "SpecsGen/Click": {
+   "corpus": "Click",
+   "corpus_ast_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
+   "source": "ast-Click.json"
+  },
+  "SpecsGen/Jinja2": {
+   "corpus": "Jinja2",
+   "corpus_ast_sha256": "c0978f07d574a127949eb1c046181569a58258eaba788fa9b063fd345c5ebd4f",
+   "source": "ast-Jinja2.json"
   },
   "SpecsGen/LinuxLib": {
    "corpus": "LinuxLibSample",

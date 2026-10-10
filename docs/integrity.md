@@ -211,6 +211,28 @@ exporter that produced it, not about the exporter in the tree.
 
 ### Re-exporting today would cost more coverage than the staleness costs
 
+**CHANGED (2026-10-09): re-landed.** The condition this section set -- "closing the Python
+gaps the new labels name" -- was met and `ast-Cachetools.json` was re-exported on the
+current exporter (`provenance/ast-Cachetools.json.prov.json`, with `exporter_sources`), so
+the measurements below describe the September exporter and are kept as the record of why
+the re-land waited. What the re-land found, in the order it found it: the re-export
+breaks 11 declarations, not 98 (`BuiltinBase.lean`: allocation identity is qualified now;
+`Contracts.lean`: `methodkey_refines` is retired because `hashkey` is read through the
+module object at call time; `Specs/CachetoolsSpec.lean`: the accessor theorems name their
+receiver's class, `_Link`'s writes land in slot storage keys, and the `_Item.__lt__` pair is
+retired behind `functools.total_ordering`). The conformance oracle first compared 40 calls
+instead of 245 because class metadata made `Cache(collections.abc.MutableMapping)` an
+unresolved hierarchy and the oracle refused every such receiver; the external-base contracts
+([contracts.md](contracts.md), "External base classes") and the `__getattr__` miss-only hook
+brought it to **94 agree / 0 diverge / 133 inconclusive on 227 cases**, every inconclusive
+a named gap. The rest of the 534 September cases were receivers of test-defined subclasses
+(`TTLTestCache`, `Timer`), which the old artifact compared only because it carried no class
+metadata to refuse them with; the smaller number is the honest one. Hole-free went 207 →
+204 of 209: the five new holes are `collections.OrderedDict()` / `weakref.WeakKeyDictionary()`
+allocations the exporter now declines to model (`class-construction:unresolved-lexical-identity`),
+which it used to allocate as opaque objects.
+
+
 The obvious remedy — re-export and land fresh artifacts — was tried against
 `ast-Cachetools.json` and **should not be applied**. Not because it is hard, but because
 of what it produces. Measured, on cachetools v7.1.7 (the revision identified above) with

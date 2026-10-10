@@ -61,7 +61,9 @@ import random
 import re
 import subprocess
 import sys
+import signal
 import tempfile
+import time
 import deep_json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1346,6 +1348,12 @@ def staged_conformance(c, budget, execution_tactic):
     return tactic
 
 
+# Set by `main` from `--exclude-subjects`; `emit` names them in the module it writes.
+EXCLUDED_SUBJECTS = []
+# (theorem, subject, reason) for candidates `budget_probe` found over the proof budget.
+BUDGET_EXCLUDED = []
+
+
 def emit(cands, module, obligations_extra, ns=None):
     """`ns` overrides the namespace, for the mutation-gate sample module: two files that
     share a namespace also share declaration names, and importing both would clash."""
@@ -1423,6 +1431,25 @@ def emit(cands, module, obligations_extra, ns=None):
                                   json.dumps(r)) for n, s, sub, r in obs))
     out.append("#eval IO.println (renderObligations %s obligations)\n"
                % json.dumps(ns))
+    if EXCLUDED_SUBJECTS:
+        # Left out by `--exclude-subjects`: their by-computation proofs do not finish in
+        # the emission budget. Named here, in the tracked module, not only in the
+        # untracked JSON report -- an exclusion nobody can see is a silent one.
+        out.append("/-- Subjects left out of this module by `--exclude-subjects` (no "
+                   "statement about them is made here, true or open). -/\n"
+                   "def excludedSubjects : List String :=\n  [%s]\n"
+                   % ",\n   ".join(json.dumps(n) for n in EXCLUDED_SUBJECTS))
+        out.append('#eval IO.println s!"excluded subjects ─ %s ({excludedSubjects.length})"\n'
+                   % ns)
+    if BUDGET_EXCLUDED:
+        out.append("/-- Candidates left out because, compiled alone, their proof exceeded the "
+                   "emission budget (`--theorem-timeout`, `--theorem-memory-gb`): "
+                   "`(theorem, subject, reason)`. Not stated here, true or open. -/\n"
+                   "def budgetExcluded : List (String × String × String) :=\n  [%s]\n"
+                   % ",\n   ".join("(%s, %s, %s)" % (json.dumps(t), json.dumps(sj), json.dumps(r))
+                                   for t, sj, r in BUDGET_EXCLUDED))
+        out.append('#eval IO.println s!"over the proof budget ─ %s ({budgetExcluded.length})"\n'
+                   % ns)
     out.append("/-! ## Anti-vacuity gate\n\n`#audit_depends` fails the build if a "
                "theorem's proof term never mentions the generated definition it claims "
                "to be about — the necessary half of the gate. The sufficient half is "
@@ -1436,6 +1463,70 @@ def emit(cands, module, obligations_extra, ns=None):
         out.append("#audit_axioms %s" % tid)
     out.append("\nend Autoform.SpecsGen.%s\n" % ns)
     return "\n".join(out), thms, obs
+
+
+def _group_rss_kb(pgids):
+    """Resident set size, in KiB, of every process in each of the given sessions."""
+    out = subprocess.run(["ps", "-A", "-o", "pgid=,rss="], capture_output=True, text=True).stdout
+    total = {g: 0 for g in pgids}
+    for row in out.splitlines():
+        fields = row.split()
+        if len(fields) == 2 and fields[0].isdigit() and int(fields[0]) in total:
+            total[int(fields[0])] += int(fields[1]) if fields[1].isdigit() else 0
+    return total
+
+
+def budget_probe(cands, module, workdir, seconds, gigabytes, jobs, ns=None):
+    """Compile each candidate alone and exclude, by name, those over budget.
+
+    One by-computation theorem whose kernel evaluation explodes takes the whole module
+    with it: on click a 59-theorem module held 63 GB and pushed the machine into swap for
+    90 minutes, while 47 of the 59 proved alone in seconds. Probing each candidate in its
+    own process, under a wall-clock and resident-memory budget, turns that into a named
+    exclusion with a reason. A probe that merely FAILS to prove is left alone: the
+    repair rounds demote it to an open obligation, which is a different statement."""
+    live = [c for c in cands if c.status == "candidate"]
+    if not live or seconds <= 0:
+        return []
+    os.makedirs(workdir, exist_ok=True)
+    pending, running, over = list(enumerate(live)), {}, []
+    limit_kb = int(gigabytes * 1024 * 1024)
+    while pending or running:
+        while pending and len(running) < max(1, jobs):
+            i, c = pending.pop(0)
+            src, _thms, _obs = emit([c], module, [], ns=ns)
+            path = os.path.join(workdir, "probe%04d.lean" % i)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(src)
+            proc = subprocess.Popen(["lake", "env", "lean", path], cwd=REPO, env=ENV,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    start_new_session=True)
+            running[proc.pid] = (proc, c, time.time(), 0)
+        time.sleep(1)
+        rss = _group_rss_kb(list(running))
+        for pid in list(running):
+            proc, c, start, peak = running[pid]
+            peak = max(peak, rss.get(pid, 0))
+            running[pid] = (proc, c, start, peak)
+            reason = None
+            if proc.poll() is not None:
+                del running[pid]
+                continue
+            if peak > limit_kb:
+                reason = "kernel evaluation exceeded %g GB resident" % gigabytes
+            elif time.time() - start > seconds:
+                reason = "kernel evaluation exceeded %d s" % seconds
+            if reason:
+                try:
+                    os.killpg(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):  # exited; macOS says EPERM
+                    pass
+                proc.wait()
+                del running[pid]
+                c.status, c.reason = "excluded", "over the proof budget: " + reason
+                over.append(c)
+                print("   budget: excluded %s (%s): %s" % (c.id, c.subject, reason), flush=True)
+    return over
 
 
 def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
@@ -1553,6 +1644,16 @@ def main():
                          "Autoform/SpecsGen/<Module>.lean. A targeted run "
                          "(--only-subjects) must use it, or it would silently replace "
                          "the full corpus module with a two-function one")
+    ap.add_argument("--theorem-timeout", type=int,
+                    default=int(os.environ.get("AUTOFORM_THEOREM_TIMEOUT", "300")),
+                    help="seconds one candidate may take to prove when compiled alone; over "
+                         "it, the candidate is excluded by name (0 disables the probe)")
+    ap.add_argument("--theorem-memory-gb", type=float,
+                    default=float(os.environ.get("AUTOFORM_THEOREM_MEMORY_GB", "16")),
+                    help="resident memory one candidate's proof may use when compiled alone")
+    ap.add_argument("--probe-jobs", type=int,
+                    default=int(os.environ.get("AUTOFORM_PROBE_JOBS", "2")),
+                    help="budget probes run concurrently; memory use is up to jobs x the limit")
     ap.add_argument("--exclude-subjects", default=None,
                     help="`;`-separated function names to leave OUT of the mined set. For a "
                          "subject whose by-computation proof does not terminate in the "
@@ -1755,6 +1856,7 @@ def main():
     if args.exclude_subjects:
         drop = [n.strip() for n in args.exclude_subjects.split(";") if n.strip()]
         excluded = [n for n in subjects if n in drop]
+        EXCLUDED_SUBJECTS[:] = excluded
         subjects = [n for n in subjects if n not in drop]
         print("   excluded %d subject(s) by --exclude-subjects: %s"
               % (len(excluded), ", ".join(excluded) or "(none matched)"))
@@ -1845,6 +1947,12 @@ def main():
         return 6
     ns_override = (os.path.splitext(os.path.basename(path))[0]
                    if args.out else args.module)
+    over = budget_probe(cands, args.module, os.path.join(SCRATCH, "budget-probe"),
+                        args.theorem_timeout, args.theorem_memory_gb, args.probe_jobs,
+                        ns=ns_override)
+    BUDGET_EXCLUDED[:] = [(c.id, c.subject, c.reason) for c in over]
+    print("   budget probe: %d candidate(s) over %d s / %g GB, excluded by name"
+          % (len(over), args.theorem_timeout, args.theorem_memory_gb))
     ok, demoted, log = compile_repair(cands, args.module, path, ns=ns_override)
     proved = [c for c in cands if c.proved]
     unproved = [c for c in cands if c.status == "unproved"]
@@ -1909,6 +2017,8 @@ def main():
         "max_subjects": args.max_subjects or None,
         "only_subjects": args.only_subjects,
         "excluded_subjects": excluded,
+        "budget_excluded": [{"theorem": t, "subject": sj, "reason": r}
+                            for t, sj, r in BUDGET_EXCLUDED],
         "functions": len(funcs),
         "call_closed": len(core),
         "artifacts": art,
@@ -1968,7 +2078,13 @@ def main():
     print("   fuel-independent     : %d proved for ALL fuel ≥ FUEL (%d still FUEL-only)"
           % (report["fuel_independent"], report["fuel_obligations_remaining"]))
     print("   report               : %s" % args.json_path)
-    if args.conformance_only and (not proved or len(proved) != len(cands)):
+    print("   over proof budget    : %d (excluded by name; see budgetExcluded)"
+          % len(BUDGET_EXCLUDED))
+    # A candidate excluded by the proof budget is named in the module and the report, as
+    # `--exclude-subjects` is, and states nothing; it is not an unproved claim. Every
+    # candidate that WAS emitted must still prove.
+    attempted = [c for c in cands if c.status != "excluded"]
+    if args.conformance_only and (not proved or len(proved) != len(attempted)):
         print("FAIL: not every generated native conformance obligation was proved")
         return 1
     return 0 if ok else 1

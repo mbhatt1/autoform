@@ -67,7 +67,7 @@ below).
 
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 209 | 207 (99%) | 107 (51%) | 3 | 6,056 | 1,191 |
+| `cachetools` (published) | 209 | 204 (97%) | 150 (71%) | 5 | 6,625 | 1,449 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |
@@ -96,6 +96,35 @@ which has not been done — every Django figure in this table predates that work
 Hole *density* is stable — 2.4%-3.0% of AST nodes across every corpus including Django's
 397,571 nodes — so translation quality is size-independent. The hole causes shift:
 Django's top cause is `import:unresolved` (5,122), which barely registers on `cachetools`.
+
+## Sharded rendering — measured 2026-10-09
+
+The memory constraint in §4 below is now addressed. `render_lean.py --shard-functions N`
+(the CLI default, 1000; `AUTOFORM_SHARD_FUNCTIONS`; `0` disables it) writes the
+definitions into `Autoform/Generated/<M>/PartNNNN.lean`, each part importing only the
+semantics, so `lake build` elaborates the parts in parallel and each `lean` process holds
+one part. Each part also defines its slice of the function list (`PartNNNN.partFuncs`)
+and the root module's `program` appends them, so the one serial step is a dozen `++`s
+rather than a 10,000-element list literal. Every name downstream is unchanged, and the
+kernel checks the sharded `program` equal to the unsharded one by `rfl` (Jinja2, 7 parts,
+no axioms). Tracked corpora stay unsharded: their render pins are hashes of that output.
+
+Django's `django/` package, the same AST as the table above (10,658 functions after the
+generator lowering), on the same machine, `/usr/bin/time -l lake build Autoform.Generated.ScaleDjango`:
+
+| layout | wall-clock | peak RSS (largest process) |
+|---|--:|--:|
+| one module | 459 s | 16.7 GB |
+| 12 parts, root assembles the list literal | 585 s | 3.3 GB |
+| 12 parts, parts carry `partFuncs` | **244 s** | **3.3 GB** |
+
+The middle row is why the third exists: with the parts built in parallel the root's own
+elaboration of the function list was 498 s of the 585. The remaining 208 s of root time
+is the class-declaration table and the initializer list, which are not yet split.
+
+Reproduce: export Django with `cartographer/export_ast.sc`, then
+`render_lean.py <ast> Autoform/Generated/ScaleDjango.lean ScaleDjango --shard-functions 1000`
+and the build above; `--shard-functions 0` for the first row.
 
 ## Where it breaks, in the order it breaks
 

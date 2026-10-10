@@ -1030,6 +1030,35 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
       | (k, _) :: ps, some f   => if strEndsWith k suffix then none else go ps (some f)
     go ctx.table none
 
+/-- The callee of a by-name call `f(args)`.
+
+A bare Python name is looked up in the enclosing scopes, the module and then the builtins
+(Language Reference §4.2.2); it never names a method, which is reachable only through a
+receiver or its class. `Ctx.resolve`'s unique-suffix fallback does not know that: on
+Jinja2, `set()` resolved to the program's only `….set`, `_MemcachedClient.set`, and raised
+an arity `TypeError` where CPython builds an empty set. A bare name whose resolution is a
+declared class's method is therefore not resolved here, and the call goes on to the
+value, dunder and builtin paths. Dotted names and other dialects are unchanged. -/
+def Ctx.resolveCall (ctx : Ctx) (f : String) : Option Func :=
+  match ctx.resolve f with
+  | some fn =>
+      if ctx.dialect == .python && !f.toList.contains '.' &&
+          ctx.classDecls.any (fun d => fn.name == d.name ++ "." ++ f)
+      then none else some fn
+  | none => none
+
+theorem Ctx.resolveCall_resolve {ctx : Ctx} {f : String} {fn : Func}
+    (h : ctx.resolveCall f = some fn) : ctx.resolve f = some fn := by
+  unfold Ctx.resolveCall at h
+  cases hr : ctx.resolve f with
+  | none => rw [hr] at h; cases h
+  | some g =>
+      rw [hr] at h
+      dsimp only at h
+      split at h
+      · cases h
+      · exact h
+
 /-! ## The calling convention
 
 `f(*xs, k=v, **d)` and `def f(a, *args, **kwargs)` are one mechanism, split across two
@@ -1460,6 +1489,15 @@ ordinary initializer descriptor. Custom `__new__` needs its own returned-object
 and subtype checks before an initializer can be selected. -/
 def Ctx.constructionGap (ctx : Ctx) (cls : String) : Option String :=
   if ctx.usesClassMetadata cls then
+    -- A subclass of a contracted external ABC with an abstract method still unimplemented
+    -- cannot be instantiated in CPython (`TypeError`); Core does not model that refusal's
+    -- message, so it is a named gap rather than a constructed instance.
+    match (ClassHierarchy.canonicalName ctx.classDecls cls).bind (fun owner =>
+        match ClassHierarchy.linearize ctx.classDecls owner with
+        | .complete order => ClassHierarchy.unimplementedAbstract ctx.classDecls order
+        | _ => none) with
+    | some name => some ("class-construction:abstract-method:" ++ name)
+    | none =>
     match ctx.classLookup cls "__new__" with
     | .found "__builtin.object" (.opaque _) =>
         match ctx.classLookup cls "__init__" with
@@ -2454,6 +2492,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                        -- is exactly when `classLookupGap` above did not fire.
                                        else if ctx.classDecls.isEmpty then
                                          (h₁, .hole s!"field:{f}:unresolved-inheritance")
+                                       -- §3.3.2: `__getattr__` is called when the ordinary
+                                       -- lookup raises `AttributeError`, i.e. exactly here. Its
+                                       -- body is translated, but calling it from this
+                                       -- non-recursive read would change `.field`'s fuel
+                                       -- shape, so the miss is a named gap, not the exception.
+                                       else if ctx.classDefines o.cls "__getattr__" then
+                                         (h₁, .hole s!"field:{f}:__getattr__-hook")
                                        else (h₁, .exn (.str "AttributeError"))
                                  -- Every other dialect keeps `unit`: in JavaScript a missing
                                  -- property IS `undefined` (ECMA-262 §10.1.8.1
@@ -2519,7 +2564,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr (vs, kws)) =>
-        match ctx.resolve f with
+        match ctx.resolveCall f with
         | some fn =>
             -- A `@classmethod` called through its qualified name (`C.make(3)` lowered to a
             -- direct call) is still bound to its class: CPython passes `cls` whether the
@@ -5231,6 +5276,120 @@ private def attrMissMetaProg : Program :=
        | .exn (.str "AttributeError") => true | _ => false
 #guard match runFunc attrMissMetaProg 200 "m.py:<module>.caught" [] with
        | .val (.str "AttributeError") => true | _ => false
+
+/-- `class Cache(collections.abc.MutableMapping)`, with the ABC contracted
+(`ExternalBases.lean`): own members are found through the base, a name the ABC provides
+(`get`) is a named hole, a true miss is CPython's `AttributeError`, construction works
+when every abstract method is implemented and is a named gap when one is not, and an
+uncontracted external base (`foo.Bar`) leaves the hierarchy unresolved as before. -/
+private def externalBaseProg : Program :=
+  { dialect := .python
+  , classDecls :=
+      [ { name := "m.py:<module>.Cache", shortName := "Cache"
+        , bases := ["<external>collections.abc.MutableMapping"]
+        , attributes := [("__init__", .method "m.py:<module>.Cache.__init__"),
+                         ("__getitem__", .method "m.py:<module>.Cache.__getitem__"),
+                         ("__setitem__", .method "m.py:<module>.Cache.__setitem__"),
+                         ("__delitem__", .method "m.py:<module>.Cache.__delitem__"),
+                         ("__iter__", .method "m.py:<module>.Cache.__iter__"),
+                         ("__len__", .method "m.py:<module>.Cache.__len__"),
+                         ("size", .method "m.py:<module>.Cache.size")] }
+      , { name := "m.py:<module>.Partial", shortName := "Partial"
+        , bases := ["<external>collections.abc.MutableMapping"]
+        , attributes := [("__getitem__", .method "m.py:<module>.Partial.__getitem__")] }
+      , { name := "m.py:<module>.Odd", shortName := "Odd", bases := ["<external>foo.Bar"]
+        , attributes := [("size", .method "m.py:<module>.Odd.size")] } ]
+  , funcs :=
+    [ { name := "m.py:<module>.Cache.__init__", params := []
+      , body := .setField (.name "self") "n" (.lit (.int 7)) }
+    , { name := "m.py:<module>.Cache.size", params := []
+      , body := .ret (.field (.name "self") "n") }
+    , { name := "m.py:<module>.Cache.__getitem__", params := ["k"], body := .ret (.name "k") }
+    , { name := "m.py:<module>.Cache.__setitem__", params := ["k", "v"], body := .skip }
+    , { name := "m.py:<module>.Cache.__delitem__", params := ["k"], body := .skip }
+    , { name := "m.py:<module>.Cache.__iter__", params := [], body := .skip }
+    , { name := "m.py:<module>.Cache.__len__", params := [], body := .ret (.lit (.int 0)) }
+    , { name := "m.py:<module>.Partial.__getitem__", params := ["k"], body := .ret (.name "k") }
+    , { name := "m.py:<module>.Odd.size", params := [], body := .ret (.lit (.int 1)) }
+    -- `Cache().size()`  -- an own method through a contracted base
+    , { name := "m.py:<module>.own", params := []
+      , body := .seq (.assign "c" (.alloc "Cache" []))
+                     (.ret (.mcall (.name "c") "size" [])) }
+    -- `Cache().get(1)`  -- a mixin the ABC provides: its code is not translated
+    , { name := "m.py:<module>.mixin", params := []
+      , body := .seq (.assign "c" (.alloc "Cache" []))
+                     (.ret (.mcall (.name "c") "get" [.lit (.int 1)])) }
+    -- `Cache().nothing`  -- CPython: AttributeError
+    , { name := "m.py:<module>.missing", params := []
+      , body := .seq (.assign "c" (.alloc "Cache" []))
+                     (.ret (.field (.name "c") "nothing")) }
+    -- `Partial()`  -- CPython: TypeError, abstract methods unimplemented
+    , { name := "m.py:<module>.partial", params := []
+      , body := .ret (.alloc "Partial" []) }
+    -- `Odd().size()`  -- `foo.Bar` is not contracted
+    , { name := "m.py:<module>.odd", params := []
+      , body := .seq (.assign "c" (.alloc "Odd" []))
+                     (.ret (.mcall (.name "c") "size" [])) } ] }
+
+#guard match runFunc externalBaseProg 200 "m.py:<module>.own" [] with
+       | .val (.int 7) => true | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.mixin" [] with
+       | .hole "class-attribute:external-base:<external>collections.abc.MutableMapping:get" => true
+       | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.missing" [] with
+       | .exn (.str "AttributeError") => true | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.partial" [] with
+       | .hole "class-construction:abstract-method:__delitem__" => true | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.odd" [] with
+       | .hole "class-hierarchy:unresolved-base:<external>foo.Bar" => true | _ => false
+
+/-- `__getattr__` runs only on a MISS (§3.3.2): a present instance attribute reads and
+writes as usual, and the miss is a named gap rather than `AttributeError`. -/
+private def getattrHookProg : Program :=
+  { dialect := .python
+  , classDecls :=
+      [ { name := "m.py:<module>.D", shortName := "D", bases := ["__builtin.object"]
+        , attributes := [("__init__", .method "m.py:<module>.D.__init__"),
+                         ("__getattr__", .method "m.py:<module>.D.__getattr__")] } ]
+  , funcs :=
+    [ { name := "m.py:<module>.D.__init__", params := []
+      , body := .setField (.name "self") "n" (.lit (.int 3)) }
+    , { name := "m.py:<module>.D.__getattr__", params := ["name"], body := .ret (.name "name") }
+    , { name := "m.py:<module>.present", params := []
+      , body := .seq (.assign "d" (.alloc "D" []))
+                (.seq (.setField (.name "d") "n" (.lit (.int 4)))
+                      (.ret (.field (.name "d") "n"))) }
+    , { name := "m.py:<module>.missing", params := []
+      , body := .seq (.assign "d" (.alloc "D" []))
+                     (.ret (.field (.name "d") "zzz")) } ] }
+
+#guard match runFunc getattrHookProg 100 "m.py:<module>.present" [] with
+       | .val (.int 4) => true | _ => false
+#guard match runFunc getattrHookProg 100 "m.py:<module>.missing" [] with
+       | .hole "field:zzz:__getattr__-hook" => true | _ => false
+
+/-- A bare call never resolves to a method (`Ctx.resolveCall`). `set()` beside a class
+whose only `….set` is a method: CPython builds an empty set, which Core does not model,
+so the honest answer is the builtin's hole -- not the method's arity `TypeError`. -/
+private def bareCallProg : Program :=
+  { dialect := .python
+  , classDecls := [{ name := "m.py:<module>.K", shortName := "K", bases := ["__builtin.object"] }]
+  , funcs :=
+      [ { name := "m.py:<module>.K.set", params := ["self"], body := .ret (.lit (.int 1)) }
+      , { name := "m.py:<module>.bare", params := [], body := .ret (.call "set" []) }
+      , { name := "m.py:<module>.helper", params := [], body := .ret (.lit (.int 2)) }
+      , { name := "m.py:<module>.viaSuffix", params := [], body := .ret (.call "helper" []) }
+      , { name := "m.py:<module>.dotted", params := [],
+          body := .ret (.call "K.set" [.lit (.int 0)]) } ] }
+
+#guard match runFunc bareCallProg 50 "m.py:<module>.bare" [] with
+       | .hole "call:set" => true | _ => false
+-- A module-level function is still found by its bare name, and a dotted name still
+-- reaches the method.
+#guard match runFunc bareCallProg 50 "m.py:<module>.viaSuffix" [] with
+       | .val (.int 2) => true | _ => false
+#guard match runFunc bareCallProg 50 "m.py:<module>.dotted" [] with
+       | .val (.int 1) => true | _ => false
 #guard match runFunc attrMissMetaProg 200 "m.py:<module>.present" [] with
        | .val (.int 1) => true | _ => false
 #guard match runFunc attrMissMetaProg 200 "m.py:<module>.viaProperty" [] with

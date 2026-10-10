@@ -9,8 +9,8 @@ superlinearly with program size. Hence: **verified core + contracts**, never
 whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is the
 other half.
 
-On `cachetools`, 207 of 209 functions are
-hole-free and 107 are call-closed. A single untranslated construct anywhere in a function
+On `cachetools`, 204 of 209 functions are
+hole-free and 150 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
@@ -210,7 +210,7 @@ What `scripts/sacm.py` should do with it:
 
 > **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
 > `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
-> fails on a mismatch. Current: 209 functions, 207 hole-free, 107 call-closed, 3 holes.
+> fails on a mismatch. Current: 209 functions, 204 hole-free, 150 call-closed, 5 holes (re-landed 2026-10-09).
 > (97, not the 108 reported until 2026-09-21: the ledger's call analysis had a wildcard
 > arm and did not look inside `tryFinally` -- Python `with` -- so eleven functions whose
 > only open callee sat inside one were counted as closed. `Ledger.lean`'s analyses are
@@ -218,6 +218,53 @@ What `scripts/sacm.py` should do with it:
 > Historical figures elsewhere in this repository (238 functions, 208 functions, cores of
 > 45, 69, 74) are superseded snapshots taken before the exporter changes that removed
 > `<metaClassCallHandler>` synthetics and closed `op:starredUnpack`.
+
+## External base classes — the first contracts that landed
+
+The first Milestone-3 contracts are not for callees but for **base classes**. A corpus
+class whose base is not in the corpus — `class Cache(collections.abc.MutableMapping)` —
+left the whole hierarchy unresolved once the exporter started recording class metadata:
+no attribute of a `Cache` instance could be looked up, the oracle refused to snapshot such
+receivers (`class-identity-unresolved`), and 60,000 of cachetools' traced calls were
+dropped on the floor. "Unresolved" was honest and useless.
+
+A contract makes it decidable. `scripts/external_bases.py` states, for each ABC in
+`collections.abc`, exactly what it contributes to a namespace: the attribute names the ABC
+or one of its ancestors *defines* (`vars`, so an override of an `object` name such as
+`Mapping.__eq__` counts; `dir(cls) - dir(object)` would hide exactly those) and its
+`__abstractmethods__`. The sets are frozen from CPython 3.11 and emitted into
+`Autoform/Lang/Core/ExternalBases.lean` (`--emit-lean`; `tests/test_external_bases.py`
+fails if the two differ). The exporter marks such a base `<external>module.qualname`
+(`imported_base` in the sidecar resolves the import binding; a relative import of a corpus
+class resolves to its qualified name instead), and `ClassHierarchy.lean` treats a
+contracted marker as one node of a complete C3 order:
+
+* an in-corpus member found before the node is the answer, as in CPython;
+* a name the contract provides is `.opaque` — a named hole
+  (`class-attribute:external-base:<base>:<name>`) when it is reached, because the ABC's
+  code is not translated;
+* a name neither defines is absent — CPython's `AttributeError`;
+* `__init__`/`__new__` fall through to `object`, so construction works — unless an
+  abstract method is unimplemented, which CPython refuses in `object.__new__` and Core
+  reports as `class-construction:abstract-method:<name>`;
+* an *uncontracted* external base (`json.JSONEncoder`) leaves the hierarchy unresolved
+  exactly as before.
+
+What keeps this from being a guess is that the oracle checks the contract **against the
+live class** before it encodes a receiver whose MRO contains it (`external_bases.verify`):
+the defined names and abstract set must equal the pinned ones and the base must declare no
+instance storage (`__slots__ = ()`). A CPython whose ABC differs refuses the case by name
+(`external-base-contract-mismatch`) instead of comparing against a wrong model, and the
+Lean side never sees a contract the oracle did not confirm on the same interpreter.
+
+Deliberately only `collections.abc`, and only the storage-free ABCs (`MappingView` and the
+views keep a `_mapping` slot). `typing.Generic` rewrites a subclass's attributes in
+`__init_subclass__`, `enum.Enum`'s metaclass rewrites the namespace, and the exception
+hierarchy has its own representation in Core — none of those is a namespace contract.
+One approximation is documented in `ClassHierarchy.lean`: the node stands for the base and
+its ancestors together, so a name defined both by an in-corpus class placed *after* the
+base in the real C3 order and by one of the base's ancestors is answered by the node (a
+hole) where CPython would answer the in-corpus class — a lost answer, never a wrong one.
 
 ## Which callees to contract next — measured
 

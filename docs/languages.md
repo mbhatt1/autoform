@@ -44,7 +44,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 209 | 99% | 107 (51%) | 0.05% | **yes** (CPython) |
+| Python | yes | yes | yes | `.python` ✅ | 209 | 97% | 150 (71%) | 0.08% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
@@ -786,8 +786,17 @@ is "raised when an attribute reference or assignment fails".
 a `@property` getter and the class-attribute fallback have all missed, evaluates to
 `.exn (.str "AttributeError")` when the program carries recovered class metadata
 (`Program.classDecls`), so the miss was searched through a complete MRO
-(`Semantics.lean`, the `.field` clause; the arm cites the sections above). Core has no
-`__getattr__`, so there is no further fallback to model. On a legacy model with no
+(`Semantics.lean`, the `.field` clause; the arm cites the sections above). When the class
+defines `__getattr__`, §3.3.2 says it is called exactly at that miss; its body is
+translated but calling it from the non-recursive `.field` read would change the clause's
+fuel shape, so the miss is the named gap `field:<attr>:__getattr__-hook` rather than the
+exception (CHANGED 2026-10-09: the exporter used to treat `__getattr__` like
+`__getattribute__`, as a barrier on the whole namespace, which made every attribute of
+cachetools' `_Timer` instances unreadable; only `__getattribute__`, which intercepts every
+read, is a barrier now). A base class outside the corpus is searched through its contract
+when it has one (`collections.abc`, [contracts.md](contracts.md) "External base classes");
+a name the contract provides is the gap `class-attribute:external-base:<base>:<name>`, and
+an uncontracted external base leaves the hierarchy unresolved. On a legacy model with no
 class metadata Core cannot see the bases, and a miss is the named gap
 `field:<attr>:unresolved-inheritance` rather than a claim that CPython raises: on the
 tracked cachetools corpus, `self.getsizeof` on an `LRUCache` instance is the inherited
