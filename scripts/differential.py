@@ -1652,6 +1652,20 @@ def runtime_version(lang):
 # ------------------------------------------------------------------------ JVM backend
 
 JAVA_PRIM = ("int", "long", "short", "byte", "char", "float", "double", "boolean", "java.lang.String")
+# Parameter types the driver can supply a value for. `CharSequence` is the parameter
+# type of most of commons-lang3's `StringUtils` surface (`isEmpty(CharSequence)`,
+# `indexOf(CharSequence, int)`, ...); a `String` IS a `CharSequence` (JLS §4.10.2, java.lang
+# .String implements it), so the driver passes a String through a `CharSequence.class`
+# parameter slot -- reflection resolves the method by the declared parameter type, not the
+# argument's class. Return types stay `JAVA_PRIM`: a returned `CharSequence` need not be a
+# String and `enc` has no faithful encoding for an arbitrary one.
+JAVA_ARG_TYPES = JAVA_PRIM + ("java.lang.CharSequence",)
+# Extra `javac -sourcepath` roots for a corpus exported as a SUBSET of a larger tree
+# (the commons-lang3 re-land exports nine files of `org.apache.commons.lang3`; their
+# same-package references -- `ArrayUtils`, `ObjectUtils`, `CharSequenceUtils` -- live in the
+# full source release the subset was copied from). The roots are recorded in
+# `backend_info.extra_source_roots` so conformance.json says what was on the compile path.
+JAVA_SOURCEPATH_ENV = "AUTOFORM_JAVA_SOURCEPATH"
 STRING_POOL = ["", "0", "11", "1.8.0_281", "17.0.1", "java.lang.String",
                "android.os.Bundle", "com.example.Foo"]
 JAVA_SIG = re.compile(r'^(?P<cls>[\w.$]+)\.(?P<meth>[\w$<>]+):(?P<ret>[\w.$\[\]]+)'
@@ -1691,6 +1705,7 @@ public class AutoformDriver {
         else if (t.equals("float"))   { ts[i] = float.class;   vs[i] = Float.parseFloat(v); }
         else if (t.equals("double"))  { ts[i] = double.class;  vs[i] = Double.parseDouble(v); }
         else if (t.equals("boolean")) { ts[i] = boolean.class; vs[i] = Boolean.parseBoolean(v); }
+        else if (t.equals("java.lang.CharSequence")) { ts[i] = CharSequence.class; vs[i] = new String(Base64.getDecoder().decode(v)); }
         else { ts[i] = String.class; vs[i] = new String(Base64.getDecoder().decode(v)); }
       }
       try {
@@ -1797,7 +1812,7 @@ def java_backend(src_root, holefree, ncases, kotlin=False):
         if len(args) != len(f["params"]):
             skipped[f["name"]] = "signature/parameter count disagree"
             continue
-        if any(a not in JAVA_PRIM for a in args) or m.group("ret") not in JAVA_PRIM:
+        if any(a not in JAVA_ARG_TYPES for a in args) or m.group("ret") not in JAVA_PRIM:
             skipped[f["name"]] = "non-primitive signature"
             continue
         src = os.path.join(src_root, f.get("file", ""))
@@ -1820,6 +1835,14 @@ def java_backend(src_root, holefree, ncases, kotlin=False):
     candidate_sources = [] if kotlin else sorted({c[3] for c in cands})
     # Give javac the project's own source roots so intra-project references resolve.
     source_roots = java_source_roots(candidate_sources)
+    extra_roots = [r for r in os.environ.get(JAVA_SOURCEPATH_ENV, "").split(os.pathsep) if r]
+    for root in extra_roots:
+        if not os.path.isdir(root):
+            info["driver"] = "%s names a missing directory: %s" % (JAVA_SOURCEPATH_ENV, root)
+            return [], info, skipped
+    if extra_roots:
+        info["extra_source_roots"] = extra_roots
+    source_roots = source_roots + [r for r in extra_roots if r not in source_roots]
     sourcepath = ["-sourcepath", os.pathsep.join(source_roots)] if source_roots else []
     failure_causes = collections.Counter()
     for src in candidate_sources:
@@ -1862,7 +1885,7 @@ def java_backend(src_root, holefree, ncases, kotlin=False):
         for iteration in range(max(1, ncases)):
             vals, enc = [], []
             for t in argtypes:
-                if t == "java.lang.String":
+                if t in ("java.lang.String", "java.lang.CharSequence"):
                     v = random.choice(STRING_POOL)
                     vals.append(("str", v))
                     enc += [t, base64.b64encode(v.encode()).decode()]
@@ -2115,14 +2138,20 @@ def main():
                       "under backend_skipped. TypeScript runs through "
                       "`node --experimental-strip-types`: erasable annotations only.")
     elif lang in ("java", "kotlin"):
-        BASIS = "jvm-primitive-static-v1"
+        BASIS = "jvm-primitive-static-v2"
+        # v2 (2026-10-10): `CharSequence` parameters are attempted (v1 refused them as
+        # non-primitive), so the attempted population and the rates are not comparable
+        # with a v1 report.
         BASIS_NOTE = ("Only static methods whose whole signature is primitive-or-String are "
                       "called, reflectively, on a fixed pool per type (0, 1, MAX, MIN, 31, 32, "
                       "63, 64 for integers; a fixed string list; 0.0, 1.5, -2.25, 2^24, -0.0 "
-                      "for floats). Instance methods, non-primitive signatures and files that "
-                      "do not compile against the corpus's own source roots are skipped and "
-                      "COUNTED; no third-party classpath is supplied. Kotlin compiles a "
-                      "@JvmStatic thunk per function and goes through the same driver.")
+                      "for floats). A `CharSequence` parameter receives a String from the "
+                      "same list. Instance methods, other non-primitive signatures and files "
+                      "that do not compile against the corpus's own source roots (plus any "
+                      "roots named in AUTOFORM_JAVA_SOURCEPATH, recorded under "
+                      "backend_info.extra_source_roots) are skipped and COUNTED; no "
+                      "third-party classpath is supplied. Kotlin compiles a @JvmStatic thunk "
+                      "per function and goes through the same driver.")
     elif lang == "go":
         BASIS = "go-package-func-v1"
         BASIS_NOTE = ("Package-level functions with scalar parameters (integers, bool, "

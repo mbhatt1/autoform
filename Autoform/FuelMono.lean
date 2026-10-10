@@ -2258,6 +2258,51 @@ theorem execFor_fuel_mono_all {ctx : Ctx} {k k' : Nat} {h h' : Heap}
   | zero => exact he
   | succ n ih => exact execFor_fuel_succ_all ih hne
 
+/-! ## Reachability form of the side condition
+
+Roadmap item 2.2 asked for a transport whose side condition is stated over the bodies a
+run actually *reaches*, so that a law about a call into `try/finally`-heavy code does not
+pay for the whole table. Two facts fix its shape, and both are checked here rather than
+argued:
+
+* The syntactic side condition has no content left to restrict. The simultaneous
+  induction carries `controlCovered`, every statement satisfies it
+  (`controlCovered_all`), and the `_all` theorems above take no premise about any body,
+  reached or unreached. A `tryFinally` premise restricted to the reached bodies would be
+  a hypothesis the proof never uses; it is not stated.
+* The only premise the transport still has is about the run itself: it completed at the
+  smaller budget. Nothing about the context, the table, or any body is assumed.
+
+So the reachability form is the transport as an equation about **one run** with that
+single premise. `applyFunc_fuel_mono_of_defined` is what `scripts/synth_specs.py`
+transports through. For the conformance family the premise is a consequence of the law
+and the recorded outcome (`SpecsGen.Basis.lawConform_defined`): the recorded result came
+from the source runtime and is never `outOfFuel`, and the law says the interpreter
+reproduced it, so the run completed. The generated proof therefore evaluates each case
+once in the kernel, not twice.
+
+What a run reaches is paid for in kernel *evaluation*, not in the transport. Measured on
+Click (2026-10-10): a bare builtin name (`repr(x)`, `len(x)`) misses `Ctx.resolve`'s
+exact lookup and scans every table key by suffix, and each suffix test used to decode a
+UTF-8 key through well-founded recursion — about 40 MB of kernel state per key, 24 GB
+over the Click table. That is the cost the roadmap attributed to the side condition; it
+is now paid in bytes (`strEndsWith` in `Semantics.lean`), roughly eight times cheaper. -/
+
+/-- The transport as an equation about one run: the only side condition is that this run
+completed. No property of the context, of the table, or of any body is assumed. -/
+theorem applyFunc_fuel_mono_of_defined {ctx : Ctx} {k k' : Nat} {h : Heap} {fn : Func}
+    {self? : Option Val} {vs : List Val} {kws : List (String × Val)} (hk : k ≤ k')
+    (hne : (applyFunc ctx k h fn self? vs kws).2 ≠ .outOfFuel) :
+    applyFunc ctx k' h fn self? vs kws = applyFunc ctx k h fn self? vs kws :=
+  applyFunc_fuel_mono_all hk rfl hne
+
+/-- `applyClosure` version. -/
+theorem applyClosure_fuel_mono_of_defined {ctx : Ctx} {k k' : Nat} {h : Heap} {fn : Func}
+    {cap : List (String × Val)} {vs : List Val} {kws : List (String × Val)} (hk : k ≤ k')
+    (hne : (applyClosure ctx k h fn cap vs kws).2 ≠ .outOfFuel) :
+    applyClosure ctx k' h fn cap vs kws = applyClosure ctx k h fn cap vs kws :=
+  applyClosure_fuel_mono_all hk rfl hne
+
 /-! ## Incomplete execution is never masked by a finalizer -/
 
 def cexCtx : Ctx := { dialect := .python, table := [], globals := 0 }
@@ -2291,5 +2336,6 @@ def fuelMonoExclusions : List String := []
 #print axioms tryFinally_preserves_incomplete
 #print axioms execStmt_fuel_mono_all
 #print axioms applyFunc_fuel_mono_all
+#print axioms applyFunc_fuel_mono_of_defined
 
 end Autoform.Core

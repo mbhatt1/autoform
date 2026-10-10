@@ -232,6 +232,35 @@ appear in the generated module (`budgetExcluded`, printed when it builds) and in
 `specs.json` (`budget_excluded`). A candidate that simply fails to prove is not affected:
 it stays an open obligation.
 
+**Build shape.** The same probe is the per-theorem memory profile: every candidate's peak
+resident size and wall time are recorded (`specs.json`, `memory_profile`), and the empty
+module is probed once for the base cost every process pays. One Lean process retains every
+by-computation proof term it elaborates, so the predicted peak of the single-file module
+is the base plus the sum of its theorems' costs. When that exceeds `AUTOFORM_SPLIT_GB`
+(`--split-gb`, default 4; `0` disables) stage 8 emits the module the way
+`Autoform/SpecsGen/V8Base` is laid out: `Autoform/SpecsGen/<Module>/Base.lean` (the
+context, the frozen globals heap and every domain), `<Module>/PartN.lean` (theorems only,
+each part predicted under the threshold, with its own `#audit_depends`/`#audit_axioms`
+gate) and an umbrella `<Module>.lean` that imports them and declares `obligations`,
+`excludedSubjects` and `budgetExcluded`. Every file shares the unsplit module's namespace,
+so no theorem changes its name; `specs.json` records the plan (`split`). Parts are built
+one at a time. A theorem whose cost alone exceeds the threshold gets a part of its own and
+is named in the umbrella's header and in the log: no split bounds it, and the only ways
+to bound it are a cheaper proof or exclusion by `AUTOFORM_THEOREM_MEMORY_GB`.
+
+**Cache.** `.autoform-work/cache/<digest>/` memoizes, per function AST digest, what a
+re-land recomputes although nothing changed: the oracle's Lean answer for each recorded
+case (`lean-*.json`) and the synthesizer's refutation, guard, proof-fuel, execution-hint
+and probe verdicts per candidate (`synth-*.json`); the oracle's Python observation phase
+(suite trace, random and constructed calls), which runs as one process, is memoized whole
+under the AST digest, and the call-closed core and globals heap under the model digest.
+Each entry is further keyed by a digest of everything the verdict depends on: the rendered
+model, the Lean sources a proof can reach, the harness scripts, the budgets, the test
+suite and source tree. A cached "proved" is only a hint that the same text is emitted;
+`lake build` re-verifies it and is a no-op exactly when its own traces say nothing
+changed. `AUTOFORM_NO_CACHE=1` (or `synth_specs.py --no-cache`) bypasses the cache;
+`AUTOFORM_CACHE_DIR` relocates it. See `scripts/work_cache.py`.
+
 Stage 6 failures are recorded and propagate a nonzero exit status after the ledger.
 Proof synthesis runs only after successful conformance. Stage logs, reports and a
 final `pipeline.json` live in `artifacts/pipeline/<Module>/`. A new run invalidates
@@ -350,6 +379,19 @@ outside the function's contract (for example a result that cannot fit its type) 
 reported like any other. "No divergence found" means none among the inputs tried,
 never equivalence. SLEIGH descriptions are trusted, and arguments are limited to
 integer registers (no stack-passed arguments, floats or aggregates).
+
+### `autoform pr <repo> [Module] --base REF [--head REF]` — evidence for a change
+
+Runs the chain for the functions a change touched, and only those, and reports each
+one's evidence level: `none`, `hole`, `translated`, `oracle-agreed`, `proved` or
+`refuted`, each bound to the artifact that establishes it. `docs/evidence-levels.md`
+is the one-page reference for what each level does and does not claim. `--head`
+defaults to the working tree; `--sarif` and `--markdown` write the SARIF 2.1.0 file
+code scanning ingests and the review comment; `--ast FILE` uses an exporter AST
+instead of running Joern; `--mutants N` adds the mutation gate over the proved
+theorems. From a checkout, `scripts/pr_mode.py` is the same command without the
+workspace. `.github/workflows/pr.yml` runs it on the fixture history that
+`scripts/pr_fixture.py` builds and uploads the SARIF.
 
 ## 3. Reading the ledger
 
@@ -630,6 +672,7 @@ authority when they disagree, and a disagreement is a bug to file.
 | `autoform assure` / `./assure.sh` / a Git URL | every required check completed | the workflow finished with unresolved verification gaps — `completed_with_gaps` in `run.json`; a scoped certificate in `guarantee.json` can coexist with this | invocation, setup or orchestration failure; source acquisition failed; property input invalid; refused tree as above | `128+N` |
 | `autoform regress --machine` | no divergence found among the inputs tried | at least one kernel-checked diverging input (`machine/regression.json`) | usage error, a build, link or lift failure, or a source that is not a Git repository | `128+N` |
 | `autoform regress` | both runs translated and nothing that held at `--base` is lost at `--head`, and no recorded case changed outcome | a regression or a proven behavior change (`regression.json` says which), or a run that never produced an AST | usage error, the source is not a Git repository, a ref could not be fetched, busy workspace, or a refused tree as above | `128+N` from either run; `--timeout` expiry is `143` |
+| `autoform pr` / `scripts/pr_mode.py` | every changed function reported at the level its artifacts reach and none refuted | at least one changed function refuted (`pr.json` names the witness) | usage error, the source is not a Git repository, an unknown ref, or the SARIF failed validation | `128+N`; `--timeout` expiry is `143` |
 | `autoform machine` | as `scripts/formalize_machine.py` | as `formalize_machine.py` | CLI-level failure (workspace, lock, extraction) | — |
 
 Two things worth stating plainly. A `1` from `assure` is **not** a crash: it is the

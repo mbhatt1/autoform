@@ -690,6 +690,44 @@ theorem lawConform_fuel_mono_all {ctx : Ctx} {fn : Func}
   unfold lawConform at h ⊢
   rw [runCase_fuel_mono_all hk hg]; exact h
 
+/-! ### The conformance guard is a consequence of the law
+
+`gRunObs` re-runs the case to check that it did not end in `outOfFuel`. For `lawConform`
+that second run is redundant: the recorded outcome came from the source runtime, so it is
+a value or an exception, and neither `EResult.beq` nor the heap-graph comparison ever
+equates a completed result with `outOfFuel`. The three lemmas below make the implication
+explicit, so the generated proof evaluates each case once (`FuelMono.lean`,
+"Reachability form of the side condition"). The premise `defined o.expected` is a check
+on the recorded literal, not on a run. -/
+
+/-- `EResult.beq` never equates a result with `outOfFuel` unless both are. -/
+theorem defined_of_beq {r e : EResult} (h : EResult.beq r e = true) (hd : defined e = true) :
+    defined r = true := by
+  cases r <;> cases e <;> simp_all [EResult.beq, defined]
+
+/-- The heap-graph comparison answers `some true` only for a value against a value or an
+exception against an exception. -/
+theorem defined_of_compare {g : HeapObservation} {h : Heap} {e r : EResult}
+    (hc : (g.compare h e r == some true) = true) : defined r = true := by
+  unfold HeapObservation.compare at hc
+  cases e <;> cases r <;> simp_all [defined]
+
+/-- The `≠ outOfFuel` guard of the conformance family follows from the law itself. -/
+theorem lawConform_defined {ctx : Ctx} {k : Nat} {fn : Func} {o : Obs}
+    (h : lawConform ctx k fn o = true) (hd : defined o.expected = true) :
+    gRunObs ctx k fn o = true := by
+  unfold lawConform at h
+  unfold gRunObs
+  cases hp : o.post with
+  | none => simp only [hp] at h; exact defined_of_beq h hd
+  | some g => simp only [hp] at h; exact defined_of_compare h
+
+/-- Fuel transport for the conformance family with the guard derived, not evaluated. -/
+theorem lawConform_fuel_mono_of_expected {ctx : Ctx} {fn : Func} {k k' : Nat} (hk : k ≤ k')
+    {o : Obs} (hd : defined o.expected = true) (h : lawConform ctx k fn o = true) :
+    lawConform ctx k' fn o = true :=
+  lawConform_fuel_mono_all hk (lawConform_defined h hd) h
+
 theorem lawRuns_fuel_mono_all {ctx : Ctx} {fn : Func}
     {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawRuns ctx k fn c = true) :

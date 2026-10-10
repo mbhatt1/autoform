@@ -312,9 +312,26 @@ def compile_sources(source, funcs, work):
     # A kernel unit that compiled but did not link calls into a sibling file
     # (`lcm` -> `gcd`). Retry it with the siblings that built on their own, which
     # are exactly the definitions this portability build can already stand behind.
+    # The callee's file may also have exposed no scalar entry point of its own (gcd.c
+    # once gcd() carries a `for (;;)` hole: nothing in it is hole-free, so it was never
+    # a unit and is not in `compiled`). Such a file is still the kernel's own source, so
+    # the unit's same-directory siblings are offered as plain link partners next --
+    # compiled unchanged, without wrappers, supplying definitions and nothing else.
+    unit_sources = {u[1] for u in units}
     for index, unit in link_failed:
         partners = [p for p in compiled if p != unit[1]]
-        ok, record = build([unit], 'linked%d' % index, partners) if partners else (False, None)
+        siblings = sorted(p for p in unit[1].parent.glob('*.c')
+                          if p.is_file() and p != unit[1] and p not in unit_sources)
+        attempts = []
+        if partners:
+            attempts.append(('linked%d' % index, partners))
+        if siblings:
+            attempts.append(('siblings%d' % index, partners + siblings))
+        ok, record = False, None
+        for label, chosen in attempts:
+            ok, record = build([unit], label, chosen)
+            if ok:
+                break
         if record is not None:
             result.info['units'].append(record)
         if ok:
