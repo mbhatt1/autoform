@@ -69,11 +69,12 @@ jobs:
           # The release ships per-platform zips (joern-cli-linux-x86_64.zip, ...); there is
           # no joern-cli.zip, so that URL was a 404 that failed every Joern-gated job.
           ASSET="joern-cli-linux-x86_64.zip"
-          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}" -o "/tmp/${ASSET}"
-          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}.sha512" -o "/tmp/${ASSET}.sha512"
-          (cd /tmp && sha512sum -c "${ASSET}.sha512")
-          mkdir -p "$HOME/joern"
-          unzip -q "/tmp/${ASSET}" -d "$HOME/joern"
+          # The .sha512 manifest names the zip as target/<asset>, so it is fetched there.
+          mkdir -p /tmp/joern-dl/target "$HOME/joern"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}" -o "/tmp/joern-dl/target/${ASSET}"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}.sha512" -o "/tmp/joern-dl/${ASSET}.sha512"
+          (cd /tmp/joern-dl && sha512sum -c "${ASSET}.sha512")
+          unzip -q "/tmp/joern-dl/target/${ASSET}" -d "$HOME/joern"
       - name: All source languages, real runtimes and generated kernel proofs
         env:
           AUTOFORM_TEST_JOERN: '1'

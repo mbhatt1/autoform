@@ -101,8 +101,20 @@ jobs:
       # heaviest by-computation spec modules hold more than this runner's memory. The
       # umbrella says which modules the runner proves; V8Base is gated by check_specs.py
       # and by the release checklist's full build.
+      # Even pinned to one core, Lake keeps several elaborations in flight. Two of them,
+      # `Autoform.SpecsGen.Cachetools` and `Autoform.Specs.CachetoolsSpec`, are independent
+      # (both import only `Autoform.Generated.Cachetools`) and each elaborates at ~13 GB
+      # (measured 2026-10-10 with /usr/bin/time -l: 13.0 GB and 13.6 GB peak RSS; a
+      # `lean -M 6000` run shows the spec file's memory is cumulative across its
+      # proofs, not one bad theorem). Scheduled together they exceed the runner, and that
+      # is exactly where this job died on 2026-10-10 (exit 143 after job 401/405, those two
+      # the only modules of the umbrella left unbuilt). Built one at a time each fits, so
+      # they are sequenced by hand before the umbrella picks up the rest.
       - name: lake build
-        run: taskset -c 0 lake build Autoform.CI
+        run: |
+          taskset -c 0 lake build Autoform.SpecsGen.Cachetools
+          taskset -c 0 lake build Autoform.Specs.CachetoolsSpec
+          taskset -c 0 lake build Autoform.CI
 
       - uses: actions/setup-python@v5
         with:
@@ -465,11 +477,12 @@ jobs:
           # The release ships per-platform zips (joern-cli-linux-x86_64.zip, ...); there is
           # no joern-cli.zip, so that URL was a 404 that failed every Joern-gated job.
           ASSET="joern-cli-linux-x86_64.zip"
-          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}" -o "/tmp/${ASSET}"
-          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}.sha512" -o "/tmp/${ASSET}.sha512"
-          (cd /tmp && sha512sum -c "${ASSET}.sha512")
-          mkdir -p "$HOME/joern"
-          unzip -q "/tmp/${ASSET}" -d "$HOME/joern"
+          # The .sha512 manifest names the zip as target/<asset>, so it is fetched there.
+          mkdir -p /tmp/joern-dl/target "$HOME/joern"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}" -o "/tmp/joern-dl/target/${ASSET}"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}.sha512" -o "/tmp/joern-dl/${ASSET}.sha512"
+          (cd /tmp/joern-dl && sha512sum -c "${ASSET}.sha512")
+          unzip -q "/tmp/joern-dl/target/${ASSET}" -d "$HOME/joern"
 
       # Reads the version out of the jar names on disk, as provenance.py does. This is
       # what catches an installer that "exited 0" having installed nothing.
