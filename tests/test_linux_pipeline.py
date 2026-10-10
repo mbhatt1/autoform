@@ -292,3 +292,28 @@ def test_kernel_static_key_header_compiles_outside_kbuild(tmp_path, differential
     # The key is initially true and nothing outside Kbuild toggles it, so the
     # static-branch path is the one taken; __ffs resolves through tools/include.
     assert result(f)(8, 0) == 1003
+
+
+def test_kernel_unit_links_against_a_sibling_with_no_entry_point(tmp_path, differential):
+    """`lcm` calls `gcd`, and once the exporter marks every function in gcd.c with a
+    hole (its `for (;;)` is `control:FOR:elided-clause`) gcd.c exposes no scalar entry
+    point, is never compiled as a unit, and so was never offered as a link partner:
+    lcm.c failed to link and the oracle had no translation unit at all. A unit that
+    did not link is now retried with its same-directory siblings as plain partners."""
+    if shutil.which('cc') is None:
+        pytest.skip('C compiler unavailable')
+    source = make_kernel(tmp_path)
+    (source / 'gcd.c').write_text(
+        'unsigned long gcd(unsigned long a, unsigned long b)\n'
+        '{ for (;;) { if (!b) return a; unsigned long t = a % b; a = b; b = t; } }\n')
+    (source / 'lcm.c').write_text(
+        'unsigned long gcd(unsigned long a, unsigned long b);\n'
+        'unsigned long lcm(unsigned long a, unsigned long b)\n'
+        '{ return a && b ? (a / gcd(a, b)) * b : a | b; }\n')
+    # Only lcm is offered: gcd.c has no hole-free function and is not a unit.
+    f = dict(scalar('lcm', 'lcm.c', ['a', 'b']), paramIntegerTypes=['u64', 'u64'],
+             returnIntegerType='u64')
+    result = differential.c_runtime(str(source), [f])
+    assert result.info['files_compiled'] == 1, result.info
+    assert any(u.get('link_partners') == ['gcd.c'] for u in result.info['units'])
+    assert result(f)(4, 6) == 12 and result(f)(0, 6) == 6
