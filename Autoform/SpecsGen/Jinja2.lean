@@ -65,12 +65,15 @@ whose subject a mutation gate can attack.
 
 **Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
 stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
-computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
-transport needs two side conditions, both discharged rather than assumed — the context is
-covered by the unrestricted fuel theorem (including finalizers) and the run did not
-end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
-either fails, the theorem stays at `FUEL` and its generalization is recorded in
-`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono_all`. The
+transport assumes nothing about the context or about any body, reached or not (the
+unrestricted fuel theorem covers finalizers); its one side condition is that the run did
+not end in `outOfFuel`. For `conform_*` that condition is a consequence of the law — the
+recorded outcome is a value or an exception, and the law says the interpreter reproduced
+it (`lawConform_defined`) — so it is checked on the recorded literal and each case is
+evaluated once. For every other family it is the `g…` guard, evaluated over the same
+domain as the law. Where it fails, the theorem stays at `FUEL` and its generalization is
+recorded in `obligations` below as a `Prop`-valued `def` — a statement, not an admission.
 
 There is no `sorry` in this file.
 
@@ -83,17 +86,18 @@ def dom_conform_jinja2_bccache_py__module__Bucket___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_bccache_py__module__Bucket___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_bccache_py__module__Bucket___init).all (lawConform C fuel f_jinja2_bccache_py__module__Bucket___init__)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_bccache_py__module__Bucket___init).all (lawConform C 16 f_jinja2_bccache_py__module__Bucket___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_jinja2_bccache_py__module__Bucket___init__) (lawConform C 16 f_jinja2_bccache_py__module__Bucket___init__) (lawConform C fuel f_jinja2_bccache_py__module__Bucket___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_bccache_py__module__Bucket___init__) (lawConform C fuel f_jinja2_bccache_py__module__Bucket___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_bccache_py__module__Bucket_reset : List Obs :=
@@ -102,17 +106,18 @@ def dom_conform_jinja2_bccache_py__module__Bucket_reset : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_bccache_py__module__Bucket_reset : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_bccache_py__module__Bucket_reset).all (lawConform C fuel f_jinja2_bccache_py__module__Bucket_reset)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_bccache_py__module__Bucket_reset).all (lawConform C 4 f_jinja2_bccache_py__module__Bucket_reset) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_bccache_py__module__Bucket_reset) (lawConform C 4 f_jinja2_bccache_py__module__Bucket_reset) (lawConform C fuel f_jinja2_bccache_py__module__Bucket_reset)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_bccache_py__module__Bucket_reset) (lawConform C fuel f_jinja2_bccache_py__module__Bucket_reset)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_bccache_py__module__BytecodeCache_clear : List Obs :=
@@ -121,17 +126,18 @@ def dom_conform_jinja2_bccache_py__module__BytecodeCache_clear : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_bccache_py__module__BytecodeCache_clear : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_bccache_py__module__BytecodeCache_clear).all (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_clear)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_bccache_py__module__BytecodeCache_clear).all (lawConform C 4 f_jinja2_bccache_py__module__BytecodeCache_clear) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_bccache_py__module__BytecodeCache_clear) (lawConform C 4 f_jinja2_bccache_py__module__BytecodeCache_clear) (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_clear)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_bccache_py__module__BytecodeCache_clear) (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_clear)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_bccache_py__module__BytecodeCache_load_bytecode : List Obs :=
@@ -142,17 +148,18 @@ def dom_conform_jinja2_bccache_py__module__BytecodeCache_load_bytecode : List Ob
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_bccache_py__module__BytecodeCache_load_bytecode : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_bccache_py__module__BytecodeCache_load_bytecode).all (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_load_bytecode)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_bccache_py__module__BytecodeCache_load_bytecode).all (lawConform C 8 f_jinja2_bccache_py__module__BytecodeCache_load_bytecode) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_bccache_py__module__BytecodeCache_load_bytecode) (lawConform C 8 f_jinja2_bccache_py__module__BytecodeCache_load_bytecode) (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_load_bytecode)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_bccache_py__module__BytecodeCache_load_bytecode) (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_load_bytecode)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_bccache_py__module__BytecodeCache_set_bucket : List Obs :=
@@ -162,17 +169,18 @@ def dom_conform_jinja2_bccache_py__module__BytecodeCache_set_bucket : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_bccache_py__module__BytecodeCache_set_bucket : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_bccache_py__module__BytecodeCache_set_bucket).all (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_set_bucket)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_bccache_py__module__BytecodeCache_set_bucket).all (lawConform C 16 f_jinja2_bccache_py__module__BytecodeCache_set_bucket) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_jinja2_bccache_py__module__BytecodeCache_set_bucket) (lawConform C 16 f_jinja2_bccache_py__module__BytecodeCache_set_bucket) (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_set_bucket)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_bccache_py__module__BytecodeCache_set_bucket) (lawConform C fuel f_jinja2_bccache_py__module__BytecodeCache_set_bucket)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_bccache_py__module__MemcachedBytecodeCache___init : List Obs :=
@@ -183,17 +191,39 @@ def dom_conform_jinja2_bccache_py__module__MemcachedBytecodeCache___init : List 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_bccache_py__module__MemcachedBytecodeCache___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_bccache_py__module__MemcachedBytecodeCache___init).all (lawConform C fuel f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_bccache_py__module__MemcachedBytecodeCache___init).all (lawConform C 8 f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__) (lawConform C 8 f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__) (lawConform C fuel f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__) (lawConform C fuel f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator__default_finalize : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "<y>"] }, expected := EResult.val (Val.str "<y>"), post := (some { heap := h0 ++ [], roots := [], budget := 74 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "<HelloWorld>"] }, expected := EResult.val (Val.str "<HelloWorld>"), post := (some { heap := h0 ++ [], roots := [], budget := 92 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator__default_finalize : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator__default_finalize).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator__default_finalize)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator__default_finalize).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator__default_finalize) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator__default_finalize) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator__default_finalize)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_compiler_py__module__CodeGenerator_get_context_ref : List Obs :=
@@ -202,17 +232,18 @@ def dom_conform_jinja2_compiler_py__module__CodeGenerator_get_context_ref : List
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_compiler_py__module__CodeGenerator_get_context_ref : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_get_context_ref).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_get_context_ref)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_get_context_ref).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_get_context_ref) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_compiler_py__module__CodeGenerator_get_context_ref) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_get_context_ref) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_get_context_ref)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_get_context_ref) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_get_context_ref)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_compiler_py__module__CodeGenerator_get_resolve_func : List Obs :=
@@ -221,17 +252,18 @@ def dom_conform_jinja2_compiler_py__module__CodeGenerator_get_resolve_func : Lis
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_compiler_py__module__CodeGenerator_get_resolve_func : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_get_resolve_func).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_get_resolve_func).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_compiler_py__module__CodeGenerator_indent : List Obs :=
@@ -241,17 +273,18 @@ def dom_conform_jinja2_compiler_py__module__CodeGenerator_indent : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_compiler_py__module__CodeGenerator_indent : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_indent).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_indent)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_indent).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_indent) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_compiler_py__module__CodeGenerator_indent) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_indent) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_indent)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_indent) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_indent)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_compiler_py__module__CodeGenerator_leave_frame : List Obs :=
@@ -262,17 +295,38 @@ def dom_conform_jinja2_compiler_py__module__CodeGenerator_leave_frame : List Obs
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_compiler_py__module__CodeGenerator_leave_frame : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_leave_frame).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_leave_frame)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_leave_frame).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_leave_frame) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_compiler_py__module__CodeGenerator_leave_frame) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_leave_frame) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_leave_frame)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_leave_frame) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_leave_frame)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [Val.unit] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2494 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_compiler_py__module__CodeGenerator_optimized : List Obs :=
@@ -281,17 +335,18 @@ def dom_conform_jinja2_compiler_py__module__CodeGenerator_optimized : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_compiler_py__module__CodeGenerator_optimized : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_optimized).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_optimized)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_optimized).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_optimized) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_compiler_py__module__CodeGenerator_optimized) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_optimized) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_optimized)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_optimized) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_optimized)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_compiler_py__module__CodeGenerator_outdent : List Obs :=
@@ -304,17 +359,144 @@ def dom_conform_jinja2_compiler_py__module__CodeGenerator_outdent : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_compiler_py__module__CodeGenerator_outdent : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_outdent).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_outdent)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_outdent).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_outdent) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_compiler_py__module__CodeGenerator_outdent) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_outdent) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_outdent)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_outdent) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_outdent)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [Val.unit] }, expected := EResult.val (Val.bool false), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2508 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.exn (Val.str "IndexError"), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2502 }) },
+   { case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [Val.int (-2)] }, expected := EResult.exn (Val.str "IndexError"), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2502 }) },
+   { case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] }, expected := EResult.exn (Val.str "IndexError"), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2502 }) },
+   { case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [Val.int (-3)] }, expected := EResult.exn (Val.str "IndexError"), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2502 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_context_reference : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2458 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator_pop_context_reference : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_context_reference).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_pop_context_reference)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_context_reference).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_pop_context_reference) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_pop_context_reference) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_pop_context_reference)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.exn (Val.str "IndexError"), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2502 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator_push_context_reference : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context", Val.unit] }], self := (some (Val.ref (base + 0))), args := [Val.unit] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context", Val.unit, Val.unit] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2534 }) },
+   { case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context", Val.unit, Val.unit, Val.unit] }], self := (some (Val.ref (base + 0))), args := [Val.unit] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context", Val.unit, Val.unit, Val.unit, Val.unit] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2574 }) },
+   { case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [Val.unit] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (0)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context", Val.unit] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2514 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator_push_context_reference : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_push_context_reference).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_push_context_reference)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_push_context_reference).all (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_push_context_reference) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__CodeGenerator_push_context_reference) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_push_context_reference)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_compiler_py__module__CodeGenerator_temporary_identifier : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (2)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "t_3"), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (3)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2506 }) },
+   { case := { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (4)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "t_5"), post := (some { heap := h0 ++ [{ cls := "jinja2/compiler.py:<module>.CodeGenerator", fields := [("environment", Val.unit), ("name", Val.str "missingattribute"), ("filename", Val.str "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-suite-without-trio/tests/res/templates/test.html"), ("stream", Val.int (1)), ("created_block_context", Val.bool false), ("defer_init", Val.int (1)), ("optimizer", Val.ref (base + 1)), ("import_aliases", Val.ref (base + 2)), ("blocks", Val.ref (base + 3)), ("extends_so_far", Val.int (0)), ("has_known_extends", Val.bool false), ("code_lineno", Val.int (1)), ("tests", Val.ref (base + 4)), ("filters", Val.ref (base + 5)), ("debug_info", Val.ref (base + 6)), ("_write_debug_info", Val.unit), ("_new_lines", Val.int (0)), ("_last_line", Val.int (0)), ("_first_write", Val.bool true), ("_last_identifier", Val.int (5)), ("_indentation", Val.int (0)), ("_assign_stack", Val.ref (base + 7)), ("_param_def_block", Val.ref (base + 8)), ("_context_reference_stack", Val.ref (base + 9))] }, { cls := "jinja2/optimizer.py:<module>.Optimizer", fields := [("environment", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.str "context"] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2506 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_compiler_py__module__CodeGenerator_temporary_identifier : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__CodeGenerator_temporary_identifier).all (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_temporary_identifier)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_compiler_py__module__CodeGenerator_temporary_identifier).all (lawConform C 16 f_jinja2_compiler_py__module__CodeGenerator_temporary_identifier) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_compiler_py__module__CodeGenerator_temporary_identifier) (lawConform C fuel f_jinja2_compiler_py__module__CodeGenerator_temporary_identifier)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_compiler_py__module__MacroRef___init : List Obs :=
@@ -323,37 +505,39 @@ def dom_conform_jinja2_compiler_py__module__MacroRef___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_compiler_py__module__MacroRef___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_compiler_py__module__MacroRef___init).all (lawConform C fuel f_jinja2_compiler_py__module__MacroRef___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_compiler_py__module__MacroRef___init).all (lawConform C 8 f_jinja2_compiler_py__module__MacroRef___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_compiler_py__module__MacroRef___init__) (lawConform C 8 f_jinja2_compiler_py__module__MacroRef___init__) (lawConform C fuel f_jinja2_compiler_py__module__MacroRef___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_compiler_py__module__MacroRef___init__) (lawConform C fuel f_jinja2_compiler_py__module__MacroRef___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_ja2_environment_py__module__Environment_compile_templates_log_function : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.str "Compiled \"foo\" as tmpl_0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33.py"] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [], roots := [], budget := 62 }) },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "Compiling into folder PosixPath('/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1003/test_import_as_with_context_de0')"] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [], roots := [], budget := 62 }) }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Compiling into folder PosixPath('/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1074/test_import_as_with_context_de0')"] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [], roots := [], budget := 62 }) }]
 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 2 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_ja2_environment_py__module__Environment_compile_templates_log_function : ∀ fuel, FUEL ≤ fuel → ((dom_conform_ja2_environment_py__module__Environment_compile_templates_log_function).all (lawConform C fuel f_jinja2_environment_py__module__Environment_compile_templates_log_function)) = true := by
   intro fuel hf
   have hk : 2 ≤ fuel := Nat.le_trans (by decide : 2 ≤ FUEL) hf
   have hchecked : (dom_conform_ja2_environment_py__module__Environment_compile_templates_log_function).all (lawConform C 2 f_jinja2_environment_py__module__Environment_compile_templates_log_function) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 2 f_jinja2_environment_py__module__Environment_compile_templates_log_function) (lawConform C 2 f_jinja2_environment_py__module__Environment_compile_templates_log_function) (lawConform C fuel f_jinja2_environment_py__module__Environment_compile_templates_log_function)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 2 f_jinja2_environment_py__module__Environment_compile_templates_log_function) (lawConform C fuel f_jinja2_environment_py__module__Environment_compile_templates_log_function)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_environment_py__module__TemplateExpression___init : List Obs :=
@@ -363,17 +547,18 @@ def dom_conform_jinja2_environment_py__module__TemplateExpression___init : List 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_environment_py__module__TemplateExpression___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_environment_py__module__TemplateExpression___init).all (lawConform C fuel f_jinja2_environment_py__module__TemplateExpression___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_environment_py__module__TemplateExpression___init).all (lawConform C 4 f_jinja2_environment_py__module__TemplateExpression___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_environment_py__module__TemplateExpression___init__) (lawConform C 4 f_jinja2_environment_py__module__TemplateExpression___init__) (lawConform C fuel f_jinja2_environment_py__module__TemplateExpression___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_environment_py__module__TemplateExpression___init__) (lawConform C fuel f_jinja2_environment_py__module__TemplateExpression___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_environment_py__module__create_cache : List Obs :=
@@ -383,17 +568,18 @@ def dom_conform_jinja2_environment_py__module__create_cache : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_environment_py__module__create_cache : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_environment_py__module__create_cache).all (lawConform C fuel f_jinja2_environment_py__module__create_cache)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_environment_py__module__create_cache).all (lawConform C 16 f_jinja2_environment_py__module__create_cache) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_jinja2_environment_py__module__create_cache) (lawConform C 16 f_jinja2_environment_py__module__create_cache) (lawConform C fuel f_jinja2_environment_py__module__create_cache)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_environment_py__module__create_cache) (lawConform C fuel f_jinja2_environment_py__module__create_cache)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_ext_py__module__Extension_filter_stream : List Obs :=
@@ -404,17 +590,18 @@ def dom_conform_jinja2_ext_py__module__Extension_filter_stream : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_ext_py__module__Extension_filter_stream : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_ext_py__module__Extension_filter_stream).all (lawConform C fuel f_jinja2_ext_py__module__Extension_filter_stream)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_ext_py__module__Extension_filter_stream).all (lawConform C 4 f_jinja2_ext_py__module__Extension_filter_stream) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_ext_py__module__Extension_filter_stream) (lawConform C 4 f_jinja2_ext_py__module__Extension_filter_stream) (lawConform C fuel f_jinja2_ext_py__module__Extension_filter_stream)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_ext_py__module__Extension_filter_stream) (lawConform C fuel f_jinja2_ext_py__module__Extension_filter_stream)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_ext_py__module__Extension_parse : List Obs :=
@@ -423,17 +610,18 @@ def dom_conform_jinja2_ext_py__module__Extension_parse : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_ext_py__module__Extension_parse : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_ext_py__module__Extension_parse).all (lawConform C fuel f_jinja2_ext_py__module__Extension_parse)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_ext_py__module__Extension_parse).all (lawConform C 8 f_jinja2_ext_py__module__Extension_parse) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_ext_py__module__Extension_parse) (lawConform C 8 f_jinja2_ext_py__module__Extension_parse) (lawConform C fuel f_jinja2_ext_py__module__Extension_parse)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_ext_py__module__Extension_parse) (lawConform C fuel f_jinja2_ext_py__module__Extension_parse)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_ext_py__module___CommentFinder___init : List Obs :=
@@ -442,17 +630,61 @@ def dom_conform_jinja2_ext_py__module___CommentFinder___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_ext_py__module___CommentFinder___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_ext_py__module___CommentFinder___init).all (lawConform C fuel f_jinja2_ext_py__module___CommentFinder___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_ext_py__module___CommentFinder___init).all (lawConform C 8 f_jinja2_ext_py__module___CommentFinder___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_ext_py__module___CommentFinder___init__) (lawConform C 8 f_jinja2_ext_py__module___CommentFinder___init__) (lawConform C fuel f_jinja2_ext_py__module___CommentFinder___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_ext_py__module___CommentFinder___init__) (lawConform C fuel f_jinja2_ext_py__module___CommentFinder___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_ext_py__module___CommentFinder_find_comments : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/ext.py:<module>._CommentFinder", fields := [("tokens", Val.ref (base + 1)), ("comment_tags", Val.ref (base + 2)), ("offset", Val.int (0)), ("last_lineno", Val.int (0))] }, { cls := "list", fields := [], payload := .list [Val.tuple [Val.int (1), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (2), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (2), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (2), Val.str "name", Val.str "gettext"], Val.tuple [Val.int (2), Val.str "operator", Val.str "("], Val.tuple [Val.int (2), Val.str "string", Val.str "' Hello  \n  World'"], Val.tuple [Val.int (3), Val.str "operator", Val.str ")"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (3), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "trans"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "trimmed"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "data", Val.str " Hello  \n  World"], Val.tuple [Val.int (5), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (5), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (5), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (5), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (5), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (5), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (6), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "name", Val.str "trans"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "name", Val.str "trimmed"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (6), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "name", Val.str "users"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (6), Val.str "data", Val.str " \n user"], Val.tuple [Val.int (8), Val.str "block_begin", Val.str "{%-"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "name", Val.str "pluralize"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (8), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "name", Val.str "users"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (8), Val.str "data", Val.str " \n users"], Val.tuple [Val.int (9), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (9), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (9), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (9), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (9), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (9), Val.str "data", Val.str "\n            "]] }, { cls := "list", fields := [], payload := .list [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.ref (base + 3)), post := (some { heap := h0 ++ [{ cls := "jinja2/ext.py:<module>._CommentFinder", fields := [("tokens", Val.ref (base + 1)), ("comment_tags", Val.ref (base + 2)), ("offset", Val.int (0)), ("last_lineno", Val.int (0))] }, { cls := "list", fields := [], payload := .list [Val.tuple [Val.int (1), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (2), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (2), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (2), Val.str "name", Val.str "gettext"], Val.tuple [Val.int (2), Val.str "operator", Val.str "("], Val.tuple [Val.int (2), Val.str "string", Val.str "' Hello  \n  World'"], Val.tuple [Val.int (3), Val.str "operator", Val.str ")"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (3), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "trans"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "trimmed"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "data", Val.str " Hello  \n  World"], Val.tuple [Val.int (5), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (5), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (5), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (5), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (5), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (5), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (6), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "name", Val.str "trans"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "name", Val.str "trimmed"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (6), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "name", Val.str "users"], Val.tuple [Val.int (6), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (6), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (6), Val.str "data", Val.str " \n user"], Val.tuple [Val.int (8), Val.str "block_begin", Val.str "{%-"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "name", Val.str "pluralize"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (8), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "name", Val.str "users"], Val.tuple [Val.int (8), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (8), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (8), Val.str "data", Val.str " \n users"], Val.tuple [Val.int (9), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (9), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (9), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (9), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (9), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (9), Val.str "data", Val.str "\n            "]] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }], roots := [(base + 0), (base + 1), (base + 2)], budget := 7402 }) },
+   { case := { heap := h0 ++ [{ cls := "jinja2/ext.py:<module>._CommentFinder", fields := [("tokens", Val.ref (base + 1)), ("comment_tags", Val.ref (base + 2)), ("offset", Val.int (0)), ("last_lineno", Val.int (0))] }, { cls := "list", fields := [], payload := .list [Val.tuple [Val.int (1), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (2), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (2), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (2), Val.str "name", Val.str "gettext"], Val.tuple [Val.int (2), Val.str "operator", Val.str "("], Val.tuple [Val.int (2), Val.str "string", Val.str "'Hello World'"], Val.tuple [Val.int (2), Val.str "operator", Val.str ")"], Val.tuple [Val.int (2), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (2), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (2), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (3), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "name", Val.str "trans"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (3), Val.str "data", Val.str "Hello World"], Val.tuple [Val.int (3), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (3), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "trans"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "users"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (4), Val.str "data", Val.str " user"], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "pluralize"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "users"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (4), Val.str "data", Val.str " users"], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "data", Val.str "\n            "]] }, { cls := "list", fields := [], payload := .list [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4)] }, expected := EResult.val (Val.ref (base + 3)), post := (some { heap := h0 ++ [{ cls := "jinja2/ext.py:<module>._CommentFinder", fields := [("tokens", Val.ref (base + 1)), ("comment_tags", Val.ref (base + 2)), ("offset", Val.int (0)), ("last_lineno", Val.int (0))] }, { cls := "list", fields := [], payload := .list [Val.tuple [Val.int (1), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (2), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (2), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (2), Val.str "name", Val.str "gettext"], Val.tuple [Val.int (2), Val.str "operator", Val.str "("], Val.tuple [Val.int (2), Val.str "string", Val.str "'Hello World'"], Val.tuple [Val.int (2), Val.str "operator", Val.str ")"], Val.tuple [Val.int (2), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (2), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (2), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (3), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "name", Val.str "trans"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (3), Val.str "data", Val.str "Hello World"], Val.tuple [Val.int (3), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (3), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (3), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (3), Val.str "data", Val.str "\n            "], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "trans"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "users"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (4), Val.str "data", Val.str " user"], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "pluralize"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "variable_begin", Val.str "{{"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "users"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "variable_end", Val.str "}}"], Val.tuple [Val.int (4), Val.str "data", Val.str " users"], Val.tuple [Val.int (4), Val.str "block_begin", Val.str "{%"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "name", Val.str "endtrans"], Val.tuple [Val.int (4), Val.str "whitespace", Val.str " "], Val.tuple [Val.int (4), Val.str "block_end", Val.str "%}"], Val.tuple [Val.int (4), Val.str "data", Val.str "\n            "]] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }], roots := [(base + 0), (base + 1), (base + 2)], budget := 6868 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_ext_py__module___CommentFinder_find_comments : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_ext_py__module___CommentFinder_find_comments).all (lawConform C fuel f_jinja2_ext_py__module___CommentFinder_find_comments)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_ext_py__module___CommentFinder_find_comments).all (lawConform C 8 f_jinja2_ext_py__module___CommentFinder_find_comments) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_ext_py__module___CommentFinder_find_comments) (lawConform C fuel f_jinja2_ext_py__module___CommentFinder_find_comments)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_filters_py__module___min_or_max : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-5), Val.int (17), Val.int (-14), Val.int (-2), Val.int (-10)] }, expected := EResult.exn (Val.str "TypeError"), post := (some { heap := h0 ++ [], roots := [], budget := 68 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-4), Val.int (-2), Val.int (-2), Val.int (-16), Val.int (1)] }, expected := EResult.exn (Val.str "TypeError"), post := (some { heap := h0 ++ [], roots := [], budget := 68 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (20), Val.int (-18), Val.int (0), Val.int (-19), Val.int (6)] }, expected := EResult.exn (Val.str "TypeError"), post := (some { heap := h0 ++ [], roots := [], budget := 68 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_filters_py__module___min_or_max : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_filters_py__module___min_or_max).all (lawConform C fuel f_jinja2_filters_py__module___min_or_max)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_filters_py__module___min_or_max).all (lawConform C 8 f_jinja2_filters_py__module___min_or_max) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_filters_py__module___min_or_max) (lawConform C fuel f_jinja2_filters_py__module___min_or_max)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_filters_py__module___prepare_attribute_parts : List Obs :=
@@ -461,17 +693,39 @@ def dom_conform_jinja2_filters_py__module___prepare_attribute_parts : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_filters_py__module___prepare_attribute_parts : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_filters_py__module___prepare_attribute_parts).all (lawConform C fuel f_jinja2_filters_py__module___prepare_attribute_parts)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_filters_py__module___prepare_attribute_parts).all (lawConform C 8 f_jinja2_filters_py__module___prepare_attribute_parts) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_filters_py__module___prepare_attribute_parts) (lawConform C 8 f_jinja2_filters_py__module___prepare_attribute_parts) (lawConform C fuel f_jinja2_filters_py__module___prepare_attribute_parts)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_filters_py__module___prepare_attribute_parts) (lawConform C fuel f_jinja2_filters_py__module___prepare_attribute_parts)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_filters_py__module__do_mark_unsafe : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-14)] }, expected := EResult.val (Val.str "-14"), post := (some { heap := h0 ++ [], roots := [], budget := 74 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-19)] }, expected := EResult.val (Val.str "-19"), post := (some { heap := h0 ++ [], roots := [], budget := 74 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_filters_py__module__do_mark_unsafe : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_filters_py__module__do_mark_unsafe).all (lawConform C fuel f_jinja2_filters_py__module__do_mark_unsafe)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_filters_py__module__do_mark_unsafe).all (lawConform C 8 f_jinja2_filters_py__module__do_mark_unsafe) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_filters_py__module__do_mark_unsafe) (lawConform C fuel f_jinja2_filters_py__module__do_mark_unsafe)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_filters_py__module__prepare_select_or_reject_transfunc : List Obs :=
@@ -480,17 +734,18 @@ def dom_conform_jinja2_filters_py__module__prepare_select_or_reject_transfunc : 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_filters_py__module__prepare_select_or_reject_transfunc : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_filters_py__module__prepare_select_or_reject_transfunc).all (lawConform C fuel f_jinja2_filters_py__module__prepare_select_or_reject_transfunc)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_filters_py__module__prepare_select_or_reject_transfunc).all (lawConform C 4 f_jinja2_filters_py__module__prepare_select_or_reject_transfunc) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_filters_py__module__prepare_select_or_reject_transfunc) (lawConform C 4 f_jinja2_filters_py__module__prepare_select_or_reject_transfunc) (lawConform C fuel f_jinja2_filters_py__module__prepare_select_or_reject_transfunc)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_filters_py__module__prepare_select_or_reject_transfunc) (lawConform C fuel f_jinja2_filters_py__module__prepare_select_or_reject_transfunc)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_idtracking_py__module__FrameSymbolVisitor___init : List Obs :=
@@ -499,17 +754,18 @@ def dom_conform_jinja2_idtracking_py__module__FrameSymbolVisitor___init : List O
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_idtracking_py__module__FrameSymbolVisitor___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_idtracking_py__module__FrameSymbolVisitor___init).all (lawConform C fuel f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_idtracking_py__module__FrameSymbolVisitor___init).all (lawConform C 4 f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__) (lawConform C 4 f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__) (lawConform C fuel f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__) (lawConform C fuel f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_lexer_py__module__TokenStreamIterator___init : List Obs :=
@@ -520,17 +776,18 @@ def dom_conform_jinja2_lexer_py__module__TokenStreamIterator___init : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_lexer_py__module__TokenStreamIterator___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_lexer_py__module__TokenStreamIterator___init).all (lawConform C fuel f_jinja2_lexer_py__module__TokenStreamIterator___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_lexer_py__module__TokenStreamIterator___init).all (lawConform C 4 f_jinja2_lexer_py__module__TokenStreamIterator___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_lexer_py__module__TokenStreamIterator___init__) (lawConform C 4 f_jinja2_lexer_py__module__TokenStreamIterator___init__) (lawConform C fuel f_jinja2_lexer_py__module__TokenStreamIterator___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_lexer_py__module__TokenStreamIterator___init__) (lawConform C fuel f_jinja2_lexer_py__module__TokenStreamIterator___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_lexer_py__module__TokenStreamIterator___iter : List Obs :=
@@ -539,17 +796,18 @@ def dom_conform_jinja2_lexer_py__module__TokenStreamIterator___iter : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_lexer_py__module__TokenStreamIterator___iter : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_lexer_py__module__TokenStreamIterator___iter).all (lawConform C fuel f_jinja2_lexer_py__module__TokenStreamIterator___iter__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_lexer_py__module__TokenStreamIterator___iter).all (lawConform C 4 f_jinja2_lexer_py__module__TokenStreamIterator___iter__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_lexer_py__module__TokenStreamIterator___iter__) (lawConform C 4 f_jinja2_lexer_py__module__TokenStreamIterator___iter__) (lawConform C fuel f_jinja2_lexer_py__module__TokenStreamIterator___iter__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_lexer_py__module__TokenStreamIterator___iter__) (lawConform C fuel f_jinja2_lexer_py__module__TokenStreamIterator___iter__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_loaders_py__module__BaseLoader_list_templates : List Obs :=
@@ -558,17 +816,18 @@ def dom_conform_jinja2_loaders_py__module__BaseLoader_list_templates : List Obs 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_loaders_py__module__BaseLoader_list_templates : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_loaders_py__module__BaseLoader_list_templates).all (lawConform C fuel f_jinja2_loaders_py__module__BaseLoader_list_templates)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_loaders_py__module__BaseLoader_list_templates).all (lawConform C 8 f_jinja2_loaders_py__module__BaseLoader_list_templates) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_loaders_py__module__BaseLoader_list_templates) (lawConform C 8 f_jinja2_loaders_py__module__BaseLoader_list_templates) (lawConform C fuel f_jinja2_loaders_py__module__BaseLoader_list_templates)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_loaders_py__module__BaseLoader_list_templates) (lawConform C fuel f_jinja2_loaders_py__module__BaseLoader_list_templates)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_loaders_py__module__ChoiceLoader___init : List Obs :=
@@ -577,17 +836,18 @@ def dom_conform_jinja2_loaders_py__module__ChoiceLoader___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_loaders_py__module__ChoiceLoader___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_loaders_py__module__ChoiceLoader___init).all (lawConform C fuel f_jinja2_loaders_py__module__ChoiceLoader___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_loaders_py__module__ChoiceLoader___init).all (lawConform C 4 f_jinja2_loaders_py__module__ChoiceLoader___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_loaders_py__module__ChoiceLoader___init__) (lawConform C 4 f_jinja2_loaders_py__module__ChoiceLoader___init__) (lawConform C fuel f_jinja2_loaders_py__module__ChoiceLoader___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_loaders_py__module__ChoiceLoader___init__) (lawConform C fuel f_jinja2_loaders_py__module__ChoiceLoader___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_loaders_py__module__FunctionLoader___init : List Obs :=
@@ -597,17 +857,18 @@ def dom_conform_jinja2_loaders_py__module__FunctionLoader___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_loaders_py__module__FunctionLoader___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_loaders_py__module__FunctionLoader___init).all (lawConform C fuel f_jinja2_loaders_py__module__FunctionLoader___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_loaders_py__module__FunctionLoader___init).all (lawConform C 4 f_jinja2_loaders_py__module__FunctionLoader___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_loaders_py__module__FunctionLoader___init__) (lawConform C 4 f_jinja2_loaders_py__module__FunctionLoader___init__) (lawConform C fuel f_jinja2_loaders_py__module__FunctionLoader___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_loaders_py__module__FunctionLoader___init__) (lawConform C fuel f_jinja2_loaders_py__module__FunctionLoader___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_loaders_py__module__PrefixLoader___init : List Obs :=
@@ -616,17 +877,18 @@ def dom_conform_jinja2_loaders_py__module__PrefixLoader___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_loaders_py__module__PrefixLoader___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_loaders_py__module__PrefixLoader___init).all (lawConform C fuel f_jinja2_loaders_py__module__PrefixLoader___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_loaders_py__module__PrefixLoader___init).all (lawConform C 4 f_jinja2_loaders_py__module__PrefixLoader___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_loaders_py__module__PrefixLoader___init__) (lawConform C 4 f_jinja2_loaders_py__module__PrefixLoader___init__) (lawConform C fuel f_jinja2_loaders_py__module__PrefixLoader___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_loaders_py__module__PrefixLoader___init__) (lawConform C fuel f_jinja2_loaders_py__module__PrefixLoader___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize : List Obs :=
@@ -635,17 +897,18 @@ def dom_conform_jinja2_nativetypes_py__module__NativeCodeGenerator__default_fina
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize).all (lawConform C fuel f_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize).all (lawConform C 4 f_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize) (lawConform C 4 f_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize) (lawConform C fuel f_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize) (lawConform C fuel f_jinja2_nativetypes_py__module__NativeCodeGenerator__default_finalize)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_nodes_py__module__Slice_as_const_const : List Obs :=
@@ -654,17 +917,18 @@ def dom_conform_jinja2_nodes_py__module__Slice_as_const_const : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_nodes_py__module__Slice_as_const_const : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_nodes_py__module__Slice_as_const_const).all (lawConform C fuel f_jinja2_nodes_py__module__Slice_as_const_const)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_nodes_py__module__Slice_as_const_const).all (lawConform C 8 f_jinja2_nodes_py__module__Slice_as_const_const) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_nodes_py__module__Slice_as_const_const) (lawConform C 8 f_jinja2_nodes_py__module__Slice_as_const_const) (lawConform C fuel f_jinja2_nodes_py__module__Slice_as_const_const)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_nodes_py__module__Slice_as_const_const) (lawConform C fuel f_jinja2_nodes_py__module__Slice_as_const_const)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_nodes_py__module__get_eval_context : List Obs :=
@@ -673,17 +937,18 @@ def dom_conform_jinja2_nodes_py__module__get_eval_context : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_nodes_py__module__get_eval_context : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_nodes_py__module__get_eval_context).all (lawConform C fuel f_jinja2_nodes_py__module__get_eval_context)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_nodes_py__module__get_eval_context).all (lawConform C 8 f_jinja2_nodes_py__module__get_eval_context) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_nodes_py__module__get_eval_context) (lawConform C 8 f_jinja2_nodes_py__module__get_eval_context) (lawConform C fuel f_jinja2_nodes_py__module__get_eval_context)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_nodes_py__module__get_eval_context) (lawConform C fuel f_jinja2_nodes_py__module__get_eval_context)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_optimizer_py__module__Optimizer___init : List Obs :=
@@ -692,17 +957,18 @@ def dom_conform_jinja2_optimizer_py__module__Optimizer___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_optimizer_py__module__Optimizer___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_optimizer_py__module__Optimizer___init).all (lawConform C fuel f_jinja2_optimizer_py__module__Optimizer___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_optimizer_py__module__Optimizer___init).all (lawConform C 4 f_jinja2_optimizer_py__module__Optimizer___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_optimizer_py__module__Optimizer___init__) (lawConform C 4 f_jinja2_optimizer_py__module__Optimizer___init__) (lawConform C fuel f_jinja2_optimizer_py__module__Optimizer___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_optimizer_py__module__Optimizer___init__) (lawConform C fuel f_jinja2_optimizer_py__module__Optimizer___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_parser_py__module__Parser_parse_call_args_ensure : List Obs :=
@@ -711,17 +977,18 @@ def dom_conform_jinja2_parser_py__module__Parser_parse_call_args_ensure : List O
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_parser_py__module__Parser_parse_call_args_ensure : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_parser_py__module__Parser_parse_call_args_ensure).all (lawConform C fuel f_jinja2_parser_py__module__Parser_parse_call_args_ensure)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_parser_py__module__Parser_parse_call_args_ensure).all (lawConform C 8 f_jinja2_parser_py__module__Parser_parse_call_args_ensure) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_parser_py__module__Parser_parse_call_args_ensure) (lawConform C 8 f_jinja2_parser_py__module__Parser_parse_call_args_ensure) (lawConform C fuel f_jinja2_parser_py__module__Parser_parse_call_args_ensure)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_parser_py__module__Parser_parse_call_args_ensure) (lawConform C fuel f_jinja2_parser_py__module__Parser_parse_call_args_ensure)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__ChainableUndefined___getattr : List Obs :=
@@ -731,17 +998,18 @@ def dom_conform_jinja2_runtime_py__module__ChainableUndefined___getattr : List O
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__ChainableUndefined___getattr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__ChainableUndefined___getattr).all (lawConform C fuel f_jinja2_runtime_py__module__ChainableUndefined___getattr__)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__ChainableUndefined___getattr).all (lawConform C 16 f_jinja2_runtime_py__module__ChainableUndefined___getattr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_jinja2_runtime_py__module__ChainableUndefined___getattr__) (lawConform C 16 f_jinja2_runtime_py__module__ChainableUndefined___getattr__) (lawConform C fuel f_jinja2_runtime_py__module__ChainableUndefined___getattr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_runtime_py__module__ChainableUndefined___getattr__) (lawConform C fuel f_jinja2_runtime_py__module__ChainableUndefined___getattr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__ChainableUndefined___getitem : List Obs :=
@@ -751,17 +1019,18 @@ def dom_conform_jinja2_runtime_py__module__ChainableUndefined___getitem : List O
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__ChainableUndefined___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__ChainableUndefined___getitem).all (lawConform C fuel f_jinja2_runtime_py__module__ChainableUndefined___getitem__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__ChainableUndefined___getitem).all (lawConform C 4 f_jinja2_runtime_py__module__ChainableUndefined___getitem__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_runtime_py__module__ChainableUndefined___getitem__) (lawConform C 4 f_jinja2_runtime_py__module__ChainableUndefined___getitem__) (lawConform C fuel f_jinja2_runtime_py__module__ChainableUndefined___getitem__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_runtime_py__module__ChainableUndefined___getitem__) (lawConform C fuel f_jinja2_runtime_py__module__ChainableUndefined___getitem__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__TemplateReference___init : List Obs :=
@@ -772,17 +1041,18 @@ def dom_conform_jinja2_runtime_py__module__TemplateReference___init : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__TemplateReference___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__TemplateReference___init).all (lawConform C fuel f_jinja2_runtime_py__module__TemplateReference___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__TemplateReference___init).all (lawConform C 4 f_jinja2_runtime_py__module__TemplateReference___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_runtime_py__module__TemplateReference___init__) (lawConform C 4 f_jinja2_runtime_py__module__TemplateReference___init__) (lawConform C fuel f_jinja2_runtime_py__module__TemplateReference___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_runtime_py__module__TemplateReference___init__) (lawConform C fuel f_jinja2_runtime_py__module__TemplateReference___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__Undefined___bool : List Obs :=
@@ -792,17 +1062,18 @@ def dom_conform_jinja2_runtime_py__module__Undefined___bool : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__Undefined___bool : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__Undefined___bool).all (lawConform C fuel f_jinja2_runtime_py__module__Undefined___bool__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__Undefined___bool).all (lawConform C 4 f_jinja2_runtime_py__module__Undefined___bool__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_runtime_py__module__Undefined___bool__) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___bool__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___bool__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___bool__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___bool__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__Undefined___getattr___undecorated : List Obs :=
@@ -811,17 +1082,18 @@ def dom_conform_jinja2_runtime_py__module__Undefined___getattr___undecorated : L
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__Undefined___getattr___undecorated : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__Undefined___getattr___undecorated).all (lawConform C fuel f_jinja2_runtime_py__module__Undefined___getattr___undecorated_)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__Undefined___getattr___undecorated).all (lawConform C 16 f_jinja2_runtime_py__module__Undefined___getattr___undecorated_) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_jinja2_runtime_py__module__Undefined___getattr___undecorated_) (lawConform C 16 f_jinja2_runtime_py__module__Undefined___getattr___undecorated_) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___getattr___undecorated_)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_runtime_py__module__Undefined___getattr___undecorated_) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___getattr___undecorated_)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__Undefined___len : List Obs :=
@@ -831,17 +1103,18 @@ def dom_conform_jinja2_runtime_py__module__Undefined___len : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__Undefined___len : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__Undefined___len).all (lawConform C fuel f_jinja2_runtime_py__module__Undefined___len__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__Undefined___len).all (lawConform C 4 f_jinja2_runtime_py__module__Undefined___len__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_runtime_py__module__Undefined___len__) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___len__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___len__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___len__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___len__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__Undefined___repr : List Obs :=
@@ -851,17 +1124,18 @@ def dom_conform_jinja2_runtime_py__module__Undefined___repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__Undefined___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__Undefined___repr).all (lawConform C fuel f_jinja2_runtime_py__module__Undefined___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__Undefined___repr).all (lawConform C 4 f_jinja2_runtime_py__module__Undefined___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_runtime_py__module__Undefined___repr__) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___repr__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___repr__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__Undefined___str : List Obs :=
@@ -871,17 +1145,18 @@ def dom_conform_jinja2_runtime_py__module__Undefined___str : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__Undefined___str : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__Undefined___str).all (lawConform C fuel f_jinja2_runtime_py__module__Undefined___str__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__Undefined___str).all (lawConform C 4 f_jinja2_runtime_py__module__Undefined___str__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_runtime_py__module__Undefined___str__) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___str__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___str__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_runtime_py__module__Undefined___str__) (lawConform C fuel f_jinja2_runtime_py__module__Undefined___str__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_runtime_py__module__identity : List Obs :=
@@ -894,17 +1169,18 @@ def dom_conform_jinja2_runtime_py__module__identity : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_runtime_py__module__identity : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_runtime_py__module__identity).all (lawConform C fuel f_jinja2_runtime_py__module__identity)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_runtime_py__module__identity).all (lawConform C 4 f_jinja2_runtime_py__module__identity) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_runtime_py__module__identity) (lawConform C 4 f_jinja2_runtime_py__module__identity) (lawConform C fuel f_jinja2_runtime_py__module__identity)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_runtime_py__module__identity) (lawConform C fuel f_jinja2_runtime_py__module__identity)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_boolean : List Obs :=
@@ -917,17 +1193,18 @@ def dom_conform_jinja2_tests_py__module__test_boolean : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_boolean : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_boolean).all (lawConform C fuel f_jinja2_tests_py__module__test_boolean)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_boolean).all (lawConform C 16 f_jinja2_tests_py__module__test_boolean) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_jinja2_tests_py__module__test_boolean) (lawConform C 16 f_jinja2_tests_py__module__test_boolean) (lawConform C fuel f_jinja2_tests_py__module__test_boolean)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_tests_py__module__test_boolean) (lawConform C fuel f_jinja2_tests_py__module__test_boolean)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_divisibleby : List Obs :=
@@ -938,17 +1215,18 @@ def dom_conform_jinja2_tests_py__module__test_divisibleby : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_divisibleby : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_divisibleby).all (lawConform C fuel f_jinja2_tests_py__module__test_divisibleby)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_divisibleby).all (lawConform C 8 f_jinja2_tests_py__module__test_divisibleby) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_divisibleby) (lawConform C 8 f_jinja2_tests_py__module__test_divisibleby) (lawConform C fuel f_jinja2_tests_py__module__test_divisibleby)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_divisibleby) (lawConform C fuel f_jinja2_tests_py__module__test_divisibleby)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_even : List Obs :=
@@ -961,17 +1239,18 @@ def dom_conform_jinja2_tests_py__module__test_even : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_even : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_even).all (lawConform C fuel f_jinja2_tests_py__module__test_even)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_even).all (lawConform C 8 f_jinja2_tests_py__module__test_even) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_even) (lawConform C 8 f_jinja2_tests_py__module__test_even) (lawConform C fuel f_jinja2_tests_py__module__test_even)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_even) (lawConform C fuel f_jinja2_tests_py__module__test_even)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_false : List Obs :=
@@ -981,17 +1260,18 @@ def dom_conform_jinja2_tests_py__module__test_false : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_false : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_false).all (lawConform C fuel f_jinja2_tests_py__module__test_false)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_false).all (lawConform C 8 f_jinja2_tests_py__module__test_false) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_false) (lawConform C 8 f_jinja2_tests_py__module__test_false) (lawConform C fuel f_jinja2_tests_py__module__test_false)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_false) (lawConform C fuel f_jinja2_tests_py__module__test_false)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_in : List Obs :=
@@ -1001,9 +1281,10 @@ def dom_conform_jinja2_tests_py__module__test_in : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_in : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_in).all (lawConform C fuel f_jinja2_tests_py__module__test_in)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
@@ -1024,9 +1305,33 @@ theorem conform_jinja2_tests_py__module__test_in : ∀ fuel, FUEL ≤ fuel → (
       dsimp only
       rw [hrun]
       rfl
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_in) (lawConform C 8 f_jinja2_tests_py__module__test_in) (lawConform C fuel f_jinja2_tests_py__module__test_in)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_in) (lawConform C fuel f_jinja2_tests_py__module__test_in)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_tests_py__module__test_iterable : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-2)] }, expected := EResult.val (Val.bool false), post := (some { heap := h0 ++ [], roots := [], budget := 76 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-15)] }, expected := EResult.val (Val.bool false), post := (some { heap := h0 ++ [], roots := [], budget := 76 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-17)] }, expected := EResult.val (Val.bool false), post := (some { heap := h0 ++ [], roots := [], budget := 76 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false] }, expected := EResult.val (Val.bool false), post := (some { heap := h0 ++ [], roots := [], budget := 76 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (42)] }, expected := EResult.val (Val.bool false), post := (some { heap := h0 ++ [], roots := [], budget := 76 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_tests_py__module__test_iterable : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_iterable).all (lawConform C fuel f_jinja2_tests_py__module__test_iterable)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_tests_py__module__test_iterable).all (lawConform C 16 f_jinja2_tests_py__module__test_iterable) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_tests_py__module__test_iterable) (lawConform C fuel f_jinja2_tests_py__module__test_iterable)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_none : List Obs :=
@@ -1037,17 +1342,18 @@ def dom_conform_jinja2_tests_py__module__test_none : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_none : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_none).all (lawConform C fuel f_jinja2_tests_py__module__test_none)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_none).all (lawConform C 8 f_jinja2_tests_py__module__test_none) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_none) (lawConform C 8 f_jinja2_tests_py__module__test_none) (lawConform C fuel f_jinja2_tests_py__module__test_none)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_none) (lawConform C fuel f_jinja2_tests_py__module__test_none)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_odd : List Obs :=
@@ -1058,17 +1364,18 @@ def dom_conform_jinja2_tests_py__module__test_odd : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_odd : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_odd).all (lawConform C fuel f_jinja2_tests_py__module__test_odd)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_odd).all (lawConform C 8 f_jinja2_tests_py__module__test_odd) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_odd) (lawConform C 8 f_jinja2_tests_py__module__test_odd) (lawConform C fuel f_jinja2_tests_py__module__test_odd)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_odd) (lawConform C fuel f_jinja2_tests_py__module__test_odd)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_sameas : List Obs :=
@@ -1077,17 +1384,18 @@ def dom_conform_jinja2_tests_py__module__test_sameas : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_sameas : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_sameas).all (lawConform C fuel f_jinja2_tests_py__module__test_sameas)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_sameas).all (lawConform C 8 f_jinja2_tests_py__module__test_sameas) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_sameas) (lawConform C 8 f_jinja2_tests_py__module__test_sameas) (lawConform C fuel f_jinja2_tests_py__module__test_sameas)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_sameas) (lawConform C fuel f_jinja2_tests_py__module__test_sameas)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_tests_py__module__test_true : List Obs :=
@@ -1097,17 +1405,38 @@ def dom_conform_jinja2_tests_py__module__test_true : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_tests_py__module__test_true : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_tests_py__module__test_true).all (lawConform C fuel f_jinja2_tests_py__module__test_true)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_tests_py__module__test_true).all (lawConform C 8 f_jinja2_tests_py__module__test_true) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_tests_py__module__test_true) (lawConform C 8 f_jinja2_tests_py__module__test_true) (lawConform C fuel f_jinja2_tests_py__module__test_true)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_tests_py__module__test_true) (lawConform C fuel f_jinja2_tests_py__module__test_true)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_jinja2_utils_py__module__Cycler_next : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "jinja2/utils.py:<module>.Cycler", fields := [("items", Val.tuple [Val.int (1), Val.int (2), Val.int (3)]), ("pos", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (1)), post := (some { heap := h0 ++ [{ cls := "jinja2/utils.py:<module>.Cycler", fields := [("items", Val.tuple [Val.int (1), Val.int (2), Val.int (3)]), ("pos", Val.int (1))] }], roots := [(base + 0)], budget := 314 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_jinja2_utils_py__module__Cycler_next : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_utils_py__module__Cycler_next).all (lawConform C fuel f_jinja2_utils_py__module__Cycler_next)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_jinja2_utils_py__module__Cycler_next).all (lawConform C 16 f_jinja2_utils_py__module__Cycler_next) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_jinja2_utils_py__module__Cycler_next) (lawConform C fuel f_jinja2_utils_py__module__Cycler_next)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_utils_py__module__Joiner___call : List Obs :=
@@ -1116,17 +1445,18 @@ def dom_conform_jinja2_utils_py__module__Joiner___call : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_utils_py__module__Joiner___call : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_utils_py__module__Joiner___call).all (lawConform C fuel f_jinja2_utils_py__module__Joiner___call__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_utils_py__module__Joiner___call).all (lawConform C 8 f_jinja2_utils_py__module__Joiner___call__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_utils_py__module__Joiner___call__) (lawConform C 8 f_jinja2_utils_py__module__Joiner___call__) (lawConform C fuel f_jinja2_utils_py__module__Joiner___call__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_utils_py__module__Joiner___call__) (lawConform C fuel f_jinja2_utils_py__module__Joiner___call__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_utils_py__module__Joiner___init : List Obs :=
@@ -1136,17 +1466,18 @@ def dom_conform_jinja2_utils_py__module__Joiner___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_utils_py__module__Joiner___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_utils_py__module__Joiner___init).all (lawConform C fuel f_jinja2_utils_py__module__Joiner___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_utils_py__module__Joiner___init).all (lawConform C 4 f_jinja2_utils_py__module__Joiner___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_utils_py__module__Joiner___init__) (lawConform C 4 f_jinja2_utils_py__module__Joiner___init__) (lawConform C fuel f_jinja2_utils_py__module__Joiner___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_utils_py__module__Joiner___init__) (lawConform C fuel f_jinja2_utils_py__module__Joiner___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_utils_py__module___MissingType___reduce : List Obs :=
@@ -1155,17 +1486,18 @@ def dom_conform_jinja2_utils_py__module___MissingType___reduce : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_utils_py__module___MissingType___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_utils_py__module___MissingType___reduce).all (lawConform C fuel f_jinja2_utils_py__module___MissingType___reduce__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_utils_py__module___MissingType___reduce).all (lawConform C 4 f_jinja2_utils_py__module___MissingType___reduce__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_utils_py__module___MissingType___reduce__) (lawConform C 4 f_jinja2_utils_py__module___MissingType___reduce__) (lawConform C fuel f_jinja2_utils_py__module___MissingType___reduce__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_utils_py__module___MissingType___reduce__) (lawConform C fuel f_jinja2_utils_py__module___MissingType___reduce__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_utils_py__module___MissingType___repr : List Obs :=
@@ -1174,17 +1506,18 @@ def dom_conform_jinja2_utils_py__module___MissingType___repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_utils_py__module___MissingType___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_utils_py__module___MissingType___repr).all (lawConform C fuel f_jinja2_utils_py__module___MissingType___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_utils_py__module___MissingType___repr).all (lawConform C 4 f_jinja2_utils_py__module___MissingType___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_utils_py__module___MissingType___repr__) (lawConform C 4 f_jinja2_utils_py__module___MissingType___repr__) (lawConform C fuel f_jinja2_utils_py__module___MissingType___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_utils_py__module___MissingType___repr__) (lawConform C fuel f_jinja2_utils_py__module___MissingType___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_utils_py__module__object_type_repr : List Obs :=
@@ -1193,17 +1526,18 @@ def dom_conform_jinja2_utils_py__module__object_type_repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_utils_py__module__object_type_repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_utils_py__module__object_type_repr).all (lawConform C fuel f_jinja2_utils_py__module__object_type_repr)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_utils_py__module__object_type_repr).all (lawConform C 8 f_jinja2_utils_py__module__object_type_repr) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_jinja2_utils_py__module__object_type_repr) (lawConform C 8 f_jinja2_utils_py__module__object_type_repr) (lawConform C fuel f_jinja2_utils_py__module__object_type_repr)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_jinja2_utils_py__module__object_type_repr) (lawConform C fuel f_jinja2_utils_py__module__object_type_repr)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_jinja2_utils_py__module__urlize_trim_url : List Obs :=
@@ -1213,17 +1547,18 @@ def dom_conform_jinja2_utils_py__module__urlize_trim_url : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_jinja2_utils_py__module__urlize_trim_url : ∀ fuel, FUEL ≤ fuel → ((dom_conform_jinja2_utils_py__module__urlize_trim_url).all (lawConform C fuel f_jinja2_utils_py__module__urlize_trim_url)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_jinja2_utils_py__module__urlize_trim_url).all (lawConform C 4 f_jinja2_utils_py__module__urlize_trim_url) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_jinja2_utils_py__module__urlize_trim_url) (lawConform C 4 f_jinja2_utils_py__module__urlize_trim_url) (lawConform C fuel f_jinja2_utils_py__module__urlize_trim_url)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_jinja2_utils_py__module__urlize_trim_url) (lawConform C fuel f_jinja2_utils_py__module__urlize_trim_url)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 /-- Everything this module states but does not prove. A `Prop`-valued `def` asserts nothing, so nothing here is admitted. -/
@@ -1231,24 +1566,6 @@ def obligations : List OpenObligation :=
   []
 
 #eval IO.println (renderObligations "Jinja2" obligations)
-
-/-- Candidates left out because, compiled alone, their proof exceeded the emission budget (`--theorem-timeout`, `--theorem-memory-gb`): `(theorem, subject, reason)`. Not stated here, true or open. -/
-def budgetExcluded : List (String × String × String) :=
-  [("conform_jinja2_compiler_py__module__CodeGenerator__default_finalize", "jinja2/compiler.py:<module>.CodeGenerator._default_finalize", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored", "jinja2/compiler.py:<module>.CodeGenerator.mark_parameter_stored", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared", "jinja2/compiler.py:<module>.CodeGenerator.parameter_is_undeclared", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking", "jinja2/compiler.py:<module>.CodeGenerator.pop_assign_tracking", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_compiler_py__module__CodeGenerator_pop_context_reference", "jinja2/compiler.py:<module>.CodeGenerator.pop_context_reference", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions", "jinja2/compiler.py:<module>.CodeGenerator.pop_parameter_definitions", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_compiler_py__module__CodeGenerator_push_context_reference", "jinja2/compiler.py:<module>.CodeGenerator.push_context_reference", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_compiler_py__module__CodeGenerator_temporary_identifier", "jinja2/compiler.py:<module>.CodeGenerator.temporary_identifier", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_ext_py__module___CommentFinder_find_comments", "jinja2/ext.py:<module>._CommentFinder.find_comments", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_filters_py__module___min_or_max", "jinja2/filters.py:<module>._min_or_max", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_filters_py__module__do_mark_unsafe", "jinja2/filters.py:<module>.do_mark_unsafe", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_tests_py__module__test_iterable", "jinja2/tests.py:<module>.test_iterable", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_jinja2_utils_py__module__Cycler_next", "jinja2/utils.py:<module>.Cycler.next", "over the proof budget: kernel evaluation exceeded 16 GB resident")]
-
-#eval IO.println s!"over the proof budget ─ Jinja2 ({budgetExcluded.length})"
 
 /-! ## Anti-vacuity gate
 
@@ -1260,12 +1577,20 @@ def budgetExcluded : List (String × String × String) :=
 #audit_depends conform_jinja2_bccache_py__module__BytecodeCache_load_bytecode on f_jinja2_bccache_py__module__BytecodeCache_load_bytecode
 #audit_depends conform_jinja2_bccache_py__module__BytecodeCache_set_bucket on f_jinja2_bccache_py__module__BytecodeCache_set_bucket
 #audit_depends conform_jinja2_bccache_py__module__MemcachedBytecodeCache___init on f_jinja2_bccache_py__module__MemcachedBytecodeCache___init__
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator__default_finalize on f_jinja2_compiler_py__module__CodeGenerator__default_finalize
 #audit_depends conform_jinja2_compiler_py__module__CodeGenerator_get_context_ref on f_jinja2_compiler_py__module__CodeGenerator_get_context_ref
 #audit_depends conform_jinja2_compiler_py__module__CodeGenerator_get_resolve_func on f_jinja2_compiler_py__module__CodeGenerator_get_resolve_func
 #audit_depends conform_jinja2_compiler_py__module__CodeGenerator_indent on f_jinja2_compiler_py__module__CodeGenerator_indent
 #audit_depends conform_jinja2_compiler_py__module__CodeGenerator_leave_frame on f_jinja2_compiler_py__module__CodeGenerator_leave_frame
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored on f_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored
 #audit_depends conform_jinja2_compiler_py__module__CodeGenerator_optimized on f_jinja2_compiler_py__module__CodeGenerator_optimized
 #audit_depends conform_jinja2_compiler_py__module__CodeGenerator_outdent on f_jinja2_compiler_py__module__CodeGenerator_outdent
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared on f_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking on f_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator_pop_context_reference on f_jinja2_compiler_py__module__CodeGenerator_pop_context_reference
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions on f_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator_push_context_reference on f_jinja2_compiler_py__module__CodeGenerator_push_context_reference
+#audit_depends conform_jinja2_compiler_py__module__CodeGenerator_temporary_identifier on f_jinja2_compiler_py__module__CodeGenerator_temporary_identifier
 #audit_depends conform_jinja2_compiler_py__module__MacroRef___init on f_jinja2_compiler_py__module__MacroRef___init__
 #audit_depends conform_ja2_environment_py__module__Environment_compile_templates_log_function on f_jinja2_environment_py__module__Environment_compile_templates_log_function
 #audit_depends conform_jinja2_environment_py__module__TemplateExpression___init on f_jinja2_environment_py__module__TemplateExpression___init__
@@ -1273,7 +1598,10 @@ def budgetExcluded : List (String × String × String) :=
 #audit_depends conform_jinja2_ext_py__module__Extension_filter_stream on f_jinja2_ext_py__module__Extension_filter_stream
 #audit_depends conform_jinja2_ext_py__module__Extension_parse on f_jinja2_ext_py__module__Extension_parse
 #audit_depends conform_jinja2_ext_py__module___CommentFinder___init on f_jinja2_ext_py__module___CommentFinder___init__
+#audit_depends conform_jinja2_ext_py__module___CommentFinder_find_comments on f_jinja2_ext_py__module___CommentFinder_find_comments
+#audit_depends conform_jinja2_filters_py__module___min_or_max on f_jinja2_filters_py__module___min_or_max
 #audit_depends conform_jinja2_filters_py__module___prepare_attribute_parts on f_jinja2_filters_py__module___prepare_attribute_parts
+#audit_depends conform_jinja2_filters_py__module__do_mark_unsafe on f_jinja2_filters_py__module__do_mark_unsafe
 #audit_depends conform_jinja2_filters_py__module__prepare_select_or_reject_transfunc on f_jinja2_filters_py__module__prepare_select_or_reject_transfunc
 #audit_depends conform_jinja2_idtracking_py__module__FrameSymbolVisitor___init on f_jinja2_idtracking_py__module__FrameSymbolVisitor___init__
 #audit_depends conform_jinja2_lexer_py__module__TokenStreamIterator___init on f_jinja2_lexer_py__module__TokenStreamIterator___init__
@@ -1301,10 +1629,12 @@ def budgetExcluded : List (String × String × String) :=
 #audit_depends conform_jinja2_tests_py__module__test_even on f_jinja2_tests_py__module__test_even
 #audit_depends conform_jinja2_tests_py__module__test_false on f_jinja2_tests_py__module__test_false
 #audit_depends conform_jinja2_tests_py__module__test_in on f_jinja2_tests_py__module__test_in
+#audit_depends conform_jinja2_tests_py__module__test_iterable on f_jinja2_tests_py__module__test_iterable
 #audit_depends conform_jinja2_tests_py__module__test_none on f_jinja2_tests_py__module__test_none
 #audit_depends conform_jinja2_tests_py__module__test_odd on f_jinja2_tests_py__module__test_odd
 #audit_depends conform_jinja2_tests_py__module__test_sameas on f_jinja2_tests_py__module__test_sameas
 #audit_depends conform_jinja2_tests_py__module__test_true on f_jinja2_tests_py__module__test_true
+#audit_depends conform_jinja2_utils_py__module__Cycler_next on f_jinja2_utils_py__module__Cycler_next
 #audit_depends conform_jinja2_utils_py__module__Joiner___call on f_jinja2_utils_py__module__Joiner___call__
 #audit_depends conform_jinja2_utils_py__module__Joiner___init on f_jinja2_utils_py__module__Joiner___init__
 #audit_depends conform_jinja2_utils_py__module___MissingType___reduce on f_jinja2_utils_py__module___MissingType___reduce__
@@ -1322,12 +1652,20 @@ def budgetExcluded : List (String × String × String) :=
 #audit_axioms conform_jinja2_bccache_py__module__BytecodeCache_load_bytecode
 #audit_axioms conform_jinja2_bccache_py__module__BytecodeCache_set_bucket
 #audit_axioms conform_jinja2_bccache_py__module__MemcachedBytecodeCache___init
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator__default_finalize
 #audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_get_context_ref
 #audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_get_resolve_func
 #audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_indent
 #audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_leave_frame
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_mark_parameter_stored
 #audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_optimized
 #audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_outdent
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_parameter_is_undeclared
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_pop_assign_tracking
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_pop_context_reference
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_pop_parameter_definitions
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_push_context_reference
+#audit_axioms conform_jinja2_compiler_py__module__CodeGenerator_temporary_identifier
 #audit_axioms conform_jinja2_compiler_py__module__MacroRef___init
 #audit_axioms conform_ja2_environment_py__module__Environment_compile_templates_log_function
 #audit_axioms conform_jinja2_environment_py__module__TemplateExpression___init
@@ -1335,7 +1673,10 @@ def budgetExcluded : List (String × String × String) :=
 #audit_axioms conform_jinja2_ext_py__module__Extension_filter_stream
 #audit_axioms conform_jinja2_ext_py__module__Extension_parse
 #audit_axioms conform_jinja2_ext_py__module___CommentFinder___init
+#audit_axioms conform_jinja2_ext_py__module___CommentFinder_find_comments
+#audit_axioms conform_jinja2_filters_py__module___min_or_max
 #audit_axioms conform_jinja2_filters_py__module___prepare_attribute_parts
+#audit_axioms conform_jinja2_filters_py__module__do_mark_unsafe
 #audit_axioms conform_jinja2_filters_py__module__prepare_select_or_reject_transfunc
 #audit_axioms conform_jinja2_idtracking_py__module__FrameSymbolVisitor___init
 #audit_axioms conform_jinja2_lexer_py__module__TokenStreamIterator___init
@@ -1363,10 +1704,12 @@ def budgetExcluded : List (String × String × String) :=
 #audit_axioms conform_jinja2_tests_py__module__test_even
 #audit_axioms conform_jinja2_tests_py__module__test_false
 #audit_axioms conform_jinja2_tests_py__module__test_in
+#audit_axioms conform_jinja2_tests_py__module__test_iterable
 #audit_axioms conform_jinja2_tests_py__module__test_none
 #audit_axioms conform_jinja2_tests_py__module__test_odd
 #audit_axioms conform_jinja2_tests_py__module__test_sameas
 #audit_axioms conform_jinja2_tests_py__module__test_true
+#audit_axioms conform_jinja2_utils_py__module__Cycler_next
 #audit_axioms conform_jinja2_utils_py__module__Joiner___call
 #audit_axioms conform_jinja2_utils_py__module__Joiner___init
 #audit_axioms conform_jinja2_utils_py__module___MissingType___reduce

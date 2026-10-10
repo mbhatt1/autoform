@@ -141,9 +141,9 @@ Three figures are reported because one would mislead: **hole-free** is an upper 
 **call-closed** additionally requires every callee to resolve in the program and is the
 verifiable core; **dynamic-hole risk** counts constructs that can still hole on some
 input. The other re-landed corpora (`ledger-<M>.json`, `Autoform/SpecsGen/<M>.lean`):
-requests 2.32.5 — 226/260 hole-free, core 134, 147 agree / 0 diverge, 29 specs;
-click 8.2.1 — 475/549, core 265, 135 / 0, 47 specs with 12 subjects excluded by name;
-jinja2 3.1.6 — 662/817, core 438, 133 / 0, 50 specs with 6 over the proof budget.
+requests 2.32.5 — 226/260 hole-free, core 134, 147 agree / 0 diverge, 29 specs, 0 over the proof budget;
+click 8.2.1 — 475/549, core 265, 165 / 0, 71 specs, 0 over the proof budget;
+jinja2 3.1.6 — 662/817, core 438, 167 / 0, 70 specs, 0 over the proof budget.
 
 ## Languages
 

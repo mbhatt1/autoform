@@ -107,7 +107,14 @@ Discharge `Refine.lean` obligations (3), the loop-invariant rule, and (4), the
 heap-representation predicate. The `FuelMono` transport was restated with the
 2026-10-09 re-land: `SpecsGen/Cachetools.lean` discharges a finalizer-covering side
 condition per law instead of a module-wide `tryFinally`-free premise, so `C_not_tfFree`
-is already retired; what remains here is the reachability form of that side condition.
+is already retired. The reachability form of that side condition was measured on
+2026-10-10 and turned out to have no content: the unrestricted theorems assume nothing
+about any body, reached or not (`FuelMono.lean`, "Reachability form of the side
+condition"), and the cost the over-budget theorems were paying was the kernel decoding
+UTF-8 function names in `Ctx.resolve`'s suffix scan, not the transport. The scan now
+compares bytes (`Semantics.lean`, `strEndsWith`), and the conformance proofs derive
+the `≠ outOfFuel` guard from the law instead of running each case twice
+(`Basis.lawConform_defined`).
 
 *Exit:* one eviction loop in cachetools (`_Link.unlink` or `LRUCache.popitem`) has a
 proved functional specification against a `HeapRep`; the mutation gate on the spec

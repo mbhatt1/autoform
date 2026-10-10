@@ -65,12 +65,15 @@ whose subject a mutation gate can attack.
 
 **Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
 stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
-computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
-transport needs two side conditions, both discharged rather than assumed — the context is
-covered by the unrestricted fuel theorem (including finalizers) and the run did not
-end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
-either fails, the theorem stays at `FUEL` and its generalization is recorded in
-`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono_all`. The
+transport assumes nothing about the context or about any body, reached or not (the
+unrestricted fuel theorem covers finalizers); its one side condition is that the run did
+not end in `outOfFuel`. For `conform_*` that condition is a consequence of the law — the
+recorded outcome is a value or an exception, and the law says the interpreter reproduced
+it (`lawConform_defined`) — so it is checked on the recorded literal and each case is
+evaluated once. For every other family it is the `g…` guard, evaluated over the same
+domain as the law. Where it fails, the theorem stays at `FUEL` and its generalization is
+recorded in `obligations` below as a `Prop`-valued `def` — a statement, not an admission.
 
 There is no `sorry` in this file.
 
@@ -87,17 +90,18 @@ def dom_conform_click___init___py__module____getattr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 32 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click___init___py__module____getattr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click___init___py__module____getattr).all (lawConform C fuel f_click___init___py__module____getattr__)) = true := by
   intro fuel hf
   have hk : 32 ≤ fuel := Nat.le_trans (by decide : 32 ≤ FUEL) hf
   have hchecked : (dom_conform_click___init___py__module____getattr).all (lawConform C 32 f_click___init___py__module____getattr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 32 f_click___init___py__module____getattr__) (lawConform C 32 f_click___init___py__module____getattr__) (lawConform C fuel f_click___init___py__module____getattr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 32 f_click___init___py__module____getattr__) (lawConform C fuel f_click___init___py__module____getattr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click__compat_py__module___FixupStream___init : List Obs :=
@@ -110,17 +114,18 @@ def dom_conform_click__compat_py__module___FixupStream___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click__compat_py__module___FixupStream___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__compat_py__module___FixupStream___init).all (lawConform C fuel f_click__compat_py__module___FixupStream___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click__compat_py__module___FixupStream___init).all (lawConform C 8 f_click__compat_py__module___FixupStream___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click__compat_py__module___FixupStream___init__) (lawConform C 8 f_click__compat_py__module___FixupStream___init__) (lawConform C fuel f_click__compat_py__module___FixupStream___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click__compat_py__module___FixupStream___init__) (lawConform C fuel f_click__compat_py__module___FixupStream___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click__compat_py__module___FixupStream_readable : List Obs :=
@@ -129,17 +134,18 @@ def dom_conform_click__compat_py__module___FixupStream_readable : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click__compat_py__module___FixupStream_readable : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__compat_py__module___FixupStream_readable).all (lawConform C fuel f_click__compat_py__module___FixupStream_readable)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click__compat_py__module___FixupStream_readable).all (lawConform C 8 f_click__compat_py__module___FixupStream_readable) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click__compat_py__module___FixupStream_readable) (lawConform C 8 f_click__compat_py__module___FixupStream_readable) (lawConform C fuel f_click__compat_py__module___FixupStream_readable)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click__compat_py__module___FixupStream_readable) (lawConform C fuel f_click__compat_py__module___FixupStream_readable)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click__compat_py__module___get_windows_console_stream : List Obs :=
@@ -150,17 +156,18 @@ def dom_conform_click__compat_py__module___get_windows_console_stream : List Obs
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click__compat_py__module___get_windows_console_stream : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__compat_py__module___get_windows_console_stream).all (lawConform C fuel f_click__compat_py__module___get_windows_console_stream)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click__compat_py__module___get_windows_console_stream).all (lawConform C 4 f_click__compat_py__module___get_windows_console_stream) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click__compat_py__module___get_windows_console_stream) (lawConform C 4 f_click__compat_py__module___get_windows_console_stream) (lawConform C fuel f_click__compat_py__module___get_windows_console_stream)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click__compat_py__module___get_windows_console_stream) (lawConform C fuel f_click__compat_py__module___get_windows_console_stream)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click__compat_py__module__should_strip_ansi : List Obs :=
@@ -171,17 +178,18 @@ def dom_conform_click__compat_py__module__should_strip_ansi : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click__compat_py__module__should_strip_ansi : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__compat_py__module__should_strip_ansi).all (lawConform C fuel f_click__compat_py__module__should_strip_ansi)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click__compat_py__module__should_strip_ansi).all (lawConform C 8 f_click__compat_py__module__should_strip_ansi) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click__compat_py__module__should_strip_ansi) (lawConform C 8 f_click__compat_py__module__should_strip_ansi) (lawConform C fuel f_click__compat_py__module__should_strip_ansi)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click__compat_py__module__should_strip_ansi) (lawConform C fuel f_click__compat_py__module__should_strip_ansi)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click__termui_impl_py__module__Editor___init : List Obs :=
@@ -190,17 +198,18 @@ def dom_conform_click__termui_impl_py__module__Editor___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click__termui_impl_py__module__Editor___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__termui_impl_py__module__Editor___init).all (lawConform C fuel f_click__termui_impl_py__module__Editor___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click__termui_impl_py__module__Editor___init).all (lawConform C 8 f_click__termui_impl_py__module__Editor___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click__termui_impl_py__module__Editor___init__) (lawConform C 8 f_click__termui_impl_py__module__Editor___init__) (lawConform C fuel f_click__termui_impl_py__module__Editor___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click__termui_impl_py__module__Editor___init__) (lawConform C fuel f_click__termui_impl_py__module__Editor___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click__termui_impl_py__module__Editor_get_editor : List Obs :=
@@ -209,17 +218,18 @@ def dom_conform_click__termui_impl_py__module__Editor_get_editor : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click__termui_impl_py__module__Editor_get_editor : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__termui_impl_py__module__Editor_get_editor).all (lawConform C fuel f_click__termui_impl_py__module__Editor_get_editor)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click__termui_impl_py__module__Editor_get_editor).all (lawConform C 8 f_click__termui_impl_py__module__Editor_get_editor) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click__termui_impl_py__module__Editor_get_editor) (lawConform C 8 f_click__termui_impl_py__module__Editor_get_editor) (lawConform C fuel f_click__termui_impl_py__module__Editor_get_editor)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click__termui_impl_py__module__Editor_get_editor) (lawConform C fuel f_click__termui_impl_py__module__Editor_get_editor)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click__termui_impl_py__module___translate_ch_to_exc : List Obs :=
@@ -229,17 +239,60 @@ def dom_conform_click__termui_impl_py__module___translate_ch_to_exc : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click__termui_impl_py__module___translate_ch_to_exc : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__termui_impl_py__module___translate_ch_to_exc).all (lawConform C fuel f_click__termui_impl_py__module___translate_ch_to_exc)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click__termui_impl_py__module___translate_ch_to_exc).all (lawConform C 16 f_click__termui_impl_py__module___translate_ch_to_exc) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click__termui_impl_py__module___translate_ch_to_exc) (lawConform C 16 f_click__termui_impl_py__module___translate_ch_to_exc) (lawConform C fuel f_click__termui_impl_py__module___translate_ch_to_exc)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click__termui_impl_py__module___translate_ch_to_exc) (lawConform C fuel f_click__termui_impl_py__module___translate_ch_to_exc)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_core_py__module__Command___init : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/core.py:<module>.Command", fields := [] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 2)] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "name"), ("opts", Val.ref (base + 3)), ("secondary_opts", Val.ref (base + 4)), ("type", Val.ref (base + 5)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "name"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.str "test", Val.unit, Val.unit, Val.ref (base + 1), Val.unit, Val.unit, Val.unit, Val.str "[OPTIONS]", Val.bool true, Val.bool false, Val.bool false, Val.bool false] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/core.py:<module>.Command", fields := [("name", Val.str "test"), ("context_settings", Val.ref (base + 6)), ("callback", Val.unit), ("params", Val.ref (base + 1)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 2)] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "name"), ("opts", Val.ref (base + 3)), ("secondary_opts", Val.ref (base + 4)), ("type", Val.ref (base + 5)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "name"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5)], budget := 2220 }) },
+   { case := { heap := h0 ++ [{ cls := "click/core.py:<module>.Group", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.str "cli", Val.unit, Val.unit, Val.unit, Val.unit, Val.unit, Val.unit, Val.str "[OPTIONS]", Val.bool true, Val.bool false, Val.bool false, Val.bool false] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/core.py:<module>.Group", fields := [("name", Val.str "cli"), ("context_settings", Val.ref (base + 1)), ("callback", Val.unit), ("params", Val.ref (base + 2)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }], roots := [(base + 0)], budget := 1022 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 32 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_core_py__module__Command___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module__Command___init).all (lawConform C fuel f_click_core_py__module__Command___init__)) = true := by
+  intro fuel hf
+  have hk : 32 ≤ fuel := Nat.le_trans (by decide : 32 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_core_py__module__Command___init).all (lawConform C 32 f_click_core_py__module__Command___init__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 32 f_click_core_py__module__Command___init__) (lawConform C fuel f_click_core_py__module__Command___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_core_py__module__CommandCollection_add_source : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/core.py:<module>.CommandCollection", fields := [("name", Val.unit), ("context_settings", Val.ref (base + 1)), ("callback", Val.unit), ("params", Val.ref (base + 2)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 3)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit), ("sources", Val.ref (base + 4))] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [Val.int (7), Val.int (-6), Val.int (7)] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/core.py:<module>.CommandCollection", fields := [("name", Val.unit), ("context_settings", Val.ref (base + 1)), ("callback", Val.unit), ("params", Val.ref (base + 2)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 3)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit), ("sources", Val.ref (base + 4))] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [Val.int (7), Val.int (-6), Val.int (7), Val.int (3)] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4)], budget := 1658 }) },
+   { case := { heap := h0 ++ [{ cls := "click/core.py:<module>.CommandCollection", fields := [("name", Val.unit), ("context_settings", Val.ref (base + 1)), ("callback", Val.unit), ("params", Val.ref (base + 2)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 3)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit), ("sources", Val.ref (base + 4))] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [Val.int (7)] }], self := (some (Val.ref (base + 0))), args := [Val.int (-6)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/core.py:<module>.CommandCollection", fields := [("name", Val.unit), ("context_settings", Val.ref (base + 1)), ("callback", Val.unit), ("params", Val.ref (base + 2)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 3)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit), ("sources", Val.ref (base + 4))] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [Val.int (7), Val.int (-6)] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4)], budget := 1610 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_core_py__module__CommandCollection_add_source : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module__CommandCollection_add_source).all (lawConform C fuel f_click_core_py__module__CommandCollection_add_source)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_core_py__module__CommandCollection_add_source).all (lawConform C 8 f_click_core_py__module__CommandCollection_add_source) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_core_py__module__CommandCollection_add_source) (lawConform C fuel f_click_core_py__module__CommandCollection_add_source)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_core_py__module__Group_add_command : List Obs :=
@@ -248,17 +301,18 @@ def dom_conform_click_core_py__module__Group_add_command : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 32 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_core_py__module__Group_add_command : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module__Group_add_command).all (lawConform C fuel f_click_core_py__module__Group_add_command)) = true := by
   intro fuel hf
   have hk : 32 ≤ fuel := Nat.le_trans (by decide : 32 ≤ FUEL) hf
   have hchecked : (dom_conform_click_core_py__module__Group_add_command).all (lawConform C 32 f_click_core_py__module__Group_add_command) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 32 f_click_core_py__module__Group_add_command) (lawConform C 32 f_click_core_py__module__Group_add_command) (lawConform C fuel f_click_core_py__module__Group_add_command)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 32 f_click_core_py__module__Group_add_command) (lawConform C fuel f_click_core_py__module__Group_add_command)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_core_py__module__Option_prompt_for_value : List Obs :=
@@ -267,17 +321,18 @@ def dom_conform_click_core_py__module__Option_prompt_for_value : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_core_py__module__Option_prompt_for_value : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module__Option_prompt_for_value).all (lawConform C fuel f_click_core_py__module__Option_prompt_for_value)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_core_py__module__Option_prompt_for_value).all (lawConform C 8 f_click_core_py__module__Option_prompt_for_value) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_core_py__module__Option_prompt_for_value) (lawConform C 8 f_click_core_py__module__Option_prompt_for_value) (lawConform C fuel f_click_core_py__module__Option_prompt_for_value)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_core_py__module__Option_prompt_for_value) (lawConform C fuel f_click_core_py__module__Option_prompt_for_value)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_core_py__module__Parameter_human_readable_name : List Obs :=
@@ -286,17 +341,18 @@ def dom_conform_click_core_py__module__Parameter_human_readable_name : List Obs 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_core_py__module__Parameter_human_readable_name : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module__Parameter_human_readable_name).all (lawConform C fuel f_click_core_py__module__Parameter_human_readable_name)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_core_py__module__Parameter_human_readable_name).all (lawConform C 8 f_click_core_py__module__Parameter_human_readable_name) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_core_py__module__Parameter_human_readable_name) (lawConform C 8 f_click_core_py__module__Parameter_human_readable_name) (lawConform C fuel f_click_core_py__module__Parameter_human_readable_name)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_core_py__module__Parameter_human_readable_name) (lawConform C fuel f_click_core_py__module__Parameter_human_readable_name)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_core_py__module__Parameter_value_is_missing : List Obs :=
@@ -305,17 +361,18 @@ def dom_conform_click_core_py__module__Parameter_value_is_missing : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_core_py__module__Parameter_value_is_missing : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module__Parameter_value_is_missing).all (lawConform C fuel f_click_core_py__module__Parameter_value_is_missing)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click_core_py__module__Parameter_value_is_missing).all (lawConform C 16 f_click_core_py__module__Parameter_value_is_missing) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click_core_py__module__Parameter_value_is_missing) (lawConform C 16 f_click_core_py__module__Parameter_value_is_missing) (lawConform C fuel f_click_core_py__module__Parameter_value_is_missing)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_core_py__module__Parameter_value_is_missing) (lawConform C fuel f_click_core_py__module__Parameter_value_is_missing)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_core_py__module____getattr : List Obs :=
@@ -326,17 +383,41 @@ def dom_conform_click_core_py__module____getattr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_core_py__module____getattr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module____getattr).all (lawConform C fuel f_click_core_py__module____getattr__)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click_core_py__module____getattr).all (lawConform C 16 f_click_core_py__module____getattr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click_core_py__module____getattr__) (lawConform C 16 f_click_core_py__module____getattr__) (lawConform C fuel f_click_core_py__module____getattr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_core_py__module____getattr__) (lawConform C fuel f_click_core_py__module____getattr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_core_py__module__batch : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-7), Val.int (-17)] }, expected := EResult.exn (Val.str "TypeError"), post := (some { heap := h0 ++ [], roots := [], budget := 68 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (9), Val.int (20)] }, expected := EResult.exn (Val.str "TypeError"), post := (some { heap := h0 ++ [], roots := [], budget := 68 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-3), Val.int (-18)] }, expected := EResult.exn (Val.str "TypeError"), post := (some { heap := h0 ++ [], roots := [], budget := 68 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (18), Val.int (10)] }, expected := EResult.exn (Val.str "TypeError"), post := (some { heap := h0 ++ [], roots := [], budget := 68 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_core_py__module__batch : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_core_py__module__batch).all (lawConform C fuel f_click_core_py__module__batch)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_core_py__module__batch).all (lawConform C 16 f_click_core_py__module__batch) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_core_py__module__batch) (lawConform C fuel f_click_core_py__module__batch)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_decorators_py__module__command : List Obs :=
@@ -346,17 +427,18 @@ def dom_conform_click_decorators_py__module__command : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_decorators_py__module__command : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_decorators_py__module__command).all (lawConform C fuel f_click_decorators_py__module__command)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_click_decorators_py__module__command).all (lawConform C 1 f_click_decorators_py__module__command) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_click_decorators_py__module__command) (lawConform C 1 f_click_decorators_py__module__command) (lawConform C fuel f_click_decorators_py__module__command)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_click_decorators_py__module__command) (lawConform C fuel f_click_decorators_py__module__command)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_decorators_py__module__group : List Obs :=
@@ -366,17 +448,18 @@ def dom_conform_click_decorators_py__module__group : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_decorators_py__module__group : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_decorators_py__module__group).all (lawConform C fuel f_click_decorators_py__module__group)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_click_decorators_py__module__group).all (lawConform C 1 f_click_decorators_py__module__group) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_click_decorators_py__module__group) (lawConform C 1 f_click_decorators_py__module__group) (lawConform C fuel f_click_decorators_py__module__group)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_click_decorators_py__module__group) (lawConform C fuel f_click_decorators_py__module__group)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_decorators_py__module__pass_meta_key : List Obs :=
@@ -386,17 +469,18 @@ def dom_conform_click_decorators_py__module__pass_meta_key : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_decorators_py__module__pass_meta_key : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_decorators_py__module__pass_meta_key).all (lawConform C fuel f_click_decorators_py__module__pass_meta_key)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_click_decorators_py__module__pass_meta_key).all (lawConform C 1 f_click_decorators_py__module__pass_meta_key) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_click_decorators_py__module__pass_meta_key) (lawConform C 1 f_click_decorators_py__module__pass_meta_key) (lawConform C fuel f_click_decorators_py__module__pass_meta_key)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_click_decorators_py__module__pass_meta_key) (lawConform C fuel f_click_decorators_py__module__pass_meta_key)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_formatting_py__module__HelpFormatter_dedent : List Obs :=
@@ -407,17 +491,18 @@ def dom_conform_click_formatting_py__module__HelpFormatter_dedent : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_formatting_py__module__HelpFormatter_dedent : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_formatting_py__module__HelpFormatter_dedent).all (lawConform C fuel f_click_formatting_py__module__HelpFormatter_dedent)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_formatting_py__module__HelpFormatter_dedent).all (lawConform C 8 f_click_formatting_py__module__HelpFormatter_dedent) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_formatting_py__module__HelpFormatter_dedent) (lawConform C 8 f_click_formatting_py__module__HelpFormatter_dedent) (lawConform C fuel f_click_formatting_py__module__HelpFormatter_dedent)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_formatting_py__module__HelpFormatter_dedent) (lawConform C fuel f_click_formatting_py__module__HelpFormatter_dedent)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_formatting_py__module__HelpFormatter_indent : List Obs :=
@@ -428,17 +513,79 @@ def dom_conform_click_formatting_py__module__HelpFormatter_indent : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_formatting_py__module__HelpFormatter_indent : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_formatting_py__module__HelpFormatter_indent).all (lawConform C fuel f_click_formatting_py__module__HelpFormatter_indent)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_formatting_py__module__HelpFormatter_indent).all (lawConform C 8 f_click_formatting_py__module__HelpFormatter_indent) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_formatting_py__module__HelpFormatter_indent) (lawConform C 8 f_click_formatting_py__module__HelpFormatter_indent) (lawConform C fuel f_click_formatting_py__module__HelpFormatter_indent)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_formatting_py__module__HelpFormatter_indent) (lawConform C fuel f_click_formatting_py__module__HelpFormatter_indent)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_formatting_py__module__HelpFormatter_write : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/formatting.py:<module>.HelpFormatter", fields := [("indent_increment", Val.int (2)), ("width", Val.int (80)), ("current_indent", Val.int (0)), ("buffer", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.str "Usage: copy [OPTIONS] X"] }], self := (some (Val.ref (base + 0))), args := [Val.str "\n"] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/formatting.py:<module>.HelpFormatter", fields := [("indent_increment", Val.int (2)), ("width", Val.int (80)), ("current_indent", Val.int (0)), ("buffer", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.str "Usage: copy [OPTIONS] X", Val.str "\n"] }], roots := [(base + 0), (base + 1)], budget := 552 }) },
+   { case := { heap := h0 ++ [{ cls := "click/formatting.py:<module>.HelpFormatter", fields := [("indent_increment", Val.int (2)), ("width", Val.int (80)), ("current_indent", Val.int (0)), ("buffer", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [] }], self := (some (Val.ref (base + 0))), args := [Val.str "Usage: cmd [OPTIONS] ARG"] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/formatting.py:<module>.HelpFormatter", fields := [("indent_increment", Val.int (2)), ("width", Val.int (80)), ("current_indent", Val.int (0)), ("buffer", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.str "Usage: cmd [OPTIONS] ARG"] }], roots := [(base + 0), (base + 1)], budget := 524 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_formatting_py__module__HelpFormatter_write : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_formatting_py__module__HelpFormatter_write).all (lawConform C fuel f_click_formatting_py__module__HelpFormatter_write)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_formatting_py__module__HelpFormatter_write).all (lawConform C 8 f_click_formatting_py__module__HelpFormatter_write) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_formatting_py__module__HelpFormatter_write) (lawConform C fuel f_click_formatting_py__module__HelpFormatter_write)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_formatting_py__module__HelpFormatter_write_paragraph : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/formatting.py:<module>.HelpFormatter", fields := [("indent_increment", Val.int (2)), ("width", Val.int (80)), ("current_indent", Val.int (0)), ("buffer", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.str "Usage: cli NAME VAL cmd [OPTIONS]", Val.str "\n"] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/formatting.py:<module>.HelpFormatter", fields := [("indent_increment", Val.int (2)), ("width", Val.int (80)), ("current_indent", Val.int (0)), ("buffer", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.str "Usage: cli NAME VAL cmd [OPTIONS]", Val.str "\n", Val.str "\n"] }], roots := [(base + 0), (base + 1)], budget := 602 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_formatting_py__module__HelpFormatter_write_paragraph : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_formatting_py__module__HelpFormatter_write_paragraph).all (lawConform C fuel f_click_formatting_py__module__HelpFormatter_write_paragraph)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_formatting_py__module__HelpFormatter_write_paragraph).all (lawConform C 16 f_click_formatting_py__module__HelpFormatter_write_paragraph) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_formatting_py__module__HelpFormatter_write_paragraph) (lawConform C fuel f_click_formatting_py__module__HelpFormatter_write_paragraph)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_formatting_py__module__wrap_text__flush_par : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [], roots := [], budget := 62 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_formatting_py__module__wrap_text__flush_par : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_formatting_py__module__wrap_text__flush_par).all (lawConform C fuel f_click_formatting_py__module__wrap_text__flush_par)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_formatting_py__module__wrap_text__flush_par).all (lawConform C 8 f_click_formatting_py__module__wrap_text__flush_par) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_formatting_py__module__wrap_text__flush_par) (lawConform C fuel f_click_formatting_py__module__wrap_text__flush_par)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_globals_py__module__resolve_color_default : List Obs :=
@@ -447,17 +594,18 @@ def dom_conform_click_globals_py__module__resolve_color_default : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_globals_py__module__resolve_color_default : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_globals_py__module__resolve_color_default).all (lawConform C fuel f_click_globals_py__module__resolve_color_default)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_globals_py__module__resolve_color_default).all (lawConform C 8 f_click_globals_py__module__resolve_color_default) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_globals_py__module__resolve_color_default) (lawConform C 8 f_click_globals_py__module__resolve_color_default) (lawConform C fuel f_click_globals_py__module__resolve_color_default)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_globals_py__module__resolve_color_default) (lawConform C fuel f_click_globals_py__module__resolve_color_default)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_parser_py__module___Argument___init : List Obs :=
@@ -468,17 +616,40 @@ def dom_conform_click_parser_py__module___Argument___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_parser_py__module___Argument___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_parser_py__module___Argument___init).all (lawConform C fuel f_click_parser_py__module___Argument___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_parser_py__module___Argument___init).all (lawConform C 8 f_click_parser_py__module___Argument___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_parser_py__module___Argument___init__) (lawConform C 8 f_click_parser_py__module___Argument___init__) (lawConform C fuel f_click_parser_py__module___Argument___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_parser_py__module___Argument___init__) (lawConform C fuel f_click_parser_py__module___Argument___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_parser_py__module___Argument_process : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/parser.py:<module>._Argument", fields := [("dest", Val.str "src"), ("nargs", Val.int (-1)), ("obj", Val.ref (base + 1))] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 2)), ("secondary_opts", Val.ref (base + 3)), ("type", Val.ref (base + 4)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }, { cls := "click/parser.py:<module>._ParsingState", fields := [("opts", Val.ref (base + 6)), ("largs", Val.ref (base + 7)), ("rargs", Val.ref (base + 8)), ("order", Val.ref (base + 9))] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [Val.str "foo.txt", Val.str "bar.txt", Val.str "dir"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.str "foo.txt", Val.str "bar.txt"], Val.ref (base + 5)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/parser.py:<module>._Argument", fields := [("dest", Val.str "src"), ("nargs", Val.int (-1)), ("obj", Val.ref (base + 1))] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 2)), ("secondary_opts", Val.ref (base + 3)), ("type", Val.ref (base + 4)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }, { cls := "click/parser.py:<module>._ParsingState", fields := [("opts", Val.ref (base + 6)), ("largs", Val.ref (base + 7)), ("rargs", Val.ref (base + 8)), ("order", Val.ref (base + 9))] }, { cls := "dict", fields := [], payload := .dict [(Val.str "src", Val.tuple [Val.str "foo.txt", Val.str "bar.txt"])] }, { cls := "list", fields := [], payload := .list [Val.str "foo.txt", Val.str "bar.txt", Val.str "dir"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 1)] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2244 }) },
+   { case := { heap := h0 ++ [{ cls := "click/parser.py:<module>._Argument", fields := [("dest", Val.str "point"), ("nargs", Val.int (2)), ("obj", Val.ref (base + 1))] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "point"), ("opts", Val.ref (base + 2)), ("secondary_opts", Val.ref (base + 3)), ("type", Val.ref (base + 4)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (2)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "point"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.IntParamType", fields := [] }, { cls := "click/parser.py:<module>._ParsingState", fields := [("opts", Val.ref (base + 6)), ("largs", Val.ref (base + 7)), ("rargs", Val.ref (base + 8)), ("order", Val.ref (base + 9))] }, { cls := "dict", fields := [], payload := .dict [(Val.str "name", Val.str "peter")] }, { cls := "list", fields := [], payload := .list [Val.str "peter", Val.str "1", Val.str "2"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 10)] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "name"), ("opts", Val.ref (base + 11)), ("secondary_opts", Val.ref (base + 12)), ("type", Val.ref (base + 13)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "name"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.str "1", Val.str "2"], Val.ref (base + 5)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/parser.py:<module>._Argument", fields := [("dest", Val.str "point"), ("nargs", Val.int (2)), ("obj", Val.ref (base + 1))] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "point"), ("opts", Val.ref (base + 2)), ("secondary_opts", Val.ref (base + 3)), ("type", Val.ref (base + 4)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (2)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "point"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.IntParamType", fields := [] }, { cls := "click/parser.py:<module>._ParsingState", fields := [("opts", Val.ref (base + 6)), ("largs", Val.ref (base + 7)), ("rargs", Val.ref (base + 8)), ("order", Val.ref (base + 9))] }, { cls := "dict", fields := [], payload := .dict [(Val.str "name", Val.str "peter"), (Val.str "point", Val.tuple [Val.str "1", Val.str "2"])] }, { cls := "list", fields := [], payload := .list [Val.str "peter", Val.str "1", Val.str "2"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 10), Val.ref (base + 1)] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "name"), ("opts", Val.ref (base + 11)), ("secondary_opts", Val.ref (base + 12)), ("type", Val.ref (base + 13)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "name"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9), (base + 10), (base + 11), (base + 12), (base + 13)], budget := 3482 }) },
+   { case := { heap := h0 ++ [{ cls := "click/parser.py:<module>._Argument", fields := [("dest", Val.str "name"), ("nargs", Val.int (1)), ("obj", Val.ref (base + 1))] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "name"), ("opts", Val.ref (base + 2)), ("secondary_opts", Val.ref (base + 3)), ("type", Val.ref (base + 4)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "name"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }, { cls := "click/parser.py:<module>._ParsingState", fields := [("opts", Val.ref (base + 6)), ("largs", Val.ref (base + 7)), ("rargs", Val.ref (base + 8)), ("order", Val.ref (base + 9))] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [Val.str "peter", Val.str "1", Val.str "2"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }], self := (some (Val.ref (base + 0))), args := [Val.str "peter", Val.ref (base + 5)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/parser.py:<module>._Argument", fields := [("dest", Val.str "name"), ("nargs", Val.int (1)), ("obj", Val.ref (base + 1))] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "name"), ("opts", Val.ref (base + 2)), ("secondary_opts", Val.ref (base + 3)), ("type", Val.ref (base + 4)), ("required", Val.bool true), ("callback", Val.unit), ("nargs", Val.int (1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "name"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }, { cls := "click/parser.py:<module>._ParsingState", fields := [("opts", Val.ref (base + 6)), ("largs", Val.ref (base + 7)), ("rargs", Val.ref (base + 8)), ("order", Val.ref (base + 9))] }, { cls := "dict", fields := [], payload := .dict [(Val.str "name", Val.str "peter")] }, { cls := "list", fields := [], payload := .list [Val.str "peter", Val.str "1", Val.str "2"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 1)] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9)], budget := 2156 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 64 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_parser_py__module___Argument_process : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_parser_py__module___Argument_process).all (lawConform C fuel f_click_parser_py__module___Argument_process)) = true := by
+  intro fuel hf
+  have hk : 64 ≤ fuel := Nat.le_trans (by decide : 64 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_parser_py__module___Argument_process).all (lawConform C 64 f_click_parser_py__module___Argument_process) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 64 f_click_parser_py__module___Argument_process) (lawConform C fuel f_click_parser_py__module___Argument_process)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_parser_py__module___ParsingState___init : List Obs :=
@@ -487,17 +658,18 @@ def dom_conform_click_parser_py__module___ParsingState___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_parser_py__module___ParsingState___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_parser_py__module___ParsingState___init).all (lawConform C fuel f_click_parser_py__module___ParsingState___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_parser_py__module___ParsingState___init).all (lawConform C 8 f_click_parser_py__module___ParsingState___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_parser_py__module___ParsingState___init__) (lawConform C 8 f_click_parser_py__module___ParsingState___init__) (lawConform C fuel f_click_parser_py__module___ParsingState___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_parser_py__module___ParsingState___init__) (lawConform C fuel f_click_parser_py__module___ParsingState___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_parser_py__module____getattr : List Obs :=
@@ -506,17 +678,58 @@ def dom_conform_click_parser_py__module____getattr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_parser_py__module____getattr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_parser_py__module____getattr).all (lawConform C fuel f_click_parser_py__module____getattr__)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click_parser_py__module____getattr).all (lawConform C 16 f_click_parser_py__module____getattr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click_parser_py__module____getattr__) (lawConform C 16 f_click_parser_py__module____getattr__) (lawConform C fuel f_click_parser_py__module____getattr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_parser_py__module____getattr__) (lawConform C fuel f_click_parser_py__module____getattr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_shell_completion_py__module__BashComplete_format_completion : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.BashComplete", fields := [("cli", Val.ref (base + 1)), ("ctx_args", Val.ref (base + 11)), ("prog_name", Val.str "cli"), ("complete_var", Val.str "_CLI_COMPLETE")] }, { cls := "click/core.py:<module>.Group", fields := [("name", Val.str "cli"), ("context_settings", Val.ref (base + 2)), ("callback", Val.unit), ("params", Val.ref (base + 3)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 4)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.ref (base + 5)), (Val.str "b", Val.ref (base + 8))] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "a"), ("context_settings", Val.ref (base + 6)), ("callback", Val.unit), ("params", Val.ref (base + 7)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "b"), ("context_settings", Val.ref (base + 9)), ("callback", Val.unit), ("params", Val.ref (base + 10)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 13)), ("secondary_opts", Val.ref (base + 14)), ("type", Val.ref (base + 15)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 12)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.BashComplete", fields := [("cli", Val.ref (base + 1)), ("ctx_args", Val.ref (base + 11)), ("prog_name", Val.str "cli"), ("complete_var", Val.str "_CLI_COMPLETE")] }, { cls := "click/core.py:<module>.Group", fields := [("name", Val.str "cli"), ("context_settings", Val.ref (base + 2)), ("callback", Val.unit), ("params", Val.ref (base + 3)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 4)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.ref (base + 5)), (Val.str "b", Val.ref (base + 8))] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "a"), ("context_settings", Val.ref (base + 6)), ("callback", Val.unit), ("params", Val.ref (base + 7)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "b"), ("context_settings", Val.ref (base + 9)), ("callback", Val.unit), ("params", Val.ref (base + 10)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 13)), ("secondary_opts", Val.ref (base + 14)), ("type", Val.ref (base + 15)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9), (base + 10), (base + 11), (base + 12), (base + 13), (base + 14), (base + 15)], budget := 5102 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_shell_completion_py__module__BashComplete_format_completion : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_shell_completion_py__module__BashComplete_format_completion).all (lawConform C fuel f_click_shell_completion_py__module__BashComplete_format_completion)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_shell_completion_py__module__BashComplete_format_completion).all (lawConform C 8 f_click_shell_completion_py__module__BashComplete_format_completion) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_shell_completion_py__module__BashComplete_format_completion) (lawConform C fuel f_click_shell_completion_py__module__BashComplete_format_completion)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_shell_completion_py__module__CompletionItem___getattr : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [("<slot>click/shell_completion.py:<module>.CompletionItem._info", Val.ref (base + 1)), ("<slot>click/shell_completion.py:<module>.CompletionItem.help", Val.unit), ("<slot>click/shell_completion.py:<module>.CompletionItem.type", Val.str "plain"), ("<slot>click/shell_completion.py:<module>.CompletionItem.value", Val.str "test")] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.str "a"] }, expected := EResult.val (Val.int (1)), post := (some { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [("<slot>click/shell_completion.py:<module>.CompletionItem._info", Val.ref (base + 1)), ("<slot>click/shell_completion.py:<module>.CompletionItem.help", Val.unit), ("<slot>click/shell_completion.py:<module>.CompletionItem.type", Val.str "plain"), ("<slot>click/shell_completion.py:<module>.CompletionItem.value", Val.str "test")] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.int (1))] }], roots := [(base + 0), (base + 1)], budget := 942 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_shell_completion_py__module__CompletionItem___getattr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_shell_completion_py__module__CompletionItem___getattr).all (lawConform C fuel f_click_shell_completion_py__module__CompletionItem___getattr__)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_shell_completion_py__module__CompletionItem___getattr).all (lawConform C 8 f_click_shell_completion_py__module__CompletionItem___getattr__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_shell_completion_py__module__CompletionItem___getattr__) (lawConform C fuel f_click_shell_completion_py__module__CompletionItem___getattr__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_shell_completion_py__module__CompletionItem___init : List Obs :=
@@ -527,17 +740,18 @@ def dom_conform_click_shell_completion_py__module__CompletionItem___init : List 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_shell_completion_py__module__CompletionItem___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_shell_completion_py__module__CompletionItem___init).all (lawConform C fuel f_click_shell_completion_py__module__CompletionItem___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_shell_completion_py__module__CompletionItem___init).all (lawConform C 8 f_click_shell_completion_py__module__CompletionItem___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_shell_completion_py__module__CompletionItem___init__) (lawConform C 8 f_click_shell_completion_py__module__CompletionItem___init__) (lawConform C fuel f_click_shell_completion_py__module__CompletionItem___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_shell_completion_py__module__CompletionItem___init__) (lawConform C fuel f_click_shell_completion_py__module__CompletionItem___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_shell_completion_py__module__FishComplete_format_completion : List Obs :=
@@ -546,17 +760,18 @@ def dom_conform_click_shell_completion_py__module__FishComplete_format_completio
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_shell_completion_py__module__FishComplete_format_completion : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_shell_completion_py__module__FishComplete_format_completion).all (lawConform C fuel f_click_shell_completion_py__module__FishComplete_format_completion)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_shell_completion_py__module__FishComplete_format_completion).all (lawConform C 8 f_click_shell_completion_py__module__FishComplete_format_completion) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_shell_completion_py__module__FishComplete_format_completion) (lawConform C 8 f_click_shell_completion_py__module__FishComplete_format_completion) (lawConform C fuel f_click_shell_completion_py__module__FishComplete_format_completion)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_shell_completion_py__module__FishComplete_format_completion) (lawConform C fuel f_click_shell_completion_py__module__FishComplete_format_completion)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_shell_completion_py__module__ShellComplete___init : List Obs :=
@@ -566,17 +781,38 @@ def dom_conform_click_shell_completion_py__module__ShellComplete___init : List O
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_shell_completion_py__module__ShellComplete___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_shell_completion_py__module__ShellComplete___init).all (lawConform C fuel f_click_shell_completion_py__module__ShellComplete___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_shell_completion_py__module__ShellComplete___init).all (lawConform C 8 f_click_shell_completion_py__module__ShellComplete___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_shell_completion_py__module__ShellComplete___init__) (lawConform C 8 f_click_shell_completion_py__module__ShellComplete___init__) (lawConform C fuel f_click_shell_completion_py__module__ShellComplete___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_shell_completion_py__module__ShellComplete___init__) (lawConform C fuel f_click_shell_completion_py__module__ShellComplete___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_shell_completion_py__module__ZshComplete_format_completion : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.ZshComplete", fields := [("cli", Val.ref (base + 1)), ("ctx_args", Val.ref (base + 11)), ("prog_name", Val.str "cli"), ("complete_var", Val.str "_CLI_COMPLETE")] }, { cls := "click/core.py:<module>.Group", fields := [("name", Val.str "cli"), ("context_settings", Val.ref (base + 2)), ("callback", Val.unit), ("params", Val.ref (base + 3)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 4)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.ref (base + 5)), (Val.str "b", Val.ref (base + 8))] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "a"), ("context_settings", Val.ref (base + 6)), ("callback", Val.unit), ("params", Val.ref (base + 7)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "b"), ("context_settings", Val.ref (base + 9)), ("callback", Val.unit), ("params", Val.ref (base + 10)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 13)), ("secondary_opts", Val.ref (base + 14)), ("type", Val.ref (base + 15)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 12)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.ZshComplete", fields := [("cli", Val.ref (base + 1)), ("ctx_args", Val.ref (base + 11)), ("prog_name", Val.str "cli"), ("complete_var", Val.str "_CLI_COMPLETE")] }, { cls := "click/core.py:<module>.Group", fields := [("name", Val.str "cli"), ("context_settings", Val.ref (base + 2)), ("callback", Val.unit), ("params", Val.ref (base + 3)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 4)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.ref (base + 5)), (Val.str "b", Val.ref (base + 8))] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "a"), ("context_settings", Val.ref (base + 6)), ("callback", Val.unit), ("params", Val.ref (base + 7)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "b"), ("context_settings", Val.ref (base + 9)), ("callback", Val.unit), ("params", Val.ref (base + 10)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 13)), ("secondary_opts", Val.ref (base + 14)), ("type", Val.ref (base + 15)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9), (base + 10), (base + 11), (base + 12), (base + 13), (base + 14), (base + 15)], budget := 5100 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_shell_completion_py__module__ZshComplete_format_completion : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_shell_completion_py__module__ZshComplete_format_completion).all (lawConform C fuel f_click_shell_completion_py__module__ZshComplete_format_completion)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_shell_completion_py__module__ZshComplete_format_completion).all (lawConform C 16 f_click_shell_completion_py__module__ZshComplete_format_completion) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_shell_completion_py__module__ZshComplete_format_completion) (lawConform C fuel f_click_shell_completion_py__module__ZshComplete_format_completion)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_termui_py__module__secho : List Obs :=
@@ -587,17 +823,18 @@ def dom_conform_click_termui_py__module__secho : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_termui_py__module__secho : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_termui_py__module__secho).all (lawConform C fuel f_click_termui_py__module__secho)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_click_termui_py__module__secho).all (lawConform C 1 f_click_termui_py__module__secho) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_click_termui_py__module__secho) (lawConform C 1 f_click_termui_py__module__secho) (lawConform C fuel f_click_termui_py__module__secho)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_click_termui_py__module__secho) (lawConform C fuel f_click_termui_py__module__secho)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_testing_py__module__CliRunner___init : List Obs :=
@@ -606,17 +843,18 @@ def dom_conform_click_testing_py__module__CliRunner___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_testing_py__module__CliRunner___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_testing_py__module__CliRunner___init).all (lawConform C fuel f_click_testing_py__module__CliRunner___init__)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click_testing_py__module__CliRunner___init).all (lawConform C 16 f_click_testing_py__module__CliRunner___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click_testing_py__module__CliRunner___init__) (lawConform C 16 f_click_testing_py__module__CliRunner___init__) (lawConform C fuel f_click_testing_py__module__CliRunner___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_testing_py__module__CliRunner___init__) (lawConform C fuel f_click_testing_py__module__CliRunner___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_testing_py__module__CliRunner_get_default_prog_name : List Obs :=
@@ -628,17 +866,18 @@ def dom_conform_click_testing_py__module__CliRunner_get_default_prog_name : List
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_testing_py__module__CliRunner_get_default_prog_name : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_testing_py__module__CliRunner_get_default_prog_name).all (lawConform C fuel f_click_testing_py__module__CliRunner_get_default_prog_name)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_testing_py__module__CliRunner_get_default_prog_name).all (lawConform C 8 f_click_testing_py__module__CliRunner_get_default_prog_name) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_testing_py__module__CliRunner_get_default_prog_name) (lawConform C 8 f_click_testing_py__module__CliRunner_get_default_prog_name) (lawConform C fuel f_click_testing_py__module__CliRunner_get_default_prog_name)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_testing_py__module__CliRunner_get_default_prog_name) (lawConform C fuel f_click_testing_py__module__CliRunner_get_default_prog_name)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_testing_py__module__EchoingStdin___init : List Obs :=
@@ -649,17 +888,38 @@ def dom_conform_click_testing_py__module__EchoingStdin___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_testing_py__module__EchoingStdin___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_testing_py__module__EchoingStdin___init).all (lawConform C fuel f_click_testing_py__module__EchoingStdin___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_testing_py__module__EchoingStdin___init).all (lawConform C 8 f_click_testing_py__module__EchoingStdin___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_testing_py__module__EchoingStdin___init__) (lawConform C 8 f_click_testing_py__module__EchoingStdin___init__) (lawConform C fuel f_click_testing_py__module__EchoingStdin___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_testing_py__module__EchoingStdin___init__) (lawConform C fuel f_click_testing_py__module__EchoingStdin___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_testing_py__module__EchoingStdin___repr : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (1)), ("_output", Val.int (1)), ("_paused", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "1"), post := (some { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (1)), ("_output", Val.int (1)), ("_paused", Val.bool false)] }], roots := [(base + 0)], budget := 328 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_testing_py__module__EchoingStdin___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_testing_py__module__EchoingStdin___repr).all (lawConform C fuel f_click_testing_py__module__EchoingStdin___repr__)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_testing_py__module__EchoingStdin___repr).all (lawConform C 8 f_click_testing_py__module__EchoingStdin___repr__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_testing_py__module__EchoingStdin___repr__) (lawConform C fuel f_click_testing_py__module__EchoingStdin___repr__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_testing_py__module__Result___init : List Obs :=
@@ -670,17 +930,18 @@ def dom_conform_click_testing_py__module__Result___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_testing_py__module__Result___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_testing_py__module__Result___init).all (lawConform C fuel f_click_testing_py__module__Result___init__)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click_testing_py__module__Result___init).all (lawConform C 16 f_click_testing_py__module__Result___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click_testing_py__module__Result___init__) (lawConform C 16 f_click_testing_py__module__Result___init__) (lawConform C fuel f_click_testing_py__module__Result___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_testing_py__module__Result___init__) (lawConform C fuel f_click_testing_py__module__Result___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__BoolParamType___repr : List Obs :=
@@ -689,17 +950,18 @@ def dom_conform_click_types_py__module__BoolParamType___repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__BoolParamType___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__BoolParamType___repr).all (lawConform C fuel f_click_types_py__module__BoolParamType___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__BoolParamType___repr).all (lawConform C 4 f_click_types_py__module__BoolParamType___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__BoolParamType___repr__) (lawConform C 4 f_click_types_py__module__BoolParamType___repr__) (lawConform C fuel f_click_types_py__module__BoolParamType___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__BoolParamType___repr__) (lawConform C fuel f_click_types_py__module__BoolParamType___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__CompositeParamType_arity : List Obs :=
@@ -708,17 +970,39 @@ def dom_conform_click_types_py__module__CompositeParamType_arity : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__CompositeParamType_arity : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__CompositeParamType_arity).all (lawConform C fuel f_click_types_py__module__CompositeParamType_arity)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__CompositeParamType_arity).all (lawConform C 8 f_click_types_py__module__CompositeParamType_arity) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module__CompositeParamType_arity) (lawConform C 8 f_click_types_py__module__CompositeParamType_arity) (lawConform C fuel f_click_types_py__module__CompositeParamType_arity)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__CompositeParamType_arity) (lawConform C fuel f_click_types_py__module__CompositeParamType_arity)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_types_py__module__DateTime___init : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/types.py:<module>.DateTime", fields := [] }, { cls := "list", fields := [], payload := .list [Val.str "%A %B %d, %Y"] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.DateTime", fields := [("formats", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.str "%A %B %d, %Y"] }], roots := [(base + 0), (base + 1)], budget := 302 }) },
+   { case := { heap := h0 ++ [{ cls := "click/types.py:<module>.DateTime", fields := [] }, { cls := "list", fields := [], payload := .list [Val.str "%Y-%m-%d"] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.DateTime", fields := [("formats", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.str "%Y-%m-%d"] }], roots := [(base + 0), (base + 1)], budget := 294 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_types_py__module__DateTime___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__DateTime___init).all (lawConform C fuel f_click_types_py__module__DateTime___init__)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_types_py__module__DateTime___init).all (lawConform C 8 f_click_types_py__module__DateTime___init__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__DateTime___init__) (lawConform C fuel f_click_types_py__module__DateTime___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__File___init : List Obs :=
@@ -728,17 +1012,18 @@ def dom_conform_click_types_py__module__File___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__File___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__File___init).all (lawConform C fuel f_click_types_py__module__File___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__File___init).all (lawConform C 8 f_click_types_py__module__File___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module__File___init__) (lawConform C 8 f_click_types_py__module__File___init__) (lawConform C fuel f_click_types_py__module__File___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__File___init__) (lawConform C fuel f_click_types_py__module__File___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__File_shell_complete : List Obs :=
@@ -747,17 +1032,18 @@ def dom_conform_click_types_py__module__File_shell_complete : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__File_shell_complete : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__File_shell_complete).all (lawConform C fuel f_click_types_py__module__File_shell_complete)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__File_shell_complete).all (lawConform C 16 f_click_types_py__module__File_shell_complete) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click_types_py__module__File_shell_complete) (lawConform C 16 f_click_types_py__module__File_shell_complete) (lawConform C fuel f_click_types_py__module__File_shell_complete)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_types_py__module__File_shell_complete) (lawConform C fuel f_click_types_py__module__File_shell_complete)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__FloatParamType___repr : List Obs :=
@@ -766,17 +1052,18 @@ def dom_conform_click_types_py__module__FloatParamType___repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__FloatParamType___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__FloatParamType___repr).all (lawConform C fuel f_click_types_py__module__FloatParamType___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__FloatParamType___repr).all (lawConform C 4 f_click_types_py__module__FloatParamType___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__FloatParamType___repr__) (lawConform C 4 f_click_types_py__module__FloatParamType___repr__) (lawConform C fuel f_click_types_py__module__FloatParamType___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__FloatParamType___repr__) (lawConform C fuel f_click_types_py__module__FloatParamType___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__FloatRange__clamp : List Obs :=
@@ -786,17 +1073,18 @@ def dom_conform_click_types_py__module__FloatRange__clamp : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__FloatRange__clamp : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__FloatRange__clamp).all (lawConform C fuel f_click_types_py__module__FloatRange__clamp)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__FloatRange__clamp).all (lawConform C 8 f_click_types_py__module__FloatRange__clamp) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module__FloatRange__clamp) (lawConform C 8 f_click_types_py__module__FloatRange__clamp) (lawConform C fuel f_click_types_py__module__FloatRange__clamp)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__FloatRange__clamp) (lawConform C fuel f_click_types_py__module__FloatRange__clamp)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__IntParamType___repr : List Obs :=
@@ -805,17 +1093,18 @@ def dom_conform_click_types_py__module__IntParamType___repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__IntParamType___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__IntParamType___repr).all (lawConform C fuel f_click_types_py__module__IntParamType___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__IntParamType___repr).all (lawConform C 4 f_click_types_py__module__IntParamType___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__IntParamType___repr__) (lawConform C 4 f_click_types_py__module__IntParamType___repr__) (lawConform C fuel f_click_types_py__module__IntParamType___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__IntParamType___repr__) (lawConform C fuel f_click_types_py__module__IntParamType___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__IntRange__clamp : List Obs :=
@@ -824,17 +1113,18 @@ def dom_conform_click_types_py__module__IntRange__clamp : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__IntRange__clamp : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__IntRange__clamp).all (lawConform C fuel f_click_types_py__module__IntRange__clamp)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__IntRange__clamp).all (lawConform C 8 f_click_types_py__module__IntRange__clamp) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module__IntRange__clamp) (lawConform C 8 f_click_types_py__module__IntRange__clamp) (lawConform C fuel f_click_types_py__module__IntRange__clamp)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__IntRange__clamp) (lawConform C fuel f_click_types_py__module__IntRange__clamp)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__ParamType_convert : List Obs :=
@@ -843,17 +1133,18 @@ def dom_conform_click_types_py__module__ParamType_convert : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__ParamType_convert : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__ParamType_convert).all (lawConform C fuel f_click_types_py__module__ParamType_convert)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__ParamType_convert).all (lawConform C 4 f_click_types_py__module__ParamType_convert) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__ParamType_convert) (lawConform C 4 f_click_types_py__module__ParamType_convert) (lawConform C fuel f_click_types_py__module__ParamType_convert)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__ParamType_convert) (lawConform C fuel f_click_types_py__module__ParamType_convert)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__ParamType_get_metavar : List Obs :=
@@ -862,17 +1153,18 @@ def dom_conform_click_types_py__module__ParamType_get_metavar : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__ParamType_get_metavar : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__ParamType_get_metavar).all (lawConform C fuel f_click_types_py__module__ParamType_get_metavar)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__ParamType_get_metavar).all (lawConform C 4 f_click_types_py__module__ParamType_get_metavar) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__ParamType_get_metavar) (lawConform C 4 f_click_types_py__module__ParamType_get_metavar) (lawConform C fuel f_click_types_py__module__ParamType_get_metavar)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__ParamType_get_metavar) (lawConform C fuel f_click_types_py__module__ParamType_get_metavar)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__ParamType_get_missing_message : List Obs :=
@@ -881,17 +1173,18 @@ def dom_conform_click_types_py__module__ParamType_get_missing_message : List Obs
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__ParamType_get_missing_message : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__ParamType_get_missing_message).all (lawConform C fuel f_click_types_py__module__ParamType_get_missing_message)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__ParamType_get_missing_message).all (lawConform C 4 f_click_types_py__module__ParamType_get_missing_message) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__ParamType_get_missing_message) (lawConform C 4 f_click_types_py__module__ParamType_get_missing_message) (lawConform C fuel f_click_types_py__module__ParamType_get_missing_message)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__ParamType_get_missing_message) (lawConform C fuel f_click_types_py__module__ParamType_get_missing_message)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__ParamType_shell_complete : List Obs :=
@@ -900,17 +1193,18 @@ def dom_conform_click_types_py__module__ParamType_shell_complete : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__ParamType_shell_complete : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__ParamType_shell_complete).all (lawConform C fuel f_click_types_py__module__ParamType_shell_complete)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__ParamType_shell_complete).all (lawConform C 8 f_click_types_py__module__ParamType_shell_complete) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module__ParamType_shell_complete) (lawConform C 8 f_click_types_py__module__ParamType_shell_complete) (lawConform C fuel f_click_types_py__module__ParamType_shell_complete)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__ParamType_shell_complete) (lawConform C fuel f_click_types_py__module__ParamType_shell_complete)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__Path_coerce_path_result : List Obs :=
@@ -923,17 +1217,18 @@ def dom_conform_click_types_py__module__Path_coerce_path_result : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__Path_coerce_path_result : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__Path_coerce_path_result).all (lawConform C fuel f_click_types_py__module__Path_coerce_path_result)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__Path_coerce_path_result).all (lawConform C 8 f_click_types_py__module__Path_coerce_path_result) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module__Path_coerce_path_result) (lawConform C 8 f_click_types_py__module__Path_coerce_path_result) (lawConform C fuel f_click_types_py__module__Path_coerce_path_result)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__Path_coerce_path_result) (lawConform C fuel f_click_types_py__module__Path_coerce_path_result)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__Path_shell_complete : List Obs :=
@@ -942,17 +1237,18 @@ def dom_conform_click_types_py__module__Path_shell_complete : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 32 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__Path_shell_complete : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__Path_shell_complete).all (lawConform C fuel f_click_types_py__module__Path_shell_complete)) = true := by
   intro fuel hf
   have hk : 32 ≤ fuel := Nat.le_trans (by decide : 32 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__Path_shell_complete).all (lawConform C 32 f_click_types_py__module__Path_shell_complete) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 32 f_click_types_py__module__Path_shell_complete) (lawConform C 32 f_click_types_py__module__Path_shell_complete) (lawConform C fuel f_click_types_py__module__Path_shell_complete)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 32 f_click_types_py__module__Path_shell_complete) (lawConform C fuel f_click_types_py__module__Path_shell_complete)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__StringParamType___repr : List Obs :=
@@ -961,17 +1257,38 @@ def dom_conform_click_types_py__module__StringParamType___repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__StringParamType___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__StringParamType___repr).all (lawConform C fuel f_click_types_py__module__StringParamType___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__StringParamType___repr).all (lawConform C 4 f_click_types_py__module__StringParamType___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__StringParamType___repr__) (lawConform C 4 f_click_types_py__module__StringParamType___repr__) (lawConform C fuel f_click_types_py__module__StringParamType___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__StringParamType___repr__) (lawConform C fuel f_click_types_py__module__StringParamType___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_types_py__module__Tuple_arity : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/types.py:<module>.Tuple", fields := [("types", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 2), Val.ref (base + 3)] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }, { cls := "click/types.py:<module>.IntParamType", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (2)), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.Tuple", fields := [("types", Val.ref (base + 1))] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 2), Val.ref (base + 3)] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }, { cls := "click/types.py:<module>.IntParamType", fields := [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3)], budget := 508 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_types_py__module__Tuple_arity : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__Tuple_arity).all (lawConform C fuel f_click_types_py__module__Tuple_arity)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_types_py__module__Tuple_arity).all (lawConform C 8 f_click_types_py__module__Tuple_arity) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module__Tuple_arity) (lawConform C fuel f_click_types_py__module__Tuple_arity)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__UUIDParameterType___repr : List Obs :=
@@ -980,17 +1297,18 @@ def dom_conform_click_types_py__module__UUIDParameterType___repr : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__UUIDParameterType___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__UUIDParameterType___repr).all (lawConform C fuel f_click_types_py__module__UUIDParameterType___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__UUIDParameterType___repr).all (lawConform C 4 f_click_types_py__module__UUIDParameterType___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__UUIDParameterType___repr__) (lawConform C 4 f_click_types_py__module__UUIDParameterType___repr__) (lawConform C fuel f_click_types_py__module__UUIDParameterType___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__UUIDParameterType___repr__) (lawConform C fuel f_click_types_py__module__UUIDParameterType___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__UnprocessedParamType___repr : List Obs :=
@@ -999,17 +1317,18 @@ def dom_conform_click_types_py__module__UnprocessedParamType___repr : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__UnprocessedParamType___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__UnprocessedParamType___repr).all (lawConform C fuel f_click_types_py__module__UnprocessedParamType___repr__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__UnprocessedParamType___repr).all (lawConform C 4 f_click_types_py__module__UnprocessedParamType___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__UnprocessedParamType___repr__) (lawConform C 4 f_click_types_py__module__UnprocessedParamType___repr__) (lawConform C fuel f_click_types_py__module__UnprocessedParamType___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__UnprocessedParamType___repr__) (lawConform C fuel f_click_types_py__module__UnprocessedParamType___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module__UnprocessedParamType_convert : List Obs :=
@@ -1021,17 +1340,18 @@ def dom_conform_click_types_py__module__UnprocessedParamType_convert : List Obs 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module__UnprocessedParamType_convert : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__UnprocessedParamType_convert).all (lawConform C fuel f_click_types_py__module__UnprocessedParamType_convert)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module__UnprocessedParamType_convert).all (lawConform C 4 f_click_types_py__module__UnprocessedParamType_convert) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_types_py__module__UnprocessedParamType_convert) (lawConform C 4 f_click_types_py__module__UnprocessedParamType_convert) (lawConform C fuel f_click_types_py__module__UnprocessedParamType_convert)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_types_py__module__UnprocessedParamType_convert) (lawConform C fuel f_click_types_py__module__UnprocessedParamType_convert)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module___NumberRangeBase___init : List Obs :=
@@ -1041,17 +1361,18 @@ def dom_conform_click_types_py__module___NumberRangeBase___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module___NumberRangeBase___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module___NumberRangeBase___init).all (lawConform C fuel f_click_types_py__module___NumberRangeBase___init__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module___NumberRangeBase___init).all (lawConform C 8 f_click_types_py__module___NumberRangeBase___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module___NumberRangeBase___init__) (lawConform C 8 f_click_types_py__module___NumberRangeBase___init__) (lawConform C fuel f_click_types_py__module___NumberRangeBase___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module___NumberRangeBase___init__) (lawConform C fuel f_click_types_py__module___NumberRangeBase___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_types_py__module___NumberRangeBase__clamp : List Obs :=
@@ -1062,17 +1383,39 @@ def dom_conform_click_types_py__module___NumberRangeBase__clamp : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_types_py__module___NumberRangeBase__clamp : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module___NumberRangeBase__clamp).all (lawConform C fuel f_click_types_py__module___NumberRangeBase__clamp)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_click_types_py__module___NumberRangeBase__clamp).all (lawConform C 8 f_click_types_py__module___NumberRangeBase__clamp) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_click_types_py__module___NumberRangeBase__clamp) (lawConform C 8 f_click_types_py__module___NumberRangeBase__clamp) (lawConform C fuel f_click_types_py__module___NumberRangeBase__clamp)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_types_py__module___NumberRangeBase__clamp) (lawConform C fuel f_click_types_py__module___NumberRangeBase__clamp)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_types_py__module___NumberRangeBase__describe_range : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/types.py:<module>.IntRange", fields := [("min", Val.int (1)), ("max", Val.int (32)), ("min_open", Val.bool false), ("max_open", Val.bool false), ("clamp", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "1<=x<=32"), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.IntRange", fields := [("min", Val.int (1)), ("max", Val.int (32)), ("min_open", Val.bool false), ("max_open", Val.bool false), ("clamp", Val.bool false)] }], roots := [(base + 0)], budget := 438 }) },
+   { case := { heap := h0 ++ [{ cls := "click/types.py:<module>.IntRange", fields := [("min", Val.int (0)), ("max", Val.int (3)), ("min_open", Val.bool false), ("max_open", Val.bool false), ("clamp", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "0<=x<=3"), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.IntRange", fields := [("min", Val.int (0)), ("max", Val.int (3)), ("min_open", Val.bool false), ("max_open", Val.bool false), ("clamp", Val.bool false)] }], roots := [(base + 0)], budget := 434 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 32 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_types_py__module___NumberRangeBase__describe_range : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module___NumberRangeBase__describe_range).all (lawConform C fuel f_click_types_py__module___NumberRangeBase__describe_range)) = true := by
+  intro fuel hf
+  have hk : 32 ≤ fuel := Nat.le_trans (by decide : 32 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_types_py__module___NumberRangeBase__describe_range).all (lawConform C 32 f_click_types_py__module___NumberRangeBase__describe_range) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 32 f_click_types_py__module___NumberRangeBase__describe_range) (lawConform C fuel f_click_types_py__module___NumberRangeBase__describe_range)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_utils_py__module__KeepOpenFile___enter : List Obs :=
@@ -1081,17 +1424,18 @@ def dom_conform_click_utils_py__module__KeepOpenFile___enter : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_utils_py__module__KeepOpenFile___enter : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__KeepOpenFile___enter).all (lawConform C fuel f_click_utils_py__module__KeepOpenFile___enter__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_utils_py__module__KeepOpenFile___enter).all (lawConform C 4 f_click_utils_py__module__KeepOpenFile___enter__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_utils_py__module__KeepOpenFile___enter__) (lawConform C 4 f_click_utils_py__module__KeepOpenFile___enter__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___enter__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_utils_py__module__KeepOpenFile___enter__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___enter__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_utils_py__module__KeepOpenFile___exit : List Obs :=
@@ -1101,17 +1445,18 @@ def dom_conform_click_utils_py__module__KeepOpenFile___exit : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 2 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_utils_py__module__KeepOpenFile___exit : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__KeepOpenFile___exit).all (lawConform C fuel f_click_utils_py__module__KeepOpenFile___exit__)) = true := by
   intro fuel hf
   have hk : 2 ≤ fuel := Nat.le_trans (by decide : 2 ≤ FUEL) hf
   have hchecked : (dom_conform_click_utils_py__module__KeepOpenFile___exit).all (lawConform C 2 f_click_utils_py__module__KeepOpenFile___exit__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 2 f_click_utils_py__module__KeepOpenFile___exit__) (lawConform C 2 f_click_utils_py__module__KeepOpenFile___exit__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___exit__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 2 f_click_utils_py__module__KeepOpenFile___exit__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___exit__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_utils_py__module__KeepOpenFile___init : List Obs :=
@@ -1121,36 +1466,58 @@ def dom_conform_click_utils_py__module__KeepOpenFile___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_utils_py__module__KeepOpenFile___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__KeepOpenFile___init).all (lawConform C fuel f_click_utils_py__module__KeepOpenFile___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_utils_py__module__KeepOpenFile___init).all (lawConform C 4 f_click_utils_py__module__KeepOpenFile___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_utils_py__module__KeepOpenFile___init__) (lawConform C 4 f_click_utils_py__module__KeepOpenFile___init__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_utils_py__module__KeepOpenFile___init__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_utils_py__module__KeepOpenFile___repr : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.KeepOpenFile", fields := [("_file", Val.str "hello.txt")] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "'hello.txt'"), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.KeepOpenFile", fields := [("_file", Val.str "hello.txt")] }], roots := [(base + 0)], budget := 252 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_click_utils_py__module__KeepOpenFile___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__KeepOpenFile___repr).all (lawConform C fuel f_click_utils_py__module__KeepOpenFile___repr__)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_utils_py__module__KeepOpenFile___repr).all (lawConform C 8 f_click_utils_py__module__KeepOpenFile___repr__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_click_utils_py__module__KeepOpenFile___repr__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___repr__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_utils_py__module__LazyFile___enter : List Obs :=
-  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1002/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 0)), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1002/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], roots := [(base + 0)], budget := 764 }) }]
+  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1068/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 0)), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1068/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], roots := [(base + 0)], budget := 764 }) }]
 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_utils_py__module__LazyFile___enter : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__LazyFile___enter).all (lawConform C fuel f_click_utils_py__module__LazyFile___enter__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_utils_py__module__LazyFile___enter).all (lawConform C 4 f_click_utils_py__module__LazyFile___enter__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_utils_py__module__LazyFile___enter__) (lawConform C 4 f_click_utils_py__module__LazyFile___enter__) (lawConform C fuel f_click_utils_py__module__LazyFile___enter__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_utils_py__module__LazyFile___enter__) (lawConform C fuel f_click_utils_py__module__LazyFile___enter__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_utils_py__module__LazyFile_close_intelligently : List Obs :=
@@ -1159,17 +1526,18 @@ def dom_conform_click_utils_py__module__LazyFile_close_intelligently : List Obs 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_utils_py__module__LazyFile_close_intelligently : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__LazyFile_close_intelligently).all (lawConform C fuel f_click_utils_py__module__LazyFile_close_intelligently)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_click_utils_py__module__LazyFile_close_intelligently).all (lawConform C 16 f_click_utils_py__module__LazyFile_close_intelligently) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_click_utils_py__module__LazyFile_close_intelligently) (lawConform C 16 f_click_utils_py__module__LazyFile_close_intelligently) (lawConform C fuel f_click_utils_py__module__LazyFile_close_intelligently)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_click_utils_py__module__LazyFile_close_intelligently) (lawConform C fuel f_click_utils_py__module__LazyFile_close_intelligently)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_click_utils_py__module__PacifyFlushWrapper___init : List Obs :=
@@ -1181,17 +1549,18 @@ def dom_conform_click_utils_py__module__PacifyFlushWrapper___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_click_utils_py__module__PacifyFlushWrapper___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__PacifyFlushWrapper___init).all (lawConform C fuel f_click_utils_py__module__PacifyFlushWrapper___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_click_utils_py__module__PacifyFlushWrapper___init).all (lawConform C 4 f_click_utils_py__module__PacifyFlushWrapper___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_click_utils_py__module__PacifyFlushWrapper___init__) (lawConform C 4 f_click_utils_py__module__PacifyFlushWrapper___init__) (lawConform C fuel f_click_utils_py__module__PacifyFlushWrapper___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_click_utils_py__module__PacifyFlushWrapper___init__) (lawConform C fuel f_click_utils_py__module__PacifyFlushWrapper___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 /-- Everything this module states but does not prove. A `Prop`-valued `def` asserts nothing, so nothing here is admitted. -/
@@ -1199,26 +1568,6 @@ def obligations : List OpenObligation :=
   []
 
 #eval IO.println (renderObligations "Click" obligations)
-
-/-- Candidates left out because, compiled alone, their proof exceeded the emission budget (`--theorem-timeout`, `--theorem-memory-gb`): `(theorem, subject, reason)`. Not stated here, true or open. -/
-def budgetExcluded : List (String × String × String) :=
-  [("conform_click_core_py__module__Command___init", "click/core.py:<module>.Command.__init__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_core_py__module__CommandCollection_add_source", "click/core.py:<module>.CommandCollection.add_source", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_core_py__module__batch", "click/core.py:<module>.batch", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_formatting_py__module__HelpFormatter_write", "click/formatting.py:<module>.HelpFormatter.write", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_formatting_py__module__HelpFormatter_write_paragraph", "click/formatting.py:<module>.HelpFormatter.write_paragraph", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_formatting_py__module__wrap_text__flush_par", "click/formatting.py:<module>.wrap_text._flush_par", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_parser_py__module___Argument_process", "click/parser.py:<module>._Argument.process", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_shell_completion_py__module__BashComplete_format_completion", "click/shell_completion.py:<module>.BashComplete.format_completion", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_shell_completion_py__module__CompletionItem___getattr", "click/shell_completion.py:<module>.CompletionItem.__getattr__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_shell_completion_py__module__ZshComplete_format_completion", "click/shell_completion.py:<module>.ZshComplete.format_completion", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_testing_py__module__EchoingStdin___repr", "click/testing.py:<module>.EchoingStdin.__repr__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_types_py__module__DateTime___init", "click/types.py:<module>.DateTime.__init__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_types_py__module__Tuple_arity", "click/types.py:<module>.Tuple.arity", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_types_py__module___NumberRangeBase__describe_range", "click/types.py:<module>._NumberRangeBase._describe_range", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_click_utils_py__module__KeepOpenFile___repr", "click/utils.py:<module>.KeepOpenFile.__repr__", "over the proof budget: kernel evaluation exceeded 16 GB resident")]
-
-#eval IO.println s!"over the proof budget ─ Click ({budgetExcluded.length})"
 
 /-! ## Anti-vacuity gate
 
@@ -1232,30 +1581,42 @@ def budgetExcluded : List (String × String × String) :=
 #audit_depends conform_click__termui_impl_py__module__Editor___init on f_click__termui_impl_py__module__Editor___init__
 #audit_depends conform_click__termui_impl_py__module__Editor_get_editor on f_click__termui_impl_py__module__Editor_get_editor
 #audit_depends conform_click__termui_impl_py__module___translate_ch_to_exc on f_click__termui_impl_py__module___translate_ch_to_exc
+#audit_depends conform_click_core_py__module__Command___init on f_click_core_py__module__Command___init__
+#audit_depends conform_click_core_py__module__CommandCollection_add_source on f_click_core_py__module__CommandCollection_add_source
 #audit_depends conform_click_core_py__module__Group_add_command on f_click_core_py__module__Group_add_command
 #audit_depends conform_click_core_py__module__Option_prompt_for_value on f_click_core_py__module__Option_prompt_for_value
 #audit_depends conform_click_core_py__module__Parameter_human_readable_name on f_click_core_py__module__Parameter_human_readable_name
 #audit_depends conform_click_core_py__module__Parameter_value_is_missing on f_click_core_py__module__Parameter_value_is_missing
 #audit_depends conform_click_core_py__module____getattr on f_click_core_py__module____getattr__
+#audit_depends conform_click_core_py__module__batch on f_click_core_py__module__batch
 #audit_depends conform_click_decorators_py__module__command on f_click_decorators_py__module__command
 #audit_depends conform_click_decorators_py__module__group on f_click_decorators_py__module__group
 #audit_depends conform_click_decorators_py__module__pass_meta_key on f_click_decorators_py__module__pass_meta_key
 #audit_depends conform_click_formatting_py__module__HelpFormatter_dedent on f_click_formatting_py__module__HelpFormatter_dedent
 #audit_depends conform_click_formatting_py__module__HelpFormatter_indent on f_click_formatting_py__module__HelpFormatter_indent
+#audit_depends conform_click_formatting_py__module__HelpFormatter_write on f_click_formatting_py__module__HelpFormatter_write
+#audit_depends conform_click_formatting_py__module__HelpFormatter_write_paragraph on f_click_formatting_py__module__HelpFormatter_write_paragraph
+#audit_depends conform_click_formatting_py__module__wrap_text__flush_par on f_click_formatting_py__module__wrap_text__flush_par
 #audit_depends conform_click_globals_py__module__resolve_color_default on f_click_globals_py__module__resolve_color_default
 #audit_depends conform_click_parser_py__module___Argument___init on f_click_parser_py__module___Argument___init__
+#audit_depends conform_click_parser_py__module___Argument_process on f_click_parser_py__module___Argument_process
 #audit_depends conform_click_parser_py__module___ParsingState___init on f_click_parser_py__module___ParsingState___init__
 #audit_depends conform_click_parser_py__module____getattr on f_click_parser_py__module____getattr__
+#audit_depends conform_click_shell_completion_py__module__BashComplete_format_completion on f_click_shell_completion_py__module__BashComplete_format_completion
+#audit_depends conform_click_shell_completion_py__module__CompletionItem___getattr on f_click_shell_completion_py__module__CompletionItem___getattr__
 #audit_depends conform_click_shell_completion_py__module__CompletionItem___init on f_click_shell_completion_py__module__CompletionItem___init__
 #audit_depends conform_click_shell_completion_py__module__FishComplete_format_completion on f_click_shell_completion_py__module__FishComplete_format_completion
 #audit_depends conform_click_shell_completion_py__module__ShellComplete___init on f_click_shell_completion_py__module__ShellComplete___init__
+#audit_depends conform_click_shell_completion_py__module__ZshComplete_format_completion on f_click_shell_completion_py__module__ZshComplete_format_completion
 #audit_depends conform_click_termui_py__module__secho on f_click_termui_py__module__secho
 #audit_depends conform_click_testing_py__module__CliRunner___init on f_click_testing_py__module__CliRunner___init__
 #audit_depends conform_click_testing_py__module__CliRunner_get_default_prog_name on f_click_testing_py__module__CliRunner_get_default_prog_name
 #audit_depends conform_click_testing_py__module__EchoingStdin___init on f_click_testing_py__module__EchoingStdin___init__
+#audit_depends conform_click_testing_py__module__EchoingStdin___repr on f_click_testing_py__module__EchoingStdin___repr__
 #audit_depends conform_click_testing_py__module__Result___init on f_click_testing_py__module__Result___init__
 #audit_depends conform_click_types_py__module__BoolParamType___repr on f_click_types_py__module__BoolParamType___repr__
 #audit_depends conform_click_types_py__module__CompositeParamType_arity on f_click_types_py__module__CompositeParamType_arity
+#audit_depends conform_click_types_py__module__DateTime___init on f_click_types_py__module__DateTime___init__
 #audit_depends conform_click_types_py__module__File___init on f_click_types_py__module__File___init__
 #audit_depends conform_click_types_py__module__File_shell_complete on f_click_types_py__module__File_shell_complete
 #audit_depends conform_click_types_py__module__FloatParamType___repr on f_click_types_py__module__FloatParamType___repr__
@@ -1269,14 +1630,17 @@ def budgetExcluded : List (String × String × String) :=
 #audit_depends conform_click_types_py__module__Path_coerce_path_result on f_click_types_py__module__Path_coerce_path_result
 #audit_depends conform_click_types_py__module__Path_shell_complete on f_click_types_py__module__Path_shell_complete
 #audit_depends conform_click_types_py__module__StringParamType___repr on f_click_types_py__module__StringParamType___repr__
+#audit_depends conform_click_types_py__module__Tuple_arity on f_click_types_py__module__Tuple_arity
 #audit_depends conform_click_types_py__module__UUIDParameterType___repr on f_click_types_py__module__UUIDParameterType___repr__
 #audit_depends conform_click_types_py__module__UnprocessedParamType___repr on f_click_types_py__module__UnprocessedParamType___repr__
 #audit_depends conform_click_types_py__module__UnprocessedParamType_convert on f_click_types_py__module__UnprocessedParamType_convert
 #audit_depends conform_click_types_py__module___NumberRangeBase___init on f_click_types_py__module___NumberRangeBase___init__
 #audit_depends conform_click_types_py__module___NumberRangeBase__clamp on f_click_types_py__module___NumberRangeBase__clamp
+#audit_depends conform_click_types_py__module___NumberRangeBase__describe_range on f_click_types_py__module___NumberRangeBase__describe_range
 #audit_depends conform_click_utils_py__module__KeepOpenFile___enter on f_click_utils_py__module__KeepOpenFile___enter__
 #audit_depends conform_click_utils_py__module__KeepOpenFile___exit on f_click_utils_py__module__KeepOpenFile___exit__
 #audit_depends conform_click_utils_py__module__KeepOpenFile___init on f_click_utils_py__module__KeepOpenFile___init__
+#audit_depends conform_click_utils_py__module__KeepOpenFile___repr on f_click_utils_py__module__KeepOpenFile___repr__
 #audit_depends conform_click_utils_py__module__LazyFile___enter on f_click_utils_py__module__LazyFile___enter__
 #audit_depends conform_click_utils_py__module__LazyFile_close_intelligently on f_click_utils_py__module__LazyFile_close_intelligently
 #audit_depends conform_click_utils_py__module__PacifyFlushWrapper___init on f_click_utils_py__module__PacifyFlushWrapper___init__
@@ -1293,30 +1657,42 @@ def budgetExcluded : List (String × String × String) :=
 #audit_axioms conform_click__termui_impl_py__module__Editor___init
 #audit_axioms conform_click__termui_impl_py__module__Editor_get_editor
 #audit_axioms conform_click__termui_impl_py__module___translate_ch_to_exc
+#audit_axioms conform_click_core_py__module__Command___init
+#audit_axioms conform_click_core_py__module__CommandCollection_add_source
 #audit_axioms conform_click_core_py__module__Group_add_command
 #audit_axioms conform_click_core_py__module__Option_prompt_for_value
 #audit_axioms conform_click_core_py__module__Parameter_human_readable_name
 #audit_axioms conform_click_core_py__module__Parameter_value_is_missing
 #audit_axioms conform_click_core_py__module____getattr
+#audit_axioms conform_click_core_py__module__batch
 #audit_axioms conform_click_decorators_py__module__command
 #audit_axioms conform_click_decorators_py__module__group
 #audit_axioms conform_click_decorators_py__module__pass_meta_key
 #audit_axioms conform_click_formatting_py__module__HelpFormatter_dedent
 #audit_axioms conform_click_formatting_py__module__HelpFormatter_indent
+#audit_axioms conform_click_formatting_py__module__HelpFormatter_write
+#audit_axioms conform_click_formatting_py__module__HelpFormatter_write_paragraph
+#audit_axioms conform_click_formatting_py__module__wrap_text__flush_par
 #audit_axioms conform_click_globals_py__module__resolve_color_default
 #audit_axioms conform_click_parser_py__module___Argument___init
+#audit_axioms conform_click_parser_py__module___Argument_process
 #audit_axioms conform_click_parser_py__module___ParsingState___init
 #audit_axioms conform_click_parser_py__module____getattr
+#audit_axioms conform_click_shell_completion_py__module__BashComplete_format_completion
+#audit_axioms conform_click_shell_completion_py__module__CompletionItem___getattr
 #audit_axioms conform_click_shell_completion_py__module__CompletionItem___init
 #audit_axioms conform_click_shell_completion_py__module__FishComplete_format_completion
 #audit_axioms conform_click_shell_completion_py__module__ShellComplete___init
+#audit_axioms conform_click_shell_completion_py__module__ZshComplete_format_completion
 #audit_axioms conform_click_termui_py__module__secho
 #audit_axioms conform_click_testing_py__module__CliRunner___init
 #audit_axioms conform_click_testing_py__module__CliRunner_get_default_prog_name
 #audit_axioms conform_click_testing_py__module__EchoingStdin___init
+#audit_axioms conform_click_testing_py__module__EchoingStdin___repr
 #audit_axioms conform_click_testing_py__module__Result___init
 #audit_axioms conform_click_types_py__module__BoolParamType___repr
 #audit_axioms conform_click_types_py__module__CompositeParamType_arity
+#audit_axioms conform_click_types_py__module__DateTime___init
 #audit_axioms conform_click_types_py__module__File___init
 #audit_axioms conform_click_types_py__module__File_shell_complete
 #audit_axioms conform_click_types_py__module__FloatParamType___repr
@@ -1330,14 +1706,17 @@ def budgetExcluded : List (String × String × String) :=
 #audit_axioms conform_click_types_py__module__Path_coerce_path_result
 #audit_axioms conform_click_types_py__module__Path_shell_complete
 #audit_axioms conform_click_types_py__module__StringParamType___repr
+#audit_axioms conform_click_types_py__module__Tuple_arity
 #audit_axioms conform_click_types_py__module__UUIDParameterType___repr
 #audit_axioms conform_click_types_py__module__UnprocessedParamType___repr
 #audit_axioms conform_click_types_py__module__UnprocessedParamType_convert
 #audit_axioms conform_click_types_py__module___NumberRangeBase___init
 #audit_axioms conform_click_types_py__module___NumberRangeBase__clamp
+#audit_axioms conform_click_types_py__module___NumberRangeBase__describe_range
 #audit_axioms conform_click_utils_py__module__KeepOpenFile___enter
 #audit_axioms conform_click_utils_py__module__KeepOpenFile___exit
 #audit_axioms conform_click_utils_py__module__KeepOpenFile___init
+#audit_axioms conform_click_utils_py__module__KeepOpenFile___repr
 #audit_axioms conform_click_utils_py__module__LazyFile___enter
 #audit_axioms conform_click_utils_py__module__LazyFile_close_intelligently
 #audit_axioms conform_click_utils_py__module__PacifyFlushWrapper___init

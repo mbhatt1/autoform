@@ -65,12 +65,15 @@ whose subject a mutation gate can attack.
 
 **Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
 stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
-computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
-transport needs two side conditions, both discharged rather than assumed — the context is
-covered by the unrestricted fuel theorem (including finalizers) and the run did not
-end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
-either fails, the theorem stays at `FUEL` and its generalization is recorded in
-`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono_all`. The
+transport assumes nothing about the context or about any body, reached or not (the
+unrestricted fuel theorem covers finalizers); its one side condition is that the run did
+not end in `outOfFuel`. For `conform_*` that condition is a consequence of the law — the
+recorded outcome is a value or an exception, and the law says the interpreter reproduced
+it (`lawConform_defined`) — so it is checked on the recorded literal and each case is
+evaluated once. For every other family it is the `g…` guard, evaluated over the same
+domain as the law. Where it fails, the theorem stays at `FUEL` and its generalization is
+recorded in `obligations` below as a `Prop`-valued `def` — a statement, not an admission.
 
 There is no `sorry` in this file.
 
@@ -83,17 +86,18 @@ def dom_conform_requests_adapters_py__module__BaseAdapter_close : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_adapters_py__module__BaseAdapter_close : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_adapters_py__module__BaseAdapter_close).all (lawConform C fuel f_requests_adapters_py__module__BaseAdapter_close)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_adapters_py__module__BaseAdapter_close).all (lawConform C 8 f_requests_adapters_py__module__BaseAdapter_close) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_adapters_py__module__BaseAdapter_close) (lawConform C 8 f_requests_adapters_py__module__BaseAdapter_close) (lawConform C fuel f_requests_adapters_py__module__BaseAdapter_close)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_adapters_py__module__BaseAdapter_close) (lawConform C fuel f_requests_adapters_py__module__BaseAdapter_close)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_adapters_py__module__BaseAdapter_send : List Obs :=
@@ -106,17 +110,18 @@ def dom_conform_requests_adapters_py__module__BaseAdapter_send : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_adapters_py__module__BaseAdapter_send : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_adapters_py__module__BaseAdapter_send).all (lawConform C fuel f_requests_adapters_py__module__BaseAdapter_send)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_adapters_py__module__BaseAdapter_send).all (lawConform C 8 f_requests_adapters_py__module__BaseAdapter_send) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_adapters_py__module__BaseAdapter_send) (lawConform C 8 f_requests_adapters_py__module__BaseAdapter_send) (lawConform C fuel f_requests_adapters_py__module__BaseAdapter_send)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_adapters_py__module__BaseAdapter_send) (lawConform C fuel f_requests_adapters_py__module__BaseAdapter_send)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_api_py__module__delete : List Obs :=
@@ -129,17 +134,18 @@ def dom_conform_requests_api_py__module__delete : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_api_py__module__delete : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_api_py__module__delete).all (lawConform C fuel f_requests_api_py__module__delete)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_api_py__module__delete).all (lawConform C 1 f_requests_api_py__module__delete) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_api_py__module__delete) (lawConform C 1 f_requests_api_py__module__delete) (lawConform C fuel f_requests_api_py__module__delete)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_api_py__module__delete) (lawConform C fuel f_requests_api_py__module__delete)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_api_py__module__get : List Obs :=
@@ -152,17 +158,18 @@ def dom_conform_requests_api_py__module__get : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_api_py__module__get : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_api_py__module__get).all (lawConform C fuel f_requests_api_py__module__get)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_api_py__module__get).all (lawConform C 1 f_requests_api_py__module__get) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_api_py__module__get) (lawConform C 1 f_requests_api_py__module__get) (lawConform C fuel f_requests_api_py__module__get)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_api_py__module__get) (lawConform C fuel f_requests_api_py__module__get)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_api_py__module__head : List Obs :=
@@ -175,17 +182,18 @@ def dom_conform_requests_api_py__module__head : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_api_py__module__head : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_api_py__module__head).all (lawConform C fuel f_requests_api_py__module__head)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_api_py__module__head).all (lawConform C 1 f_requests_api_py__module__head) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_api_py__module__head) (lawConform C 1 f_requests_api_py__module__head) (lawConform C fuel f_requests_api_py__module__head)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_api_py__module__head) (lawConform C fuel f_requests_api_py__module__head)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_api_py__module__options : List Obs :=
@@ -198,17 +206,18 @@ def dom_conform_requests_api_py__module__options : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_api_py__module__options : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_api_py__module__options).all (lawConform C fuel f_requests_api_py__module__options)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_api_py__module__options).all (lawConform C 1 f_requests_api_py__module__options) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_api_py__module__options) (lawConform C 1 f_requests_api_py__module__options) (lawConform C fuel f_requests_api_py__module__options)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_api_py__module__options) (lawConform C fuel f_requests_api_py__module__options)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_api_py__module__patch : List Obs :=
@@ -221,17 +230,18 @@ def dom_conform_requests_api_py__module__patch : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_api_py__module__patch : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_api_py__module__patch).all (lawConform C fuel f_requests_api_py__module__patch)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_api_py__module__patch).all (lawConform C 1 f_requests_api_py__module__patch) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_api_py__module__patch) (lawConform C 1 f_requests_api_py__module__patch) (lawConform C fuel f_requests_api_py__module__patch)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_api_py__module__patch) (lawConform C fuel f_requests_api_py__module__patch)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_api_py__module__post : List Obs :=
@@ -244,17 +254,18 @@ def dom_conform_requests_api_py__module__post : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_api_py__module__post : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_api_py__module__post).all (lawConform C fuel f_requests_api_py__module__post)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_api_py__module__post).all (lawConform C 1 f_requests_api_py__module__post) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_api_py__module__post) (lawConform C 1 f_requests_api_py__module__post) (lawConform C fuel f_requests_api_py__module__post)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_api_py__module__post) (lawConform C fuel f_requests_api_py__module__post)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_api_py__module__put : List Obs :=
@@ -267,17 +278,18 @@ def dom_conform_requests_api_py__module__put : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_api_py__module__put : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_api_py__module__put).all (lawConform C fuel f_requests_api_py__module__put)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_api_py__module__put).all (lawConform C 1 f_requests_api_py__module__put) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_api_py__module__put) (lawConform C 1 f_requests_api_py__module__put) (lawConform C fuel f_requests_api_py__module__put)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_api_py__module__put) (lawConform C fuel f_requests_api_py__module__put)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_auth_py__module__AuthBase___call : List Obs :=
@@ -290,17 +302,18 @@ def dom_conform_requests_auth_py__module__AuthBase___call : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_auth_py__module__AuthBase___call : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_auth_py__module__AuthBase___call).all (lawConform C fuel f_requests_auth_py__module__AuthBase___call__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_auth_py__module__AuthBase___call).all (lawConform C 8 f_requests_auth_py__module__AuthBase___call__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_auth_py__module__AuthBase___call__) (lawConform C 8 f_requests_auth_py__module__AuthBase___call__) (lawConform C fuel f_requests_auth_py__module__AuthBase___call__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_auth_py__module__AuthBase___call__) (lawConform C fuel f_requests_auth_py__module__AuthBase___call__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_auth_py__module__HTTPBasicAuth___init : List Obs :=
@@ -309,17 +322,18 @@ def dom_conform_requests_auth_py__module__HTTPBasicAuth___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_auth_py__module__HTTPBasicAuth___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_auth_py__module__HTTPBasicAuth___init).all (lawConform C fuel f_requests_auth_py__module__HTTPBasicAuth___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_auth_py__module__HTTPBasicAuth___init).all (lawConform C 4 f_requests_auth_py__module__HTTPBasicAuth___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_requests_auth_py__module__HTTPBasicAuth___init__) (lawConform C 4 f_requests_auth_py__module__HTTPBasicAuth___init__) (lawConform C fuel f_requests_auth_py__module__HTTPBasicAuth___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_requests_auth_py__module__HTTPBasicAuth___init__) (lawConform C fuel f_requests_auth_py__module__HTTPBasicAuth___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockRequest_add_header : List Obs :=
@@ -332,17 +346,18 @@ def dom_conform_requests_cookies_py__module__MockRequest_add_header : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockRequest_add_header : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_add_header).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_add_header)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_add_header).all (lawConform C 8 f_requests_cookies_py__module__MockRequest_add_header) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_cookies_py__module__MockRequest_add_header) (lawConform C 8 f_requests_cookies_py__module__MockRequest_add_header) (lawConform C fuel f_requests_cookies_py__module__MockRequest_add_header)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_cookies_py__module__MockRequest_add_header) (lawConform C fuel f_requests_cookies_py__module__MockRequest_add_header)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockRequest_add_unredirected_header : List Obs :=
@@ -352,17 +367,62 @@ def dom_conform_requests_cookies_py__module__MockRequest_add_unredirected_header
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockRequest_add_unredirected_header : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_add_unredirected_header).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_add_unredirected_header)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_add_unredirected_header).all (lawConform C 4 f_requests_cookies_py__module__MockRequest_add_unredirected_header) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_requests_cookies_py__module__MockRequest_add_unredirected_header) (lawConform C 4 f_requests_cookies_py__module__MockRequest_add_unredirected_header) (lawConform C fuel f_requests_cookies_py__module__MockRequest_add_unredirected_header)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_requests_cookies_py__module__MockRequest_add_unredirected_header) (lawConform C fuel f_requests_cookies_py__module__MockRequest_add_unredirected_header)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_requests_cookies_py__module__MockRequest_get_full_url : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "/"), post := (some { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8)], budget := 1340 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_requests_cookies_py__module__MockRequest_get_full_url : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_get_full_url).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_full_url)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_get_full_url).all (lawConform C 8 f_requests_cookies_py__module__MockRequest_get_full_url) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_cookies_py__module__MockRequest_get_full_url) (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_full_url)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_requests_cookies_py__module__MockRequest_get_header : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [Val.str "python-requests", Val.int (-4)] }, expected := EResult.val (Val.int (-4)), post := (some { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8)], budget := 1338 }) },
+   { case := { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [Val.str "python-requests", Val.int (8)] }, expected := EResult.val (Val.int (8)), post := (some { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8)], budget := 1336 }) },
+   { case := { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [Val.str "python-requests", Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := (some { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8)], budget := 1338 }) },
+   { case := { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [Val.str "python-requests", Val.int (1)] }, expected := EResult.val (Val.int (1)), post := (some { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8)], budget := 1336 }) },
+   { case := { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [Val.str "python-requests", Val.int (-5)] }, expected := EResult.val (Val.int (-5)), post := (some { heap := h0 ++ [{ cls := "requests/cookies.py:<module>.MockRequest", fields := [("_r", Val.ref (base + 1)), ("_new_headers", Val.ref (base + 8)), ("type", Val.str "")] }, { cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 2)), ("method", Val.str "POST"), ("url", Val.str "/"), ("headers", Val.ref (base + 4)), ("files", Val.ref (base + 5)), ("data", Val.ref (base + 6)), ("json", Val.unit), ("params", Val.ref (base + 7)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 3))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8)], budget := 1338 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_requests_cookies_py__module__MockRequest_get_header : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_get_header).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_header)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_get_header).all (lawConform C 16 f_requests_cookies_py__module__MockRequest_get_header) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_requests_cookies_py__module__MockRequest_get_header) (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_header)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockRequest_get_new_headers : List Obs :=
@@ -371,17 +431,18 @@ def dom_conform_requests_cookies_py__module__MockRequest_get_new_headers : List 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockRequest_get_new_headers : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_get_new_headers).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_new_headers)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_get_new_headers).all (lawConform C 4 f_requests_cookies_py__module__MockRequest_get_new_headers) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_requests_cookies_py__module__MockRequest_get_new_headers) (lawConform C 4 f_requests_cookies_py__module__MockRequest_get_new_headers) (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_new_headers)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_requests_cookies_py__module__MockRequest_get_new_headers) (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_new_headers)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockRequest_get_type : List Obs :=
@@ -390,17 +451,18 @@ def dom_conform_requests_cookies_py__module__MockRequest_get_type : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockRequest_get_type : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_get_type).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_type)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_get_type).all (lawConform C 4 f_requests_cookies_py__module__MockRequest_get_type) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_requests_cookies_py__module__MockRequest_get_type) (lawConform C 4 f_requests_cookies_py__module__MockRequest_get_type) (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_type)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_requests_cookies_py__module__MockRequest_get_type) (lawConform C fuel f_requests_cookies_py__module__MockRequest_get_type)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockRequest_has_header : List Obs :=
@@ -409,17 +471,18 @@ def dom_conform_requests_cookies_py__module__MockRequest_has_header : List Obs :
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockRequest_has_header : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_has_header).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_has_header)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_has_header).all (lawConform C 16 f_requests_cookies_py__module__MockRequest_has_header) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_requests_cookies_py__module__MockRequest_has_header) (lawConform C 16 f_requests_cookies_py__module__MockRequest_has_header) (lawConform C fuel f_requests_cookies_py__module__MockRequest_has_header)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_requests_cookies_py__module__MockRequest_has_header) (lawConform C fuel f_requests_cookies_py__module__MockRequest_has_header)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockRequest_is_unverifiable : List Obs :=
@@ -428,17 +491,18 @@ def dom_conform_requests_cookies_py__module__MockRequest_is_unverifiable : List 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockRequest_is_unverifiable : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_is_unverifiable).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_is_unverifiable)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_is_unverifiable).all (lawConform C 4 f_requests_cookies_py__module__MockRequest_is_unverifiable) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_requests_cookies_py__module__MockRequest_is_unverifiable) (lawConform C 4 f_requests_cookies_py__module__MockRequest_is_unverifiable) (lawConform C fuel f_requests_cookies_py__module__MockRequest_is_unverifiable)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_requests_cookies_py__module__MockRequest_is_unverifiable) (lawConform C fuel f_requests_cookies_py__module__MockRequest_is_unverifiable)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockRequest_unverifiable : List Obs :=
@@ -447,17 +511,18 @@ def dom_conform_requests_cookies_py__module__MockRequest_unverifiable : List Obs
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockRequest_unverifiable : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockRequest_unverifiable).all (lawConform C fuel f_requests_cookies_py__module__MockRequest_unverifiable)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockRequest_unverifiable).all (lawConform C 8 f_requests_cookies_py__module__MockRequest_unverifiable) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_cookies_py__module__MockRequest_unverifiable) (lawConform C 8 f_requests_cookies_py__module__MockRequest_unverifiable) (lawConform C fuel f_requests_cookies_py__module__MockRequest_unverifiable)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_cookies_py__module__MockRequest_unverifiable) (lawConform C fuel f_requests_cookies_py__module__MockRequest_unverifiable)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockResponse___init : List Obs :=
@@ -468,17 +533,18 @@ def dom_conform_requests_cookies_py__module__MockResponse___init : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockResponse___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockResponse___init).all (lawConform C fuel f_requests_cookies_py__module__MockResponse___init__)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockResponse___init).all (lawConform C 4 f_requests_cookies_py__module__MockResponse___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_requests_cookies_py__module__MockResponse___init__) (lawConform C 4 f_requests_cookies_py__module__MockResponse___init__) (lawConform C fuel f_requests_cookies_py__module__MockResponse___init__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_requests_cookies_py__module__MockResponse___init__) (lawConform C fuel f_requests_cookies_py__module__MockResponse___init__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module__MockResponse_info : List Obs :=
@@ -487,17 +553,18 @@ def dom_conform_requests_cookies_py__module__MockResponse_info : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module__MockResponse_info : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module__MockResponse_info).all (lawConform C fuel f_requests_cookies_py__module__MockResponse_info)) = true := by
   intro fuel hf
   have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module__MockResponse_info).all (lawConform C 4 f_requests_cookies_py__module__MockResponse_info) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 4 f_requests_cookies_py__module__MockResponse_info) (lawConform C 4 f_requests_cookies_py__module__MockResponse_info) (lawConform C fuel f_requests_cookies_py__module__MockResponse_info)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 4 f_requests_cookies_py__module__MockResponse_info) (lawConform C fuel f_requests_cookies_py__module__MockResponse_info)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_cookies_py__module___copy_cookie_jar : List Obs :=
@@ -506,17 +573,18 @@ def dom_conform_requests_cookies_py__module___copy_cookie_jar : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_cookies_py__module___copy_cookie_jar : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_cookies_py__module___copy_cookie_jar).all (lawConform C fuel f_requests_cookies_py__module___copy_cookie_jar)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_cookies_py__module___copy_cookie_jar).all (lawConform C 8 f_requests_cookies_py__module___copy_cookie_jar) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_cookies_py__module___copy_cookie_jar) (lawConform C 8 f_requests_cookies_py__module___copy_cookie_jar) (lawConform C fuel f_requests_cookies_py__module___copy_cookie_jar)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_cookies_py__module___copy_cookie_jar) (lawConform C fuel f_requests_cookies_py__module___copy_cookie_jar)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_hooks_py__module__default_hooks : List Obs :=
@@ -525,17 +593,18 @@ def dom_conform_requests_hooks_py__module__default_hooks : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_hooks_py__module__default_hooks : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_hooks_py__module__default_hooks).all (lawConform C fuel f_requests_hooks_py__module__default_hooks)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_hooks_py__module__default_hooks).all (lawConform C 16 f_requests_hooks_py__module__default_hooks) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_requests_hooks_py__module__default_hooks) (lawConform C 16 f_requests_hooks_py__module__default_hooks) (lawConform C fuel f_requests_hooks_py__module__default_hooks)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_requests_hooks_py__module__default_hooks) (lawConform C fuel f_requests_hooks_py__module__default_hooks)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_hooks_py__module__dispatch_hook : List Obs :=
@@ -548,39 +617,41 @@ def dom_conform_requests_hooks_py__module__dispatch_hook : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 1 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_hooks_py__module__dispatch_hook : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_hooks_py__module__dispatch_hook).all (lawConform C fuel f_requests_hooks_py__module__dispatch_hook)) = true := by
   intro fuel hf
   have hk : 1 ≤ fuel := Nat.le_trans (by decide : 1 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_hooks_py__module__dispatch_hook).all (lawConform C 1 f_requests_hooks_py__module__dispatch_hook) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 1 f_requests_hooks_py__module__dispatch_hook) (lawConform C 1 f_requests_hooks_py__module__dispatch_hook) (lawConform C fuel f_requests_hooks_py__module__dispatch_hook)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 1 f_requests_hooks_py__module__dispatch_hook) (lawConform C fuel f_requests_hooks_py__module__dispatch_hook)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_models_py__module__Request___repr : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://127.0.0.1:10000//v:h"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "<Request [GET]>"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://127.0.0.1:10000//v:h"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6)], budget := 1108 }) },
-   { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:56007/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "<Request [GET]>"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:56007/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6)], budget := 1100 }) },
-   { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:56013/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "<Request [GET]>"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:56013/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6)], budget := 1100 }) },
-   { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:56021"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "<Request [GET]>"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:56021"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6)], budget := 1098 }) }]
+   { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:58926/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "<Request [GET]>"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:58926/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6)], budget := 1100 }) },
+   { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:58932/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "<Request [GET]>"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:58932/"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6)], budget := 1100 }) },
+   { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:58958"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "<Request [GET]>"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.Request", fields := [("hooks", Val.ref (base + 1)), ("method", Val.str "GET"), ("url", Val.str "http://localhost:58958"), ("headers", Val.ref (base + 3)), ("files", Val.ref (base + 4)), ("data", Val.ref (base + 5)), ("json", Val.unit), ("params", Val.ref (base + 6)), ("auth", Val.unit), ("cookies", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [(Val.str "response", Val.ref (base + 2))] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6)], budget := 1098 }) }]
 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_models_py__module__Request___repr : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_models_py__module__Request___repr).all (lawConform C fuel f_requests_models_py__module__Request___repr__)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_models_py__module__Request___repr).all (lawConform C 8 f_requests_models_py__module__Request___repr__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_models_py__module__Request___repr__) (lawConform C 8 f_requests_models_py__module__Request___repr__) (lawConform C fuel f_requests_models_py__module__Request___repr__)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_models_py__module__Request___repr__) (lawConform C fuel f_requests_models_py__module__Request___repr__)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_models_py__module__RequestHooksMixin_deregister_hook : List Obs :=
@@ -593,17 +664,18 @@ def dom_conform_requests_models_py__module__RequestHooksMixin_deregister_hook : 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_models_py__module__RequestHooksMixin_deregister_hook : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_models_py__module__RequestHooksMixin_deregister_hook).all (lawConform C fuel f_requests_models_py__module__RequestHooksMixin_deregister_hook)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_models_py__module__RequestHooksMixin_deregister_hook).all (lawConform C 16 f_requests_models_py__module__RequestHooksMixin_deregister_hook) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_requests_models_py__module__RequestHooksMixin_deregister_hook) (lawConform C 16 f_requests_models_py__module__RequestHooksMixin_deregister_hook) (lawConform C fuel f_requests_models_py__module__RequestHooksMixin_deregister_hook)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_requests_models_py__module__RequestHooksMixin_deregister_hook) (lawConform C fuel f_requests_models_py__module__RequestHooksMixin_deregister_hook)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_models_py__module__RequestHooksMixin_register_hook : List Obs :=
@@ -616,17 +688,18 @@ def dom_conform_requests_models_py__module__RequestHooksMixin_register_hook : Li
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_models_py__module__RequestHooksMixin_register_hook : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_models_py__module__RequestHooksMixin_register_hook).all (lawConform C fuel f_requests_models_py__module__RequestHooksMixin_register_hook)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_models_py__module__RequestHooksMixin_register_hook).all (lawConform C 8 f_requests_models_py__module__RequestHooksMixin_register_hook) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_requests_models_py__module__RequestHooksMixin_register_hook) (lawConform C 8 f_requests_models_py__module__RequestHooksMixin_register_hook) (lawConform C fuel f_requests_models_py__module__RequestHooksMixin_register_hook)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_requests_models_py__module__RequestHooksMixin_register_hook) (lawConform C fuel f_requests_models_py__module__RequestHooksMixin_register_hook)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_requests_utils_py__module__default_user_agent : List Obs :=
@@ -639,17 +712,18 @@ def dom_conform_requests_utils_py__module__default_user_agent : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_requests_utils_py__module__default_user_agent : ∀ fuel, FUEL ≤ fuel → ((dom_conform_requests_utils_py__module__default_user_agent).all (lawConform C fuel f_requests_utils_py__module__default_user_agent)) = true := by
   intro fuel hf
   have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
   have hchecked : (dom_conform_requests_utils_py__module__default_user_agent).all (lawConform C 16 f_requests_utils_py__module__default_user_agent) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 16 f_requests_utils_py__module__default_user_agent) (lawConform C 16 f_requests_utils_py__module__default_user_agent) (lawConform C fuel f_requests_utils_py__module__default_user_agent)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_requests_utils_py__module__default_user_agent) (lawConform C fuel f_requests_utils_py__module__default_user_agent)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 /-- Everything this module states but does not prove. A `Prop`-valued `def` asserts nothing, so nothing here is admitted. -/
@@ -657,13 +731,6 @@ def obligations : List OpenObligation :=
   []
 
 #eval IO.println (renderObligations "Requests" obligations)
-
-/-- Candidates left out because, compiled alone, their proof exceeded the emission budget (`--theorem-timeout`, `--theorem-memory-gb`): `(theorem, subject, reason)`. Not stated here, true or open. -/
-def budgetExcluded : List (String × String × String) :=
-  [("conform_requests_cookies_py__module__MockRequest_get_full_url", "requests/cookies.py:<module>.MockRequest.get_full_url", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
-   ("conform_requests_cookies_py__module__MockRequest_get_header", "requests/cookies.py:<module>.MockRequest.get_header", "over the proof budget: kernel evaluation exceeded 16 GB resident")]
-
-#eval IO.println s!"over the proof budget ─ Requests ({budgetExcluded.length})"
 
 /-! ## Anti-vacuity gate
 
@@ -682,6 +749,8 @@ def budgetExcluded : List (String × String × String) :=
 #audit_depends conform_requests_auth_py__module__HTTPBasicAuth___init on f_requests_auth_py__module__HTTPBasicAuth___init__
 #audit_depends conform_requests_cookies_py__module__MockRequest_add_header on f_requests_cookies_py__module__MockRequest_add_header
 #audit_depends conform_requests_cookies_py__module__MockRequest_add_unredirected_header on f_requests_cookies_py__module__MockRequest_add_unredirected_header
+#audit_depends conform_requests_cookies_py__module__MockRequest_get_full_url on f_requests_cookies_py__module__MockRequest_get_full_url
+#audit_depends conform_requests_cookies_py__module__MockRequest_get_header on f_requests_cookies_py__module__MockRequest_get_header
 #audit_depends conform_requests_cookies_py__module__MockRequest_get_new_headers on f_requests_cookies_py__module__MockRequest_get_new_headers
 #audit_depends conform_requests_cookies_py__module__MockRequest_get_type on f_requests_cookies_py__module__MockRequest_get_type
 #audit_depends conform_requests_cookies_py__module__MockRequest_has_header on f_requests_cookies_py__module__MockRequest_has_header
@@ -714,6 +783,8 @@ def budgetExcluded : List (String × String × String) :=
 #audit_axioms conform_requests_auth_py__module__HTTPBasicAuth___init
 #audit_axioms conform_requests_cookies_py__module__MockRequest_add_header
 #audit_axioms conform_requests_cookies_py__module__MockRequest_add_unredirected_header
+#audit_axioms conform_requests_cookies_py__module__MockRequest_get_full_url
+#audit_axioms conform_requests_cookies_py__module__MockRequest_get_header
 #audit_axioms conform_requests_cookies_py__module__MockRequest_get_new_headers
 #audit_axioms conform_requests_cookies_py__module__MockRequest_get_type
 #audit_axioms conform_requests_cookies_py__module__MockRequest_has_header
