@@ -707,7 +707,12 @@ def _run_main():
             body = [
                 "import Autoform.Lang.Core.Semantics",
                 "",
-                *module_options(len(chunk)),
+                # The module-wide count, not the part's: the limit also has to cover the
+                # deepest single body (a module initializer of a few hundred statements
+                # is a term that deep), which the whole-module formula covered because
+                # the list term dominated. Django's part 10 hit the limit at the part's
+                # own count. A limit never reached costs nothing.
+                *module_options(len(funcs)),
                 "/-!",
                 f"# {module}, part {k} of {len(parts)} — machine-generated",
                 "",

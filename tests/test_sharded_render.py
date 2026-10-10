@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -60,9 +61,12 @@ def test_sharded_root_imports_its_parts(generated):
     assert ' : Func :=' not in root
     defs = sum(p.read_text().count(' : Func :=') for p in parts)
     assert defs >= len(functions)
+    depth = re.search(r'set_option maxRecDepth (\d+)', root).group(1)
     for part in parts:
         text = part.read_text()
         assert text.startswith('import Autoform.Lang.Core.Semantics\n')
+        # A part carries the module-wide limit: a deep body needs it whatever its part's size.
+        assert re.search(r'set_option maxRecDepth (\d+)', text).group(1) == depth
         assert 'import Autoform.Generated' not in text      # independent: built in parallel
         assert 'namespace Autoform.Generated.Sharded' in text
 
