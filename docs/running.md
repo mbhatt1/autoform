@@ -356,7 +356,8 @@ subject, and the assurance case caps it accordingly.
 
 ```sh
 # conformance vs the real runtime (CPython / cc)
-python3.11 scripts/differential.py ast-<M>.json <src-dir> <M> 5 [--tests DIR]
+python3.11 scripts/differential.py ast-<M>.json <src-dir> <M> 5 [--tests DIR] \
+        [--no-cache] [--cache-dir DIR]
 
 # execution oracle over the claimed verifiable core
 python3.11 scripts/core_oracle.py ast-<M>.json <M> <src-dir> [-n 24] [--fuel 5000]
@@ -378,6 +379,21 @@ python3 scripts/sacm.py --module <M> [--markdown sacm-<M>.md]
 # scale measurement, stage by stage (see docs/scale.md)
 python3 scripts/scale_test.py --out results.json --target Name /path/to/repo
 ```
+
+**The conformance oracle is incremental by default.** It stores one verdict file per
+function under `.autoform-work/oracle/<M>/` (`--cache-dir DIR` relocates it) and, on the
+next run, sends back to the Lean interpreter only the functions whose key changed: the
+function's own AST record and its rendered Lean definition, the same for every function
+it can reach (by name, by dispatch through its class hierarchy, or through the classes
+of the objects in its cases), the module bodies and the rest of the rendered module,
+`Autoform/Lang/Core`, the renderer, the harness, the Lean toolchain, the runtime
+version, or the recorded cases themselves. A change to
+`Autoform/Lang/Core` invalidates every entry. The test suite is traced on every run; only
+the evaluation is skipped. Replayed verdicts are reported as such -- the summary reads
+`N COMPARED now, M cached from <timestamp>`, and each replayed observation in
+`conformance.json` carries `cached_from` -- and are never counted as comparisons made
+now. `--no-cache` ignores the store and re-compares everything (the entries are still
+refreshed). The store is scratch state: delete the directory to start cold.
 
 `Demo.lean` (`lake env lean Demo.lean`) is a guided tour of the refutation gate, the axiom
 audit, vacuity detection and the ledger. It **deliberately contains an admitted theorem and

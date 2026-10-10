@@ -125,7 +125,7 @@ also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and
 | `inventory.json`, `selection.json` | repository scan | every file, its hash and language, exclusions, scan errors |
 | `ast-<Module>.json`, `frontend.json`, `export.log` | exporter | the neutral AST; CPG population and excluded declarations |
 | `Autoform/Generated/<Module>.lean` (+ `<Module>/PartNNNN.lean`) | renderer | the model; part modules when sharded |
-| `conformance.json` | `scripts/differential.py` | every compared case: agree / diverge / inconclusive, the measurement basis, provenance hashes |
+| `conformance.json` | `scripts/differential.py` | every compared case: agree / diverge / inconclusive, the measurement basis, provenance hashes; a `cache` block and `cached_from` on every verdict replayed from `.autoform-work/oracle/<Module>/` rather than compared now (`differential.py --no-cache` re-compares everything, `--cache-dir DIR` relocates the store; docs/running.md §4) |
 | `ledger-<Module>.json` | `scripts/ledger.lean.tmpl` | holes by label, hole-free count, verifiable core, call closure |
 | `specs.json`, `Autoform/SpecsGen/<Module>.lean` | `scripts/synth_specs.py` | the proved observation theorems; open obligations; subjects excluded by name and why |
 | `core-oracle.json` | `scripts/core_oracle.py` | execution coverage of the recorded observations |
