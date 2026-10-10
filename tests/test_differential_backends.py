@@ -150,6 +150,13 @@ def test_oracle_agrees_with_core_on_the_fixture(lang, tmp_path, generated_module
     # used -- a Node rate must never read as a CPython one.
     assert report["language"] == lang and report["language_override"] == lang
     assert report["measurement_basis"].startswith(basis_prefix)
+    # The oracle re-executed itself under the sandbox (or says it was told not to): the
+    # report carries the mechanism and whether it was enforced, never silence.
+    assert report["sandbox"]["mechanism"] in ("seatbelt", "bwrap", "unshare", "off")
+    assert report["sandbox"]["enforced"] is (os.environ.get("AUTOFORM_SANDBOX", "on") != "off")
+    if report["sandbox"]["enforced"]:
+        assert report["sandbox"]["network"] == "denied"
+        assert report["backend_info"]["sandbox"]["inherited"] is True
     assert report["backend_status"] == "available", report["backend_status"]
     assert report["runtime_version"] and not report["runtime_version"].startswith("unavailable")
     assert report["divergences"] == 0, report["divergence_detail"]

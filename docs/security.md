@@ -119,9 +119,13 @@ The native adapters execute repository code. C library loading, initializers and
 function calls run in separate workers, with a three-second deadline enforced by
 the parent. A timed-out worker and descendants in its process group are killed;
 crashes, timeouts, load errors and missing results remain distinct report outcomes.
-These workers are not a filesystem or network sandbox. Use a disposable, restricted
-environment for an untrusted repository. An automated security service still needs
-containment around acquisition, builds and execution.
+The workers, the oracle's own process and the nl runners launch through
+`scripts/sandbox.py`: no network, writes only under the work directory (docs/trust-model.md,
+"What the sandbox does and does not do"); `native-build.json` records the mechanism and
+whether it was enforced. That is confinement of the subject, not a container: it limits
+no CPU or memory, and the `unshare` fallback limits the network only. Use a disposable,
+restricted environment for an untrusted repository. An automated security service still
+needs containment around acquisition and builds.
 
 ## A concrete security-fix workflow
 

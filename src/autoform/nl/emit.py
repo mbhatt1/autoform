@@ -53,6 +53,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from ..harness.verifier import run_lean
+from .model import sandbox_module
 from . import check as K
 from . import pyprop
 from . import pyvalues as pv
@@ -419,15 +420,18 @@ def run_pytest(python: str, target: Path, import_root: Path, work: Path) -> dict
            f'--junit-xml={xml}', '-o', 'junit_family=xunit2', '-o', 'junit_logging=no']
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1', PYTHONHASHSEED='0',
                PYTHONPATH=str(import_root) + (os.pathsep + os.environ['PYTHONPATH'] if os.environ.get('PYTHONPATH') else ''))
+    # The target's tests run confined (scripts/sandbox.py): no network, writes only under
+    # `work` (the JUnit report, hypothesis's example database, TMPDIR); the target tree is read-only.
+    launch = sandbox_module().sandboxed(cmd, cwd=str(import_root), env=env, work=work, read_only=[str(import_root)])
     started = time.time()
     try:
-        proc = subprocess.run(cmd, cwd=str(import_root), env=env, capture_output=True, text=True,
+        proc = subprocess.run(launch.argv, cwd=launch.cwd, env=launch.env, capture_output=True, text=True,
                               timeout=PYTEST_TIMEOUT, start_new_session=True)
         code, log = proc.returncode, (proc.stdout + proc.stderr)
     except subprocess.TimeoutExpired as exc:
         code, log = 124, f'pytest exceeded {PYTEST_TIMEOUT}s\n' + str(exc.stdout or '')[-1500:]
     rec = {'command': cmd, 'cwd': str(import_root), 'returncode': code, 'seconds': round(time.time() - started, 2),
-           'log_tail': log[-2500:], 'tests': {}, 'file_skips': {}}
+           'sandbox': launch.record, 'log_tail': log[-2500:], 'tests': {}, 'file_skips': {}}
     if not xml.is_file():
         rec['error'] = 'pytest produced no JUnit report (is pytest importable by ' + python + '?)'
         return rec
@@ -483,6 +487,7 @@ def emit(translation: dict, statements: list, checks: list, out_dir: Path, *, pr
     keep, dropped = survivors(statements, checks, adjudication)
     results: dict = {sid: schema.EmitResult(sid, 'NOT_EMITTED', reason=why) for sid, why in dropped.items()}
     out = {'target': str(target), 'python': python, 'run_id': rid, 'model': default_model,
+           'sandbox': sandbox_module().report(),
            'source_root': str(source_root), 'files': [], 'statements': [], 'counts': {}, 'dedupe': {},
            'pytest': None, 'notes': []}
 

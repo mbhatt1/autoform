@@ -51,6 +51,12 @@ from pathlib import Path
 
 from .schema import FILES, dump
 
+
+def _sandbox_record() -> dict:
+    """What confines the subject processes of this run (scripts/sandbox.py); in run.json."""
+    from . import model   # lazy: the stages are imported by name below
+    return model.sandbox_record()
+
 MODEL_STAGES = ('model', 'describe', 'formalize', 'check', 'prove', 'emit')
 DEEP_STAGES = ('translate', 'describe', 'formalize', 'check', 'prove', 'emit')
 DEEP_TOO_STAGES = ('model', 'translate', 'describe', 'formalize', 'check', 'prove', 'refine', 'emit')
@@ -224,7 +230,7 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             'functions': functions, 'prove': prove, 'runtime': runtime, 'budget_usd': budget_usd,
             'second': second, 'judge': judge, 'max_properties_per_function': max_properties_per_function,
             'tests': tests, 'emit': emit, 'emit_dir': emit_dir, 'domain_size': domain_size, 'started': started_at,
-            'id': _hash(source, module, started_at)[:12], 'stages': {}}
+            'id': _hash(source, module, started_at)[:12], 'sandbox': _sandbox_record(), 'stages': {}}
     spent = 0.0
 
     def save():

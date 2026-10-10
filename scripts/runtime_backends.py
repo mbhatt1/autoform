@@ -12,6 +12,7 @@ import subprocess
 import hashlib
 import deep_json
 import generated_module
+import sandbox
 
 
 def sha256(path):
@@ -104,8 +105,8 @@ def compile_kotlin(src_root, candidates, work):
         target.write_text(code + "\nobject " + cls + " {\n @JvmStatic fun invoke(" + params +
                           "): " + kt_type[m.group("ret")] + " = " + short + "(" + vals + ")\n}\n")
         names[f["name"]] = prefix + cls + ".invoke:" + m.group("ret") + "(" + ",".join(args) + ")"
-    p = subprocess.run(compiler + flags + [str(dest), "-d", str(classes)],
-                       capture_output=True, text=True, timeout=180)
+    launch = sandbox.sandboxed(compiler + flags + [str(dest), "-d", str(classes)], cwd=str(work), work=work)
+    p = launch.run(capture_output=True, text=True, timeout=180, start_new_session=True)
     if p.returncode:
         return {}, {f["name"]: "kotlinc failed: " + (p.stderr + p.stdout)[-3000:]
                     for f, *_ in candidates}, runtime
@@ -268,8 +269,11 @@ def go_backend(src_root, funcs, ncases, work):
             "package " + package + "\n" + GO_DRIVER.replace("__CALLS__", calls))
         env = dict(os.environ)
         env.setdefault("GOCACHE", str(Path(work) / "go-cache"))
-        r = subprocess.run(["go", "test", "-run", "^TestAutoformRuntime$", "-v", "-count=1", "-timeout=30s", "."],
-                           cwd=target, env=env, capture_output=True, text=True, timeout=180)
+        # No network inside the sandbox: a toolchain the go.mod asks for must already be local.
+        env.setdefault("GOTOOLCHAIN", "local")
+        launch = sandbox.sandboxed(["go", "test", "-run", "^TestAutoformRuntime$", "-v", "-count=1", "-timeout=30s", "."],
+                                   cwd=str(target), env=env, work=work)
+        r = launch.run(capture_output=True, text=True, timeout=180, start_new_session=True)
         lines = [l[len("@@RESULT@@"):] for l in r.stdout.splitlines() if l.startswith("@@RESULT@@")]
         if r.returncode or not lines:
             for f, _ in entries:
@@ -278,7 +282,7 @@ def go_backend(src_root, funcs, ncases, work):
         found, refused = records(json.loads(lines[-1]), [f for f, _ in entries])
         cases.extend(found)
         skipped.update(refused)
-    return cases, {"packages": len(groups), "cases_built": len(cases)}, skipped
+    return cases, {"packages": len(groups), "cases_built": len(cases), "sandbox": sandbox.report()}, skipped
 
 
 NODE_DRIVER = r'''
@@ -353,11 +357,12 @@ def node_backend(src_root, funcs, ncases, lang, work):
     driver = Path(work) / "node_driver.mjs"
     driver.write_text(NODE_DRIVER)
     cmd = ["node"] + (["--experimental-strip-types"] if lang == "ts" else [])
-    r = subprocess.run(cmd + [str(driver), json.dumps(targets)], capture_output=True, text=True, timeout=120)
+    launch = sandbox.sandboxed(cmd + [str(driver), json.dumps(targets)], cwd=str(work), work=work)
+    r = launch.run(capture_output=True, text=True, timeout=120, start_new_session=True)
     lines = [l[len("@@RESULT@@"):] for l in r.stdout.splitlines() if l.startswith("@@RESULT@@")]
     if r.returncode or not lines:
         skipped.update({f["name"]: "node driver failed: " + (r.stderr + r.stdout)[-2000:] for f in candidates})
-        return [], {"cases_built": 0}, skipped
+        return [], {"cases_built": 0, "sandbox": launch.record}, skipped
     cases, refused = records(json.loads(lines[-1]), candidates)
     skipped.update(refused)
-    return cases, {"files": len(groups), "cases_built": len(cases)}, skipped
+    return cases, {"files": len(groups), "cases_built": len(cases), "sandbox": launch.record}, skipped

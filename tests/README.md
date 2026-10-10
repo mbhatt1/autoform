@@ -116,4 +116,10 @@ failing verdict; printing a failed claim while returning success is insufficient
   real `check_render.py` and `render_lean.py` into a temp tree.
 * `scripts/differential.py` re-execs the whole process at import time unless
   `AUTOFORM_NO_REEXEC` is set — importing it unguarded makes `pytest` exit 0 with no
-  output. Use the `differential` fixture.
+  output. Use the `differential` fixture. From its command-line entry it also re-execs
+  itself under `scripts/sandbox.py`; a `main()` called in process is not confined and its
+  `conformance.json` says so (`sandbox.enforced: false`).
+* Subject processes (runtime drivers, the native worker, the nl runners) are sandboxed.
+  A test whose fixture must write somewhere the subject can reach puts it under the
+  work directory it passes in. `tests/test_sandbox.py` skips, naming the reason, on a
+  host with no mechanism; it never passes vacuously (the control run must exfiltrate).

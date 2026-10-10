@@ -258,6 +258,16 @@ say "conformance oracle is alive (compared > 0)"
 # The only check that compares the semantics to a real runtime. It once reported every
 # case INCONCLUSIVE for weeks while every gate stayed green (ci.yml); so the test is not
 # the agreement rate but that it decided anything at all.
+# The oracle runs the corpus's own test suite, confined by scripts/sandbox.py (no
+# network, writes only under its work tree). A host with no mechanism fails here, by
+# name, rather than inside the oracle: macOS ships sandbox-exec; Linux needs bubblewrap
+# or unshare with user namespaces. AUTOFORM_SANDBOX=off is the recorded opt-out.
+"$PY" - <<'PY' || die "no sandbox mechanism for the code under test (see docs/running.md §4)"
+import sys; sys.path.insert(0, 'scripts')
+import sandbox
+sandbox.require()
+print('sandbox:', sandbox.report()['mechanism'])
+PY
 conf_log="$(mktemp)"
 PYTHONHASHSEED=0 AUTOFORM_NO_REEXEC=1 "$PY" scripts/differential.py \
   ast-Cachetools.json "$CORPUS" Cachetools 5 | tee "$conf_log"

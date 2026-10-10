@@ -57,7 +57,9 @@ installs a JDK (Joern needs one; CI uses temurin 21), and it refuses to overwrit
 in `JOERN_HOME` that does not match the pin. `AUTOFORM_BOOTSTRAP_ROOT=Autoform` builds and
 audits the whole project including the V8Base parts, which CI cannot (`Autoform/CI.lean`).
 Written and run on macOS arm64; the Linux branches follow `.github/workflows/ci.yml` and
-have not been run on Ubuntu from this script. Expect the first run to take the better
+have not been run on Ubuntu from this script. The oracle and every runtime worker need a
+sandbox mechanism (`sandbox-exec` on macOS; `bubblewrap` or `unshare` with user
+namespaces on Linux, see §4) or an explicit `AUTOFORM_SANDBOX=off`. Expect the first run to take the better
 part of an hour, most of it in the build. The rest of this section is what the script does
 by hand.
 
@@ -414,6 +416,19 @@ python3 scripts/sacm.py --module <M> [--markdown sacm-<M>.md]
 # scale measurement, stage by stage (see docs/scale.md)
 python3 scripts/scale_test.py --out results.json --target Name /path/to/repo
 ```
+
+**Everything that runs the code under test runs sandboxed.** `scripts/differential.py`
+re-executes itself under `scripts/sandbox.py` from its command-line entry; the Node, JVM
+and Go drivers, the native C worker (`native_c.py`) and the nl stages launch their
+subjects through the same layer: no network, writes only under the work directory (the
+oracle may also write its report directory, `.lake` and the oracle cache), `TMPDIR`
+inside the work directory. macOS uses `sandbox-exec`; Linux needs `bwrap` (package
+`bubblewrap`) or falls back to `unshare -rn` (network only). With neither, the run
+**refuses** and names what to install. `AUTOFORM_SANDBOX=off` runs the subject
+unconfined; the opt-out is recorded in `conformance.json`, `native-build.json`,
+`emit.json`, `model.meta.json`, `fuzz.json` and `run.json` as
+`sandbox: {"mechanism": "off", "enforced": false}`. `AUTOFORM_SANDBOX=seatbelt|bwrap|unshare`
+forces a mechanism. See docs/trust-model.md, "What the sandbox does and does not do".
 
 **The conformance oracle is incremental by default.** It stores one verdict file per
 function under `.autoform-work/oracle/<M>/` (`--cache-dir DIR` relocates it) and, on the
