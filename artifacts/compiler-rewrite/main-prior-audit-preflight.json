@@ -1,0 +1,7 @@
+{
+  "status": "STABLE",
+  "artifacts": 7943,
+  "expected_absent": 281,
+  "changed": [],
+  "source": "Previously completed whole-Autoform fresh audit transported to main; hash comparison only, not a new replay."
+}

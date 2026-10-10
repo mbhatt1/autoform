@@ -112,9 +112,11 @@ def substE (σ : Impl) : Expr → Expr
   | .binop o a b   => .binop o (substE σ a) (substE σ b)
   | .unop o a      => .unop o (substE σ a)
   | .index a b     => .index (substE σ a) (substE σ b)
+  | .slice a lo hi st => .slice (substE σ a) (substE σ lo) (substE σ hi) (substE σ st)
   | .field a f     => .field (substE σ a) f
   | .call f as     => .call f (substEL σ as)
   | .mcall r m as  => .mcall (substE σ r) m (substEL σ as)
+  | .callValue f as => .callValue (substE σ f) (substEL σ as)
   | .alloc c as    => .alloc c (substEL σ as)
   | .listE as      => .listE (substEL σ as)
   | .tupleE as     => .tupleE (substEL σ as)
@@ -160,6 +162,9 @@ def substS (σ : Impl) : Stmt → Stmt
   | .assign x e      => .assign x (substE σ e)
   | .setField r f v  => .setField (substE σ r) f (substE σ v)
   | .setIndex r i v  => .setIndex (substE σ r) (substE σ i) (substE σ v)
+  | .delIndex r i    => .delIndex (substE σ r) (substE σ i)
+  | .setSlice r lo hi st v => .setSlice (substE σ r) (substE σ lo) (substE σ hi) (substE σ st) (substE σ v)
+  | .delSlice r lo hi st   => .delSlice (substE σ r) (substE σ lo) (substE σ hi) (substE σ st)
   | .setDerefIref p v => .setDerefIref (substE σ p) (substE σ v)
   | .seq a b         => .seq (substS σ a) (substS σ b)
   | .ifte c a b      => .ifte (substE σ c) (substS σ a) (substS σ b)
@@ -180,11 +185,13 @@ def substS (σ : Impl) : Stmt → Stmt
 
 /-- Apply an implementation to a function. Name and parameters are untouched, so name
 resolution in the instantiated program is the same as in the original. -/
-def Impl.onFunc (σ : Impl) (f : Func) : Func := { f with body := substS σ f.body }
+def Impl.onFunc (σ : Impl) (f : Func) : Func :=
+  { f with body := substS σ f.body, analysisBody := f.analysisBody.map (substS σ) }
 
 /-- Apply an implementation to a whole program. -/
 def Impl.onProgram (σ : Impl) (p : Program) : Program :=
-  { p with funcs := p.funcs.map σ.onFunc }
+  { p with funcs := p.funcs.map σ.onFunc,
+           auxiliaryFuncs := p.auxiliaryFuncs.map σ.onFunc }
 
 /-! ### The empty implementation changes nothing
 
@@ -202,9 +209,11 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .binop o a b   => by rw [substE, substE_nil a, substE_nil b]
   | .unop o a      => by rw [substE, substE_nil a]
   | .index a b     => by rw [substE, substE_nil a, substE_nil b]
+  | .slice a lo hi st => by rw [substE, substE_nil a, substE_nil lo, substE_nil hi, substE_nil st]
   | .field a f     => by rw [substE, substE_nil a]
   | .call f as     => by rw [substE, substEL_nil as]
   | .mcall r m as  => by rw [substE, substE_nil r, substEL_nil as]
+  | .callValue f as => by rw [substE, substE_nil f, substEL_nil as]
   | .alloc c as    => by rw [substE, substEL_nil as]
   | .listE as      => by rw [substE, substEL_nil as]
   | .tupleE as     => by rw [substE, substEL_nil as]
@@ -239,6 +248,9 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .assign x e      => by rw [substS, substE_nil e]
   | .setField r f v  => by rw [substS, substE_nil r, substE_nil v]
   | .setIndex r i v  => by rw [substS, substE_nil r, substE_nil i, substE_nil v]
+  | .delIndex r i    => by rw [substS, substE_nil r, substE_nil i]
+  | .setSlice r lo hi st v => by rw [substS, substE_nil r, substE_nil lo, substE_nil hi, substE_nil st, substE_nil v]
+  | .delSlice r lo hi st   => by rw [substS, substE_nil r, substE_nil lo, substE_nil hi, substE_nil st]
   | .setDerefIref p v => by rw [substS, substE_nil p, substE_nil v]
   | .seq a b         => by rw [substS, substS_nil a, substS_nil b]
   | .ifte c a b      => by rw [substS, substE_nil c, substS_nil a, substS_nil b]
@@ -252,7 +264,7 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .setGlobal x e   => by rw [substS, substE_nil e]
 
 @[simp] theorem onFunc_nil (f : Func) : Impl.onFunc [] f = f := by
-  simp [Impl.onFunc, substS_nil]
+  simp [Impl.onFunc, show substS [] = id from funext substS_nil]
 
 @[simp] theorem onProgram_nil (p : Program) : Impl.onProgram [] p = p := by
   simp [Impl.onProgram, List.map_id'']
@@ -545,8 +557,10 @@ verifiable core.
         [(.starred (.name "args")), (.dstarred (.name "kwargs"))])
 ```
 
-with no hole at all. `methodkey_refines` below is therefore **unconditional** — the same
-conclusion the contract-relative theorem reached, now with an empty `Γ`.
+with no hole at all, and `methodkey_refines` proved the contract-relative conclusion with an
+empty `Γ`. (RELAND 2026-10-09: the exporter now reads `hashkey` through the module object
+at call time, which a slice without the module initializer cannot answer; that theorem is
+retired. See the note where it stood.)
 
 That would leave this section with nothing to demonstrate contracts *on*, so the
 contract-relative theorems are kept and re-pointed at `keysProgramHoled`: `methodkey`
@@ -576,6 +590,17 @@ def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
 
+@[simp] theorem constructionGap_keysProgram (cls : String) :
+    (ctxOf keysProgram).constructionGap cls = none := rfl
+
+@[simp] theorem allocationCaptures_keysProgram (environment : Env) (cls : String) :
+    (ctxOf keysProgram).allocationCaptures environment cls =
+      some (match environment.get cls with | .clsClos _ cap => cap | _ => []) := rfl
+
+@[simp] theorem defaultConstructor_keysProgram (cls : String) (receiver : Ref)
+    (values : List Val) (keywords : List (String × Val)) :
+    (ctxOf keysProgram).defaultConstructor cls receiver values keywords = .val (.ref receiver) := rfl
+
 /-- `keys.py` records no class with a builtin base, so `Expr.alloc "_HashedTuple"` takes
 the ordinary heap-allocation branch. Stated as a lemma so the evaluation `simp`s below can
 step past `Ctx.builtinBase` without unfolding the program. -/
@@ -602,12 +627,36 @@ def methodkeyWith (e : Expr) : Func :=
 def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
 
+/-- The fragment declares no classes, so a by-name call here is never refused as a bare
+method reference (`Ctx.resolveCall`). -/
+@[simp] theorem exists_classDecl_keysProgramWith (e : Expr) (P : ClassDecl → Prop) :
+    (∃ x, x ∈ (keysProgramWith e).classDecls ∧ P x) ↔ False := by
+  simp [keysProgramWith]
+
+@[simp] theorem constructionGap_keysProgramWith (e : Expr) (cls : String) :
+    (ctxOf (keysProgramWith e)).constructionGap cls = none := rfl
+
+@[simp] theorem allocationCaptures_keysProgramWith (e : Expr) (environment : Env) (cls : String) :
+    (ctxOf (keysProgramWith e)).allocationCaptures environment cls =
+      some (match environment.get cls with | .clsClos _ cap => cap | _ => []) := rfl
+
+@[simp] theorem defaultConstructor_keysProgramWith (e : Expr) (cls : String) (receiver : Ref)
+    (values : List Val) (keywords : List (String × Val)) :
+    (ctxOf (keysProgramWith e)).defaultConstructor cls receiver values keywords = .val (.ref receiver) := rfl
+
 /-- The `keys.py` fragment records no class with a builtin base, so `Expr.alloc
 "_HashedTuple"` takes the ordinary heap-allocation branch. Stated as a lemma so the
 evaluation `simp`s below can step past `Ctx.builtinBase` without unfolding the whole
 program. -/
 @[simp] theorem builtinBase_keysProgramWith (e : Expr) (cls : String) :
     (ctxOf (keysProgramWith e)).builtinBase cls = none := rfl
+
+/-- The fragment is Python, so `Dialect.ctorName` picks `__init__`. Stated on the
+`ctorName` term itself (not on the `.dialect` projection): rewriting the projection would
+also fire inside the `Ctx` literal and stop `ctx_fold` from folding it back to
+`ctxOf (keysProgramWith e)`, which the `resolve_*` lemmas are stated over. -/
+@[simp] theorem ctorName_keysProgramWith (e : Expr) :
+    (keysProgramWith e).dialect.ctorName = "__init__" := rfl
 
 /-- `methodkey` **as the transpiler used to emit it**: the starred call replaced by the
 hole it produced before `Expr.starred`/`Expr.dstarred` existed. This is the subject of the
@@ -661,20 +710,45 @@ theorem resolve_kwargs (e : Expr) : (ctxOf (keysProgramWith e)).resolve "kwargs"
 reference without running one — and the unpacked arguments are therefore not observable in
 `methodkey`'s result. -/
 theorem resolveMethod_hashedTuple_init (e : Expr) :
-    (ctxOf (keysProgramWith e)).resolveMethod "_HashedTuple" "__init__" = none := by
+    (ctxOf (keysProgramWith e)).resolveMethod "cachetools/keys.py:<module>._HashedTuple" "__init__" = none := by
   simp only [Ctx.resolveMethod, ctxOf, table_keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
-  rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__" from by rfl]
+  rw [show ("." ++ "cachetools/keys.py:<module>._HashedTuple" ++ "." ++ "__init__") = ".cachetools/keys.py:<module>._HashedTuple.__init__" from by rfl]
   simp +decide [List.filter_cons, String.endsWith]
   simp only [Ctx.resolve, ctxOf, table_keysProgramWith]
   rw [show ("." ++ "__init__") = ".__init__" from by rfl]
   simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass,
+    Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass,
+    Ctx.usesClassMetadata, keysProgramWith]
+
+/-- Nor a `<init>` (the JavaScript/Java constructor name `Ctx.resolveCtor` tries second). -/
+theorem resolveMethod_hashedTuple_initJs (e : Expr) :
+    (ctxOf (keysProgramWith e)).resolveMethod "cachetools/keys.py:<module>._HashedTuple" "<init>" = none := by
+  simp only [Ctx.resolveMethod, ctxOf, table_keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  rw [show ("." ++ "cachetools/keys.py:<module>._HashedTuple" ++ "." ++ "<init>") = ".cachetools/keys.py:<module>._HashedTuple.<init>" from by rfl]
+  simp +decide [List.filter_cons, String.endsWith]
+  simp only [Ctx.resolve, ctxOf, table_keysProgramWith]
+  rw [show ("." ++ "<init>") = ".<init>" from by rfl]
+  simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass,
+    Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass,
+    Ctx.usesClassMetadata, keysProgramWith]
+
+/-- So `Expr.alloc "cachetools/keys.py:<module>._HashedTuple"` runs no constructor at all
+(the exporter qualifies allocation identity since the re-land of 2026-10-09). -/
+theorem resolveCtor_hashedTuple (e : Expr) :
+    (ctxOf (keysProgramWith e)).resolveCtor "cachetools/keys.py:<module>._HashedTuple" = none := by
+  simp only [Ctx.resolveCtor, resolveMethod_hashedTuple_init, resolveMethod_hashedTuple_initJs]
 
 /-- `runFunc` builds its context inline; folding it back to `ctxOf` is what lets the
 resolution lemmas above apply. -/
 private theorem ctx_fold (p : Program) :
-    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases } : Ctx) = ctxOf p := rfl
+    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
+       properties := p.properties, excClasses := p.excClasses, classDecls := p.classDecls } : Ctx) = ctxOf p := rfl
 
 /-! ### Satisfiability first
 
@@ -742,6 +816,14 @@ theorem satisfiable_raises_zeroDiv :
 Both are `RefinesUnder`, at the concrete fuel bound 14, on the unrestricted domain. -/
 
 set_option maxHeartbeats 2000000 in
+/-! **Re-land note (cachetools v7.1.7, current exporter).** These theorems used to claim
+`methodkey` for *every* argument list (`fun _ => True`). That was never its domain:
+`methodkey(self, *args, **kwargs)` requires `self`, and CPython raises `TypeError` for
+`methodkey()`. The old render carried `pythonSignature = none`, so `signatureRejected_legacy`
+discharged the check by `rfl` and the over-broad domain was invisible. The fresh export
+records the signature (`required = ["self"]`), and the theorems are stated for `args ≠ []`
+-- the domain they always had. -/
+
 /-- **`methodkey` refines a total Lean specification, under one contract.**
 
 Assuming only that the starred-unpack construct returns *some* value without touching the
@@ -756,7 +838,7 @@ mechanism can deliver — and here it happens to be available, because `_HashedT
 result. That is a fact about `cachetools`'s translation, discovered by the proof. -/
 theorem methodkey_refinesUnder_value :
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .ret (.ref 0)) := by
+      (fun args => args ≠ []) (fun _ => .ret (.ref 0)) := by
   intro σ hc ht
   have hmem : pureValueContract "op:starredUnpack" ∈ [pureValueContract "op:starredUnpack"] := by
     simp
@@ -778,7 +860,8 @@ theorem methodkey_refinesUnder_value :
     exact Prod.ext h1 h2
   rw [onProgram_keysProgramHoled he] at hvf
   have hplain : e.plainArg = true := hc.2.2 _ _ he
-  intro args _
+  intro args hargs
+  obtain ⟨self, rest, rfl⟩ := List.exists_cons_of_ne_nil hargs
   apply forall_ge_of_forall_add
   intro k
   rw [onProgram_keysProgramHoled he]
@@ -793,9 +876,9 @@ theorem methodkey_refinesUnder_value :
         show (k+7)+1 = k+8 from rfl, hvf (k+8) h ρ (by omega)]
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
-    resolveMethod_hashedTuple_init, methodkeyWith,
-    f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, ctx_fold, Ctx.resolveCall, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+    resolveMethod_hashedTuple_init, resolveCtor_hashedTuple, methodkeyWith,
+    f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
 
 set_option maxHeartbeats 2000000 in
@@ -811,7 +894,7 @@ because they are relative to different `Γ`s. Reading either one without its `Γ
 it wrong. -/
 theorem methodkey_refinesUnder_raise (payload : Val) :
     RefinesUnder [raisesContract "op:starredUnpack" payload] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .raise payload) := by
+      (fun args => args ≠ []) (fun _ => .raise payload) := by
   intro σ hc ht
   have hmem : raisesContract "op:starredUnpack" payload ∈
       [raisesContract "op:starredUnpack" payload] := by simp
@@ -822,24 +905,26 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   simp only [raisesContract] at hpost
   simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith, substS, substE, substEL,
     he, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hpost
+    f_cachetools_keys_py__module__methodkey, List.map, Program.table, List.append_nil,
+    Option.map_none] at hpost
   have hplain : e.plainArg = true := hc.2.2 _ _ he
-  intro args _
+  intro args hargs
+  obtain ⟨self, rest, rfl⟩ := List.exists_cons_of_ne_nil hargs
   apply forall_ge_of_forall_add
   intro k
   -- As in the value theorem: the plainness clause of `Consistent` is what lets a fact
   -- about `evalExpr e` become a fact about the argument list `[e]`.
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
+    substS, substE, substEL, he, Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
+    applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, hpost]
 
 /-- The contract-relative theorem plus its satisfiability proof, which is the pair a
 reader is entitled to demand. Stated as one declaration so the two cannot drift apart. -/
 theorem methodkey_value_result :
     Satisfiable [pureValueContract "op:starredUnpack"] keysProgramHoled ∧
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .ret (.ref 0)) :=
+      (fun args => args ≠ []) (fun _ => .ret (.ref 0)) :=
   ⟨satisfiable_pureValue, methodkey_refinesUnder_value⟩
 
 /-- The raising contract, paired with the payload for which satisfiability is proved.
@@ -848,7 +933,7 @@ comes with a witness that the assumption can be met. -/
 theorem methodkey_raise_result :
     Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgramHoled ∧
     RefinesUnder [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgramHoled
-      "cachetools/keys.py:<module>.methodkey" 14 (fun _ => True)
+      "cachetools/keys.py:<module>.methodkey" 14 (fun args => args ≠ [])
       (fun _ => .raise (.str "ZeroDivisionError")) :=
   ⟨satisfiable_raises_zeroDiv, methodkey_refinesUnder_raise _⟩
 
@@ -874,56 +959,39 @@ theorem resolve_hashkey' :
   simp +decide [Ctx.resolve, ctxOf, table_keysProgram,
     f_cachetools_keys_py__module__hashkey]
 
+-- A concrete resolution MISS, by kernel computation: `resolveMethod`/`resolve` test
+-- suffixes with the structural `strEndsWith`, so nothing has to be unfolded by hand.
 theorem resolveMethod_hashedTuple_init' :
-    (ctxOf keysProgram).resolveMethod "_HashedTuple" "__init__" = none := by
-  simp only [Ctx.resolveMethod, ctxOf, table_keysProgram,
-    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
-  rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__" from by rfl]
-  simp +decide [List.filter_cons, String.endsWith]
-  simp only [Ctx.resolve, ctxOf, table_keysProgram]
-  rw [show ("." ++ "__init__") = ".__init__" from by rfl]
-  simp +decide [Ctx.resolve.go, String.endsWith,
-    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+    (ctxOf keysProgram).resolveMethod "cachetools/keys.py:<module>._HashedTuple" "__init__" = none := by
+  rfl
+
+theorem resolveCtor_hashedTuple' : (ctxOf keysProgram).resolveCtor "cachetools/keys.py:<module>._HashedTuple" = none := by
+  rfl
 
 /-! ### The unconditional theorem
 
 The point of the whole section: with the calling convention modelled, the contract is no
 longer needed. -/
 
-set_option maxHeartbeats 4000000 in
-/-- **`methodkey` refines a total Lean specification, unconditionally.**
+/- RELAND (2026-10-09): `methodkey_refines` and `methodkey_unconditional` are retired.
 
-Same entry point, same fuel bound, same domain and same conclusion as
-`methodkey_refinesUnder_value` — with `Γ = []`. By `refinesUnder_nil_iff` a theorem is
-unconditional exactly when its contract environment is literally empty, and this one has
-no contract environment at all: it is an ordinary `Refine.Refines`.
+They stated that on `keysProgram` -- `hashkey` and `methodkey` and nothing else, run from
+the empty heap -- `methodkey` returns `_HashedTuple` at address 0 for every non-empty
+argument list, with no contract. The re-landed exporter translates `hashkey(*args,
+**kwargs)` inside `methodkey` the way Python executes it: the global is read through the
+module object at call time,
 
-What closed it was language modelling, not proof automation: `Expr.starred`/`Expr.dstarred`
-and `Func.vararg`/`Func.kwarg`, plus an exporter that emits them. The hole
-`op:starredUnpack` no longer occurs anywhere in the corpus.
+```lean
+.ret (.callValue (.field (.name "<module>cachetools/keys.py") "hashkey")
+        [(.starred (.name "args")), (.dstarred (.name "kwargs"))])
+```
 
-The conclusion is still `_HashedTuple` at address 0 and still does not depend on the
-unpacked arguments, for the reason the contract-relative proof already found: the
-translated `_HashedTuple` has no `__init__`. That is the builtin-base-class gap
-STRATEGY.md §31/§34 records, and it is unchanged by this theorem. -/
-theorem methodkey_refines :
-    Refines keysProgram "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .ret (.ref 0)) := by
-  intro args _
-  apply forall_ge_of_forall_add
-  intro k
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
-    resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
-    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
-    Val.iterable, strKeyed, Heap.get, Heap.alloc]
-
-/-- The unconditional theorem needs no satisfiability obligation — there is nothing to
-satisfy. Recorded as a declaration so the contrast with `methodkey_value_result` is
-mechanical rather than a matter of reading the prose. -/
-theorem methodkey_unconditional : RefinesUnder [] keysProgram
-    "cachetools/keys.py:<module>.methodkey" 14 (fun _ => True) (fun _ => .ret (.ref 0)) :=
-  (refinesUnder_nil_iff _ _ _ _ _).mpr methodkey_refines
+so the answer depends on the module initializer having bound `hashkey`, which a
+two-function slice run from the empty heap never does. The theorem was true of the
+old, statically bound translation and is false of the faithful one; restating it about
+a frozen copy of the old body would be a theorem about an artifact that no longer
+exists, so it is deleted. The contract-relative theorems below are about
+`methodkeyWith`, a hand-built body with a direct call, and stand unchanged. -/
 
 /-! ### The negative result
 
@@ -941,11 +1009,11 @@ set_option maxHeartbeats 1000000 in
 whole file exists to improve on. -/
 theorem methodkey_holes (k : Nat) (args : List Val) :
     runFunc keysProgramHoled (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
+    f_cachetools_keys_py__module__methodkey, Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy,
+    applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, Env.get, Val.truthy,
     Heap.get, Heap.alloc]
 
 /-- **An unconstrained contract proves nothing.**
@@ -988,8 +1056,9 @@ theorem methodkey_not_refinable_under_top (N : Nat) (dom : List Val → Prop)
 oracle-not-sharing-the-artifact's-assumptions discipline as §17. They are `#eval`, so they
 are evidence for a reader, not part of any proof. -/
 
--- The full program agrees with `methodkey_refines`: `_HashedTuple` at address 0, with no
--- hole and no contract. This is the line that used to print `hole "op:starredUnpack"`.
+-- The full program, from the empty heap: `methodkey` reads `hashkey` through the module
+-- object, which only the module initializer binds (see the RELAND note above). This is
+-- the line that used to print `hole "op:starredUnpack"`.
 #eval reprStr (runFunc Autoform.Generated.Cachetools.program 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
 
 -- Re-holing the starred call reproduces the old behaviour on the full program, which is
@@ -1008,11 +1077,9 @@ def reholed : Program :=
 
 /-! ### Axiom audit
 
-The headline of this section is now the unconditional theorem, so it is the one whose
-axiom base a reader should check. -/
+The contract-relative theorems are the headline again (the unconditional one is retired;
+see the RELAND note), so they are the ones whose axiom base a reader should check. -/
 
-#print axioms methodkey_refines
-#print axioms methodkey_unconditional
 #print axioms methodkey_refinesUnder_value
 #print axioms methodkey_refinesUnder_raise
 #print axioms methodkey_not_refinable_under_top

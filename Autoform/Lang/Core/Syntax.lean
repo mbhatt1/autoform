@@ -1,5 +1,6 @@
 import Specimen
 import Autoform.Lang.Core.Float
+import Autoform.Lang.Core.ClassHierarchy
 
 /-!
 # Core — a universal deep-embedded imperative language
@@ -45,22 +46,56 @@ arithmetic now agrees with Node up to `Number.MAX_SAFE_INTEGER` (2^53 - 1).
 doubles, and this project's `Val` has no single "JS number" representation that is
 sometimes-int-sometimes-float the way `Number` is — `NumConfig.python`'s *unbounded*
 integers are themselves a known-wrong approximation past 2^53 (Numeric.lean already
-recorded this before this dialect existed). Bitwise/shift operators (`&`, `|`, `^`, `<<`,
-`>>`, `>>>`) go through the same `NumConfig`, but real JS converts their operands to
-Int32 first (ECMA `ToInt32`) — a genuinely different width policy from JS's own
-arithmetic operators. Modelling that correctly needs a *second* numeric config per
-dialect (one for arithmetic, one for bitwise), which `Dialect.toNumConfig`'s
-one-config-per-dialect shape does not support yet; until it does, `<<`/`>>`/bitwise ops
-on `.javascript` inherit the unbounded config and are a known, recorded gap, not a
-claimed fix. `Lang.approximated` still marks JavaScript/TypeScript `true` for this
-reason. -/
+recorded this before this dialect existed). Untagged bitwise/shift operators also
+inherit that unbounded configuration. Fresh Joern exports instead preserve these
+operations as `num:js:i32:<op>`; TypedNumeric applies Number coercion to 32 bits.
+String/object coercion and BigInt remain outside that subset. General Number
+arithmetic still makes `Lang.approximated` true for JavaScript/TypeScript. -/
 inductive Dialect where
   | python
   | cLike
   | javascript
+  /-- Java. Split from `.cLike` because three of its answers differ from C's: strings are
+  VALUES with `+` as concatenation, arrays and collections have IDENTITY, and `==` on two
+  strings is REFERENCE equality — which is a hole here, not a wrong answer either way.
+  Untagged integer arithmetic is Java `int` (`NumConfig.java32`: wraps, `/` truncates,
+  shift counts masked); a `long` operation reaches Core as a tagged `num:java:i64:*` op
+  and carries its own width (`TypedNumeric`). Kotlin/JVM routes here too — same integer
+  model, same boolean operators; its structural string `==` is left as the
+  reference-equality hole, which is conservative, not wrong. -/
+  | java
+  /-- Go. Split from `.cLike` because its `int` is 64-bit (`NumConfig.go64`: wraps,
+  division by zero panics), its strings are values with content `==`, and slices/maps have
+  identity. A Go ARRAY is a value that copies on assignment; the exporter cannot tell an
+  array from a slice, so array assignment is a known approximation under this dialect. -/
+  | go
   deriving Repr, Inhabited, DecidableEq
 
 namespace Dialect
+
+/-- The method `Expr.alloc` runs on a fresh instance. Python's `__init__`; JavaScript's
+`<init>`, which is the name jssrc2cpg gives a class's `constructor(...)` -- ECMA-262
+§13.3.5 (`new MemberExpression Arguments`) → EvaluateNew → Construct → the class's
+[[Construct]], which runs that method with `this` bound to the new object. The exporter
+spells every other dialect's constructor `__init__` on the way out (C++'s `Foo.Foo`). -/
+def ctorName : Dialect → String
+  | .javascript => "<init>"
+  | _           => "__init__"
+
+/-- Do this dialect's container literals allocate — do lists and dicts have IDENTITY?
+
+Python and JavaScript: yes. `a = [1]; b = a; b[0] = 9` changes `a` in both, and two
+literals with equal contents are `==` but not `is`/`===`. A C aggregate initializer is a
+VALUE — `int a[] = {7,8,9}` has no identity to share — and boxing it made C wrong in the
+commit that made Python right, which is why this is a named predicate rather than a
+`== .python` test scattered across the interpreter. -/
+def boxesContainers : Dialect → Bool
+  | .python | .javascript => true
+  | .cLike                => false
+  -- Java arrays and collections are objects; Go slices and maps are references to shared
+  -- storage (`b := a; b[0] = 9` changes `a`). Go ARRAYS are values — see `Dialect.go`.
+  | .java | .go           => true
+
 
 /-- Do `and`/`or` evaluate to one of their **operands** (Python, JavaScript) rather than
 to a boolean (C, Java, Go)? `0 and 5` is `0` in Python and `1` in C. -/
@@ -68,6 +103,7 @@ def boolOpsAreValues : Dialect → Bool
   | .python     => true
   | .cLike      => false
   | .javascript => true
+  | .java | .go => false
 
 /-- Are strings **values** with content equality and concatenation (Python, Java, Go,
 JavaScript), or pointers with address semantics (C)? Under pointer semantics `+`, `<`,
@@ -76,6 +112,17 @@ def stringsAreValues : Dialect → Bool
   | .python     => true
   | .cLike      => false
   | .javascript => true
+  -- `+` concatenates and `<`/`>` compare contents in both; `==` is the exception for Java
+  -- and has its own predicate below.
+  | .java | .go => true
+
+/-- Is `==` on two strings REFERENCE equality? Java: `new String("a") == "a"` is `false`
+while two interned literals compare `true`, and Core has one `Val.str` for both, so the
+honest answer is a hole (`str:reference-equality`), not `Val.beq`. Everywhere else that
+`stringsAreValues` holds, `==` compares contents (Python, JavaScript, Go). -/
+def stringEqIsReference : Dialect → Bool
+  | .java => true
+  | .python | .cLike | .javascript | .go => false
 
 /-- Is `e.f` on a **dict** value a member selection?
 
@@ -100,6 +147,11 @@ def fieldsOnDicts : Dialect → Bool
   | .python     => false
   | .cLike      => true
   | .javascript => true
+  -- A Go struct literal `T{a: 1}` is an aggregate exactly like the C initializer above.
+  -- Java has no aggregate literal: an object is `new` (an allocation), so a dict is never
+  -- something Java code dots into, and the access stays the `field:*:non-object` hole.
+  | .go         => true
+  | .java       => false
 
 /-- Does comparing an integer against a float compare **exactly** (Python: `10**23 ==
 1e23` is `False`), or promote the integer to a double first (C)? JavaScript has no
@@ -111,6 +163,8 @@ def comparesIntFloatExactly : Dialect → Bool
   | .python     => true
   | .cLike      => false
   | .javascript => false
+  -- Java and Go both promote the integer to the float's type before comparing.
+  | .java | .go => false
 
 end Dialect
 
@@ -125,6 +179,8 @@ def Dialect.toFConfig : Dialect → FConfig
   | .python     => FConfig.python
   | .cLike      => FConfig.cDouble
   | .javascript => FConfig.cDouble
+  -- Java `double` and Go `float64` are IEEE binary64 with the same rounding as C's.
+  | .java | .go => FConfig.cDouble
 
 /-- A heap address. Objects are boxed and mutable; everything else is a value. -/
 abbrev Ref := Nat
@@ -280,6 +336,25 @@ inductive Payload where
   | tuple : List Val → Payload
   deriving Repr, Inhabited
 
+/-- The `Val` a payload presents to `Stdlib.method`, which speaks `Val.list`/`Val.dict`.
+
+An adapter rather than a rewrite of `Stdlib.lean` against `Payload`, deliberately:
+`Stdlib` is 700 lines with its own evidence and none of it is about aliasing
+(`docs/boxed-containers.md` §2). `.none` has no container to present. -/
+def Payload.toVal : Payload → Option Val
+  | .none     => Option.none
+  | .list vs  => some (.list vs)
+  | .dict ps  => some (.dict ps)
+  | .tuple vs => some (.tuple vs)
+
+/-- The payload a mutating builtin's new receiver becomes. `none` for a non-container,
+which the caller must refuse rather than guess at. -/
+def Payload.ofVal : Val → Option Payload
+  | .list vs  => some (.list vs)
+  | .dict ps  => some (.dict ps)
+  | .tuple vs => some (.tuple vs)
+  | _         => Option.none
+
 /-- A heap object: its class and its mutable fields. -/
 structure Obj where
   cls    : String
@@ -336,6 +411,17 @@ def setPayload (h : Heap) (r : Ref) (p : Payload) : Heap :=
 
 end Heap
 
+/-- The container a value presents, looking through a box.
+
+After the switchover a list literal is a `Val.ref`, so everything that inspected a
+`Val.list` structurally -- splatting `*xs`, `**kw` -- has to look through the reference or
+it silently sees "not a container". Non-refs and refs without a payload are returned
+unchanged, so this is the identity on every value Core built before boxing. -/
+def Val.unbox (h : Heap) : Val → Val
+  | .ref r => (h.payload r).toVal.getD (.ref r)
+  | v      => v
+
+
 /-- Literals as they appear in source. -/
 inductive Lit where
   | int   : Int → Lit
@@ -349,6 +435,19 @@ inductive Lit where
   | unit  : Lit
   deriving Repr, Inhabited, DecidableEq
 
+/-- The value a literal denotes. Total and effect-free by construction, which is the
+property that lets a literal default be bound at call time rather than at definition
+time. Kept in agreement with `evalExpr`'s `.lit` cases by
+`Lit.toVal_agrees_with_evalExpr` in `Semantics.lean`; a literal form that evaluated
+differently here than there would be a silent divergence of exactly the kind the
+differential oracle exists to find, so the two are pinned to each other. -/
+def Lit.toVal : Lit → Val
+  | .int i   => .int i
+  | .str s   => .str s
+  | .bool b  => .bool b
+  | .float f => .float f
+  | .unit    => .unit
+
 /-- Expressions. `call` is by name: the CPG gives us resolved callee names. -/
 inductive Expr where
   | lit    : Lit → Expr
@@ -361,6 +460,11 @@ inductive Expr where
   | field  : Expr → String → Expr
   /-- Method call on a receiver: `e.m(args)`. Dispatch is on the receiver's class. -/
   | mcall  : Expr → String → List Expr → Expr
+  /-- Call of a COMPUTED callee: `f(x)(y)`, `d["k"](3)`, `make()(v)`. `call` is by name;
+  this applies whatever VALUE the callee expression evaluates to -- a function, a closure,
+  a boxed function object -- and holes (`call:value:not-callable`) on anything else.
+  Arguments use the same three argument forms as `call`. -/
+  | callValue : Expr → List Expr → Expr
   /-- Object construction: `Cls(args)`, running `Cls.__init__` if one is known. -/
   | alloc  : String → List Expr → Expr
   /-- A function, method or class used as a value (`METHOD_REF` / `TYPE_REF`). -/
@@ -508,6 +612,20 @@ inductive Expr where
   `""` in Python and `s.drop 999` is `[]` in Lean -- no undefined behaviour to
   guard against on that side, unlike `strByte`'s own out-of-range READ. -/
   | strFrom : Expr → Expr → Expr
+  /-- `xs[lo:hi:st]` — a Python slice read (`docs/boxed-containers.md` §2, §9 item 3).
+
+  Every bound is a mandatory `Expr`, and an OMITTED bound is `.lit .unit`. That is not a
+  shortcut around `Option`: it is Python's own definition. `xs[:2]` is `xs[slice(None, 2,
+  None)]`, `xs[None:2]` is the same slice, and the bound `None` means "use the default for
+  this step's direction". Encoding absence as the value Python itself uses keeps the
+  constructor on the plain four-child shape every exhaustive match, `FuelMono` case and
+  renderer path already handles, and it makes `xs[None:2]` and `xs[:2]` the same term,
+  which is what they are.
+
+  Evaluates to a NEW container — a fresh boxed list for a list receiver, a `Val.tuple` for
+  a tuple, a `Val.str` for a string — with CPython's `slice.indices` normalisation for
+  negative, out-of-range and reversed bounds and its `ValueError` for a zero step. -/
+  | slice : Expr → Expr → Expr → Expr → Expr
   deriving Repr, Inhabited
 
 /-- Statements. -/
@@ -519,6 +637,20 @@ inductive Stmt where
   | setField : Expr → String → Expr → Stmt
   /-- `e[i] = v` -/
   | setIndex : Expr → Expr → Expr → Stmt
+  /-- `del e[i]` (`docs/boxed-containers.md` §2). A separate constructor because there was
+  nothing to translate `del` to: the `op:delete-index` holes exist for want of a target,
+  not for want of semantics. Mirrors `setIndex` — `.dict` deletes the key or raises
+  `KeyError`, `.list` drops the position or raises `IndexError`, a `.tuple` payload is a
+  `TypeError`, and an unboxed container value still holes. -/
+  | delIndex : Expr → Expr → Stmt
+  /-- `xs[lo:hi:st] = v`. Bounds as in `Expr.slice` (`.lit .unit` is an omitted bound).
+  A unit step replaces the range with the iterable, whatever its length — CPython's
+  `xs[3:1] = [9]` inserts at 3. Any other step is an *extended* slice assignment and
+  requires the iterable's length to equal the slice's, else `ValueError`. Only a list
+  payload is assignable; a tuple payload is a `TypeError`. -/
+  | setSlice : Expr → Expr → Expr → Expr → Expr → Stmt
+  /-- `del xs[lo:hi:st]`. Removes exactly the positions the slice denotes, for any step. -/
+  | delSlice : Expr → Expr → Expr → Expr → Stmt
   /-- `006-reduce-remaining-holes`, Story 5: `*p = v` where `p` is an interior-pointer
   VALUE (as opposed to `Stmt.setField`, which takes an explicit field name for a NAMED
   receiver). Requires its pointer operand to evaluate to `Val.iref r sel` and
@@ -560,6 +692,94 @@ inductive Stmt where
   | hole     : String → Stmt
   deriving Repr, Inhabited
 
+/-- A parameter default Core can bind without function-object state.
+
+Both forms are **time-invariant**: their value does not depend on when they are
+evaluated and evaluating them has no effect, which is the property that lets a default be
+bound at call time rather than at definition time. A literal is obvious; a reference to an
+in-program function is the same argument -- `def f(k=keys.hashkey)` stores the function
+object, and that object is the same whenever it is looked up.
+
+Anything else -- a call, a mutable literal, an attribute of something that can be
+rebound -- is NOT time-invariant and the definition still holes. Keeping this a closed
+two-constructor type is what makes that checkable by the type rather than by convention. -/
+inductive DefaultValue where
+  | lit   : Lit → DefaultValue
+  | fnref : String → DefaultValue
+  deriving Repr, Inhabited
+
+/-! A class-attribute default -- `def pop(self, key, default=__marker)` where
+`__marker = object()` is a class attribute -- is deliberately NOT a third constructor
+here. `DefaultValue.toVal` is total and heap-free, and `bindParams` folds it without a
+heap, which is what every accessor theorem's `hdef : fn.literalDefaults = []` and the
+reducible calling-convention proofs rest on. A class attribute has no heap-free value, so
+it lives in `PythonSignature.classAttrDefaults` and is resolved by `applyFunc`, which has
+the heap. Two fields with one job each, rather than one field whose `toVal` is partial. -/
+
+def DefaultValue.toVal : DefaultValue → Val
+  | .lit l   => l.toVal
+  | .fnref f => .fn f
+
+/-- Python parameter kinds recovered from the source definition. Default values
+are not stored here: evaluating and retaining them requires function-object state.
+`required` names parameters without defaults, excluding `*args` and `**kwargs`. -/
+structure PythonSignature where
+  positionalOnly : List String := []
+  keywordOnly : List String := []
+  required : List String := []
+  /-- Parameters with a **literal** default, and that default.
+
+  Python evaluates a default expression once, when the `def` executes, and stores the
+  result on the function object. Core has no function-object state, so in general a
+  default cannot be modelled and the exporter holes the definition
+  (`call:python-defaults`). A *literal* default is the case where that machinery is not
+  needed: its value does not depend on when it is evaluated and evaluating it has no
+  effect, so binding it at call time is indistinguishable from binding it at definition
+  time. Restricting the field to `Lit` is what makes that argument checkable by the type
+  rather than by convention — a default that is a name, an attribute or any other
+  expression cannot be written here, and still holes.
+
+  Empty for every function without defaults, which is why every already-rendered corpus
+  keeps its meaning: `bindParams` folds an empty list into the base environment and
+  reduces to exactly the term it had before. -/
+  defaults : List (String × DefaultValue) := []
+  /-- Parameters whose default is a **class attribute** of the enclosing class:
+  `(parameter, class short name, mangled attribute name)`, so `def pop(self, key,
+  default=__marker)` inside `class Cache` records `("default", "Cache", "_Cache__marker")`.
+
+  Not a `DefaultValue`, on purpose: its value is on the heap, and reading it is what
+  `applyFunc` does -- `bindParams` stays heap-free. The value is time-invariant in the way
+  a literal is (the class attribute is bound once, when the class body runs, and re-read
+  at call time gives the same object), which is what lets it be bound at call time; the
+  common case is a sentinel, `__marker = object()`, whose entire meaning is "an object no
+  caller can pass", and identity is exactly what a fresh heap cell has.
+
+  Empty by default, so every corpus rendered before this field existed applies no class
+  attribute anywhere and `applyFunc` reduces to the term it had. -/
+  classAttrDefaults : List (String × String × String) := []
+  /-- Lexical method classification from Python source. `none` retains the
+  historical naming heuristic for models without this information. -/
+  isMethod : Option Bool := none
+  /-- What the receiver IS, when it is not an instance. `some "class"` is a
+  `@classmethod`: Python passes the class as the first positional, so the exporter keeps
+  that parameter (usually `cls`) in `params` instead of stripping it the way it strips
+  `self`, and the `.mcall` sites pass the class value with no separate receiver. `none`
+  is an ordinary method or a plain function, and nothing about them changes. -/
+  receiverKind : Option String := none
+  /-- The name of the INSTANCE receiver the exporter stripped from `params`, recorded when
+  a keyword argument of that name must still be refused.
+
+  `def f(self, **kw)` called as `o.f(self=1)` is `TypeError: f() got multiple values for
+  argument 'self'` in CPython: the bound receiver already fills `self`. After stripping,
+  `bindParams` would drop `self=1` into `**kw` and the call would succeed -- the shadowing
+  that made the exporter hole every `def f(self, *args, **kwargs)` as
+  `call:python-receiver-signature`. With the name recorded, `kwargsRejected` refuses the
+  keyword and the shape binds. Set only when the shadowing is possible -- a `**kwargs`
+  collector and a receiver that is not positional-only (`def f(self, /, **kw)` DOES put
+  `self=1` in `kw`) -- and `none` everywhere else, so every rendered corpus keeps its term. -/
+  receiverName : Option String := none
+  deriving Repr, Inhabited
+
 /-- A function: name, parameters, body.
 
 `params` lists **every** parameter name in source order, including the variadic ones.
@@ -575,21 +795,46 @@ structure Func where
   vararg : Option String := none
   /-- The `**kwargs` parameter's name, if the function has one. -/
   kwarg  : Option String := none
+  /-- Source Python binding rules. `none` is legacy/foreign metadata, not evidence
+  that an omitted parameter has a default. Newly exported Python definitions
+  always supply this field or contain an explicit metadata hole. -/
+  pythonSignature : Option PythonSignature := none
+  /-- Source control flow for static coverage when execution uses a compiled frame.
+  This is analysis data only; the interpreter always executes `body`. -/
+  analysisBody : Option Stmt := none
   deriving Repr, Inhabited
 
-/-- Whether this `Func` is a method, by the exporter's naming convention: the segment after
-`<module>.` is `Class.method` rather than a bare function name. Used to recover Python's
-unbound-method rule, where a method reached as a plain value takes its receiver as the
-first positional argument. -/
+/-- Tail after the first Python scope marker. Structural recursion keeps legacy
+method classification reducible in kernel-checked execution. -/
+def pythonScopeTail : List Char → Option (List Char)
+  | [] => none
+  | c :: cs =>
+      if "<module>.".toList.isPrefixOf (c :: cs) then some ((c :: cs).drop 9)
+      else pythonScopeTail cs
+
+/-- Whether this `Func` is a method. Source metadata distinguishes nested functions
+from class methods; a dotted qualified name cannot establish that distinction.
+Legacy models retain the naming heuristic. Used for Python's unbound-method rule,
+where a method reached as a plain value takes its receiver as the first argument. -/
 def Func.isMethod (fn : Func) : Bool :=
-  match fn.name.splitOn "<module>." with
-  | [_, rest] => rest.any (· == '.')
-  | _         => false
+  match fn.pythonSignature.bind (·.isMethod) with
+  | some method => method
+  | none =>
+    match pythonScopeTail fn.name.toList with
+    | some rest => (pythonScopeTail rest).isNone && rest.any (· == '.')
+    | none => false
 
 /-- A whole translated codebase, tagged with the dialect it came from. -/
 structure Program where
   funcs   : List Func
+  /-- Compiler-generated frame methods. Available for execution and resolution, but
+  not additional source functions in the coverage denominator. Their source operations
+  are represented in the owning function's `analysisBody`. -/
+  auxiliaryFuncs : List Func := []
   dialect : Dialect := .python
+  /-- Qualified Python class namespaces and ordered bases recovered from source.
+  Empty for legacy models; missing metadata is not evidence of a missing attribute. -/
+  classDecls : List ClassDecl := []
   /-- Classes whose (single) base is a builtin type, by the **short** class name that
   `Expr.alloc` uses. Empty by default, so a program translated before the exporter
   learned to record bases behaves exactly as it did: opaque `Val.ref` instances.
@@ -599,6 +844,29 @@ structure Program where
   represented; the exporter drops such a name entirely rather than guessing, which
   degrades to the pre-existing opaque-reference behaviour. -/
   builtinBases : List (String × BuiltinBase) := []
+  /-- `(class, name)` for every `@property` getter in the program, by the **short** class
+  name `Expr.alloc` stores in `Obj.cls`.
+
+  Python reaches a property getter by attribute ACCESS, not by a call: `c.currsize` runs
+  `Cache.currsize`. Core has no descriptor protocol, and this list is the whole of one --
+  consulted before instance fields because a property is a data descriptor, including
+  a read-only property. Empty by default; other descriptor kinds still need their own
+  explicit model.
+
+  A list on `Program`/`Ctx` rather than a marker name in the function table, because the
+  accessor theorems in `SpecsGen/Basis.lean` must be able to say "this field is not a
+  property", and absence from a list is `decide`-able while absence from a suffix-matched
+  table is a `String` scan the kernel will not reduce. -/
+  properties : List (String × String) := []
+  /-- Short names of the classes THIS PROGRAM defines that are exceptions -- classes
+  whose base chain reaches a builtin exception. The Python reference (§8.4.1, "except
+  clause") matches a raised exception against a handler naming "the class or a non-virtual
+  base class of the exception object"; the library reference ("Built-in Exceptions")
+  says user code should "derive new exceptions from the `Exception` class or one of its
+  subclasses". So a corpus class is a legitimate exception exactly when it is on this list,
+  and `Stmt.raise` accepts its name as it accepts `Stdlib.excNames`; the exporter expands
+  every handler's accepted set over the corpus hierarchy (`docs/languages.md` §16.C). -/
+  excClasses : List String := []
   deriving Repr, Inhabited
 
 namespace Expr
@@ -623,9 +891,11 @@ def holes : Expr → List String
   | .binop _ a b  => holes a ++ holes b
   | .unop _ a     => holes a
   | .index a b    => holes a ++ holes b
+  | .slice a lo hi st => holes a ++ holes lo ++ holes hi ++ holes st
   | .field a _    => holes a
   | .call _ as    => holesL as
   | .mcall r _ as => holes r ++ holesL as
+  | .callValue f as => holes f ++ holesL as
   | .alloc _ as   => holesL as
   | .listE as     => holesL as
   | .tupleE as    => holesL as
@@ -661,9 +931,11 @@ def size : Expr → Nat
   | .binop _ a b  => 1 + size a + size b
   | .unop _ a     => 1 + size a
   | .index a b    => 1 + size a + size b
+  | .slice a lo hi st => 1 + size a + size lo + size hi + size st
   | .field a _    => 1 + size a
   | .call _ as    => 1 + sizeL as
   | .mcall r _ as => 1 + size r + sizeL as
+  | .callValue f as => 1 + size f + sizeL as
   | .alloc _ as   => 1 + sizeL as
   | .listE as     => 1 + sizeL as
   | .tupleE as    => 1 + sizeL as
@@ -704,6 +976,9 @@ def holes : Stmt → List String
   | .assign _ e      => e.holes
   | .setField r _ v  => r.holes ++ v.holes
   | .setIndex r i v  => r.holes ++ i.holes ++ v.holes
+  | .delIndex r i    => r.holes ++ i.holes
+  | .setSlice r lo hi st v => r.holes ++ lo.holes ++ hi.holes ++ st.holes ++ v.holes
+  | .delSlice r lo hi st   => r.holes ++ lo.holes ++ hi.holes ++ st.holes
   | .setDerefIref p v => p.holes ++ v.holes
   | .seq a b         => a.holes ++ b.holes
   | .ifte c a b      => c.holes ++ a.holes ++ b.holes
@@ -723,6 +998,9 @@ def size : Stmt → Nat
   | .assign _ e      => 1 + e.size
   | .setField r _ v  => 1 + r.size + v.size
   | .setIndex r i v  => 1 + r.size + i.size + v.size
+  | .delIndex r i    => 1 + r.size + i.size
+  | .setSlice r lo hi st v => 1 + r.size + lo.size + hi.size + st.size + v.size
+  | .delSlice r lo hi st   => 1 + r.size + lo.size + hi.size + st.size
   | .setDerefIref p v => 1 + p.size + v.size
   | .seq a b         => a.size + b.size
   | .ifte c a b      => 1 + c.size + a.size + b.size
@@ -739,10 +1017,12 @@ def size : Stmt → Nat
 end Stmt
 
 namespace Func
+/-- The source-level body used for coverage and dependency analysis. -/
+def analyzedBody (f : Func) : Stmt := f.analysisBody.getD f.body
 /-- Holes in a function. -/
-def holes (f : Func) : List String := f.body.holes
+def holes (f : Func) : List String := f.analyzedBody.holes
 /-- Node count of a function. -/
-def size (f : Func) : Nat := f.body.size
+def size (f : Func) : Nat := f.analyzedBody.size
 /-- A function is *fully translated* when it contains no holes. Only these are
 candidates for unconditional verification. -/
 def total (f : Func) : Bool := f.holes.isEmpty
@@ -1010,6 +1290,35 @@ non-recursive matchers: making them recursive compiles them through `brecOn`, an
 def Val.unbuiltin : Val → Val
   | .bobj _ v => v
   | v         => v
+
+/-! ## UTF-16, for JavaScript strings
+
+A JavaScript string is a sequence of UTF-16 code units, and `s[i]` and `s.length` are
+defined over units, not codepoints: `"😀".length` is `2`. Lean's `String` is codepoints,
+so the units are computed rather than stored. Everything here is total; a lone surrogate
+(half of an astral codepoint) has no `Char`, and the caller refuses it rather than
+inventing one — `Char.ofNat` on a surrogate would silently yield `'\0'`. -/
+
+/-- The UTF-16 code units of a string, one or two per codepoint. -/
+def _root_.String.utf16Units (s : String) : List Nat :=
+  s.toList.flatMap fun c =>
+    let n := c.toNat
+    if n < 0x10000 then [n]
+    else
+      let m := n - 0x10000
+      [0xD800 + m / 0x400, 0xDC00 + m % 0x400]
+
+/-- `s.length` in JavaScript: the UTF-16 unit count. Not `utf16Length`, which Lean's own LSP
+module already declares under `String`. -/
+def _root_.String.jsLength (s : String) : Nat := s.utf16Units.length
+
+/-- The code unit at UTF-16 index `i`, or `none` when out of range — which is what
+JavaScript's `undefined` result for `s[i]` becomes. A negative index is out of range. -/
+def _root_.String.utf16At (s : String) (i : Int) : Option Nat :=
+  if i < 0 then none else s.utf16Units[i.toNat]?
+
+/-- A UTF-16 surrogate code unit: half of an astral codepoint, not a character on its own. -/
+def _root_.Nat.isUTF16Surrogate (u : Nat) : Bool := decide (0xD800 ≤ u) && decide (u ≤ 0xDFFF)
 
 /-- Truthiness, in the permissive sense shared by most dynamic languages. -/
 def Val.truthy : Val → Bool

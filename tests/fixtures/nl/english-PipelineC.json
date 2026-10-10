@@ -1,0 +1,93 @@
+[
+ {
+  "function": "add",
+  "summary": "Adds two 64-bit signed integers.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "For 64-bit signed integers a and b whose sum does not overflow, add(a, b) returns a + b.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "wrap",
+  "summary": "Adds two unsigned 32-bit integers.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "For unsigned 32-bit a and b, wrap(a, b) returns (a + b) modulo 2^32.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "mixed",
+  "summary": "Compares a and b as unsigned 32-bit integers.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "mixed(a, b) returns 1 if a is less than b when both are reinterpreted as unsigned 32-bit integers, and 0 otherwise.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "bump",
+  "summary": "Increments a byte.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "For a byte value a between 0 and 255, bump(a) returns (a + 1) modulo 256.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "literal",
+  "summary": "Returns a constant.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "literal() returns 2147483649.",
+    "kind": "example",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "wideshift",
+  "summary": "Returns a shifted constant.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "wideshift() returns 2 to the power 40.",
+    "kind": "example",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "octalcompare",
+  "summary": "Compares constants.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "octalcompare() returns 0.",
+    "kind": "example",
+    "evidence": []
+   }
+  ]
+ }
+]

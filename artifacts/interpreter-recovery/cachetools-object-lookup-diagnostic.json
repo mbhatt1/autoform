@@ -1,0 +1,80 @@
+{
+  "base_revision": "61ffe0f5478c0c112dc20d2cf66d685221e6afed",
+  "workspace": "/private/tmp/autoform-cachetools-object-lookup-work",
+  "status": "INCOMPLETE_RELAND",
+  "scope": "Fresh Cachetools export under the first object lookup implementation; failed generated specification rebuild followed by an independent conformance diagnostic.",
+  "reland": {
+    "command": "LEAN_NUM_THREADS=1 JOERN_HOME=/Users/mbhatt/joern scripts/reland_corpus.sh /private/tmp/ct-v717 Cachetools",
+    "source": "/private/tmp/ct-v717",
+    "log": "/tmp/autoform-cachetools-object-lookup-reland1.log",
+    "failed_step": 6,
+    "failed_target": "Autoform.SpecsGen.Cachetools",
+    "failed_theorem": "conform_cachetools___init___py__module__Cache___init",
+    "kernel_observation_fuel": 16,
+    "error": "kernel computation did not establish the claim; compiler-generated sorryAx was rejected by audit",
+    "generated_artifacts_promoted": false
+  },
+  "inputs": {
+    "ast-Cachetools.json": "587d885280495a5e36d4074f786043853d02d513aae094bdaa29f0d8eeb38864",
+    "Autoform/Generated/Cachetools.lean": "7c79c7e430ff34a5126742d0634eb75224219a108fcf3a4633885ead70bf385f",
+    "Autoform/SpecsGen/Cachetools.lean": "211a17e17e949a5d1df055410144823f7416ac36eacb267cd48d75e1cb465131",
+    "provenance/ast-Cachetools.json.prov.json": "242fc5b8f619737667ab623366422fe09f917c0c64c7f02c0781c782ba5e5401"
+  },
+  "diagnostic": {
+    "command": ".venv/bin/python -u scripts/differential.py ast-Cachetools.json /private/tmp/ct-v717 Cachetools 5",
+    "report": "/private/tmp/autoform-cachetools-object-lookup-work/.autoform-work/reland/Cachetools/conformance.json",
+    "report_sha256": "3d69b3efab4b19a4050747fca6cc53dc4fb70bcac2621886197bcdbfca80e368",
+    "measurement_basis": "python-exception-guards-v3",
+    "functions_total": 209,
+    "functions_covered": 112,
+    "cases": 560,
+    "agree": 205,
+    "total": 265,
+    "divergences": 60,
+    "inconclusive": 295,
+    "build_stable": true,
+    "divergences_by_function": {
+      "cachetools/func.py:<module>.fifo_cache": 5,
+      "cachetools/func.py:<module>.lfu_cache": 5,
+      "cachetools/func.py:<module>.lru_cache": 5,
+      "cachetools/func.py:<module>.rr_cache": 5,
+      "cachetools/func.py:<module>.ttl_cache": 5,
+      "cachetools/__init__.py:<module>.TTLCache.__setitem__": 5,
+      "cachetools/__init__.py:<module>.TTLCache.__setstate__": 5,
+      "cachetools/__init__.py:<module>.TTLCache.popitem": 5,
+      "cachetools/__init__.py:<module>.TLRUCache.__setitem__": 5,
+      "cachetools/__init__.py:<module>.TLRUCache.__delitem__": 5,
+      "cachetools/__init__.py:<module>.TLRUCache.expire": 5,
+      "cachetools/__init__.py:<module>.TLRUCache.popitem": 5
+    }
+  },
+  "findings": [
+    {
+      "status": "confirmed_in_code",
+      "detail": "The fresh Cache.__init__ AST reads Cache.getsizeof through Expr.field on a class function value. The interpreter at this revision has no class-value field branch, so this expression yields field:getsizeof:non-object."
+    },
+    {
+      "status": "hypothesis",
+      "detail": "All 60 divergent cases report Lean AttributeError. Inherited getsizeof methods and _TimedCache.timer properties are absent from the current own-class lookup; focused inheritance validation remains necessary."
+    }
+  ],
+  "limits": [
+    "This run used five synthesized cases per function and attempted 560 cases; it is not directly comparable with earlier 600-case diagnostics.",
+    "Conformance was run separately after the re-land stopped, not as a successful re-land stage.",
+    "No generated model, specification, manifest or source provenance was promoted to main."
+  ],
+  "logs": [
+    {
+      "path": "/tmp/autoform-cachetools-object-lookup-reland1.log",
+      "sha256": "5f2f88516b5d4745868473425e38fb752805c76962c79aead9b1345b4fa47914"
+    },
+    {
+      "path": "/tmp/autoform-cachetools-object-lookup-spec-errors.log",
+      "sha256": "79724e2113d37da09f7c50ed56d5dc3337363bc07f33eeeec733b6ddc3b9759d"
+    },
+    {
+      "path": "/tmp/autoform-cachetools-object-lookup-conformance1.log",
+      "sha256": "7648c17d68d857808e98ab06fc46c8ba3abaa9475dd46e6ff746f8a555ba2378"
+    }
+  ]
+}

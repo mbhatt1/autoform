@@ -1,5 +1,6 @@
 import Autoform.Refine
 import Autoform.FuelMono
+import Autoform.Lang.Core.Observation
 
 /-!
 # `SpecsGen.Basis` — the hand-written substrate the synthesized specifications stand on
@@ -92,10 +93,58 @@ def EResult.beq : EResult → EResult → Bool
   | .outOfFuel, .outOfFuel => true
   | _,          _          => false
 
-/-- Structural equality on heap objects. -/
+mutual
+/-- Exact stored state, including closure captures and floating-point bits.
+Unlike language-level `Val.beq`, this must detect changes from an integer to an
+equal float, between signed zeros, or between closures with different captures. -/
+def Val.stateEq : Val → Val → Bool
+  | .int a, .int b => a == b
+  | .str a, .str b => a == b
+  | .bool a, .bool b => a == b
+  | .float a, .float b => decide (a = b)
+  | .unit, .unit => true
+  | .ref a, .ref b => a == b
+  | .iref a i, .iref b j => a == b && decide (i = j)
+  | .fn a, .fn b => a == b
+  | .clos a xs, .clos b ys => a == b && Val.bindingsStateEq xs ys
+  | .clsClos a xs, .clsClos b ys => a == b && Val.bindingsStateEq xs ys
+  | .list a, .list b => Val.listStateEq a b
+  | .tuple a, .tuple b => Val.listStateEq a b
+  | .dict a, .dict b => Val.pairsStateEq a b
+  | .bobj a x, .bobj b y => a == b && Val.stateEq x y
+  | _, _ => false
+
+def Val.listStateEq : List Val → List Val → Bool
+  | [], [] => true
+  | a :: as, b :: bs => Val.stateEq a b && Val.listStateEq as bs
+  | _, _ => false
+
+def Val.pairsStateEq : List (Val × Val) → List (Val × Val) → Bool
+  | [], [] => true
+  | (a, b) :: xs, (c, d) :: ys =>
+      Val.stateEq a c && Val.stateEq b d && Val.pairsStateEq xs ys
+  | _, _ => false
+
+def Val.bindingsStateEq : List (String × Val) → List (String × Val) → Bool
+  | [], [] => true
+  | (a, b) :: xs, (c, d) :: ys =>
+      a == c && Val.stateEq b d && Val.bindingsStateEq xs ys
+  | _, _ => false
+end
+
+/-- Exact container state, preserving its kind and insertion order. -/
+def Payload.stateEq : Payload → Payload → Bool
+  | .none, .none => true
+  | .list a, .list b => Val.listStateEq a b
+  | .tuple a, .tuple b => Val.listStateEq a b
+  | .dict a, .dict b => Val.pairsStateEq a b
+  | _, _ => false
+
+/-- Structural equality on every component of a heap object. -/
 def Obj.beq (a b : Obj) : Bool :=
-  a.cls == b.cls && a.fields.length == b.fields.length
-    && (a.fields.zip b.fields).all (fun kv => kv.1.1 == kv.2.1 && Val.beq kv.1.2 kv.2.2)
+  a.cls == b.cls && Val.bindingsStateEq a.fields b.fields
+    && Val.bindingsStateEq a.captured b.captured
+    && Payload.stateEq a.payload b.payload && a.version == b.version
 
 /-- Structural equality on heaps. -/
 def Heap.beq (h g : Heap) : Bool :=
@@ -107,6 +156,8 @@ structure Obs where
   /-- What CPython did. Recorded by `scripts/differential.py`'s trace hook, not by the
   interpreter this file is about. -/
   expected : EResult
+  /-- Optional native final graph. Historical return-only observations remain explicit. -/
+  post : Option HeapObservation := none
   deriving Repr, Inhabited
 
 /-! ## 2. The laws
@@ -120,7 +171,23 @@ looks for. -/
 The right-hand side comes from outside this system, so this is not the interpreter
 agreeing with itself. -/
 def lawConform (ctx : Ctx) (fuel : Nat) (fn : Func) (o : Obs) : Bool :=
-  EResult.beq (runCase ctx fuel fn o.case).2 o.expected
+  let result := runCase ctx fuel fn o.case
+  match o.post with
+  | none => EResult.beq result.2 o.expected
+  | some graph => graph.compare result.1 o.expected result.2 == some true
+
+/-- Check execution before structural comparison. Keeping the interpreter outside
+`Val.beq`'s nested recursor avoids costly kernel reductions of unused shift branches.
+The expected outcome still comes from the native runtime, and both premises are
+kernel checked. The second premise is explicit because NaN is not equal to itself. -/
+theorem lawConform_of_result {ctx : Ctx} {fuel : Nat} {fn : Func} {o : Obs}
+    (hrun : (runCase ctx fuel fn o.case).2 = o.expected)
+    (heq : EResult.beq o.expected o.expected = true) (hpost : o.post = none) :
+    lawConform ctx fuel fn o = true := by
+  unfold lawConform
+  simp only [hpost]
+  rw [hrun]
+  exact heq
 
 /-- **Totality / no-hole / termination.** The three-in-one structural spec of §4 source 2:
 within `fuel`, the function neither reaches an untranslated construct nor runs out. -/
@@ -131,8 +198,8 @@ def lawRuns (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
 def lawReturns (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
   isVal (runCase ctx fuel fn c).2
 
-/-- **Purity of the heap.** The call leaves the heap structurally unchanged. False for
-anything that writes a field, so `Stmt.setField` mutations are caught by it. -/
+/-- **Purity of the heap.** The final heap has exactly the initial stored state,
+including container payloads, closure captures and mutation versions. -/
 def lawHeapPreserved (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
   Heap.beq (runCase ctx fuel fn c).1 c.heap
 
@@ -274,6 +341,22 @@ def fieldOf (h : Heap) (r : Ref) (f : String) : Val :=
                                | none        => .unit
   | none => .unit
 
+/-- If no property in the list has the name `f`, then no `(cls, f)` pair is in it for any
+class. This is the bridge from the side condition an accessor theorem can `decide` on a
+concrete program -- which mentions only `f` -- to the `(o.cls, f)` test `evalExpr` makes,
+which mentions a receiver the theorem quantifies over. -/
+private theorem props_any_false_of_all_ne {ps : List (String × String)} {c f : String}
+    (h : ps.all (fun p => p.2 != f) = true) :
+    ps.any (fun p => p.1 == c && p.2 == f) = false := by
+  induction ps with
+  | nil => rfl
+  | cons p ps ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at h
+    have hne : (p.2 == f) = false := by
+      have := h.1
+      cases hb : (p.2 == f) <;> simp_all [bne]
+    simp [List.any_cons, hne, ih h.2]
+
 /-- **An accessor returns the field it names**, for every heap, every receiver and every
 argument list, at every fuel budget of at least four.
 
@@ -302,23 +385,102 @@ quantified over *arbitrary* `args` and was true only because surplus arguments w
 silently dropped; it is now false for `args ≠ []`, and stating the domain is the honest
 repair. Nothing in the generated corpora loses a theorem: a projection method is called
 with no arguments.
+
+Signature-aware calls additionally require `signatureRejected fn args [] = false`.
+The generated proof establishes this by kernel reduction; it cannot infer call
+validity merely from the body shape.
 -/
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
-    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    -- After the switchover a Python receiver can be a boxed container, which has no
+    -- `__dict__` to read a field out of and answers a hole. "An accessor returns the
+    -- field it names" is a claim about ordinary instances. Only Python boxes, so the
+    -- obligation is conditional on the dialect and the default discharges it outright
+    -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
+    (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
+      intro hc; exact absurd hc (by decide))
+    (hsig : signatureRejected fn args [] = false := by rfl)
+    (hdef : fn.literalDefaults = [] := by rfl)
+    -- No class-attribute default either: `applyFunc` seeds those from the heap before
+    -- `bindParams`, and the accessor claim is about a call that reaches its body.
+    (hcad : fn.classAttrDefaults = [] := by rfl)
+    -- Under Python the receiver HAS the field (or captures it): a miss raises
+    -- `AttributeError` under recovered class metadata (Python Language Reference
+    -- §3.2.11/§3.3.2; `Semantics.lean`, `.field`) and is a named gap without it, so
+    -- "an accessor returns the field it names" is a claim about receivers
+    -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
+    -- answers there. A property takes precedence even on a hit; `hprop` below excludes
+    -- that case. Python specs carry the field-presence condition as a domain conjunct
+    -- (`synth_specs.py` emits it).
+    (hfld : ctx.dialect = .python → ∀ o, h.get r = some o →
+        (o.fields.find? (·.1 == fld)).isSome = true ∨
+        (o.captured.find? (·.1 == fld)).isSome = true := by
+      intro hc; exact absurd hc (by decide))
+    -- Accessor synthesis uses this lemma only when the accessed name is absent from
+    -- the program's property table. A same-named property would run arbitrary code.
+    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide)
+    -- Recovered class namespaces must permit an ordinary dictionary projection.
+    -- Lexical captures are not instance attributes on this path.
+    (hmeta : ∀ o, h.get r = some o → ctx.usesClassMetadata o.cls = true →
+        ctx.classLookupGap o.cls fld = none ∧ ctx.isProperty o.cls fld = false ∧
+        ctx.readSlot o fld = none ∧
+        (o.fields.find? (·.1 == fld)).isSome = true := by
+      intro o ho hm; change false = true at hm; cases hm) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
+  have hbind (base : Env) : bindParams fn base args [] = base := by
+    simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
-    execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+    seedClassAttrDefaults, hcad, seedClassAttrs,
+    execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
+    have hgap : ctx.classLookupGap o.cls fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).1
+      · simp [Ctx.classLookupGap, hm]
+    have hpr : (ctx.dialect == .python && ctx.isProperty o.cls fld) = false := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · simp [(hmeta o hgr hm).2.1]
+      have hp : ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld) = false := by
+        apply List.any_eq_false.mpr
+        intro p hmem
+        have hn := List.all_eq_true.mp hprop p hmem
+        simp_all
+      simp [Ctx.isProperty, hm, hp]
+    have hslot : ctx.readSlot o fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).2.2.1
+      · simp [Ctx.readSlot, hm]
+    have hnop : (o.cls, fld) ∉ ctx.properties := by
+      intro hmem
+      have hp := List.all_eq_true.mp hprop (o.cls, fld) hmem
+      simp at hp
+    simp only [hgr, hgap, hslot, hpr, Bool.false_eq_true, if_false]
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
-        simp [hgr, hf, hc, hm]
-    · simp [hgr, hf]
+    · have hmdata : ctx.usesClassMetadata o.cls = false := by
+        cases hm : ctx.usesClassMetadata o.cls
+        · rfl
+        · have hh := (hmeta o hgr hm).2.2.2
+          simp [hf] at hh
+      rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
+      · by_cases hd : ctx.dialect = .python
+        · -- Both lookups missed: `hfld` says that cannot happen under Python.
+          exfalso
+          have hhit := hfld hd o hgr
+          simp [hf, hc] at hhit
+        · by_cases hbx : ctx.dialect.boxesContainers = true
+          · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
+          · -- JavaScript boxes containers, so a dialect that does not box is not it and
+            -- the JS property path (`jsContainerField`) is not taken.
+            have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
+            simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hd, hbx, hjs]
+      · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hnop]
+    · simp [hgap, hslot, hpr, hgr, hf, hnop]
 
 /-- The same theorem for the shape a *documented* accessor actually has.
 
@@ -332,34 +494,110 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (hb : fn.body = .seq (.expr (.lit (.str doc))) (.ret (.field (.name "self") fld)))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
-    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    -- After the switchover a Python receiver can be a boxed container, which has no
+    -- `__dict__` to read a field out of and answers a hole. "An accessor returns the
+    -- field it names" is a claim about ordinary instances. Only Python boxes, so the
+    -- obligation is conditional on the dialect and the default discharges it outright
+    -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
+    (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
+      intro hc; exact absurd hc (by decide))
+    (hsig : signatureRejected fn args [] = false := by rfl)
+    (hdef : fn.literalDefaults = [] := by rfl)
+    -- No class-attribute default either: `applyFunc` seeds those from the heap before
+    -- `bindParams`, and the accessor claim is about a call that reaches its body.
+    (hcad : fn.classAttrDefaults = [] := by rfl)
+    -- Under Python the receiver HAS the field (or captures it): a miss raises
+    -- `AttributeError` under recovered class metadata (Python Language Reference
+    -- §3.2.11/§3.3.2; `Semantics.lean`, `.field`) and is a named gap without it, so
+    -- "an accessor returns the field it names" is a claim about receivers
+    -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
+    -- answers there. A property takes precedence even on a hit; `hprop` below excludes
+    -- that case. Python specs carry the field-presence condition as a domain conjunct
+    -- (`synth_specs.py` emits it).
+    (hfld : ctx.dialect = .python → ∀ o, h.get r = some o →
+        (o.fields.find? (·.1 == fld)).isSome = true ∨
+        (o.captured.find? (·.1 == fld)).isSome = true := by
+      intro hc; exact absurd hc (by decide))
+    -- Accessor synthesis uses this lemma only when the accessed name is absent from
+    -- the program's property table. A same-named property would run arbitrary code.
+    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide)
+    -- Recovered class namespaces must permit an ordinary dictionary projection.
+    -- Lexical captures are not instance attributes on this path.
+    (hmeta : ∀ o, h.get r = some o → ctx.usesClassMetadata o.cls = true →
+        ctx.classLookupGap o.cls fld = none ∧ ctx.isProperty o.cls fld = false ∧
+        ctx.readSlot o fld = none ∧
+        (o.fields.find? (·.1 == fld)).isSome = true := by
+      intro o ho hm; change false = true at hm; cases hm) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
+  have hbind (base : Env) : bindParams fn base args [] = base := by
+    simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
-    execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+    seedClassAttrDefaults, hcad, seedClassAttrs,
+    execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
+    have hgap : ctx.classLookupGap o.cls fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).1
+      · simp [Ctx.classLookupGap, hm]
+    have hpr : (ctx.dialect == .python && ctx.isProperty o.cls fld) = false := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · simp [(hmeta o hgr hm).2.1]
+      have hp : ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld) = false := by
+        apply List.any_eq_false.mpr
+        intro p hmem
+        have hn := List.all_eq_true.mp hprop p hmem
+        simp_all
+      simp [Ctx.isProperty, hm, hp]
+    have hslot : ctx.readSlot o fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).2.2.1
+      · simp [Ctx.readSlot, hm]
+    have hnop : (o.cls, fld) ∉ ctx.properties := by
+      intro hmem
+      have hp := List.all_eq_true.mp hprop (o.cls, fld) hmem
+      simp at hp
+    simp only [hgr, hgap, hslot, hpr, Bool.false_eq_true, if_false]
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
-        simp [hgr, hf, hc, hm]
-    · simp [hgr, hf]
+    · have hmdata : ctx.usesClassMetadata o.cls = false := by
+        cases hm : ctx.usesClassMetadata o.cls
+        · rfl
+        · have hh := (hmeta o hgr hm).2.2.2
+          simp [hf] at hh
+      rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
+      · by_cases hd : ctx.dialect = .python
+        · -- Both lookups missed: `hfld` says that cannot happen under Python.
+          exfalso
+          have hhit := hfld hd o hgr
+          simp [hf, hc] at hhit
+        · by_cases hbx : ctx.dialect.boxesContainers = true
+          · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
+          · -- JavaScript boxes containers, so a dialect that does not box is not it and
+            -- the JS property path (`jsContainerField`) is not taken.
+            have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
+            simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hd, hbx, hjs]
+      · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hnop]
+    · simp [hgap, hslot, hpr, hgr, hf, hnop]
 
 /-! ## 3b. Fuel independence
 
 Every mined law is checked, and proved, at one concrete fuel budget. That is a weaker
 statement than it looks: `FUEL` is an arbitrary constant, and a reader is entitled to ask
 whether the law is a fact about the program or an artefact of the budget. `Autoform/FuelMono.lean`
-answers it in general — for a `tryFinally`-free context, raising the budget cannot change a
+answers it in general — including finalizers, raising the budget cannot change a
 result that did not run out of fuel — and this section lifts that from `applyFunc` to the
 laws, so a generated theorem can quantify over *every* budget at or above the one it was
 checked at.
 
-Two things are load-bearing and neither is decoration:
+The following boundaries are explicit:
 
-* **`tryFinally` is genuinely excluded.** `FuelMono.tryFinally_breaks_fuel_mono` exhibits a
-  program that returns `1` at fuel 4 and `2` at fuel 5. A law about a subject whose body
-  contains `tryFinally` therefore stays an open obligation; it is not routed around.
+* **Finalizers cannot hide interpreter failures.** Holes and exhausted fuel propagate;
+  finalizers run on language exits after preserving the current local environment.
+  The `_all` transport lemmas have no `tryFinally` exclusion. Older entry points keep
+  their syntactic premises for existing generated modules.
 * **The `≠ outOfFuel` side condition is checked, not assumed.** Some laws force it
   (`lawRuns` rejects `outOfFuel` by construction); others do *not*. `lawCommutes` is
   `EResult.beq r₁ r₂`, which is `true` when both sides are `outOfFuel` — precisely the
@@ -377,15 +615,21 @@ def defined (r : EResult) : Bool :=
   | _          => true
 
 /-- **Fuel monotonicity, at the level of a `Case`.** -/
-theorem runCase_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem runCase_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hd : defined (runCase ctx k fn c).2 = true) :
     runCase ctx k' fn c = runCase ctx k fn c := by
   have hne : (runCase ctx k fn c).2 ≠ .outOfFuel := by
     intro hEq; rw [hEq] at hd; simp [defined] at hd
   have he : applyFunc ctx k c.heap fn c.self c.args []
       = ((runCase ctx k fn c).1, (runCase ctx k fn c).2) := rfl
-  simpa [runCase] using applyFunc_fuel_mono hctx hfn hk he hne
+  simpa [runCase] using applyFunc_fuel_mono_all hk he hne
+
+theorem runCase_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hd : defined (runCase ctx k fn c).2 = true) :
+    runCase ctx k' fn c = runCase ctx k fn c  := by
+  exact runCase_fuel_mono_all hk hd
 
 /-- Lift a per-element implication over a list, with a guard that also has to hold.
 
@@ -439,71 +683,71 @@ def gComm (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
 
 /-! ### Step lemmas -/
 
-theorem lawConform_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {o : Obs}
+theorem lawConform_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {o : Obs}
     (hg : gRunObs ctx k fn o = true) (h : lawConform ctx k fn o = true) :
     lawConform ctx k' fn o = true := by
   unfold lawConform at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawRuns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawRuns_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawRuns ctx k fn c = true) :
     lawRuns ctx k' fn c = true := by
   unfold lawRuns at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawReturns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawReturns_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawReturns ctx k fn c = true) :
     lawReturns ctx k' fn c = true := by
   unfold lawReturns at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawHeapPreserved_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawHeapPreserved_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawHeapPreserved ctx k fn c = true) :
     lawHeapPreserved ctx k' fn c = true := by
   unfold lawHeapPreserved at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawConst_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+theorem lawConst_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawConst ctx k fn v c = true) :
     lawConst ctx k' fn v c = true := by
   unfold lawConst at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawProjects_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {fld : String} {c : Case}
+theorem lawProjects_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {fld : String} {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawProjects ctx k fn fld c = true) :
     lawProjects ctx k' fn fld c = true := by
   unfold lawProjects at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawIdentity_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawIdentity_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawIdentity ctx k fn c = true) :
     lawIdentity ctx k' fn c = true := by
   unfold lawIdentity at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawNonneg_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawNonneg_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawNonneg ctx k fn c = true) :
     lawNonneg ctx k' fn c = true := by
   unfold lawNonneg at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawRaises_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+theorem lawRaises_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawRaises ctx k fn v c = true) :
     lawRaises ctx k' fn v c = true := by
   unfold lawRaises at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawIdempotent_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawIdempotent_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gIdem ctx k fn c = true) (h : lawIdempotent ctx k fn c = true) :
     lawIdempotent ctx k' fn c = true := by
   unfold gIdem at hg
@@ -513,16 +757,16 @@ theorem lawIdempotent_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
   cases r with
   | val v =>
       have hd1 : defined (runCase ctx k fn c).2 = true := by rw [hr]; rfl
-      rw [runCase_fuel_mono hctx hfn hk hd1]
+      rw [runCase_fuel_mono_all hk hd1]
       simp only [hr]
-      rw [runCase_fuel_mono hctx hfn hk hg]
+      rw [runCase_fuel_mono_all hk hg]
       exact h
   | exn v => simp at hg
   | hole l => simp at hg
   | outOfFuel => simp at hg
 
-theorem lawInvolutive_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawInvolutive_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gInvol ctx k fn c = true) (h : lawInvolutive ctx k fn c = true) :
     lawInvolutive ctx k' fn c = true := by
   unfold gInvol at hg
@@ -534,16 +778,16 @@ theorem lawInvolutive_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
     cases r with
     | val v =>
         have hd1 : defined (runCase ctx k fn c).2 = true := by rw [hr]; rfl
-        rw [runCase_fuel_mono hctx hfn hk hd1]
+        rw [runCase_fuel_mono_all hk hd1]
         simp only [hr]
-        rw [runCase_fuel_mono hctx hfn hk hg]
+        rw [runCase_fuel_mono_all hk hg]
         exact h
     | exn v => simp at hg
     | hole l => simp at hg
     | outOfFuel => simp at hg
 
-theorem lawCommutes_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawCommutes_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gComm ctx k fn c = true) (h : lawCommutes ctx k fn c = true) :
     lawCommutes ctx k' fn c = true := by
   unfold gComm at hg
@@ -555,8 +799,82 @@ theorem lawCommutes_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
     · simp only [ha, has] at hg h
       obtain ⟨hg1, hg2⟩ := Bool.and_eq_true .. |>.mp hg
       dsimp only
-      rw [runCase_fuel_mono hctx hfn hk hg1, runCase_fuel_mono hctx hfn hk hg2]
+      rw [runCase_fuel_mono_all hk hg1, runCase_fuel_mono_all hk hg2]
       exact h
+
+/-! Compatibility entry points for previously generated proof modules. -/
+
+theorem lawConform_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {o : Obs}
+    (hg : gRunObs ctx k fn o = true) (h : lawConform ctx k fn o = true) :
+    lawConform ctx k' fn o = true  := by
+  exact lawConform_fuel_mono_all hk hg h
+
+theorem lawRuns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawRuns ctx k fn c = true) :
+    lawRuns ctx k' fn c = true  := by
+  exact lawRuns_fuel_mono_all hk hg h
+
+theorem lawReturns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawReturns ctx k fn c = true) :
+    lawReturns ctx k' fn c = true  := by
+  exact lawReturns_fuel_mono_all hk hg h
+
+theorem lawHeapPreserved_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawHeapPreserved ctx k fn c = true) :
+    lawHeapPreserved ctx k' fn c = true  := by
+  exact lawHeapPreserved_fuel_mono_all hk hg h
+
+theorem lawConst_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawConst ctx k fn v c = true) :
+    lawConst ctx k' fn v c = true  := by
+  exact lawConst_fuel_mono_all hk hg h
+
+theorem lawProjects_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {fld : String} {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawProjects ctx k fn fld c = true) :
+    lawProjects ctx k' fn fld c = true  := by
+  exact lawProjects_fuel_mono_all hk hg h
+
+theorem lawIdentity_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawIdentity ctx k fn c = true) :
+    lawIdentity ctx k' fn c = true  := by
+  exact lawIdentity_fuel_mono_all hk hg h
+
+theorem lawNonneg_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawNonneg ctx k fn c = true) :
+    lawNonneg ctx k' fn c = true  := by
+  exact lawNonneg_fuel_mono_all hk hg h
+
+theorem lawRaises_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawRaises ctx k fn v c = true) :
+    lawRaises ctx k' fn v c = true  := by
+  exact lawRaises_fuel_mono_all hk hg h
+
+theorem lawIdempotent_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gIdem ctx k fn c = true) (h : lawIdempotent ctx k fn c = true) :
+    lawIdempotent ctx k' fn c = true  := by
+  exact lawIdempotent_fuel_mono_all hk hg h
+
+theorem lawInvolutive_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gInvol ctx k fn c = true) (h : lawInvolutive ctx k fn c = true) :
+    lawInvolutive ctx k' fn c = true  := by
+  exact lawInvolutive_fuel_mono_all hk hg h
+
+theorem lawCommutes_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gComm ctx k fn c = true) (h : lawCommutes ctx k fn c = true) :
+    lawCommutes ctx k' fn c = true  := by
+  exact lawCommutes_fuel_mono_all hk hg h
 
 /-! ## 4. Open obligations
 

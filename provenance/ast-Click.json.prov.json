@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-Click.json",
+ "artifact_bytes": 4726613,
+ "artifact_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
+ "command": "scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/click-8.2.1-sdist Click",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "6a9c3ab5e6aed70f77b6e6516f455d8ce2af1b8ca74c3ce5977b6504f3f3d47e",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/Users/mbhatt/.cache/autoform/corpora/click-8.2.1-sdist",
+ "source_revision": "tree-sha256:42ee03eeaa468fcea0752aa8b1ed6e47cd9e96b07ee503ca8d490b398ce1ea99:17files"
+}

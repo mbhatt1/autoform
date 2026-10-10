@@ -3,6 +3,12 @@
 How the pieces fit together. `STRATEGY.md` holds the full design record; this document is
 the map.
 
+The source pipeline below now has a separate machine-level companion:
+binary/assembled bytes → SLEIGH raw p-code → `Autoform.PCode.Program` → a total Lean
+interpreter. This path keeps machine widths, address spaces, registers, and control
+flow instead of assigning a source dialect to disassembly. See
+[machine-code.md](machine-code.md) for its interface, trust boundary, and gaps.
+
 ## The approach
 
 Programs are not translated into Lean definitions with theorems then guessed about them.
@@ -31,18 +37,30 @@ coverage metric is a fold over that value, and a "specification" is a statement 
 
 Step 2 is normally per-language: one front end, one syntax type and one transpiler per
 supported language. Joern's **code property graph** collapses that. C, C++, Java,
-JavaScript, Python, Kotlin and compiled binaries all normalize into a single node
+JavaScript, TypeScript, Go, Python and Kotlin normalize into a single node
 vocabulary — `CALL`, `IDENTIFIER`, `LITERAL`, `CONTROL_STRUCTURE`, `RETURN`, `BLOCK`,
 `FIELD_IDENTIFIER`, `METHOD_REF`, `TYPE_REF` — with operators appearing as `<operator>.*`
 calls. The system therefore writes:
 
 * **one** semantics for that vocabulary (`Autoform/Lang/Core/*`),
-* **one** CPG → JSON exporter (`cartographer/export_ast.sc`),
+* **one** CPG → JSON exporter (`cartographer/export_ast.sc`, backed by
+  `cartographer/compiler/SourceCompiler.scala`),
 * **one** JSON → Lean printer (`cartographer/render_lean.py`),
 
-and every Joern-supported front end is covered. Compared with the alternative (compile
+shared by the supported source front ends. Sharing a vocabulary does not establish
+support for every Joern language or construct; the native fixture tests and explicit
+holes define the checked boundary. Compared with the alternative (compile
 everything to Wasm and write one Wasm semantics), source-level structure survives, which
 keeps the deep≈shallow refinement tractable.
+
+The exporter entry point loads the CPG and creates one compilation instance. JSON
+encoding and typed numeric operations live in `compiler/Json.scala` and
+`compiler/Numeric.scala`; source analysis and lowering remain in `SourceCompiler.scala`.
+Its analysis priming, module initialization and method emission retain their order.
+The Python lowering passes share iterative JSON traversal in `cartographer/ast_tools.py`,
+while the Lean printer uses one measured document engine for both flat and multiline
+output. See [compiler-rewrite.md](compiler-rewrite.md) for the compatibility boundary
+and validation commands.
 
 ### The CPG front end is a pinned dependency
 
@@ -151,6 +169,8 @@ provenance/<artifact>.prov.json
     artifact_sha256    the artifact this record describes
     joern_version      the front end, checked against ./joern-version
     exporter           + exporter_sha256 of the .sc that produced it
+    exporter_sources   relative compile-unit paths and their SHA-256 digests,
+                       following every transitive Joern `using file` directive
     source_path        + source_revision (git commit, or `tree-sha256:…` content
                        digest for a tree that is not a checkout)
     command            the exact command line
@@ -168,7 +188,7 @@ Two checks, one cheap and one expensive:
   coverage (every artifact has a record or is a named entry in the backlog), integrity
   (the record's digest is the file's digest), the Joern pin, required fields, orphans, and
   — the one that closes the "cannot re-verify without the CPG" gap — **exporter drift**.
-  The moment `export_ast.sc` changes, every AST that predates the change is mechanically
+  The moment any exporter compile unit changes, every AST that predates the change is mechanically
   known to be stale, and the record holds the command that regenerates it.
 * **`scripts/reproduce_ast.py`** is the independent recomputation: rebuild the CPG from the
   recorded source tree with the pinned Joern, re-run the committed exporter, diff. It does
@@ -185,15 +205,20 @@ representation postdate them), which is recorded as the finding it is.
 
 ### Merge-phase changes this asks for elsewhere
 
-Neither is made here — `cartographer/export_ast.sc` and `autoform.sh` are owned elsewhere
-this round — and until they are, an AST produced by `./autoform.sh` is unattributed and
-the checker says so by name. Use `scripts/export_with_provenance.sh` to produce an
-attributed one.
+1. **`autoform.sh`** — **done, in part.** Stage 3 now calls `provenance.py record`
+   after writing `ast-$MOD.json`, so a run of `./autoform.sh` produces an attributed
+   AST carrying `joern_version`, `exporter_sha256`, the artifact digest and the source
+   revision. `scripts/export_with_provenance.sh` is no longer the only way to get one.
 
-1. **`autoform.sh`**: call `python3 scripts/provenance.py joern-version --check` before
-   stage 1, and `python3 scripts/provenance.py record --artifact ast-$MOD.json --source
-   "$SRC" --exporter cartographer/export_ast.sc --command "…"` after stage 3.
-2. **`cartographer/export_ast.sc`**: emit `joern.metaData.version` and the CPG root into
+   The `joern-version --check` half is deliberately **not** wired in, and is not
+   pending either. Refusing to analyze a repository because the installed Joern differs
+   from the pin is the wrong place for that verdict: the pipeline records the mismatch
+   and announces it, while `autoform doctor` returns `1` on it, so the strict gate is
+   the command you run to ask "is this machine right?" rather than a trap inside an
+   analysis run. Recording is also non-fatal — an unattributed AST warns, it does not
+   fail the run, because a missing attribution is a weaker problem than a missing
+   analysis.
+2. **`cartographer/export_ast.sc`** — still open. Emit `joern.metaData.version` and the CPG root into
    the artifact itself, so provenance survives a file copied out of the repository. This
    requires changing the top-level JSON from an array to
    `{"provenance": {...}, "functions": [...]}` and updating the three readers; the sidecar
@@ -206,9 +231,11 @@ attributed one.
 | File | Role |
 |---|---|
 | `Syntax.lean` | The universal deep embedding: `Val`, `Obj`/`Heap`, `Lit`, `Expr`, `Stmt`, `Func`, `Program`, `Dialect`, `EResult`, plus the hole/size folds the ledger is built on. |
-| `Semantics.lean` | The fuel-indexed total interpreter: `Env`, `Ctx`, `evalExpr`/`execStmt`/`applyFunc`/`applyClosure`, operator application, name resolution, `runFunc`/`runMain`. No `partial`, no `sorry`. |
+| `Semantics.lean` | The fuel-indexed total interpreter: `Env`, `Ctx`, `evalExpr`/`execStmt`/`applyFunc`/`applyClosure`, operator application, name resolution, `runFunc`/`runMain`. No `partial`, no `sorry`. **Name resolution is structurally recursive on purpose** (`strEndsWith`, `lastDotSegment`, `dropLastDotSegment`): `String.endsWith`/`splitOn` are well-founded recursions over byte positions, which the kernel does not unfold, so a proof *by computation* that reached a resolve miss or a class value's short name never terminated — three cachetools constructors had to be excluded from the generated conformance module for exactly that. Suffix matching on `List Char` reduces; `strEndsWith_eq_endsWith` proves it is the same predicate. Anything added to the resolution path must keep that property. |
 | `Numeric.lean` | Machine integers as a dialect parameter: `Width`, `IntType`, `NumConfig` (Python / C32 / C64 / unsigned / Java / Go presets), and `NumResult` with `ok`/`divZero`/`trap`/`ub`. Undefined behaviour becomes a hole, never a number. |
 | `Stdlib.lean` | A modelled Python standard library and builtins, consulted *after* user functions. Every entry returns `none` — falling through to a visible hole — on any argument shape it cannot model faithfully. Under `.cLike` it returns `none` for everything. |
+| `ClassHierarchy.lean` | Python class namespaces: C3 linearization over the exporter's class declarations, descriptor kinds (method, property, stored, slot, opaque), the barriers a dynamic class body raises, and lookup through a contracted external base. |
+| `ExternalBases.lean` | Generated from `scripts/external_bases.py`: for each storage-free `collections.abc` ABC, the names it defines beyond `object` and its abstract methods. A contracted base is one node of a complete MRO; the oracle verifies each contract against the live class before trusting it (`docs/contracts.md`). |
 | `Float.lean` | IEEE-754 binary32/binary64 as an explicit bit pattern (`Fl`) with exact-rational rounding, plus Python's float semantics (`pyMod`, int/float comparison without coercion, `OverflowError`). Chosen over Lean's `Float` because `Float` is an opaque `@[extern]` type the kernel cannot reduce. As of this writing it is a standalone development: `Val` has no `float` constructor and `Semantics.lean` does not import it, so floats still reach the interpreter as holes. Check with `grep -n float Autoform/Lang/Core/Syntax.lean`. |
 
 ### `Autoform/Lang/Imp/` — the worked example
@@ -240,19 +267,23 @@ subject.
 |---|---|
 | `formalization_graph.sc` | Joern query producing the formalization graph: call graph, effect classification (io / ffi / reflection / concurrency / nondeterminism), and a formalizability score. The scoring weights are the policy. |
 | `export_ast.sc` | CPG → language-neutral JSON AST. Deterministic, no model on this path. Also answers the whole-program questions the node vocabulary cannot: module-level bindings, which function values capture an enclosing scope, and which operators change meaning under the dialect. |
-| `render_lean.py` | JSON AST → Lean `Program`. A pure function of the JSON: no timestamps, no dict-order dependence, byte-identical output for identical input. Infers the dialect from the file extension. |
+| `render_lean.py` | JSON AST → Lean `Program`. A pure function of the JSON: no timestamps, no dict-order dependence, byte-identical output for identical input. Infers the dialect from the file extension. `--shard-functions N` writes the definitions into `Autoform/Generated/<M>/PartNNNN.lean` modules (each with its slice of the function list) that build in parallel; the root module appends the slices into `program`. Tracked corpora are rendered unsharded. |
 | `run.sh` | Cartographer-only driver (source tree → formalization graph). |
 
 ### `scripts/` — orchestration and oracles
 
 | File | Role |
 |---|---|
+| `generated_module.py` | The files that make up a rendered model — root plus the parts it imports — and the digest evidence is bound to. Everything that hashes, snapshots or mutates "the model" goes through it. |
+| `external_bases.py` | The external base-class contracts (source of truth), `verify(cls)` for the oracle, `--emit-lean` for `ExternalBases.lean`, `--check` against the running interpreter. |
 | `differential.py` | The conformance oracle. Drives from the repository's own test suite via a `sys.settrace` hook, snapshots receivers into a Lean `Heap` literal, and compares structured values and exceptions against the Lean interpreter. Three-valued: agree / diverge / INCONCLUSIVE. |
 | `core_oracle.py` | The execution oracle for the ledger's verifiable-core claim: runs every function in the claimed core over many inputs instead of analysing the AST that produced the claim. |
 | `audit_all.py` | Axiom sweep over every declaration, source sweep for escape hatches (`sorry`, `partial`, `unsafe`, `native_decide`, `@[implemented_by]`, `axiom`), and `leanchecker --fresh` kernel replay. Gates CI with `--strict`. |
 | `mutate.py` | Source-level mutation gate — the *sufficient* anti-vacuity test. Two modes: hand-written Lean, and generated modules (where the file mutated and the file rebuilt are different). |
 | `sacm.py` | Builds the SACM assurance case (G1–G5, status lattice, coverage caps) and wraps it in an in-toto Statement. |
-| `synth_specs.py` | Layer 4: specification synthesis working *down* the trustworthiness ordering — existing artefacts, structural/safety specs, mined algebraic laws, cross-implementation equivalence. |
+| `synth_specs.py` | Layer 4: specification synthesis working *down* the trustworthiness ordering — existing artefacts, structural/safety specs, mined algebraic laws, cross-implementation equivalence. Each candidate is compiled alone under a wall-clock and memory budget first (`budget_probe`); an over-budget one is excluded by name in the module and the report. |
+| `assure.py`, `repository_assurance.py`, `guarantee.py` | The `assure` orchestration: stage deadlines, per-language child modules, the gates in order, and the guarantee whose claims are bound to artifact hashes. |
+| `check_docs.py`, `check_render.py`, `check_specs_fresh.py` | Integrity gates: documented figures equal their artifacts; committed renders are renders of committed ASTs; spec modules describe the corpus in the tree. |
 | `fvspec.py` | Runs the anti-vacuity screen over the FVSpec benchmark. See `docs/fvspec.md`. |
 | `scale_test.py` | Runs the pipeline stage by stage on arbitrary source trees, recording wall-clock, peak RSS and artefact sizes per stage. See `docs/scale.md`. |
 | `prover/smt.py` | External solver driver. Produces **evidence**, never a proof: an `unsat` verdict is recorded on an open obligation because no Lean proof is reconstructed from it. |

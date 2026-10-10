@@ -91,6 +91,14 @@ class TestParenthesisation:
         assert render_lean.stmt({"k": "brk"}) == ".brk"
         assert render_lean.expr({"k": "unit"}) == "(.lit .unit)"
 
+    def test_value_callee_renders_the_callee_as_an_expression(self, render_lean):
+        """`f(x)(y)`: the callee is an expression child, not a string atom like `call`'s."""
+        node = {"k": "callV", "f": {"k": "call", "f": "mk", "args": [{"k": "int", "v": "10"}]},
+                "args": [{"k": "int", "v": "2"}]}
+        assert render_lean.expr(node) == '(.callValue (.call "mk" [(.lit (.int 10))]) [(.lit (.int 2))])'
+        head, kids = render_lean.expr_shape(node)
+        assert head == ".callValue" and [k for k, _ in kids] == ["e", "es"]
+
     def test_every_wrapped_output_balances(self, render_lean):
         node = {"k": "ifte", "c": {"k": "binop", "op": "<",
                                    "a": {"k": "name", "v": "i"},
@@ -116,6 +124,37 @@ class TestParenthesisation:
 # ---------------------------------------------------------------------------
 
 class TestRendererRefuses:
+    @pytest.mark.parametrize("signature", [
+        None, {}, {"positionalOnly": [], "keywordOnly": [], "required": [], "extra": []},
+        {"positionalOnly": ["a"], "keywordOnly": ["a"], "required": ["a"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": ["missing"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": ["rest"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": ["a", "a"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": "a"},
+        {"positionalOnly": [], "keywordOnly": [], "required": [None]},
+        {"positionalOnly": [], "keywordOnly": [], "required": [], "isMethod": 1},
+        {"positionalOnly": [], "keywordOnly": [], "required": [], "isMethod": "false"},
+        {"positionalOnly": [], "keywordOnly": [], "required": [], "isMethod": None},
+    ])
+    def test_invalid_python_signature_is_refused(self, render_lean, signature):
+        with pytest.raises(ValueError, match="Python"):
+            render_lean.render_func(fn(params=["a", "rest"], vararg="rest",
+                                      pythonSignature=signature), "f")
+
+    def test_python_signature_is_deterministic(self, render_lean):
+        signature = dict(positionalOnly=["a"], keywordOnly=["b"], required=["a", "b"])
+        first = render_lean.render_func(fn(params=["a", "b"], pythonSignature=signature), "f")
+        second = render_lean.render_func(fn(params=["a", "b"], pythonSignature=dict(
+            reversed(list(signature.items())))), "f")
+        assert first == second
+        assert 'pythonSignature := some { positionalOnly := ["a"], keywordOnly := ["b"], required := ["a", "b"] }' in '\n'.join(first)
+
+    @pytest.mark.parametrize('method', [False, True])
+    def test_explicit_python_method_classification(self, render_lean, method):
+        signature = dict(positionalOnly=[], keywordOnly=[], required=['a'], isMethod=method)
+        output = render_lean.render_func(fn(params=['a'], pythonSignature=signature), 'f')
+        assert 'isMethod := some ' + str(method).lower() in '\n'.join(output)
+
     def test_unknown_expr_kind(self, render_lean):
         with pytest.raises(ValueError, match="unknown expr node kind"):
             render_lean.expr({"k": "quasiquote"})
@@ -136,22 +175,28 @@ class TestRendererRefuses:
         """Defaulting to Python's floored division for a `.tsx` file gave `-7 % 3 = 2`
         where TypeScript gives -1. An unknown extension is an error."""
         ast = str(tmp_path / "ast-X.json")
-        write_ast(ast, [fn(file="a.tsx")])
+        write_ast(ast, [fn(file="a.unknown")])
         rc, log = run_script(RENDER, ast, str(tmp_path / "X.lean"), "X")
         assert rc != 0
         assert "cannot infer dialect" in log
-        assert ".tsx" in log
+        assert ".unknown" in log
 
     @pytest.mark.parametrize("ext,dialect", [
         (".py", ".python"), (".c", ".cLike"), (".cpp", ".cLike"),
-        (".java", ".cLike"), (".ts", ".cLike"), (".go", ".cLike"),
+        (".java", ".java"), (".kt", ".java"), (".ts", ".javascript"), (".go", ".go"),
+        (".tsx", ".javascript"), (".jsx", ".javascript"),
     ])
     def test_dialect_inference(self, render_lean, ext, dialect):
         assert render_lean.infer_dialect([fn(file="a" + ext)]) == dialect
 
-    def test_dialect_is_a_majority_vote_not_a_first_hit(self, render_lean):
+    def test_mixed_dialects_cannot_be_decided_by_majority(self, render_lean):
         funcs = [fn(file="a.c")] * 3 + [fn(file="b.py")]
-        assert render_lean.infer_dialect(funcs) == ".cLike"
+        with pytest.raises(SystemExit, match="mixed source dialects"):
+            render_lean.infer_dialect(funcs)
+
+    def test_known_extension_does_not_hide_unknown_language(self, render_lean):
+        with pytest.raises(SystemExit, match="unrecognized extensions"):
+            render_lean.infer_dialect([fn(file="a.c"), fn(file="b.unknown")])
 
     def test_unmodelled_builtin_base_is_refused(self, tmp_path):
         ast = str(tmp_path / "ast-B.json")
@@ -270,6 +315,67 @@ class TestLinearity:
         assert dt < 60, "4000 statements took %.1fs" % dt
 
 
+class TestIterativePrinter:
+    @pytest.mark.parametrize("shape", ["expression", "list", "pairs", "loop", "left_seq"])
+    def test_all_nesting_shapes_render_at_the_default_recursion_limit(self, render_lean, shape):
+        """The former seq-only loop left expressions, pairs, and left spines recursive."""
+        node = {"k": "skip"} if shape in ("loop", "left_seq") else {"k": "unit"}
+        depth = 4000
+        for _ in range(depth):
+            if shape == "expression":
+                node = {"k": "unop", "op": "-", "a": node}
+            elif shape == "list":
+                node = {"k": "listE", "items": [node]}
+            elif shape == "pairs":
+                node = {"k": "dictE", "pairs": [[{"k": "unit"}, node]]}
+            elif shape == "loop":
+                node = {"k": "loop", "c": {"k": "bool", "v": True}, "body": node}
+            else:
+                node = {"k": "seq", "a": node, "b": {"k": "skip"}}
+        kind = "s" if shape in ("loop", "left_seq") else "e"
+        previous = sys.getrecursionlimit()
+        try:
+            sys.setrecursionlimit(1000)
+            flat = render_lean.stmt(node) if kind == "s" else render_lean.expr(node)
+            wrapped = render_lean.render(node, kind, 0)
+            assert sys.getrecursionlimit() == 1000
+        finally:
+            sys.setrecursionlimit(previous)
+        assert "".join(flat.split()) == "".join(wrapped.split())
+        assert wrapped.count("\n") > depth // 2
+        assert max(len(line) - len(line.lstrip()) for line in wrapped.splitlines()) <= 40
+        assert len(wrapped) < depth * 200
+
+    def test_mixed_list_pair_layout_matches_the_existing_spelling(self, render_lean):
+        a = {"k": "name", "v": "a" * 25}
+        b = {"k": "name", "v": "b" * 25}
+        node = {"k": "call", "f": "factory", "args": [
+            {"k": "dictE", "pairs": [[a, b], [{"k": "int", "v": 1},
+                                                  {"k": "listE", "items": [a, b]}]]},
+            {"k": "name", "v": "end"}]}
+        assert render_lean.render(node, "e", 0) == (
+            '(.call\n  "factory"\n  [ (.dictE\n'
+            '      [ ((.name "aaaaaaaaaaaaaaaaaaaaaaaaa"), (.name "bbbbbbbbbbbbbbbbbbbbbbbbb"))\n'
+            '      , ((.lit (.int 1)),\n'
+            '          (.listE [(.name "aaaaaaaaaaaaaaaaaaaaaaaaa"), (.name "bbbbbbbbbbbbbbbbbbbbbbbbb")])) ])\n'
+            '  , (.name "end") ])')
+
+    def test_width_boundary_and_nullary_overflow(self, render_lean):
+        node = {"k": "name", "v": "x" * 50}
+        flat = render_lean.expr(node)
+        assert render_lean.render(node, "e", 100 - len(flat)) == flat
+        assert "\n" in render_lean.render(node, "e", 101 - len(flat))
+        assert render_lean.render({"k": "skip"}, "s", 110) == ".skip"
+
+    @pytest.mark.parametrize("pair", [[], [{"k": "unit"}], [{"k": "unit"}] * 3,
+                                      ({"k": "unit"}, {"k": "unit"})])
+    def test_malformed_pair_after_wide_prefix_is_refused(self, render_lean, pair):
+        node = {"k": "dictE", "pairs": [
+            [{"k": "str", "v": "x" * 200}, {"k": "unit"}], pair]}
+        with pytest.raises(ValueError, match="2-element array"):
+            render_lean.render(node, "e", 0)
+
+
 # ---------------------------------------------------------------------------
 # module scaffolding
 # ---------------------------------------------------------------------------
@@ -304,3 +410,49 @@ class TestModuleShape:
         assert 'vararg := some "args"' in text
         assert text.count("vararg") == 1
         assert "kwarg" not in text
+
+
+# ---------------------------------------------------------------------------
+# slices
+# ---------------------------------------------------------------------------
+
+class TestSlices:
+    """`xs[lo:hi:st]`, `xs[lo:hi:st] = v`, `del xs[lo:hi:st]`.
+
+    An omitted bound arrives as `{"k": "unit"}` and renders as `(.lit .unit)`. That is not
+    a placeholder for a missing `Option`: Python's own bound for "use the default" IS
+    `None`, so `xs[:2]` and `xs[None:2]` must be the same term, and they are.
+    """
+
+    XS = {"k": "name", "v": "xs"}
+    U = {"k": "unit"}
+
+    def test_slice_read_has_four_children_in_cpython_order(self, render_lean):
+        node = {"k": "slice", "a": self.XS, "lo": {"k": "int", "v": "1"}, "hi": self.U, "st": self.U}
+        assert render_lean.expr(node) == '(.slice (.name "xs") (.lit (.int 1)) (.lit .unit) (.lit .unit))'
+
+    def test_a_negative_step_renders_parenthesised(self, render_lean):
+        node = {"k": "slice", "a": self.XS, "lo": self.U, "hi": self.U, "st": {"k": "int", "v": "-1"}}
+        assert render_lean.expr(node) == '(.slice (.name "xs") (.lit .unit) (.lit .unit) (.lit (.int (-1))))'
+
+    def test_slice_assignment_puts_the_value_last(self, render_lean):
+        node = {"k": "setSlice", "r": self.XS, "lo": {"k": "int", "v": "0"}, "hi": {"k": "int", "v": "1"},
+                "st": self.U, "v": {"k": "int", "v": "9"}}
+        assert render_lean.stmt(node) == \
+            '(.setSlice (.name "xs") (.lit (.int 0)) (.lit (.int 1)) (.lit .unit) (.lit (.int 9)))'
+
+    def test_slice_deletion(self, render_lean):
+        node = {"k": "delSlice", "r": self.XS, "lo": self.U, "hi": self.U, "st": {"k": "int", "v": "2"}}
+        assert render_lean.stmt(node) == '(.delSlice (.name "xs") (.lit .unit) (.lit .unit) (.lit (.int 2)))'
+
+    def test_index_deletion_renders_too(self, render_lean):
+        """`delIndex` existed in Core before the renderer knew it; a `del xs[i]` the
+        exporter starts emitting must not be an unknown statement kind."""
+        node = {"k": "delIndex", "a": self.XS, "i": {"k": "int", "v": "0"}}
+        assert render_lean.stmt(node) == '(.delIndex (.name "xs") (.lit (.int 0)))'
+
+    def test_a_missing_bound_key_is_an_error_not_a_default(self, render_lean):
+        """The exporter always emits all three bounds; a node without one is malformed,
+        and silently defaulting it would hide an exporter bug."""
+        with pytest.raises(Exception):
+            render_lean.expr({"k": "slice", "a": self.XS, "lo": self.U})

@@ -7,22 +7,114 @@
 #                      │                                    │
 #                      └─▶ formalization graph              └─▶ differential vs runtime
 #
-# The CPG is the universal front end: C/C++/Java/JavaScript/Python/Kotlin/binaries all
-# normalize to one node vocabulary, so one semantics and one exporter cover all of them.
+# Source frontends normalize syntax through Joern; dialect-specific coverage is limited.
+# --machine uses a separate p-code interpreter for binary and assembly input.
 set -euo pipefail
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  cat <<'USAGE'
+Usage:
+  ./autoform.sh <source-dir> [ModuleName]
+  ./autoform.sh --machine <binary-or-assembly> [ModuleName] [options]
+  ./autoform.sh --machine --list-languages
+
+Source mode requires Joern and Lean. Machine mode uses requirements-machine.txt
+and Lean. See docs/machine-code.md or ./autoform.sh --machine --help.
+AUTOFORM_DATA_MODEL selects lp64 (default), llp64, ilp32, or unknown for source integers.
+
+Exit status (docs/running.md §7): 0 every stage ran and the runtime oracle agreed;
+1 a stage failed or the oracle found divergences (its log is under
+artifacts/pipeline/<Module>/); 2 usage error, Joern not installed, or the run was
+refused because the tree holds a live mutant or modified tracked artifacts.
+Run `autoform doctor` first: it names every missing prerequisite and how to install it.
+USAGE
+  exit 0
+fi
+
+# Binary and assembly models use machine semantics rather than a guessed source dialect.
+if [ "${1:-}" = "--machine" ]; then
+  shift
+  ROOT="$(cd "$(dirname "$0")" && pwd)"
+  PYTHON="${AUTOFORM_PYTHON:-python3}"
+  if [ -z "${AUTOFORM_PYTHON:-}" ] && [ -x "$ROOT/.venv/bin/python" ]; then
+    PYTHON="$ROOT/.venv/bin/python"
+  fi
+  exec "$PYTHON" "$ROOT/scripts/formalize_machine.py" "$@"
+fi
 
 SRC="${1:?usage: autoform.sh <source-dir> [ModuleName]}"
 MOD="${2:-Translated}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-JOERN="${JOERN_HOME:-$HOME/joern}/joern-cli"
+if [[ ! "$MOD" =~ ^[A-Z][A-Za-z0-9_]*$ ]]; then
+  echo "ModuleName must be a Lean identifier beginning with an uppercase letter" >&2
+  exit 2
+fi
+SRC="$(cd "$SRC" && pwd)"
+JOERN="${JOERN_HOME:-$HOME/joern}"
+if [ -d "$JOERN/joern-cli" ]; then JOERN="$JOERN/joern-cli"; fi
+PYTHON="${AUTOFORM_PYTHON:-python3}"
+if [ -z "${AUTOFORM_PYTHON:-}" ] && [ -x "$ROOT/.venv/bin/python" ]; then
+  PYTHON="$ROOT/.venv/bin/python"
+fi
+if [[ "$PYTHON" == */* ]]; then
+  PYTHON="$(cd "$(dirname "$PYTHON")" && pwd)/$(basename "$PYTHON")"
+fi
+# Refuse to build evidence over a live mutant or a modified tracked artifact -- both
+# have produced false divergences here before (docs/integrity.md, "Concurrency").
+# shellcheck source=scripts/integrity_guard.sh
+. "$ROOT/scripts/integrity_guard.sh"
+autoform_integrity_guard "$ROOT" "$MOD" || exit $?
+REPORT="$ROOT/artifacts/pipeline/$MOD"
+mkdir -p "$REPORT"
 WORK="$(mktemp -d)"
+STAGE=setup
+export PYTHONUNBUFFERED=1
 # Unconditional cleanup: `set -e` means any failing stage below (a `lake build`
 # hitting a heartbeat/recDepth limit, an unresolved codebase, ...) exits the
 # script immediately, and a plain trailing `rm -rf` at the bottom of the file is
 # never reached on that path. Every failed run used to leak `$WORK`'s full CPG
 # binary + exported AST JSON (measured on a real SQLite attempt: ~100-200 MB per
 # leaked run) and Joern's own project cache under `$ROOT/workspace` forever.
-trap 'rm -rf "$WORK" "$ROOT/workspace"' EXIT
+finish() {
+  local status=$?
+  "$PYTHON" - "$REPORT" "$MOD" "$SRC" "$STAGE" "$status" <<'PY'
+import datetime, json, pathlib, sys
+report, module, source, stage, code = sys.argv[1:]
+path = pathlib.Path(report) / "pipeline.json"
+data = dict(module=module, source=source, stage=stage, exit_code=int(code),
+            status="passed" if int(code) == 0 else "failed",
+            finished_at=datetime.datetime.now(datetime.timezone.utc).isoformat())
+path.write_text(json.dumps(data, indent=2) + "\n")
+PY
+  rm -rf "$WORK"
+}
+trap finish EXIT
+# Clear only reports produced by this pipeline, so an aborted run cannot leave
+# yesterday's passing evidence under today's output paths.
+"$PYTHON" - "$REPORT" "$MOD" "$SRC" <<'PY'
+import json, pathlib, sys
+report = pathlib.Path(sys.argv[1])
+for name in ("conformance.json", "specs.json", "ledger.json", "audit.json",
+             "core-oracle.json", "mutation.json", "assurance.md", "sacm.json",
+             "native-build.json", "context.json", "frontend.json", "export.log",
+             "ast-" + sys.argv[2] + ".json", "ledger-" + sys.argv[2] + ".json",
+             "sacm-" + sys.argv[2] + ".json", "contracts-" + sys.argv[2] + ".json"):
+    (report / name).unlink(missing_ok=True)
+(report / "pipeline.json").write_text(json.dumps(dict(
+    module=sys.argv[2], source=sys.argv[3], status="running", stage="setup")))
+PY
+STAGE=prerequisites
+# Joern is a ~1.7 GB external prerequisite and by far the most likely thing to be
+# missing on a first run. Without this check the pipeline gets as far as clone +
+# inventory and then dies on a bare "No such file or directory" from the shell,
+# which names a path the user never typed and suggests no remedy.
+if [ ! -x "$JOERN/joern-parse" ]; then
+  echo "autoform: no Joern frontend at $JOERN/joern-parse" >&2
+  echo "  Joern is required to translate source code and is installed separately." >&2
+  echo "  Set JOERN_HOME to an existing install, or see docs/running.md to install it." >&2
+  echo "  Run 'autoform doctor' to check every prerequisite at once." >&2
+  exit 2
+fi
 export PATH="$HOME/.elan/bin:$PATH"
 # `export_ast.sc`'s own comments are full of real prose punctuation (em-dashes,
 # curly quotes). Joern's C frontend does not need a locale to run correctly,
@@ -64,42 +156,108 @@ cd "$ROOT"
 # flag). Empty by default: no behavior change for a codebase this does not
 # apply to, or when the caller does not set it.
 FRONTEND_ARGS=()
-if [ -n "${CPP_DEFINES:-}" ]; then
-  FRONTEND_ARGS+=(--frontend-args)
-  IFS=',' read -ra CPP_DEFINE_NAMES <<< "$CPP_DEFINES"
-  for name in "${CPP_DEFINE_NAMES[@]}"; do
-    FRONTEND_ARGS+=(--define "$name")
-  done
+"$PYTHON" "$ROOT/scripts/source_context.py" "$SRC" "$REPORT/context.json" \
+  --args-file "$WORK/frontend-args"
+while IFS= read -r -d '' option; do FRONTEND_ARGS+=("$option"); done < "$WORK/frontend-args"
+LANGUAGE_ARGS=()
+if [ -n "${AUTOFORM_FRONTEND:-}" ]; then
+  LANGUAGE_ARGS=(--language "$AUTOFORM_FRONTEND")
 fi
 
-echo "==> [1/6] parsing $SRC"
-"$JOERN/joern-parse" "$SRC" --output "$WORK/cpg.bin" "${FRONTEND_ARGS[@]}" >/dev/null 2>&1
+STAGE=parse
+echo "==> [1/8] parsing $SRC"
+# Bash 3.2 (macOS) treats an empty array as unset under `set -u`. Expand it only
+# when populated, without passing an empty argument to the frontend.
+if ! (cd "$WORK" && "$JOERN/joern-parse" "$SRC" --output "$WORK/cpg.bin" ${LANGUAGE_ARGS[@]+"${LANGUAGE_ARGS[@]}"} ${FRONTEND_ARGS[@]+"${FRONTEND_ARGS[@]}"}) >"$REPORT/parse.log" 2>&1; then
+  cat "$REPORT/parse.log" >&2
+  exit 1
+fi
 
-echo "==> [2/6] cartographer: formalization graph"
-"$JOERN/joern" --script "$ROOT/cartographer/formalization_graph.sc" \
-  --param cpgPath="$WORK/cpg.bin" --param out="$ROOT/formalization-graph.json" 2>&1 \
-  | grep -E "^wrote|^pure" || true
+STAGE=graph
+echo "==> [2/8] cartographer: formalization graph"
+if ! (cd "$WORK" && "$JOERN/joern" --script "$ROOT/cartographer/formalization_graph.sc" \
+  --param cpgPath="$WORK/cpg.bin" --param out="$REPORT/formalization-graph.json") >"$REPORT/graph.log" 2>&1; then
+  cat "$REPORT/graph.log" >&2
+  exit 1
+fi
+cp "$REPORT/formalization-graph.json" "$ROOT/formalization-graph.json"
 
-echo "==> [3/6] transpiler: CPG -> neutral AST"
-EXPORT_OUT="$("$JOERN/joern" --script "$ROOT/cartographer/export_ast.sc" \
-  --param cpgPath="$WORK/cpg.bin" --param out="$WORK/ast.json" 2>&1)" && EXPORT_STATUS=0 || EXPORT_STATUS=$?
+STAGE=export
+echo "==> [3/8] transpiler: CPG -> neutral AST"
+EXPORT_OUT="$(cd "$WORK" && "$JOERN/joern" --script "$ROOT/cartographer/export_ast.sc" \
+  --param cpgPath="$WORK/cpg.bin" --param out="$WORK/ast.json" \
+  --param dataModel="${AUTOFORM_DATA_MODEL:-lp64}" 2>&1)" && EXPORT_STATUS=0 || EXPORT_STATUS=$?
+printf '%s\n' "$EXPORT_OUT" > "$REPORT/export.log"
 if [ "$EXPORT_STATUS" -ne 0 ] || ! grep -qE "^exported" <<<"$EXPORT_OUT"; then
   echo "$EXPORT_OUT" >&2
-  echo "==> [3/6] FAILED: export_ast.sc did not report success (see output above)" >&2
+  echo "==> [3/8] FAILED: export_ast.sc did not report success (see output above)" >&2
   exit 1
 fi
 grep -E "^exported" <<<"$EXPORT_OUT"
+if [ -n "${AUTOFORM_LANGUAGE:-}" ]; then
+  "$PYTHON" "$ROOT/scripts/repository_scope.py" "$WORK/ast.json" "$SRC" \
+    "$AUTOFORM_LANGUAGE" "$REPORT/selection.json"
+fi
 cp "$WORK/ast.json" "$ROOT/ast-$MOD.json"
+cp "$WORK/ast.json" "$REPORT/ast-$MOD.json"
+if [ -f "$WORK/ast.json.meta.json" ]; then cp "$WORK/ast.json.meta.json" "$REPORT/frontend.json"; fi
 
-echo "==> [4/6] rendering Lean"
-python3 "$ROOT/cartographer/render_lean.py" "$WORK/ast.json" \
-  "$ROOT/Autoform/Generated/$MOD.lean" "$MOD"
+# Attribute the AST to the frontend and exporter that produced it. Until this ran,
+# every AST this pipeline emitted was unattributed -- `provenance/` held a single
+# `unattributed.json` -- even though `provenance.py record` already captured exactly
+# the two fields that matter: `joern_version` (the neutral AST is a function of the
+# frontend build) and `exporter_sha256` (an exporter change silently alters the AST
+# for reasons unrelated to the source; the `'0'`-is-48 fix is a live example).
+# docs/architecture.md has prescribed this call since the provenance work landed.
+#
+# Deliberately NOT fatal, and deliberately not `joern-version --check`: an analysis
+# run must not be refused because the installed Joern differs from the pin. The pin
+# is enforced where a user asks for a verdict -- `autoform doctor` returns 1 on a
+# mismatch -- while here a mismatch is recorded and announced, so the artifact still
+# says which frontend made it.
+if ! "$PYTHON" "$ROOT/scripts/provenance.py" record \
+      --artifact "$ROOT/ast-$MOD.json" --source "$SRC" \
+      --exporter cartographer/export_ast.sc \
+      --command "autoform.sh $MOD" >"$REPORT/provenance.log" 2>&1; then
+  echo "==> [3/8] WARNING: AST is unattributed (see $REPORT/provenance.log)" >&2
+  sed -n '1,3p' "$REPORT/provenance.log" >&2 || true
+fi
 
-echo "==> [5/6] type-checking generated Lean"
-lake build "Autoform.Generated.$MOD"
+STAGE=render
+echo "==> [4/8] rendering Lean"
+"$PYTHON" "$ROOT/cartographer/render_lean.py" "$WORK/ast.json" \
+  "$ROOT/Autoform/Generated/$MOD.lean" "$MOD" 2>&1 | tee "$REPORT/render.log"
 
-echo "==> [6/6] differential conformance vs the real runtime"
-python3 "$ROOT/scripts/differential.py" "$WORK/ast.json" "$SRC" "$MOD" 5 || true
+STAGE=build
+echo "==> [5/8] type-checking generated Lean"
+lake build Autoform.Runtime "Autoform.Generated.$MOD" 2>&1 | tee "$REPORT/build.log"
 
+STAGE=runtime
+echo "==> [6/8] differential conformance vs the real runtime"
+CONFORMANCE_STATUS=0
+(cd "$REPORT" && "$PYTHON" "$ROOT/scripts/differential.py" "$ROOT/ast-$MOD.json" "$SRC" "$MOD" "${AUTOFORM_CASES:-5}") \
+  >"$REPORT/conformance.log" 2>&1 || CONFORMANCE_STATUS=$?
+cat "$REPORT/conformance.log"
+if [ -f "$REPORT/conformance.json" ]; then
+  cp "$REPORT/conformance.json" "$ROOT/conformance.json"
+fi
+
+STAGE=ledger
+echo "==> [7/8] coverage ledger"
 sed "s/@MODULE@/$MOD/g" "$ROOT/scripts/ledger.lean.tmpl" > "$WORK/Ledger.lean"
-lake env lean "$WORK/Ledger.lean"
+lake env lean "$WORK/Ledger.lean" 2>&1 | tee "$REPORT/ledger.log"
+cp "$ROOT/ledger-$MOD.json" "$REPORT/ledger.json"
+cp "$ROOT/ledger-$MOD.json" "$REPORT/ledger-$MOD.json"
+if [ "$CONFORMANCE_STATUS" -eq 0 ]; then
+  STAGE=proofs
+  echo "==> [8/8] proving native runtime observations"
+  "$PYTHON" -u "$ROOT/scripts/synth_specs.py" "$ROOT/ast-$MOD.json" "$SRC" "$MOD" \
+    --conformance "$REPORT/conformance.json" --conformance-only \
+    --domain "${AUTOFORM_CASES:-5}" --sample-subjects 0 --json "$REPORT/specs.json" \
+    >"$REPORT/specs.log" 2>&1 || { cat "$REPORT/specs.log" >&2; exit 1; }
+  cat "$REPORT/specs.log"
+  lake build "Autoform.SpecsGen.$MOD" 2>&1 | tee "$REPORT/specs-build.log"
+fi
+if [ "$CONFORMANCE_STATUS" -eq 0 ]; then STAGE=complete; else STAGE=runtime; fi
+echo "==> evidence: $REPORT"
+exit "$CONFORMANCE_STATUS"

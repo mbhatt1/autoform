@@ -1,0 +1,72 @@
+{
+  "status": "IN_PROGRESS_NOT_PROMOTED",
+  "candidate_revision": "38ed72a60e362f8c87feff31580f9ae7121ab473",
+  "scope": "Exact qualified class-value comparisons and conformance proofs for recovered class identities. Ordinary function-name comparisons remain separate and unproved.",
+  "source_sha256": {
+    "scripts/differential.py": "1c6279aae0c60115edd39d202e5625cdec431cd365a7c3d4d29048f40fd9be5c",
+    "scripts/synth_specs.py": "32b9415c2677bf2965b0d485761874d95e462fa23d627c989f4b5562319a41df",
+    "tests/test_python_class_identities.py": "43e7df37a4fdfeaac712e238a570a13e953675dbb59eb81b31f38a896ebdf1f7",
+    "tests/test_class_value_observations.py": "6098f31967c8f619b37a0220d3768767ba6256b8f8a872cd5dfcfc2c09c3fa4e"
+  },
+  "measurement_basis": "python-class-slots-v6+class-values-v1+trace-returns-v1",
+  "checks": {
+    "focused": {
+      "status": "PASS",
+      "log": "class-values-focused1.log",
+      "summary": "41 passed, 1 skipped in 86.80s."
+    },
+    "python": {
+      "status": "PASS",
+      "log": "integration-python3.log",
+      "session_id": 32563,
+      "summary": "843 passed, 62 skipped, 1 xfailed in 320.04s."
+    },
+    "pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "workspace": "../interpreter-integration-validation3",
+      "log": "integration-pipeline3.log",
+      "session_id": 54600,
+      "comparisons": {
+        "cases": 28,
+        "agree": 28,
+        "divergences": 0,
+        "inconclusive": 0
+      },
+      "proofs": 8,
+      "open_obligations": 0,
+      "excluded_subjects": [],
+      "observation_skips": 0,
+      "holes": 0,
+      "verification_complete": false,
+      "stage_exit_codes": {
+        "source": 0,
+        "core-oracle": 0,
+        "mutation": 1,
+        "restore-build": 0,
+        "audit": 0,
+        "contracts": 0,
+        "assurance": 1
+      },
+      "mutation": {
+        "tested": 16,
+        "killed": 12,
+        "survived": 4,
+        "invalid": 0,
+        "inconclusive": 0
+      },
+      "fresh_proof_audit": {
+        "verdict": {
+          "failures": [],
+          "pass": true
+        },
+        "artifact_binding": "STABLE",
+        "kernel_recheck": "VERIFIED"
+      }
+    }
+  },
+  "compatibility": "Older name-matching evidence cannot gain class-value proofs. Duplicate/unknown class identities and ordinary callable outcomes remain excluded explicitly.",
+  "implementation_notes": [
+    "Only the native class-identity branch may encode the reserved <meta> marker; functions with reassigned marker-like qualified names are refused.",
+    "The new proof path uses the existing structural Val equality law; no Lean evaluator or theorem assumptions changed."
+  ]
+}

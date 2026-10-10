@@ -1,10 +1,32 @@
 # Installing and running autoform
 
+For pip installation, the installed `autoform` command, and CI-built wheels, see
+[packaging.md](packaging.md). The shell commands below run from a checkout.
+The Git URL and assurance workflow automatically inventories and dispatches supported
+languages; see [repository analysis](repository-analysis.md) for mixed-language scope
+and the files that remain unsupported.
+
+For independent security requirements, place `autoform.properties.json` in `SOURCE`
+and use `./assure.sh SOURCE Module`, or supply an explicit `--properties properties.json`
+override; see [the property format and runnable example](security.md).
+Python test discovery stays within the selected source directory. It does not search
+parent directories; the differential tool's explicit `--tests DIR` option can select
+an external suite. When analyzing a repository root, its tests remain discoverable
+even when imports resolve under a `src/` subdirectory.
+
+For compiled binaries or assembly, use the independent
+[machine-code workflow](machine-code.md). It needs the pinned Lean toolchain and
+`requirements-machine.txt`, and does not require Joern.
+
 Written for someone who has never run this repository. Nothing below embeds a result;
 where a number would be useful, the command that produces it is given instead. Figures
 move with every change; where a document and an artifact disagree, the artifact wins.
 
 ---
+
+> The installed command is documented in [cli.md](cli.md) (subcommands, flags, artifacts,
+> environment variables, exit codes) and its use from Python in [library.md](library.md).
+> This page covers the checkout entry points and the mechanics behind both.
 
 ## 1. Prerequisites
 
@@ -25,7 +47,7 @@ toolchain** (v4.28.0+). There is nothing to install and no Homebrew formula; the
 standalone `lean4checker` is deprecated. Verify:
 
 ```sh
-lake env leanchecker --help >/dev/null && echo present
+command -v leanchecker
 ```
 
 Then build. The first build fetches and compiles Specimen and Plausible and is slow;
@@ -38,8 +60,8 @@ lake build
 ### Joern — pinned, like the Lean toolchain
 
 Joern supplies the code property graph that is this project's universal front end. It is a
-**~1.7 GB download**, which is why CI never installs it on the gating build — the Joern
-end-to-end job is opt-in.
+**~1.7 GB download**. The source-runtime CI workflow caches the pinned distribution
+and runs all eight source fixtures; the main library build does not need Joern.
 
 **The version is pinned in `joern-version`, and the pin is load-bearing.** The neutral AST
 is a *function of the front end*: which nodes exist, how `fullName`s resolve, whether
@@ -135,26 +157,48 @@ python3.11 scripts/differential.py ast-Cachetools.json ~/src/cachetools Cachetoo
 
 A C compiler (`cc`) is needed only for the C conformance corpus.
 
-## 2. The two entry points
+## 2. The entry points
 
 ### `./autoform.sh <source-dir> [ModuleName]` — translate
 
-Six stages, each announced:
+Eight stages, each announced:
 
 | Stage | What it does | What it writes |
 |---|---|---|
-| `[1/6] parsing` | `joern-parse` builds the CPG | `cpg.bin` in a temp dir |
-| `[2/6] cartographer` | call graph, effect classes, formalizability score | `formalization-graph.json` |
-| `[3/6] transpiler` | CPG → language-neutral JSON AST; prints `exported N methods` | `ast-<Module>.json` |
-| `[4/6] rendering Lean` | deterministic JSON → Lean printer | `Autoform/Generated/<Module>.lean` |
-| `[5/6] type-checking` | `lake build Autoform.Generated.<Module>` | `.olean` |
-| `[6/6] differential conformance` | replays the corpus's own test suite against the Lean interpreter | `conformance.json` |
+| `[1/8] parsing` | `joern-parse` builds the CPG | `cpg.bin` in a temp dir |
+| `[2/8] cartographer` | call graph, effects and formalizability | `formalization-graph.json` |
+| `[3/8] transpiler` | CPG → language-neutral JSON AST | `ast-<Module>.json` |
+| `[4/8] rendering Lean` | deterministic JSON → Lean printer | `Autoform/Generated/<Module>.lean` |
+| `[5/8] type-checking` | build the generated Lean module | `.olean` |
+| `[6/8] differential conformance` | compare actual runtime observations with Core execution | `conformance.json` |
+| `[7/8] coverage ledger` | compute static holes and call closure | `ledger.json` |
+| `[8/8] runtime proofs` | prove the compared observations in the kernel | `specs.json`, `Autoform/SpecsGen/<Module>.lean` |
 
 then instantiates `scripts/ledger.lean.tmpl` and `#eval`s it, which prints the ledger and
 writes `ledger-<Module>.json`.
 
-Stage 6 is allowed to fail without failing the run: a divergence is a *finding*, and the
-script records it and continues.
+**Large models render in parts.** With `AUTOFORM_SHARD_FUNCTIONS=N` (the installed CLI's
+`--shard-functions N`, default 1000; `0` disables it), stage 4 writes definitions into
+`Autoform/Generated/<Module>/PartNNNN.lean`, at most N functions each. The parts import
+only the semantics, so stage 5 elaborates them in parallel, and each `lean` process holds
+one part instead of the whole corpus. The root module imports every part and still defines
+`moduleInits` and `program`, so every downstream name is unchanged. A model of N functions
+or fewer renders as the single module it always was. Tracked corpora are always rendered
+unsharded, because their pins in `artifact-manifest.json` are hashes of that render. See
+[`scale.md`](scale.md) §4.
+
+**Proof budget.** Stage 8 compiles each candidate theorem alone before emitting the module.
+Any candidate that runs past `AUTOFORM_THEOREM_TIMEOUT` seconds (default 300) or
+`AUTOFORM_THEOREM_MEMORY_GB` resident (default 16) is excluded by name. Up to
+`AUTOFORM_PROBE_JOBS` (default 2) probes run concurrently. Each exclusion and its reason
+appear in the generated module (`budgetExcluded`, printed when it builds) and in
+`specs.json` (`budget_excluded`). A candidate that simply fails to prove is not affected:
+it stays an open obligation.
+
+Stage 6 failures are recorded and propagate a nonzero exit status after the ledger.
+Proof synthesis runs only after successful conformance. Stage logs, reports and a
+final `pipeline.json` live in `artifacts/pipeline/<Module>/`. A new run invalidates
+previous evidence before starting, so an interrupted run cannot reuse a passing report.
 
 ### `./assure.sh <source-dir> <ModuleName>` — translate and argue
 
@@ -162,15 +206,113 @@ Runs `autoform.sh`, then:
 
 | Stage | Tool | Artefact |
 |---|---|---|
-| 2/5 conformance | `scripts/differential.py` | `conformance.json` |
-| 3/5 axiom + escape-hatch audit | `scripts/audit_all.py` (after a full `lake build`) | `audit.json` |
-| 4/5 specification teeth | `scripts/mutate.py` | `mutation.json` |
-| 5/5 assurance case | `scripts/sacm.py` | `sacm-<Module>.json` |
+| execution coverage | `scripts/core_oracle.py`, using the same observations | `core-oracle.json` |
+| specification adequacy | `scripts/mutate.py`, targeting the generated proofs | `mutation.json` |
+| proof audit | `scripts/audit_all.py`, after restoring the mutated subject | `audit.json` |
+| contracts and assurance case | `scripts/emit_contracts.py`, `scripts/sacm.py` | `contracts-<Module>.json`, `sacm-<Module>.json`, `assurance.md` |
 
-Steps 2–4 **may legitimately fail** — a divergence, a leaked axiom or a surviving mutant
-are all real findings, and the pipeline records them and continues, because a suppressed
-finding is worse than a red build. Only step 5 decides whether the top claim is assertable,
-and `assure.sh` exits with its status.
+Every run finishes with `summary.md`, `run.json`, and `assurance.md`, including runs
+where parsing, compilation or native execution fails. Dependent checks are marked
+blocked and fresh evidence is required before proof/mutation/audit stages run.
+The exit status remains nonzero for failed checks or an unsupported assurance claim;
+`execution_status: completed_with_gaps` does not mean the source was verified.
+Sampled conformance cannot establish translation correctness for all inputs.
+
+Linux trees are detected from their ancestors' Kbuild/Kconfig files. Without a
+compilation database the frontend supplies kernel annotation macros and the selected
+integer model's `BITS_PER_LONG`. The native adapter automatically tries scalar
+entry points in separate, unchanged translation units using Linux's own userspace
+compatibility headers. A failed unit leaves diagnostics in `native-build.json` and
+does not discard successful units. These are host portability observations, not
+execution in a booted kernel. `context.json` records that boundary.
+
+A `compile_commands.json` at the source/kernel root, or `AUTOFORM_COMPILE_COMMANDS`,
+is passed to Joern as a compilation database. A configured target requires a
+matching runtime adapter; Autoform refuses to substitute host portability
+observations for that target. `CPP_DEFINES` reaches both parsing and native
+compilation. `AUTOFORM_CFLAGS` adds native compiler flags. Header dependencies used
+by native observations are hashed and rechecked before proof synthesis.
+
+`frontend.json` records the CPG population and excluded declarations. Functions with
+unparsed nonempty bodies remain visible as holes. The CPG population is not an
+independent source census. Kernel synchronization is explicitly represented by
+`effect:kernel-sync:<operation>` holes.
+
+### `autoform regress <repo> [Module] --base REF [--head REF]` — compare two commits
+
+Runs `autoform.sh` at two commits of one repository and compares what each run could
+prove, never the source text. `<repo>` is a Git URL or a local checkout with a `.git`
+directory; `--head` defaults to the repository's `HEAD`; `--subdir` selects the same
+directory inside both checkouts; `--timeout` bounds each of the two runs. The same
+module name is used at both commits on purpose, because theorem identifiers are per
+function and must line up across the runs.
+
+Each run's report is copied from `artifacts/pipeline/<Module>/` to
+`artifacts/regression/<Module>/{base,head}/` before the next run overwrites it, and
+`scripts/regression.py compare` writes `regression.json` and `regression.md` next to
+them (`runs.json` records the resolved commits and exit codes). The comparison is over
+the facts a run records:
+
+| Fact at `--base` | Lost at `--head` | Reported as |
+|---|---|---|
+| a function translated without holes | it holes (`hole` / `holeS` in `ast-<Module>.json`) | regression `translation`, with the labels |
+| a theorem in `specs.json` was proved | refuted, open, or no longer emitted while the function still exists | regression `proof` |
+| every recorded runtime case of a function agreed with the runtime | a recorded case diverges | regression `conformance` |
+| the pipeline passed | it stops at an earlier stage | regression `pipeline` |
+| a recorded case `(function, self, args)` had outcome `x` | the same inputs have outcome `y` | **behavior change**; `proven_both` when the function's theorem holds at both commits |
+
+The reverse of each row is an improvement; functions present at only one commit are
+listed as added or removed and are never regressions by themselves (a removed
+function's proved theorems are named). Exit `0` when nothing regressed and no outcome
+changed, `1` otherwise, `2` when a run never reached translation or the source is not a
+Git repository. A behavior change is reported under its own heading and still exits `1`:
+the tool can show that the two commits provably compute different things on the same
+inputs, not whether that was intended.
+
+Scope: a function the runtime never reached has no cases to compare, and an outcome
+that changed on inputs recorded at only one commit is not visible. Random cases are
+drawn with a fixed seed so the two runs see the same inputs; test-suite cases follow
+the repository's own tests at each commit. `scripts/regression.py profile <report>`
+prints the facts one run recorded; `compare <base> <head>` diffs any two report
+directories, including ones produced by hand or by CI at different times.
+
+### `autoform regress <repo> [Module] --base REF [--head REF] --machine --files FILE...` — compare compiled code
+
+Instead of running the source pipeline, `--machine` compiles the listed files at both
+commits for a Linux target (`--target aarch64`, the default, or `x86_64` or `i386`),
+links each commit's objects with `ld.lld` so calls between files resolve, and lifts
+each compared function through Ghidra's SLEIGH descriptions into the p-code Lean model.
+`--functions` names the functions to compare; by default every function whose compiled
+bytes changed is compared. It works for any language `clang` compiles to these
+targets; kernel headers are replaced by the declaration-only shim in
+`scripts/kernel_shim/`.
+
+For each function:
+
+1. **Search.** Candidate inputs are each parameter type's width boundaries (powers of
+   two straddling 32 and 64 bits, the type's extremes, their neighbours) and seeded
+   random values; parameter and return shapes come from DWARF. If this host can execute
+   the target's calling convention (an arm64 host for AArch64 integer functions), both
+   commits are also built for the host and run natively. Otherwise the lifted Lean
+   models are executed on the candidates. `scripts/machine_regress.py --input a,b,c`
+   supplies known reproducers, which are tried first and always reported.
+2. **Confirmation.** Each diverging input is re-run on both lifted models, which must
+   agree with native execution, and then **kernel-checked**: one Lean theorem per
+   commit states the exact return value its machine code produces on that input, proved
+   by `rfl` against the SLEIGH-lifted program.
+
+`artifacts/regression/<Module>/machine/` holds `regression.json`, `regression.md`,
+both commits' linked images, and the Lean check files. Exit `0` when no divergence was
+found, `1` when at least one was found and kernel-checked, `2` on a build or usage
+failure.
+
+What it proves and what it does not: a reported divergence is a machine-checked fact
+that the two commits' compiled code returns different values on that input. Which
+result is correct needs a specification or a reference; a divergence on an input
+outside the function's contract (for example a result that cannot fit its type) is
+reported like any other. "No divergence found" means none among the inputs tried,
+never equivalence. SLEIGH descriptions are trusted, and arguments are limited to
+integer registers (no stack-passed arguments, floats or aggregates).
 
 ## 3. Reading the ledger
 
@@ -330,6 +472,20 @@ is the same gap, one step earlier.
 
 ## 6. Troubleshooting
 
+**A large AST hits Python's recursion limit.** The main source pipeline reads JSON
+containers and walks AST bodies iteratively through `scripts/deep_json.py`; it does
+not require callers to raise Python's recursion limit. The reader preserves standard
+JSON string and number decoding and rejects malformed containers. Rebuild an older
+installed package and use a new workspace to pick up this change.
+
+**Native comparisons agree but proof synthesis reports an exhausted budget.** Native
+conformance reports record `interpreter_fuel` and `initializer_fuel`. Proof synthesis
+uses those budgets and checks a smaller sufficient proof budget when possible. Older
+native reports without these fields use the differential harness's established default.
+An exhausted execution or failed execution precondition remains unverified; it is not
+reported as a counterexample to the native behavior. A completed execution that disagrees
+with the expected result can still refute a candidate.
+
 **`leanchecker` passes but checked nothing.** Always pass `--fresh`. Without it the checker
 can silently no-op on a module that has only imports and no declarations of its own —
 exactly the shape of `Autoform.lean`. `scripts/audit_all.py` uses `--fresh` by default and
@@ -367,10 +523,10 @@ oracle reading a stale cache answers with the *previous* semantics and produces 
 specific, wrong findings. `differential.py` and `core_oracle.py` both `lake build` before
 comparing; if you are running something by hand, build first.
 
-**The audit reports failures unrelated to soundness.** It sweeps every declaration in the
-built library, so the **whole** library must be built first. `autoform.sh` only builds the
-generated module; run a bare `lake build` before `audit_all.py` (this is why `assure.sh`
-does).
+**The audit reports a build failure or changed artifacts.** It builds its root module
+before replay and records the source, compiled imports and supplied evidence. Fix the
+build failure or let concurrent edits finish, then rerun the audit. `--module` selects
+the root; the default is `Autoform`. An old passing audit cannot validate changed files.
 
 **Joern "installed" but nothing works.** See §1 — the macOS arm64 installer exits 0 on
 failure. Check that `$JOERN_HOME/joern-cli/joern-parse` exists and runs.
@@ -383,9 +539,10 @@ wide containers) or the receivers are `tuple`/`dict` subclasses, which Core cann
 represent as objects. Cases refused for (c) are counted under `unencodable_reasons` in
 `conformance.json` — refused, never silently compared.
 
-**A mutation run reports a suspiciously round score.** If a mutant makes the module fail to
-compile, every theorem in that module is credited with killing it. The aggregate is sound;
-per-theorem attribution is coarse.
+**A mutation run reports inconclusive checks.** Timeouts, dependency errors and failures
+without a diagnostic in the subject theorem receive no kill credit. Inspect the recorded
+reason and build output. The gate also requires the original source to rebuild after
+mutation; an incomplete run cannot support a guarantee.
 
 **Build is slow.** Specimen and Plausible dominate. Cache `.lake` (CI keys the cache on
 `lean-toolchain`, `lake-manifest.json`, `lakefile.toml` and the source hashes).
@@ -393,3 +550,25 @@ per-theorem attribution is coarse.
 **`Autoform/Generated/*.lean` looks wrong.** Do not hand-edit it. It is a pure function of
 `ast-<Module>.json`; re-run `cartographer/render_lean.py`, and if the AST is wrong, fix the
 exporter.
+
+## 7. Exit codes
+
+One table, matching the code. `autoform --help` prints the short form; this is the
+authority when they disagree, and a disagreement is a bug to file.
+
+| command | `0` | `1` | `2` | other |
+|---|---|---|---|---|
+| `autoform doctor` | every **required** tool (Python 3.10+, git, lake, lean, leanchecker, joern) present and matching its pin | a required tool missing or mismatched; with `--strict`, also an optional one | the check itself could not run (package payload unreadable) | — |
+| `autoform init` | workspace extracted or already matching this package | — | workspace not empty, from a different package, or an init already in progress | — |
+| `autoform source` / `./autoform.sh` | every stage ran and the differential oracle agreed | a stage failed (parse, graph, export, render, build, ledger, proofs) or the oracle reported divergences — the stage's log is under `artifacts/pipeline/<Module>/` | usage error, module name not a Lean identifier, Joern not installed, busy workspace, or the run was **refused** because the tree holds a live `.mutate-backup` or modified tracked artifacts (§5, `docs/integrity.md`) | `128+N` interrupted by signal N; `--timeout` expiry is `143` |
+| `autoform assure` / `./assure.sh` / a Git URL | every required check completed | the workflow finished with unresolved verification gaps — `completed_with_gaps` in `run.json`; a scoped certificate in `guarantee.json` can coexist with this | invocation, setup or orchestration failure; source acquisition failed; property input invalid; refused tree as above | `128+N` |
+| `autoform regress --machine` | no divergence found among the inputs tried | at least one kernel-checked diverging input (`machine/regression.json`) | usage error, a build, link or lift failure, or a source that is not a Git repository | `128+N` |
+| `autoform regress` | both runs translated and nothing that held at `--base` is lost at `--head`, and no recorded case changed outcome | a regression or a proven behavior change (`regression.json` says which), or a run that never produced an AST | usage error, the source is not a Git repository, a ref could not be fetched, busy workspace, or a refused tree as above | `128+N` from either run; `--timeout` expiry is `143` |
+| `autoform machine` | as `scripts/formalize_machine.py` | as `formalize_machine.py` | CLI-level failure (workspace, lock, extraction) | — |
+
+Two things worth stating plainly. A `1` from `assure` is **not** a crash: it is the
+workflow saying the assurance case has gaps, which is the honest outcome for most
+real repositories — read `run.json` and `guarantee.json` together. And a `2` from the
+integrity guard is deliberate: `AUTOFORM_ALLOW_DIRTY=1` lifts the modified-artifact
+check for someone iterating on a render they know is uncommitted; nothing lifts the
+live-mutant check, because there is no legitimate evidence to collect over a mutant.

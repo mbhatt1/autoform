@@ -29,6 +29,7 @@ Usage:
 from __future__ import annotations
 
 import argparse, json, os, re, shutil, subprocess, sys, tempfile, time
+import deep_json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JOERN = os.path.join(os.environ.get("JOERN_HOME", os.path.expanduser("~/joern")), "joern-cli")
@@ -120,8 +121,7 @@ def ast_stats(path: str) -> dict:
     so a deep AST becomes a deeply nested single term, which is what would stress Lean's
     elaborator.
     """
-    with open(path) as fh:
-        funcs = json.load(fh)
+    funcs = deep_json.load(path)
 
     def walk(n, d=1):
         """Iterative so a deep AST cannot blow *this* script's stack too."""
@@ -145,9 +145,7 @@ def ast_stats(path: str) -> dict:
         n, d = walk(f.get("body", {}))
         total_nodes += n
         max_depth = max(max_depth, d)
-    blob = json.dumps(funcs)
-    holes = blob.count('"k": "hole"') + blob.count('"k":"hole"') \
-        + blob.count('"k": "holeS"') + blob.count('"k":"holeS"')
+    holes = sum(n.get('k') in ('hole', 'holeS') for n in deep_json.dict_nodes(funcs))
     return {"ast_functions": len(funcs), "ast_nodes": total_nodes,
             "ast_max_depth": max_depth, "ast_holes_raw": holes,
             "ast_bytes": os.path.getsize(path)}

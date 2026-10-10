@@ -1,0 +1,116 @@
+{
+ "module": "PipelineCPP",
+ "corpus": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/examples/source/cpp",
+ "mode": "native",
+ "interpreter_fuel": 5000,
+ "initializer_fuel": 5000,
+ "cross_runtime_evidence": true,
+ "self_recorded_families": [
+  "charact"
+ ],
+ "self_recorded_note": "`charact_*` right-hand sides are this interpreter's own output. They are characterization/regression theorems and are NOT cross-implementation evidence; only `conform_*` is, and it needs a runtime this repository can drive.",
+ "families_unavailable": [],
+ "subjects_considered": 2,
+ "subject_population": "observed",
+ "max_subjects": null,
+ "only_subjects": null,
+ "excluded_subjects": [],
+ "functions": 3,
+ "call_closed": 3,
+ "artifacts": {
+  "docstrings": 0,
+  "doctests": 0,
+  "asserts": 0,
+  "raises": 0,
+  "pbt_files": 0,
+  "pbt_properties": 0,
+  "test_files": 0
+ },
+ "observations": {
+  "calls": 10,
+  "in_core": 10,
+  "tests": [],
+  "skipped": {
+   "skip_varargs": 0,
+   "skip_unencodable_args": 0,
+   "skip_unencodable_ret": 0,
+   "runtime": "cc",
+   "evidence": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/artifacts/pipeline/PipelineCPP/conformance.json"
+  }
+ },
+ "candidates": 2,
+ "refuted": 0,
+ "not_checked": 0,
+ "vacuous": 0,
+ "vacuity_checks": {},
+ "vacuity_rate_pct": 0.0,
+ "emitted": 2,
+ "proved": 2,
+ "open_obligations": 0,
+ "build_clean": true,
+ "artifact_hashes": {
+  "ast": "c3338cb711bde78c219dd435273ff64a1ed7fdf3ff046cfacb5a939cccbb8b83",
+  "model": "36ec0882317694b6a40d8d50ba7a02ae1ab60bb0deeb8bbcbe964c1cf214d1c6",
+  "conformance": "1c6df8c9577d25293d972e67f0cc21961bf18a90bb4c27206081caf3a148193e",
+  "proof": "4aeb27b7d29554daa56ef1f8f8859f8f5e52a1f53632f22afae350d29d3b35f7"
+ },
+ "mutation_sample": null,
+ "fuel_independent": 2,
+ "fuel_obligations_remaining": 0,
+ "fuel_blocked_reasons": {},
+ "outOfFuel_cases": {},
+ "by_family": {
+  "conform": {
+   "candidates": 2,
+   "refuted": 0,
+   "vacuous": 0,
+   "proved": 2
+  }
+ },
+ "specs": [
+  {
+   "id": "conform_add_long_long_long",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "add:long(long,long)",
+   "definition": "f_add_long_long_long_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_wide_longlong",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "wide:longlong()",
+   "definition": "f_wide_longlong__",
+   "kind": "law",
+   "domain": 1,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 1,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  }
+ ],
+ "not_checked_gates": [
+  "scripts/mutate.py \u2014 run separately; a surviving mutant means the spec is vacuous in the sufficient sense",
+  "scripts/audit_all.py \u2014 axiom basis of the emitted theorems"
+ ]
+}

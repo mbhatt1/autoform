@@ -1,0 +1,521 @@
+[
+ {
+  "name": "add",
+  "file": "numbers.c",
+  "sourceName": "add",
+  "paramTypes": [
+   "long",
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i64",
+    "a": {
+     "k": "binop",
+     "op": "num:c:i64:+",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "wrap",
+  "file": "numbers.c",
+  "sourceName": "wrap",
+  "paramTypes": [
+   "unsigned int",
+   "unsigned int"
+  ],
+  "returnType": "unsigned int",
+  "paramIntegerTypes": [
+   "u32",
+   "u32"
+  ],
+  "returnIntegerType": "u32",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:u32",
+    "a": {
+     "k": "binop",
+     "op": "num:c:u32:+",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "mixed",
+  "file": "numbers.c",
+  "sourceName": "mixed",
+  "paramTypes": [
+   "int",
+   "unsigned int"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "i32",
+   "u32"
+  ],
+  "returnIntegerType": "i32",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i32",
+    "a": {
+     "k": "binop",
+     "op": "num:c:u32:<",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "right",
+  "file": "numbers.c",
+  "sourceName": "right",
+  "paramTypes": [
+   "unsigned int",
+   "unsigned int"
+  ],
+  "returnType": "unsigned int",
+  "paramIntegerTypes": [
+   "u32",
+   "u32"
+  ],
+  "returnIntegerType": "u32",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:u32",
+    "a": {
+     "k": "binop",
+     "op": "num:c:u32:>>>",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "bump",
+  "file": "numbers.c",
+  "sourceName": "bump",
+  "paramTypes": [
+   "unsigned char"
+  ],
+  "returnType": "unsigned char",
+  "paramIntegerTypes": [
+   "u8"
+  ],
+  "returnIntegerType": "u8",
+  "params": [
+   "a"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "cast:u8",
+     "a": {
+      "k": "binop",
+      "op": "num:c:i32:+",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": 1
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "unop",
+     "op": "cast:u8",
+     "a": {
+      "k": "name",
+      "v": "a"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "nested",
+  "file": "numbers.c",
+  "sourceName": "nested",
+  "paramTypes": [
+   "long",
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i64",
+    "a": {
+     "k": "binop",
+     "op": "num:c:i64:*",
+     "a": {
+      "k": "binop",
+      "op": "num:c:i64:+",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "literal",
+  "file": "numbers.c",
+  "sourceName": "literal",
+  "paramTypes": [],
+  "returnType": "long",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "i64",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i64",
+    "a": {
+     "k": "binop",
+     "op": "num:c:i64:+",
+     "a": {
+      "k": "int",
+      "v": "2147483648"
+     },
+     "b": {
+      "k": "int",
+      "v": "1"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "mixedwidth",
+  "file": "numbers.c",
+  "sourceName": "mixedwidth",
+  "paramTypes": [
+   "long",
+   "unsigned int"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "u32"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i64",
+    "a": {
+     "k": "binop",
+     "op": "num:c:i64:+",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "promote",
+  "file": "numbers.c",
+  "sourceName": "promote",
+  "paramTypes": [
+   "unsigned char",
+   "int"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "u8",
+   "i32"
+  ],
+  "returnIntegerType": "i32",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i32",
+    "a": {
+     "k": "binop",
+     "op": "num:c:i32:+",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "hexliteral",
+  "file": "numbers.c",
+  "sourceName": "hexliteral",
+  "paramTypes": [],
+  "returnType": "unsigned int",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "u32",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:u32",
+    "a": {
+     "k": "binop",
+     "op": "num:c:u32:|",
+     "a": {
+      "k": "int",
+      "v": "4294967295"
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "wideshift",
+  "file": "numbers.c",
+  "sourceName": "wideshift",
+  "paramTypes": [],
+  "returnType": "unsigned long long",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "u64",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:u64",
+    "a": {
+     "k": "binop",
+     "op": "num:c:u64:<<",
+     "a": {
+      "k": "int",
+      "v": "1"
+     },
+     "b": {
+      "k": "int",
+      "v": "40"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "octalcompare",
+  "file": "numbers.c",
+  "sourceName": "octalcompare",
+  "paramTypes": [],
+  "returnType": "int",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "i32",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i32",
+    "a": {
+     "k": "binop",
+     "op": "num:c:u32:<",
+     "a": {
+      "k": "int",
+      "v": "4294967295"
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.c:<global>",
+  "file": "numbers.c",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "skip"
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

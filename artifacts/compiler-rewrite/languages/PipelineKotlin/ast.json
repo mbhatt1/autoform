@@ -1,0 +1,129 @@
+[
+ {
+  "name": "numbers.add:long(long,long)",
+  "file": "Numbers.kt",
+  "sourceName": "add",
+  "paramTypes": [
+   "long",
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:java:i64:+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.word:int(int,int)",
+  "file": "Numbers.kt",
+  "sourceName": "word",
+  "paramTypes": [
+   "int",
+   "int"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "i32",
+   "i32"
+  ],
+  "returnIntegerType": "i32",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:java:i32:+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.shift:long(long,int)",
+  "file": "Numbers.kt",
+  "sourceName": "shift",
+  "paramTypes": [
+   "long",
+   "int"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i32"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "n"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:java:i64:<<",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "n"
+    }
+   }
+  }
+ },
+ {
+  "name": "Numbers.kt:Numbers.kt:numbers.global",
+  "file": "Numbers.kt",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "skip"
+    }
+   }
+  }
+ }
+]

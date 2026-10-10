@@ -19,6 +19,10 @@ def main : IO Unit :=
 
 
 def emit(module: str) -> dict:
+    # The only registered contract-relative theorems currently describe Cachetools.
+    # Relabelling that demo registry as another module invents off-subject evidence.
+    if module != "Cachetools":
+        return {"module": module, "theorems": []}
     with tempfile.NamedTemporaryFile("w", suffix=".lean", dir=ROOT, delete=False) as fh:
         fh.write(DRIVER % json.dumps(module))
         path = fh.name

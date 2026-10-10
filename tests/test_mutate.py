@@ -8,8 +8,67 @@ here at some point.
 from __future__ import annotations
 
 import re
+import json
+import os
+import signal
+import sys
+import time
+from pathlib import Path
 
 import pytest
+
+
+@pytest.mark.skipif(os.name != 'posix', reason='process groups require POSIX')
+@pytest.mark.parametrize('timeout', [False, True])
+def test_build_cleanup_releases_descendant_resources(tmp_path, monkeypatch, mutate, timeout):
+    import fcntl
+    lake = tmp_path/'lake'
+    lake.write_text('#!' + sys.executable + '\n' + '''
+import fcntl, os, sys, time
+read, write = os.pipe()
+pid = os.fork()
+if pid == 0:
+    os.close(read)
+    with open('descendant.lock', 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        os.write(write, b'x')
+        os.close(write)
+        os.close(1)
+        os.close(2)
+        while True: time.sleep(60)
+os.close(write)
+assert os.read(read, 1) == b'x'
+os.close(read)
+with open('descendant.pid', 'w') as result: result.write(str(pid))
+if os.environ['STALL'] == '1':
+    while True: time.sleep(60)
+''')
+    lake.chmod(0o755)
+    monkeypatch.setattr(mutate, 'lake_env', lambda:dict(os.environ, PATH=str(tmp_path),
+                                                      STALL='1' if timeout else '0'))
+    start = time.monotonic()
+    try:
+        rc, _, timed_out = mutate.run_build(tmp_path, 'Check', 1)
+        assert timed_out == timeout
+        assert (rc == 0) != timeout
+        assert time.monotonic() - start < 8
+        deadline = time.monotonic() + 2
+        with (tmp_path/'descendant.lock').open() as lock:
+            while True:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        pytest.fail('compiler descendant remained alive after build cleanup')
+                    time.sleep(0.01)
+    finally:
+        pid = tmp_path/'descendant.pid'
+        if pid.exists():
+            try:
+                os.kill(int(pid.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +139,15 @@ class TestDeclParsing:
         assert not mutate.DEF_KINDS & mutate.THEOREM_KINDS
         assert not mutate.THEOREM_KINDS & mutate.SPEC_KINDS
 
+    def test_comments_and_following_commands_are_not_theorem_bodies(self, mutate):
+        source = ['theorem checked : True := by\n', '  trivial\n',
+                  '/- theorem fake : False := by\n', '  sorry -/\n',
+                  '#guard false\n']
+        decls = mutate.parse_decls(source)
+        assert not any(d.name == 'fake' for d in decls)
+        assert mutate.decl_at(decls, 2).name == 'checked'
+        assert mutate.decl_at(decls, 5).kind == 'command'
+
 
 class TestHandWrittenMutants:
     def _ops(self, mutate, lines):
@@ -128,6 +196,15 @@ def f_f : Func :=
 
 
 class TestGeneratedMutants:
+    @pytest.mark.parametrize("operator", ["num:go:i64:+", "num:java:i32:+", "py:/", "js:*"])
+    def test_typed_operators_preserve_their_semantics_tag(self, mutate, operator):
+        src = ['def f : Func := { body := (.ret (.binop "%s" (.lit (.int 1)) (.lit (.int 2)))) }\n' % operator]
+        mutations = mutate.gen_mutants_generated(src, mutate.parse_decls(src))
+        swapped = [m for m in mutations if m.op.startswith("ast-binop:")]
+        assert len(swapped) == 1
+        prefix, _, suffix = operator.rpartition(":")
+        assert '"' + prefix + ':' + mutate.AST_BINOP_SWAPS[suffix] + '"' in swapped[0].new
+
     @pytest.fixture
     def gen(self, mutate):
         lines = GENERATED.splitlines(keepends=True)
@@ -171,27 +248,140 @@ class TestScoringRules:
     """The rules that decide kill/survive/invalid/inconclusive. Getting these wrong is
     how a gate reports 100% while measuring nothing."""
 
-    def test_the_source_says_a_foreign_build_break_is_inconclusive(self, mutate):
-        src = open(mutate.__file__).read()
-        assert 'rec["verdict"] = "inconclusive"' in src
-        assert "foreign" in src
-        assert re.search(r"if l\[0\] not in \(base, spec_base\)", src), (
-            "the foreign-error filter is the thing that stops an unrelated broken "
-            "dependency being credited to a theorem")
+    @pytest.mark.parametrize('failure,expected', [
+        ((1, '', True), 'inconclusive'),
+        ((1, 'lake: internal error', False), 'inconclusive'),
+        ((1, 'Other.lean:2:0: error: dependency failed', False), 'inconclusive'),
+        ((1, 'Check.lean:1:0: error: type mismatch\nCheck.lean:2:0: error: goal failed', False), 'invalid'),
+        ((1, 'Check.lean:2:0: error: goal failed', False), 'killed'),
+        ((0, '', False), 'survived'),
+    ])
+    def test_actual_gate_attributes_only_proof_failures(self, tmp_path, monkeypatch, mutate, failure, expected):
+        source = tmp_path / 'Check.lean'
+        original = 'def value : Nat := 1\ntheorem checked : value = 1 := rfl\n'
+        source.write_text(original)
+        (tmp_path / 'lakefile.toml').write_text('name = "test"\n')
+        report = tmp_path / 'mutation.json'
+        monkeypatch.setattr(mutate, 'run_build', lambda *args:
+                            (0, '', False) if source.read_text() == original else failure)
+        monkeypatch.setattr('sys.argv', ['mutate.py', str(source), 'Check', '--decls', 'value',
+                                       '--subject', 'checked=value', '--max-mutants', '1',
+                                       '--json', str(report)])
+        code = mutate.main()
+        data = json.loads(report.read_text())
+        result = data['mutants'][0]['verdict']
+        assert (result['checked'] if isinstance(result, dict) else result) == expected
+        assert (code == 0) == (expected == 'killed')
+        assert data['theorems']['checked']['killed'] == (expected == 'killed')
+        assert source.read_text() == original
 
-    def test_an_ill_typed_mutant_is_invalid_not_a_kill(self, mutate):
-        src = open(mutate.__file__).read()
-        assert 'rec["verdict"] = "invalid"' in src
-        assert "hit_defs and not hit_thms" in src
+    def test_failed_restoration_cannot_pass_gate(self, tmp_path, monkeypatch, mutate):
+        source = tmp_path / 'Check.lean'
+        source.write_text('def value : Nat := 1\ntheorem checked : value = 1 := rfl\n')
+        (tmp_path / 'lakefile.toml').write_text('name = "test"\n')
+        report = tmp_path / 'mutation.json'
+        results = iter([(0, '', False), (1, 'Check.lean:2:0: error: goal failed', False),
+                        (1, 'restored build failed', False)])
+        monkeypatch.setattr(mutate, 'run_build', lambda *args: next(results))
+        monkeypatch.setattr('sys.argv', ['mutate.py', str(source), 'Check', '--decls', 'value',
+                                       '--subject', 'checked=value', '--max-mutants', '1',
+                                       '--json', str(report)])
+        assert mutate.main() != 0
+        assert json.loads(report.read_text())['status'] == 'RESTORE_FAILED'
 
-    def test_the_coarse_fallback_is_counted_and_warned_about(self, mutate):
-        """It must never be possible to report a kill rate without saying how much of
-        it came from unattributed build failures."""
-        src = open(mutate.__file__).read()
-        assert 'rec["attribution"] = "coarse"' in src
-        assert 'report["coarse_attributions"] = coarse' in src
-        assert "WARNING" in src
+    def test_failed_command_after_theorem_is_not_credited_as_a_kill(self, tmp_path, monkeypatch, mutate):
+        source = tmp_path/'Check.lean'
+        original = 'def value : Nat := 1\ntheorem checked : value = value := rfl\n#guard value == 1\n'
+        source.write_text(original)
+        (tmp_path/'lakefile.toml').write_text('name = "test"\n')
+        report = tmp_path/'mutation.json'
+        monkeypatch.setattr(mutate, 'run_build', lambda *args:
+                            (0, '', False) if source.read_text() == original else
+                            (1, 'Check.lean:3:0: error: guard failed', False))
+        monkeypatch.setattr('sys.argv', ['mutate.py',str(source),'Check','--decls','value',
+                                       '--subject','checked=value','--max-mutants','1','--json',str(report)])
+        assert mutate.main() != 0
+        data = json.loads(report.read_text())
+        assert data['mutants'][0]['verdict'] == 'inconclusive'
+        assert data['theorems']['checked']['killed'] == 0
+
+    def test_generated_and_spec_with_same_basename_are_distinct(self, tmp_path, monkeypatch, mutate):
+        source=tmp_path/'Autoform/Generated/Check.lean'
+        spec=tmp_path/'Autoform/SpecsGen/Check.lean'
+        source.parent.mkdir(parents=True)
+        spec.parent.mkdir(parents=True)
+        original='def value : Nat := 1\n'
+        source.write_text(original)
+        spec.write_text('theorem checked : value = 1 := rfl\n')
+        (tmp_path/'lakefile.toml').write_text('name="fixture"\n')
+        report=tmp_path/'mutation.json'
+        monkeypatch.setattr(mutate,'run_build',lambda *args:(0,'',False) if source.read_text()==original
+                            else (1,'error: Autoform/SpecsGen/Check.lean:1:0: unsolved goals',False))
+        # Use ordinary Lean operators on this small fixture while retaining the
+        # real generated/spec directory layout that exposed the ambiguity.
+        monkeypatch.setattr(mutate,'gen_mutants_generated',mutate.gen_mutants)
+        monkeypatch.setattr('sys.argv',['mutate.py',str(source),'Autoform.Generated.Check',
+            '--spec-file',str(spec),'--spec-module','Autoform.SpecsGen.Check',
+            '--decls','value','--subject','checked=value','--max-mutants','1','--json',str(report)])
+        assert mutate.main()==0
+        data=json.loads(report.read_text())
+        assert data['invalid']==0 and data['theorems']['checked']['killed']==1
 
     def test_the_build_is_retried_before_a_failure_is_believed(self, mutate):
         src = open(mutate.__file__).read()
         assert "if rc == 0 or timed_out or all_error_lines(out):" in src
+
+
+class TestDiagnosticCalibration:
+    """`error_lines_sanity` — the guard the regex comment promises.
+
+    Both diagnostic shapes are matched today, but the reason the gate once reported a
+    meaningless 100% is that nothing noticed when they stopped matching. It reads the
+    build output the run already captured, so it costs nothing and assumes no toolchain.
+    """
+
+    def test_output_that_parsed_is_ok(self, mutate):
+        status, _ = mutate.error_lines_sanity(['Foo.lean:2:25: error: type mismatch\n'])
+        assert status == 'ok'
+
+    def test_the_severity_first_shape_is_also_ok(self, mutate):
+        status, _ = mutate.error_lines_sanity(['error: Foo.lean:2:25: type mismatch\n'])
+        assert status == 'ok'
+
+    def test_a_drifted_diagnostic_format_is_broken(self, mutate):
+        """The regression that matters: a file and line are plainly there, and neither
+        strict pattern can read them."""
+        status, detail = mutate.error_lines_sanity(
+            ['error: in Foo.lean at line 2, column 25: type mismatch\n'])
+        assert status == 'broken'
+        assert 'attribut' in detail.lower()
+
+    def test_output_with_no_diagnostic_shape_is_unavailable(self, mutate):
+        """A stubbed `lake`, a killed process or a missing toolchain produces failures
+        with nothing diagnostic in them. That is not evidence the format changed, and
+        treating it as such aborted a harness driving `lake` through a stub."""
+        status, detail = mutate.error_lines_sanity(
+            ['error: no default toolchain configured\n', ''])
+        assert status == 'unavailable'
+        assert 'nothing to calibrate' in detail.lower()
+
+    def test_it_needs_no_subprocess_and_no_toolchain(self, mutate, monkeypatch):
+        def explode(*a, **k):
+            raise AssertionError('error_lines_sanity must not shell out')
+
+        monkeypatch.setattr(mutate.subprocess, 'run', explode)
+        monkeypatch.setattr(mutate.subprocess, 'Popen', explode)
+        assert mutate.error_lines_sanity(['Foo.lean:2:1: error: x\n'])[0] == 'ok'
+
+    def test_the_gate_refuses_to_score_when_attribution_is_broken(self, mutate):
+        src = Path(mutate.__file__).read_text()
+        assert 'ATTRIBUTION_BROKEN' in src
+        assert 'if status == "broken":' in src
+
+    def test_the_check_only_runs_once_something_went_unattributed(self, mutate):
+        """Diagnosis, not a toll on every run: a run in which every mutant was
+        attributed has already demonstrated that attribution works."""
+        src = Path(mutate.__file__).read_text()
+        probe = src.index('status, detail = error_lines_sanity(')
+        guard = src.index('if coarse:', src.index('=== mutation score ==='))
+        assert guard < probe, 'the check must sit inside the `if coarse:` branch'

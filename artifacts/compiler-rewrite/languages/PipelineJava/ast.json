@@ -1,0 +1,279 @@
+[
+ {
+  "name": "Numbers.add:long(long,long)",
+  "file": "Numbers.java",
+  "sourceName": "add",
+  "paramTypes": [
+   "long",
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:java:i64:+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "Numbers.div:long(long,long)",
+  "file": "Numbers.java",
+  "sourceName": "div",
+  "paramTypes": [
+   "long",
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:java:i64:/",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "Numbers.shift:int(int,int)",
+  "file": "Numbers.java",
+  "sourceName": "shift",
+  "paramTypes": [
+   "int",
+   "int"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "i32",
+   "i32"
+  ],
+  "returnIntegerType": "i32",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:java:i32:<<",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "Numbers.unsigned:long(long,int)",
+  "file": "Numbers.java",
+  "sourceName": "unsigned",
+  "paramTypes": [
+   "long",
+   "int"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i32"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:java:i64:>>>",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "Numbers.inc:long(long)",
+  "file": "Numbers.java",
+  "sourceName": "inc",
+  "paramTypes": [
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "cast:i64",
+     "a": {
+      "k": "binop",
+      "op": "num:java:i64:+",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "Numbers.bump:byte(byte)",
+  "file": "Numbers.java",
+  "sourceName": "bump",
+  "paramTypes": [
+   "byte"
+  ],
+  "returnType": "byte",
+  "paramIntegerTypes": [
+   "i8"
+  ],
+  "returnIntegerType": "i8",
+  "params": [
+   "a"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "cast:i8",
+     "a": {
+      "k": "binop",
+      "op": "num:java:i32:+",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": 1
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "Numbers.compound:byte(byte,int)",
+  "file": "Numbers.java",
+  "sourceName": "compound",
+  "paramTypes": [
+   "byte",
+   "int"
+  ],
+  "returnType": "byte",
+  "paramIntegerTypes": [
+   "i8",
+   "i32"
+  ],
+  "returnIntegerType": "i8",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "cast:i8",
+     "a": {
+      "k": "binop",
+      "op": "num:java:i32:+",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ }
+]

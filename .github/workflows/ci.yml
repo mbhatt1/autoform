@@ -5,16 +5,13 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      run_joern:
-        description: >-
-          Also run the Joern end-to-end pipeline job. Off by default: installing
-          Joern is a ~1.7 GB download, so it is never part of the gating build.
-        type: boolean
-        default: false
+  workflow_call:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-repository-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -25,7 +22,9 @@ jobs:
   build-and-audit:
     name: build + trust audit
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Fresh independent replay can consume an hour by itself; preserve time for
+    # the clean build, integrity checks and conformance suite as well.
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +48,9 @@ jobs:
           # toolchain since v4.28.0, so there is nothing to build or cache. If this
           # line ever fails, the audit's check [3] would go UNVERIFIED rather than
           # silently passing -- but we would rather know here.
-          lake env leanchecker --help >/dev/null 2>&1 || which leanchecker
+          # This toolchain does not provide a cheap --help probe; it can enter
+          # kernel replay. Check availability here and run the actual audit below.
+          command -v leanchecker
 
       # `Autoform/Generated/V8Base.lean` is a gitignored build product (the
       # "track the AST, not the render" policy, commit dbb8181 / docs/integrity.md)
@@ -135,8 +136,39 @@ jobs:
       # byte-for-byte with the committed module. This is the check that
       # caught a mutation-gate mutant which had survived four commits with
       # every proof still passing (STRATEGY.md 17/30/31).
+      # Exit codes are load-bearing here: 1 = a committed module is NOT the render of
+      # its committed AST (a real integrity failure), 2 = nothing was compared (the
+      # check found nothing and must not pass), 3 = everything comparable verified but
+      # some module could not be checked at all.
+      #
+      # Only 3 is tolerated, and only for the three corpora whose ASTs are too large to
+      # track in git (docs/integrity.md) -- Ansible, LinuxCrypto, LinuxLib. Those are a
+      # standing, documented condition, so treating 3 as a hard failure made this step
+      # permanently red, which is how a genuine mismatch would have gone unnoticed among
+      # the noise. A module becoming unverifiable for any OTHER reason still fails.
+      # The tolerated list below is the ONE in docs/integrity.md ("Input availability"):
+      # Ansible, LinuxCrypto and LinuxLib have tracked manifests but untracked ASTs.
+      # Change both or neither.
       - name: check_render — committed modules are renders of committed ASTs
-        run: python3 scripts/check_render.py
+        run: |
+          set -o pipefail
+          status=0
+          python3 scripts/check_render.py 2>&1 | tee /tmp/check_render.log || status=$?
+          if [ "$status" -eq 0 ]; then exit 0; fi
+          if [ "$status" -ne 3 ]; then
+            echo "check_render failed with exit $status (1 = mismatch, 2 = nothing compared)." >&2
+            exit "$status"
+          fi
+          unexpected=$(grep '^UNVERIFIABLE ' /tmp/check_render.log \
+            | sed 's/^UNVERIFIABLE \([A-Za-z0-9_]*\):.*/\1/' \
+            | grep -vxE 'Ansible|LinuxCrypto|LinuxLib' || true)
+          if [ -n "$unexpected" ]; then
+            echo "check_render: unexpected UNVERIFIABLE module(s):" >&2
+            echo "$unexpected" >&2
+            echo "Only Ansible, LinuxCrypto and LinuxLib may be unverifiable (ASTs too large to track)." >&2
+            exit 3
+          fi
+          echo "check_render: verified everything comparable; the 3 large corpora remain unverifiable by policy."
 
       # A specification is a statement about a SPECIFIC RENDERING of a corpus. Closing a
       # hole changes what the translated function computes, so improving coverage can turn
@@ -151,6 +183,26 @@ jobs:
       # itself and said nothing about the 74 tracked V8Base spec files. See STRATEGY.md 55.
       - name: check_specs_fresh — specs describe the corpus in the tree
         run: python3 scripts/check_specs_fresh.py
+
+      # An AST is evidence about the exporter that produced it. Nothing recorded which
+      # exporter that was: `provenance.py record` writes `joern_version` and
+      # `exporter_sha256`, and for a long time nothing called it, so every committed AST
+      # was unattributed and the field that would have flagged the character-literal fix
+      # as a reason to re-export was never written (docs/integrity.md).
+      #
+      # This step is the cheap half of that. It does not re-export anything; it asks
+      # whether each tracked AST is either attributed or named in
+      # provenance/unattributed.json with a reason. The backlog is not an exemption: an
+      # entry stops applying the moment its artifact's digest changes, so regenerating a
+      # listed AST turns this step red until real provenance is recorded for it. That is
+      # the whole point, and it is why the file cannot simply be topped up with today's
+      # digests.
+      #
+      # Exit codes: 0 attributed or explicitly baselined, 1 a violation, 2 nothing
+      # checked at all. 2 fails for the same reason it does everywhere else in this file
+      # -- a check that passes by finding nothing is not a check.
+      - name: check_provenance — every tracked AST is attributed or named
+        run: python3 scripts/check_provenance.py
 
       # THE CONFORMANCE ORACLE MUST NOT BE DARK.
       #
@@ -179,10 +231,23 @@ jobs:
           git -C /tmp/cachetools checkout -q 01af8e5
           test -d /tmp/cachetools/src
 
+      - name: Bundled Cachetools notice matches the pinned upstream revision
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          upstream = Path('/tmp/cachetools/LICENSE').read_text()
+          bundled = Path('licenses/cachetools-MIT.txt').read_text()
+          if upstream.split() != bundled.split():
+              raise SystemExit('Bundled Cachetools notice differs from pinned upstream; review the original license before release.')
+          print('License matched at', subprocess.check_output(
+              ['git', '-C', '/tmp/cachetools', 'rev-parse', 'HEAD'], text=True).strip())
+          PY
+
       - name: Conformance oracle is alive (compared > 0)
         run: |
           set -euo pipefail
-          AUTOFORM_NO_REEXEC=1 python3 scripts/differential.py \
+          PYTHONHASHSEED=0 AUTOFORM_NO_REEXEC=1 python3 scripts/differential.py \
             ast-Cachetools.json /tmp/cachetools Cachetools 5 | tee /tmp/conf-ci.log
           compared=$(sed -n 's/.*, \([0-9]*\) COMPARED .*/\1/p' /tmp/conf-ci.log | head -1)
           echo "compared=${compared:-0}"
@@ -216,20 +281,20 @@ jobs:
       - name: pytest — the Python tooling
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet pytest
+          python3 -m pip install --quiet pytest -r requirements.txt
           python3 -m pytest tests/ -q
 
       # Cheap, deterministic guard on the one invariant this repo has an
       # explicit rule about: the fuel-monotonicity exclusion list. Widening
       # it is how a genuine break gets hidden instead of proved.
-      - name: FuelMono exclusion list is exactly ["Stmt.tryFinally"]
+      - name: Fuel monotonicity has no excluded statements
         run: |
           set -euo pipefail
           line=$(grep -n 'def fuelMonoExclusions' Autoform/FuelMono.lean || true)
           test -n "$line" || { echo "FuelMono.lean no longer defines fuelMonoExclusions — this guard stopped guarding; fix it, do not delete it."; exit 1; }
-          echo "$line" | grep -qF 'def fuelMonoExclusions : List String := ["Stmt.tryFinally"]' || {
+          echo "$line" | grep -qF 'def fuelMonoExclusions : List String := []' || {
             echo "fuelMonoExclusions was changed: $line"
-            echo 'It must be exactly ["Stmt.tryFinally"]. A genuine break needs a proved counterexample, not a wider exclusion list.'
+            echo 'It must be empty: fuel monotonicity is proved for every statement. A regression must not be hidden by an exclusion.'
             exit 1; }
 
       # Proof inventory. The floor used to be `grep -c '^ *theorem '`, and that is
@@ -328,71 +393,120 @@ jobs:
           grep -q "VACUOUS" demo.out
 
   # ------------------------------------------------------------------ #
-  # OPTIONAL / MANUAL ONLY.
+  # The Joern-gated suites. Everything above runs without Joern by design;
+  # these are the tests that compare the exporter's output to the REAL
+  # runtimes -- CPython, cc, javac, go, node -- through the real frontend.
+  # They live behind AUTOFORM_TEST_JOERN=1 because Joern is a ~1.7 GB
+  # download, which means an ordinary `pytest` never runs them and a
+  # regression in the numeric or signature semantics is invisible until
+  # someone remembers to set the flag. So they run here, on every push.
   #
-  # Joern is a ~1.7 GB download, so the CPG -> AST -> Lean pipeline is NOT
-  # part of the gating build. Run it by hand from the Actions tab, or on a
-  # schedule, when the exporter or the transpiler changes.
+  # Two guards that are easy to get wrong:
+  #   * Joern is installed from the pinned release asset, never
+  #     `joern-install.sh` and never "latest": the neutral AST is a function
+  #     of the frontend build (docs/running.md §1), and the pin is checked
+  #     against the jars actually on disk before a single test runs.
+  #   * A gated test that SKIPS still shows green. The last step fails the
+  #     job if pytest reports the skip reason these tests use, because a
+  #     silently skipped gate is exactly the shape of failure this repository
+  #     keeps re-learning (an oracle that no-ops looks like one that passes).
   # ------------------------------------------------------------------ #
-  joern-pipeline:
-    name: end-to-end pipeline (Joern, manual only)
+  joern-gated:
+    name: Joern-gated suites (real frontend, real runtimes)
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-    if: >-
-      github.event_name == 'workflow_dispatch' &&
-      inputs.run_joern == true
-
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
 
-      - name: Install elan / Lean
+      - name: Install elan / Lean (pinned)
         run: |
           set -euo pipefail
           curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
           sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Joern (~1.7 GB — this is why the job is opt-in)
-        run: |
-          set -euo pipefail
-          curl -L https://github.com/joernio/joern/releases/latest/download/joern-install.sh -o joern-install.sh
-          chmod +x joern-install.sh
-          sudo ./joern-install.sh --without-plugins
-          joern --version
-
       - name: Cache .lake
         uses: actions/cache@v4
         with:
           path: .lake
           key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+            lake-${{ runner.os }}-
 
-      - name: lake build
-        run: lake build
-
-      - name: End-to-end run on the sample corpus
-        env:
-          JOERN_HOME: /opt/joern
-        run: |
-          mkdir -p /tmp/corpus
-          cp -r cartographer /tmp/corpus/ 2>/dev/null || true
-          ./autoform.sh /tmp/corpus Pipeline
-
-      - name: Upload pipeline artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
+      - uses: actions/cache@v4
+        id: joern
         with:
-          name: pipeline-output
+          path: ~/joern
+          key: joern-${{ runner.os }}-${{ hashFiles('joern-version') }}
+
+      - name: Install pinned Joern
+        if: steps.joern.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/joern-cli.zip" -o /tmp/joern.zip
+          mkdir -p "$HOME/joern"
+          unzip -q /tmp/joern.zip -d "$HOME/joern"
+
+      # Reads the version out of the jar names on disk, as provenance.py does. This is
+      # what catches an installer that "exited 0" having installed nothing.
+      - name: Installed Joern matches the pin
+        run: python3 scripts/provenance.py joern-version --check
+
+      - name: Install the Python tooling
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pytest -r requirements.txt
+
+      # JOERN_HOME is deliberately unset: every harness defaults to ~/joern, which is
+      # where the step above unpacked it, and `${{ env.HOME }}` is not a job-level
+      # expression GitHub evaluates.
+      - name: Gated suites against the real runtimes
+        env:
+          AUTOFORM_TEST_JOERN: '1'
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q -rs \
+            tests/test_source_numeric.py \
+            tests/test_python_signatures.py \
+            tests/test_python_receivers.py \
+            tests/test_python_binding.py \
+            tests/test_python_callable_shapes.py \
+            tests/test_python_handlers.py \
+            tests/test_python_raises.py \
+            tests/test_control_flow.py \
+            tests/test_production_gaps.py \
+            2>&1 | tee /tmp/gated.log
+
+      - name: The gate actually ran (no test skipped for want of Joern)
+        run: |
+          set -euo pipefail
+          if grep -q 'set AUTOFORM_TEST_JOERN=1' /tmp/gated.log; then
+            echo "FAIL: at least one Joern-gated test SKIPPED. Joern was installed above, so" >&2
+            echo "the skip means the harness could not see it -- a gate that skips is a gate" >&2
+            echo "that passed by not looking. Skip reasons:" >&2
+            grep 'SKIPPED' /tmp/gated.log >&2 || true
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: joern-gated-evidence
           path: |
-            ast-*.json
-            formalization-graph.json
-            conformance.json
+            /tmp/gated.log
+            artifacts/pipeline/
           if-no-files-found: warn

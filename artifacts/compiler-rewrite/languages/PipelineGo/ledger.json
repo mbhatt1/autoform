@@ -1,0 +1,12 @@
+{"verifiableCore": 9,
+ "nodes": 40,
+ "module": "PipelineGo",
+ "holesByLabel": [],
+ "holes": 0,
+ "holeFree": 9,
+ "functions": 9,
+ "dynamicHoleRisk": 8,
+ "dialect": "go",
+ "contractsUsed": [],
+ "closedByTranslation": 9,
+ "closedByContract": 0}

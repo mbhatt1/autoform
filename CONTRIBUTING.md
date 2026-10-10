@@ -184,6 +184,46 @@ than quietly regenerating the artefacts.
 * `lakefile.toml` and the dependency set are deliberately minimal. Adding a dependency is a
   design decision, not a convenience.
 
+### Adding a corpus
+
+A corpus is a real repository at a **pinned revision**, exported once, whose AST is
+tracked and whose render, specs and manifest hashes are all derived from it.
+
+1. Pin the revision and record it: `provenance/` must be able to say where the AST came
+   from. `ast-Cachetools.json`'s revision had to be *recovered* after the fact
+   (`docs/integrity.md`); do not make the next person do that.
+2. Export with the pinned Joern and the committed exporter through `./autoform.sh
+   <src> <Module>` -- never by hand -- so stage 3 records provenance automatically.
+3. Land the AST, the render, `scripts/check_render.py --record <Module>`, regenerated
+   specs and the manifest **together**, in one commit. A partial landing is what
+   `check_specs_fresh.py` exists to catch.
+4. Give CI a way to reach the source: the conformance-oracle-alive step in `ci.yml`
+   clones cachetools at its pin and fails if the oracle compares zero cases. A corpus
+   the oracle cannot reach in CI is a corpus whose numbers nobody is checking.
+5. Add its figures to `scripts/check_docs.py`'s bindings before quoting any of them in
+   prose, and read `docs/integrity.md` first: re-exporting an *existing* corpus with a
+   newer exporter is measured there as a coverage regression, not a refresh.
+
+### Adding a language
+
+Source languages arrive through Joern, so the first question is whether Joern has a
+frontend for it; the second is which `Dialect` it maps to in `Autoform/Lang/Core`.
+
+1. Add the extension → dialect mapping in **both** `cartographer/render_lean.py` and
+   `scripts/lang_matrix.py` (the duplication is deliberate: the measurement must not
+   inherit the pipeline's choices silently).
+2. If the language's integers, division, shifts or boolean operators differ from an
+   existing dialect, that is a new `NumConfig`/`Dialect`, not a special case in the
+   evaluator -- see how `javascript` was split from `cLike` in `Syntax.lean`.
+3. Add a fixture to `tests/test_source_numeric.py::SOURCES` covering arithmetic,
+   shifts, short-circuit, assignment order and call order, and a native runner so the
+   differential test can compare. The gate for "this language is supported" is that
+   suite passing against the real runtime, not the exporter producing an AST.
+4. Register the runtime in `autoform doctor` (`_DISABLES` in `src/autoform/cli.py`) so
+   a missing tool is reported as disabling *that* language's oracle.
+5. Expect holes. Record each new hole label in `docs/languages.md` with what it would
+   take to close it; a labelled hole is a result, an unlabelled `unit` is a bug.
+
 ### Commit and review expectations
 
 * Explain **why**, not what. This repository's history is part of its evidence: several

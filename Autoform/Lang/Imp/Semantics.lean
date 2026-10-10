@@ -132,13 +132,48 @@ This is precisely the vacuity class that `#audit_depends` cannot see: `evalStmt_
 argument for keeping the mutation gate separate from the dependency check.
 
 The fix is to pin `evalBExpr` against something not defined in terms of itself — the
-integer order and equality on `evalExpr`'s results. These lemmas are `rfl`, but they are
-not vacuous: each one dies under the corresponding mutation.
+integer order and equality on `evalExpr`'s results.
+
+**What the gate actually measures, re-run over all 39 mutants with per-theorem
+attribution working** (`mutation-Imp.json`; 12 mutants are invalid, 27 are scored):
+
+* 24 of 27 are killed by some theorem here. The 3 survivors are `_+1` → `_+0` on
+  `evalStmt`'s fuel patterns, and they are *equivalent mutants*: `| 0, _, _` is the
+  first arm, so `_+0` is shadowed at zero fuel and identical above it. Nothing can
+  kill them, and nothing should.
+* The killing is done by the `@[simp]` `rfl` lemmas. The three explicitly-shaped
+  `≠`/`∃` theorems below score 0%, 0% and 3.7%: a mutation that would refute one
+  first breaks the `rfl` lemma it is proved *through*, Lean reports the error there
+  and admits the broken lemma with `sorryAx`, and the downstream theorem is then
+  discharged by `simp` from a false hypothesis. They are shadowed, not vacuous — but
+  the gate cannot tell those apart, and neither can a reader without this note.
+* An earlier version of this comment claimed each characterization lemma "dies under
+  the corresponding mutation", and a 100% score was once reported here. Both predate
+  working attribution. The honest summary is the first bullet, not a percentage: a
+  per-theorem score in this file measures how much of the evaluator one theorem
+  happens to touch, and the useful quantity is the union.
 -/
 
 section Characterization
 
-variable (s : State) (a b : Expr) (p q : BExpr)
+variable (s : State) (a b : Expr) (p q : BExpr) (n : Int)
+
+/-- `evalExpr` is pinned first, because everything below pins `evalBExpr` *against*
+it. Running the gate over all 39 mutants showed the arithmetic operators
+(`+`→`-`, `-`→`+`, `*`→`/`) surviving every theorem in the file: the
+characterization stopped one level short, and `evalExpr` was constrained by nothing at
+all. That is the same vacuity the section below was written to fix, one layer down.
+
+`evalExpr_lit` scores 0%, because the gate generates no mutant of `.lit n => n`.
+Unlike a constructor-disjointness fact it *is* falsifiable by a mutation — there
+simply is not one — so it stays and completes the characterization. -/
+@[simp] theorem evalExpr_lit : evalExpr s (.lit n) = n := rfl
+
+@[simp] theorem evalExpr_add : evalExpr s (.add a b) = evalExpr s a + evalExpr s b := rfl
+
+@[simp] theorem evalExpr_sub : evalExpr s (.sub a b) = evalExpr s a - evalExpr s b := rfl
+
+@[simp] theorem evalExpr_mul : evalExpr s (.mul a b) = evalExpr s a * evalExpr s b := rfl
 
 @[simp] theorem evalBExpr_tt  : evalBExpr s .tt = true := rfl
 @[simp] theorem evalBExpr_ff  : evalBExpr s .ff = false := rfl
@@ -159,23 +194,61 @@ happens to compute. -/
 @[simp] theorem evalBExpr_and :
     evalBExpr s (.and p q) = (evalBExpr s p && evalBExpr s q) := rfl
 
-/-- Conjunction is not disjunction. Stated explicitly because the `&&`→`||` mutant
-survived until these lemmas existed. -/
+/-- Conjunction is not disjunction. Kept because it states the property directly, but
+the gate credits the kill to `evalBExpr_and` above: see the shadowing note in the
+section preamble. -/
 theorem evalBExpr_and_ne_or :
     ∃ (s : State) (p q : BExpr),
       evalBExpr s (.and p q) ≠ (evalBExpr s p || evalBExpr s q) := by
   exact ⟨[], .tt, .ff, by simp⟩
 
-/-- `tt` and `ff` are distinguishable — kills the `.tt => false` mutant. -/
+/-- `tt` and `ff` are distinguishable. Measured: 0 kills — `evalBExpr_tt`/`evalBExpr_ff`
+break first and shadow this one. -/
 theorem evalBExpr_tt_ne_ff (s : State) : evalBExpr s .tt ≠ evalBExpr s .ff := by
   simp
 
-/-- `le` is not `ge` — kills the `≤`→`≥` mutant. -/
+/-- `le` is not `ge`. Measured: 1 kill; `evalBExpr_le` catches the rest first. -/
 theorem evalBExpr_le_ne_ge :
     ∃ (s : State) (a b : Expr),
       evalBExpr s (.le a b) ≠ decide (evalExpr s b ≤ evalExpr s a) := by
   exact ⟨[], .lit 0, .lit 1, by simp [evalBExpr, evalExpr]⟩
 
 end Characterization
+
+section OutcomePropagation
+
+/-!
+## Holes propagate as holes, not as exhausted fuel
+
+Measured, not assumed: the mutation gate (`mutation-Imp.json`) found that replacing
+`.hitHole h => .hitHole h` with `.hitHole h => .outOfFuel` in the `seq` and `loop`
+branches was caught by **no theorem in this file**. `evalStmt_sound` cannot see it —
+it constrains only the `.ok` outcome, and this mutant changes neither which states
+are reachable nor which programs terminate.
+
+What it changes is the project's central distinction: `outOfFuel` ("did not run long
+enough") and `hitHole` ("did not translate") are supposed to be different answers, and
+a ledger that counts holes is reading exactly this constructor. A mutant that quietly
+reclassifies every hole reached under a loop as a fuel exhaustion is the shape of bug
+that would make untranslated code look like a resource limit.
+
+These pin the propagation at each recursive site.
+
+A third candidate — `Outcome.hitHole h ≠ Outcome.outOfFuel` — is deliberately absent.
+It is true, and it is about the right distinction, but it is a fact about the
+`Outcome` constructors that no mutation of `evalStmt` or `evalBExpr` can falsify: the
+gate scores it 0%, VACUOUS. Keeping it would add a theorem that cannot fail to a file
+whose purpose is to demonstrate theorems that can.
+-/
+
+/-- A hole in a sequence propagates as a hole. -/
+theorem evalStmt_seq_hole_propagates :
+    evalStmt 2 [] (.seq (.opaqueHole 7) .skip) = .hitHole 7 := rfl
+
+/-- A hole reached through a loop body propagates as a hole, not as `outOfFuel`. -/
+theorem evalStmt_loop_hole_propagates :
+    evalStmt 3 [] (.loop .tt (.opaqueHole 7)) = .hitHole 7 := rfl
+
+end OutcomePropagation
 
 end Autoform.Imp

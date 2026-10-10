@@ -26,21 +26,17 @@ out of fuel is a budget we chose. Collapsing them would let "we did not look" be
 ## What fuel is not
 
 Fuel is not a termination argument. `outOfFuel` does not mean the program diverges, and a
-program that terminates in CPython can still exhaust any budget. The interpreter therefore
-establishes *partial* correctness: whenever it produces an answer, that answer is right.
+program that terminates in CPython can still exhaust any budget. Fuel bounds execution of the formal model. It does not itself prove source-to-model
+fidelity or establish that the returned value meets an independent specification.
 Total correctness — this function terminates on this domain — is a separate claim requiring
 a decreasing measure, which `execStmt_loop_rule` in `Autoform/Refine.lean` takes as an
 explicit argument.
 
 ## The resulting problem
 
-A specification proved at one fuel budget is a weak statement. `∀ x ∈ dom, law(x) at
-FUEL = true` says the law holds when evaluated with 400 units of fuel. It does not rule out
-the law failing at 401. Every synthesized specification in `Autoform/SpecsGen/` was of this
-shape, and each carried an open obligation reading *"proved at FUEL only; fuel-independence
-unproved"* — one per law. (The count was 71 at one point and 72 later; the population moves
-when the generated module is re-exported, which is why this document quotes the *ratio*
-closed rather than a snapshot.)
+A specification proved at one fuel budget states what the model computes with that
+budget. Transporting it to every larger budget requires a monotonicity theorem and
+evidence that the recorded execution did not run out of fuel.
 
 Since the laws are `Bool`-valued and `outOfFuel` is a distinct constructor, a law could in
 principle hold at `FUEL` for the wrong reason.
@@ -53,7 +49,7 @@ mutually recursive interpreter functions:
 > raising the budget cannot change a result that did not run out of fuel.
 
 ```lean
-theorem applyFunc_fuel_mono {ctx} (hctx : TFFreeCtx ctx) {k k'} … (hk : k ≤ k')
+theorem applyFunc_fuel_mono_all {ctx} {k k'} … (hk : k ≤ k')
     (he : applyFunc ctx k h ρ … = (h', r)) (hne : r ≠ .outOfFuel) :
     applyFunc ctx k' h ρ … = (h', r)
 ```
@@ -61,50 +57,35 @@ theorem applyFunc_fuel_mono {ctx} (hctx : TFFreeCtx ctx) {k k'} … (hk : k ≤ 
 Proved by a single induction on fuel over a seven-way conjunction covering
 `evalExpr`, `evalList`, `evalPairs`, `execStmt`, `execFor`, `applyFunc` and
 `applyClosure` — every recursive call is at `k`, so one induction hypothesis serves all
-seven. Each function has a `_fuel_succ` form (`k` to `k+1`) and a `_fuel_mono` corollary
+seven. Each function has a `_fuel_succ_all` form (`k` to `k+1`) and a `_fuel_mono_all` corollary
 (`k ≤ k'`). The out-of-fuel spelling differs per function and is documented at each:
 `EResult.outOfFuel` for `evalExpr`/`applyFunc`/`applyClosure`, `Sum.inl .outOfFuel` for
 `evalList`/`evalPairs`, and a `Ctl` constructor for `execStmt`/`execFor`.
 
 Axiom basis: `[propext, Classical.choice, Quot.sound]`. No `sorry`, no `native_decide`.
 
-## The general statement is false
+## Finalizers and incomplete execution
 
-`Stmt.tryFinally` is the one construct that does not propagate an out-of-fuel sub-result.
-If the body exhausts fuel and the finalizer exits abnormally, Python's rule makes the
-finalizer's outcome discard the body's, so the statement returns an ordinary result computed
-from a partially-mutated heap, and more fuel mutates that heap further.
+A language-level return, exception, break or continue carries the local environment
+at its exit point. Handlers and finalizers use that environment. If a finalizer
+completes normally, its updated locals accompany the pending exit; the already
+computed return value or exception payload is preserved. If it exits abnormally,
+its new exit replaces the pending one.
 
-```python
-try:
-    x = 1
-    x = 2
-finally:
-    return x
-```
+Interpreter holes and exhausted fuel are different: the body was not fully
+interpreted, so its finalizer is not run. A `finally: return 1` cannot erase a
+translation gap or turn an unfinished loop into an apparent result.
 
-returns **1 at fuel 4** and **2 at fuel 5**. This is a theorem:
+The regression theorem `tryFinally_preserves_incomplete` checks that an insufficient
+budget reports `outOfFuel` instead of the partial value previously returned by the
+finalizer. With sufficient fuel it returns the complete result. This correction
+allows the unrestricted monotonicity proof to cover every statement constructor;
+`fuelMonoExclusions` is now `[]`.
 
-```lean
-theorem tryFinally_breaks_fuel_mono :
-    (execStmt cexCtx 4 cexHeap [] cexStmt).2 = .ret (.int 1) ∧
-    (execStmt cexCtx 5 cexHeap [] cexStmt).2 = .ret (.int 2) ∧
-    tfFreeS cexStmt = false := ⟨rfl, rfl, rfl⟩
-```
-
-The function table is empty, so call resolution is not involved; the construct itself is the
-cause.
-
-The theorems therefore carry a side condition rather than a weakened conclusion:
-
-* `tfFreeS : Stmt → Bool` — this statement contains no `tryFinally`;
-* `TFFreeCtx ctx` — no reachable function body contains one;
-* `tfFree_of_table` — discharges `TFFreeCtx` from a table-wide check;
-* `fuelMonoExclusions : List String := ["Stmt.tryFinally"]` — the exclusion as a
-  `#print`-able value, not a comment.
-
-If you extend the interpreter and a construct breaks monotonicity, add it here with a
-counterexample rather than weakening the statement.
+The legacy predicates `tfFreeS` and `TFFreeCtx` still mean that a statement or context
+contains no finalizer. Older theorem entry points accept these premises for existing
+generated modules. New `_all` entry points do not require them. Historical generated
+comments that describe a finalizer counterexample refer to the previous semantics.
 
 ## Discharging the obligations
 
@@ -114,16 +95,15 @@ With monotonicity available, every `…_at_FUEL` theorem lifts to its ∀-fuel f
 theorem X : ∀ fuel, FUEL ≤ fuel → ((dom_X).all (lawY C fuel f_…)) = true
 ```
 
-The route, in `Autoform/SpecsGen/Basis.lean`: `runCase_fuel_mono` reduces a `Case` to
-`applyFunc_fuel_mono`; `all_transfer` lifts a per-element guard-and-law implication over
-the domain list; twelve per-law transport lemmas and five guards handle the law families.
-`C_tfFree : TFFreeCtx C` is proved by computation (`tfFree_of_table` over `C.table.all`, by
-`rfl`), and each theorem additionally discharges `tfFreeS f_X.body = true` per subject, so
-the exclusion is checked per function rather than assumed globally.
+The route, in `Autoform/SpecsGen/Basis.lean`: `runCase_fuel_mono_all` reduces a `Case`
+to `applyFunc_fuel_mono_all`; `all_transfer` lifts a per-element guard-and-law
+implication over the domain list. The per-law `_fuel_mono_all` lemmas include
+finalizers and require the same evaluated guards as other functions. The generator
+uses these unrestricted entry points.
 
-Result: 72 of 72 fuel obligations closed, zero `def ob_*` stubs left. The 11 remaining
-obligations are not fuel-related; they are statements the proof portfolio cannot close at
-all, so there was no `_at_FUEL` theorem to lift.
+Run `./assure.sh examples/python_control ControlFlow` to regenerate native
+comparisons, conformance proofs, mutation checks and independent replay for the
+control-flow examples. Current proved and open counts are recorded in its reports.
 
 ## Vacuity in `lawCommutes`
 

@@ -40,17 +40,16 @@ cannot accidentally quantify over them. The cases, and who does what:
 |---|---|---|---|---|
 | signed overflow | **UB** | wraps | wraps | n/a (bignum) |
 | unsigned overflow | wraps | n/a | wraps | n/a |
-| `INT_MIN / -1` | **UB** | yields `INT_MIN` | **panics** | n/a |
-| `INT_MIN % -1` | **UB** | yields `0` | panics | n/a |
-| shift count ≥ width | **UB** | count taken mod width | **panics**¹ | n/a |
+| `INT_MIN / -1` | **UB** | yields `INT_MIN` | yields `INT_MIN` | n/a |
+| `INT_MIN % -1` | **UB** | yields `0` | yields `0` | n/a |
+| shift count ≥ width | **UB** | count taken mod width | 0 or sign extension¹ | n/a |
 | negative shift count | **UB** | (mod width, so no) | panics | `ValueError` |
 | `>>` of a negative | arithmetic | `>>` arithmetic, `>>>` logical | arithmetic | arithmetic |
 | `/` rounding | toward zero | toward zero | toward zero | toward −∞ |
 
-¹ Go shifts by an over-large *count* yield 0 rather than panicking; Go panics only on a
-negative count. `Policy.wrap` here means "reduce the count mod width" (the x86/Java
-behaviour), so Go is modelled with `.undefined` unless the caller knows better. This
-imprecision is recorded rather than hidden.
+¹ Go permits arbitrarily large counts. A signed negative left operand of `>>`
+sign-extends to -1; other wide shifts produce 0. `TypedNumeric.shift` handles this
+before invoking the bounded NumConfig operation; negative counts panic.
 
 Note the deliberate asymmetry: `NumConfig.c32` uses `Policy.undefined` for signed
 overflow, because that is what the *standard* says, and a program relying on it is a
@@ -199,6 +198,14 @@ structure NumConfig where
   onSignedOverflow : Policy        := .wrap
   /-- Shift count negative, or ≥ width. -/
   onShiftCount     : Policy        := .undefined
+  /-- When `onShiftCount = .trap`, the name of the exception the source language
+  raises. `numToE` turns a trap into `.exn (.str r)`, so `r` is read downstream as the
+  *class name* of the raised exception — Python's `try`/`except` dispatch compares it
+  against `Stdlib.excNames`. Leaving the prose reason there produced
+  `.exn (.str "negative shift count")` where CPython raises `ValueError`, so no handler
+  could match it and the exporter's dispatch holed instead. `none` keeps the prose,
+  which is right for a language that traps without naming an exception. -/
+  shiftCountFault  : Option String := none
   /-- `>>` applied to a negative value. -/
   negRightShift    : ShiftSemantics := .arithmetic
   divRound         : DivRound      := .trunc
@@ -208,7 +215,8 @@ namespace NumConfig
 
 /-- Python: bignums, floor division, negative shift counts raise `ValueError`. -/
 def python : NumConfig :=
-  { type := .unbounded, onShiftCount := .trap, divRound := .floor }
+  { type := .unbounded, onShiftCount := .trap, divRound := .floor,
+    shiftCountFault := some "ValueError" }
 
 /-- C `int` as the standard defines it: signed overflow, `INT_MIN / -1` and over-wide
 shifts are **undefined**, and this config says so out loud. -/
@@ -235,10 +243,10 @@ def java32 : NumConfig :=
 /-- Java `long`. -/
 def java64 : NumConfig := { java32 with type := .signed .w64 }
 
-/-- Go `int` (64-bit on mainstream platforms): overflow wraps, division by zero and
-`MinInt / -1` panic. -/
+/-- Go `int` on a 64-bit target: overflow wraps, including `MinInt / -1`.
+Division by zero panics. TypedNumeric handles Go's unbounded shift counts. -/
 def go64 : NumConfig :=
-  { type := .signed .w64, onSignedOverflow := .trap, onShiftCount := .undefined,
+  { type := .signed .w64, onSignedOverflow := .wrap, onShiftCount := .undefined,
     negRightShift := .arithmetic, divRound := .trunc }
 
 end NumConfig
@@ -255,6 +263,13 @@ def Dialect.toNumConfig : Dialect → NumConfig
   | .python     => NumConfig.python
   | .cLike      => NumConfig.c32Wrapv
   | .javascript => NumConfig.python
+  -- The UNTAGGED default per language: Java `int` (32-bit, wraps, masked shifts) and Go
+  -- `int` (64-bit on every mainstream target, wraps, zero-divide panics). A `long`, `int8`,
+  -- `uint64`… operation is tagged by the exporter (`num:java:i64:+`, `num:go:u64:<<`) and
+  -- `TypedNumeric` gives it its own width; this config is what an operation gets when no
+  -- type was recoverable.
+  | .java       => NumConfig.java32
+  | .go         => NumConfig.go64
 
 /-! ## Results -/
 
@@ -398,7 +413,7 @@ def div (c : NumConfig) (a b : Int) : NumResult :=
   if b == 0 then .divZero else c.finish (c.quot a b)
 
 /-- Remainder. `INT_MIN % -1` is mathematically `0` — in range — yet C makes it
-undefined and Go panics, because the *quotient* overflows. So the overflow check is on
+undefined because the *quotient* overflows. So the overflow check is on
 the quotient, and the wrapping answer is the true remainder `0`. -/
 def mod (c : NumConfig) (a b : Int) : NumResult :=
   if b == 0 then .divZero
@@ -425,7 +440,7 @@ def shiftCount (c : NumConfig) (k : Int) : NumResult :=
         match c.onShiftCount with
         | .wrap      => .ok 0
         | .undefined => .ub "negative shift count"
-        | .trap      => .trap "negative shift count"
+        | .trap      => .trap (c.shiftCountFault.getD "negative shift count")
       else .ok k
   | t =>
       let n : Int := (t.bits : Int)
@@ -434,7 +449,7 @@ def shiftCount (c : NumConfig) (k : Int) : NumResult :=
         match c.onShiftCount with
         | .wrap      => .ok (k % n)                 -- Java / x86: mask to log2(width) bits
         | .undefined => .ub "shift count out of range"
-        | .trap      => .trap "shift count out of range"
+        | .trap      => .trap (c.shiftCountFault.getD "shift count out of range")
 
 /-- `a << k`. The count is normalised first, then the value is shifted exactly and put
 through the overflow policy — C makes a signed left shift that loses bits undefined,
@@ -485,9 +500,19 @@ def bitwise (c : NumConfig) (f : Nat → Nat → Nat) (a b : Int) : NumResult :=
   | t =>
       .ok (t.wrap ((f (t.bitsOf a) (t.bitsOf b) : Nat) : Int))
 
-def band (c : NumConfig) (a b : Int) : NumResult := c.bitwise Nat.land a b
-def bor  (c : NumConfig) (a b : Int) : NumResult := c.bitwise Nat.lor  a b
-def bxor (c : NumConfig) (a b : Int) : NumResult := c.bitwise Nat.xor  a b
+-- These identities avoid expanding Nat.bitwise's well-founded recursion on
+-- unreduced width conversions just to discover a zero operand during kernel
+-- reduction. They hold at both fixed and unbounded widths.
+def band (c : NumConfig) (a b : Int) : NumResult :=
+  if a == 0 || b == 0 then .ok 0 else c.bitwise Nat.land a b
+def bor (c : NumConfig) (a b : Int) : NumResult :=
+  if a == 0 then .ok (c.type.wrap b)
+  else if b == 0 then .ok (c.type.wrap a)
+  else c.bitwise Nat.lor a b
+def bxor (c : NumConfig) (a b : Int) : NumResult :=
+  if a == 0 then .ok (c.type.wrap b)
+  else if b == 0 then .ok (c.type.wrap a)
+  else c.bitwise Nat.xor a b
 
 /-- Bitwise complement. `~x = -x - 1` in two's complement, at every width, and it never
 overflows: the complement of a representable value is representable. -/
@@ -505,6 +530,22 @@ def cast (c : NumConfig) (a : Int) : Int := c.type.wrap a
 def lt (c : NumConfig) (a b : Int) : Bool := c.cast a < c.cast b
 def le (c : NumConfig) (a b : Int) : Bool := c.cast a ≤ c.cast b
 def eq (c : NumConfig) (a b : Int) : Bool := c.cast a == c.cast b
+
+/-- Every trap the Python config can produce names a class Core represents.
+
+`numToE` turns `.trap r` into `.exn (.str r)`, and Python `except` dispatch reads that
+string as the exception's CLASS NAME. This used to be the prose `"negative shift count"`,
+so `except ValueError:` could not match it. The table at the top of this file said
+`ValueError` the whole time and nothing compared the two, which is why a theorem is worth
+more here than a comment: the shift path is the only way `NumConfig.python` can trap
+(`type := .unbounded` rules out an overflow trap, and division by zero is `.divZero`, not
+a trap), so this covers it. -/
+theorem python_shiftCount_trap {k : Int} {r : String} :
+    NumConfig.python.shiftCount k = .trap r → r = "ValueError" := by
+  intro h
+  unfold NumConfig.shiftCount NumConfig.python at h
+  repeat' split at h
+  all_goals simp_all
 
 end NumConfig
 
@@ -640,7 +681,7 @@ example : NumConfig.c32Wrapv.mul 100000 100000 = .ok 1410065408 := by decide
 -- INT_MIN / -1.
 #eval NumConfig.c32.div (-2147483648) (-1)        -- ub "signed integer overflow"
 #eval NumConfig.java32.div (-2147483648) (-1)     -- ok (-2147483648)
-#eval NumConfig.go64.div (-9223372036854775808) (-1)  -- trap
+#eval NumConfig.go64.div (-9223372036854775808) (-1)  -- ok (-9223372036854775808)
 #eval NumConfig.c32.div 1 0                       -- divZero
 #eval NumConfig.c32.mod (-2147483648) (-1)        -- ub
 #eval NumConfig.java32.mod (-2147483648) (-1)     -- ok 0
@@ -657,7 +698,7 @@ example : NumConfig.c32Wrapv.mul 100000 100000 = .ok 1410065408 := by decide
 #eval NumConfig.c32.shl 1 32                      -- ub "shift count out of range"
 #eval NumConfig.java32.shl 1 32                   -- ok 1 (count masked to 0)
 #eval NumConfig.python.shl 1 40                   -- ok 1099511627776
-#eval NumConfig.python.shl 1 (-1)                 -- trap "negative shift count"
+#eval NumConfig.python.shl 1 (-1)                 -- trap "ValueError" (CPython raises it)
 #eval NumConfig.java32.shr (-8) 1                 -- ok (-4)   arithmetic
 #eval ({ NumConfig.java32 with negRightShift := .logical } : NumConfig).shr (-8) 1
                                                   -- ok 2147483644  (Java >>>)
@@ -688,14 +729,11 @@ invisible because nothing in the build ever named a language.
 `Lang` names it. `javascript`/`typescript` now route to the real `Dialect.javascript`
 (see `Syntax.lean`) instead of `.cLike`, which fixes the measured `&&`/`||` and integer-
 overflow bugs; `Lang.approximated` still marks them `true` because the bitwise/shift-op
-gap documented on `Dialect` itself remains open. Java and Go stay on `.cLike`, which is
-still the correct call for their boolean operators.
-
-Why constructor-per-language for the *other* under-provisioned languages (Java, Go) is
-still additive rather than done: about 110 sites still `match` on `Dialect` directly, so
-adding a constructor makes every one of them non-exhaustive at once — which is exactly
-what happened, and was worked through, when `javascript` was added. `java`/`go`
-constructors are the same shape of work, not yet done. -/
+gap documented on `Dialect` itself remains open. Java and Go have their own constructors
+too now (`Dialect.java`, `Dialect.go` in `Syntax.lean`): boolean operators still yield a
+bool as under `.cLike`, but strings are values, containers are boxed, untagged Go `int` is
+64-bit and untagged Java `int` 32-bit (`Dialect.toNumConfig`), and Java's `==` on strings
+is the named hole `str:reference-equality`. Kotlin/JVM rides `.java`. -/
 inductive Lang where
   | python | c | java | go | javascript | typescript | kotlin
   deriving Repr, Inhabited, DecidableEq
@@ -718,32 +756,43 @@ def extensions : Lang → List String
 approximations; `approximated` says which. -/
 def dialect : Lang → Dialect
   | .python     => .python
-  -- Correct for `and`/`or`: Java and Go really do yield a bool. No constructor of their
-  -- own yet (see the module doc comment above), so they stay on `.cLike`.
-  | .java | .go | .c => .cLike
+  | .c          => .cLike
+  -- Real constructors now (Syntax.lean): 64-bit Go `int`, value strings with content
+  -- `+`, boxed arrays/slices/maps, and Java's reference `==` on strings as a named hole.
+  | .java       => .java
+  | .go         => .go
   -- `.javascript` is a real constructor now (Syntax.lean): `&&`/`||` yield an operand
   -- and arithmetic no longer wraps at 32 bits. TypeScript shares it — type erasure means
   -- TS's runtime numeric/boolean/string behaviour is JS's.
   | .javascript | .typescript => .javascript
-  -- Kotlin's `&&`/`||` are bool-valued, like Java's.
-  | .kotlin     => .cLike
+  -- Kotlin/JVM: Java's integer model and boolean operators. Its `==` on strings is
+  -- structural where Java's is by reference; under `.java` that is the
+  -- `str:reference-equality` hole — conservative, not wrong.
+  | .kotlin     => .java
 
-/-- Does this language's real behaviour disagree with the dialect it is run under, in a
-way the semantics can currently express? Each `true` is a known-wrong answer, not an
-unknown one. JS/TS's `&&`/`||`/overflow bugs are fixed by `.javascript`; `true` here now
-tracks the *narrower*, still-open gap: real JS truncates bitwise/shift operands to
-Int32, and `.javascript`'s one `NumConfig` (unbounded, chosen to fix arithmetic) does not
-model that separately — see `Dialect`'s doc comment in `Syntax.lean`. -/
+/-- Does the language-wide dialect default approximate numeric behavior?
+Fresh exports use TypedNumeric operation tags for known C/Java/Go integer types
+and JS Number bitwise operations. Legacy untagged ASTs still use these defaults;
+this flag is not a coverage certificate for a whole language. -/
 def approximated : Lang → Bool
-  | .javascript | .typescript => true   -- bitwise/shift ops still truncate wrong
+  | .c | .java | .go | .kotlin | .javascript | .typescript => true
   | _ => false
 
-/-- The integer model. `java64` and `go64` were written months ago and never wired to
-anything, because nothing named a language. -/
+/-- Representative integer configurations. Concrete widths are preserved by the
+exporter's operation tags and interpreted in TypedNumeric.
+
+**NON-NORMATIVE. The interpreter does not consult this function.** It has no callers
+anywhere in `Autoform/` -- it is documentation of what each language's untagged integers
+*are*, and `Lang.numConfig_agrees_with_dialect` below checks it against what the
+evaluator *does*: a tagged operation goes through `TypedNumeric.parse` (width-correct,
+so Java `long` really is 64-bit), an untagged one through `Dialect.toNumConfig`. C is
+the one deliberate disagreement: this table states the STANDARD (`c32`, overflow
+undefined) where the evaluator uses the measured compiler behaviour (`c32Wrapv`). -/
 def numConfig : Lang → NumConfig
   | .python                   => NumConfig.python
   | .c                        => NumConfig.c32
-  | .java | .kotlin           => NumConfig.java64
+  -- Java `int` / Kotlin `Int`: the untagged default. `long` is tagged, 64-bit.
+  | .java | .kotlin           => NumConfig.java32
   | .go                       => NumConfig.go64
   -- JS/TS numbers are IEEE doubles, not integers at all; `.javascript`'s `NumConfig` is
   -- `NumConfig.python` (unbounded) — exact up to `Number.MAX_SAFE_INTEGER`, a named
@@ -753,6 +802,18 @@ def numConfig : Lang → NumConfig
 /-- Languages whose semantics are currently known to be wrong. -/
 def known_wrong : List Lang :=
   [.python, .c, .java, .go, .javascript, .typescript, .kotlin].filter approximated
+
+/-- The non-normative table agrees with the evaluator for every language but C, where
+the disagreement is the standard-vs-compiler one its docstring names. -/
+theorem numConfig_agrees_with_dialect (l : Lang) (hc : l ≠ .c) :
+    l.numConfig = l.dialect.toNumConfig := by
+  cases l <;> first | rfl | exact absurd rfl hc
+
+-- Untagged Go `int` is 64-bit and wraps; untagged Java `int` is 32-bit and wraps.
+#guard Dialect.go.toNumConfig.add 9223372036854775807 1 == .ok (-9223372036854775808)
+#guard Dialect.go.toNumConfig.add 2147483647 1 == .ok 2147483648
+#guard Dialect.java.toNumConfig.add 2147483647 1 == .ok (-2147483648)
+#guard Dialect.java.toNumConfig.mul 100000 100000 == .ok 1410065408
 
 end Lang
 

@@ -1,0 +1,116 @@
+{
+  "base_revision": "2a431df8f6e5532d9bad7ccbc7202fde25a64c78",
+  "scope": "Effectful Python truth conditions, value and branch lowering, and associated proofs; excludes corpus regeneration.",
+  "workspace": "/private/tmp/autoform-condition-work",
+  "input_sha256": {
+    "Autoform/Lang/Core/Semantics.lean": "4cbf9379d10ee8c544bae98016a380a94a802a78efd96cdf6e3449132929173b",
+    "Autoform/Lang/Core/Iteration.lean": "470c8616225925994b6d7fb928b21a7140159b8f00f9493f4251079fa5b78279",
+    "Autoform/Lang/Core/ExcSafe.lean": "df5b3ab1354aa1ab6bb5b0b5ff829dc98e44b91cb3248f7c86071c43c3755192",
+    "Autoform/FuelMono.lean": "31099b075ae9df1959a2cd6f4858b96a9a557f36cccaf67b601e3e4742a56b08",
+    "Autoform/Refine.lean": "402eccd935295e37a07fc89bb3aa2ca9301e37aabe7164a1dd34c59668dcfe8c",
+    "cartographer/export_ast.sc": "ffd05b7898648c1278521c17cf326c993deca0557c8da5f23e2c7f848c93a4bb",
+    "cartographer/render_lean.py": "4b2326e2512bca41d569310c21b53c7cf601cf00ff195f2e0ef9662bbf4cffa2",
+    "cartographer/generator_lowering.py": "24100e7bc91173bb3e82a1d824f24b49815e7cc0c3fd7b4f64fdcd32386d6f98",
+    "cartographer/python_truth_lowering.py": "a78b02f3ec829379a61508c1fd5b8a2a08dc8f616cdceddeb2f2944f5fa7e409",
+    "cartographer/python_truth_values.py": "86d2d02f7777f166a364f8a589d8418b2aa653af696007a6c6e5fca66e796822",
+    "tests/conftest.py": "653e26dd9d579054e79eff4efb18ded7ddb65393013c0d84a3f161fa16e2144a",
+    "tests/test_production_gaps.py": "311dc81a72a4cc22c54da6ccb7fdcb2ae9617e80cec75fc1aa1ebb51d35e0e71",
+    "tests/test_python_truth_lowering.py": "b1f5db4c15628e5c4c4ce18edefcfdf2c4e779b0046d8c9dba27585d21ea5a21",
+    "tests/test_source_truth_conditions.py": "61f425f22868f719ee78c68583350b44913a23402d9b28bd82f96289d79cdfed",
+    "examples/python_control/truth_conditions.py": "963febf6b37a45f35242f714dfe80a1cd8433bc72b5a17dd72c0bbd7a4d8288b"
+  },
+  "checks": {
+    "python": {
+      "status": "PASS",
+      "command": "LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/ -q",
+      "result": {
+        "passed": 804,
+        "skipped": 54,
+        "xfailed": 1
+      },
+      "log": "/tmp/autoform-condition-full-pytest2.log",
+      "log_sha256": "6b247b33538dc3259ece7530873bf2108f94b19ccb2de83ab51017ba3f0fce79",
+      "summary": "804 passed, 54 skipped, 1 xfailed in 401.25s (0:06:41)"
+    },
+    "truth_source": {
+      "status": "PASS",
+      "command": "AUTOFORM_TEST_JOERN=1 JOERN_HOME=/Users/mbhatt/joern/joern-cli LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/test_source_truth_conditions.py -q --basetemp=/tmp/autoform-condition-source8",
+      "result": {
+        "passed": 1,
+        "native_observations": 31,
+        "kernel_observations": 31,
+        "kernel_named_gaps": 2
+      },
+      "log": "/tmp/autoform-condition-source8.log",
+      "log_sha256": "9fb06b13295e0304c0a439644160224b1591f3c5dc8542c43cbf1b06790e8043",
+      "summary": "1 passed in 826.03s (0:13:46)"
+    },
+    "runtime_audit": {
+      "status": "PASS",
+      "module": "Autoform.Runtime",
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 .venv/bin/python -u scripts/audit_all.py --module Autoform.Runtime --strict -o /tmp/autoform-condition-runtime-audit.json",
+      "report": "/tmp/autoform-condition-runtime-audit.json",
+      "report_sha256": "641c36cf97067dcc304e4beee22549aa5a534e9294a1a4cef61ba68157058f05",
+      "artifact_snapshot_status": "STABLE",
+      "axiom_sweep": {
+        "status": "CLEAN",
+        "declarations": 4184,
+        "leaks": [],
+        "declared_axioms": [],
+        "nonstandard_axioms": [],
+        "axiom_histogram": {
+          "propext": 1529,
+          "Quot.sound": 784,
+          "Classical.choice": 721
+        },
+        "error": null,
+        "root_theorems": 0,
+        "root_theorem_names": [],
+        "root_axioms": []
+      },
+      "lean4checker": {
+        "status": "VERIFIED",
+        "available": true,
+        "exe": "/Users/mbhatt/.elan/bin/leanchecker",
+        "mode": "fresh",
+        "command": "lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform.Runtime",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "detail": "the kernel replayed every constant reachable from `Autoform.Runtime` into a fresh environment and accepted them all"
+      },
+      "verdict": {
+        "failures": [],
+        "pass": true
+      }
+    },
+    "lean_build": {
+      "status": "PASS",
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 lake build",
+      "result": {
+        "jobs": 478
+      },
+      "log": "/tmp/autoform-condition-full-build.log",
+      "log_sha256": "cd1a755dea07c21be00f3aa20e6f9922d81b900b65bcb4a5edca84ac8c4c60c7",
+      "summary": "Build completed successfully (478 jobs)."
+    },
+    "source_regressions": {
+      "status": "PASS",
+      "command": "AUTOFORM_TEST_JOERN=1 JOERN_HOME=/Users/mbhatt/joern/joern-cli LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/test_source_generators.py tests/test_source_iterators.py tests/test_source_generator_expressions.py tests/test_source_truth_consumers.py tests/test_python_scope_metadata.py -q --basetemp=/tmp/autoform-condition-protocol-regressions",
+      "result": {
+        "passed": 18
+      },
+      "log": "/tmp/autoform-condition-protocol-regressions.log",
+      "log_sha256": "c305e1c0358c02929443f8b4b00beb54295871b88d378cbee20ebbbfa9d2ac5e",
+      "summary": "18 passed in 1888.07s (0:31:28)"
+    },
+    "full_audit": {
+      "status": "PASS",
+      "revision": "4bc664a3eb35cd0c2425a9aaa9cc8686e1def14a",
+      "summary": "artifacts/interpreter-recovery/truth-conditions-audit.json"
+    }
+  },
+  "pending": [
+    "complete regeneration of four Python corpora"
+  ]
+}

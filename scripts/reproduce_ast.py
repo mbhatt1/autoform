@@ -64,7 +64,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("artifact")
     ap.add_argument("--source", help="source tree (default: from the provenance record)")
-    ap.add_argument("--exporter", default="cartographer/export_ast.sc")
+    ap.add_argument("--exporter", help="exporter script (default: provenance record or cartographer/export_ast.sc)")
     ap.add_argument("--keep", help="directory to leave the fresh export in")
     a = ap.parse_args()
 
@@ -79,16 +79,26 @@ def main() -> int:
     if rec_path.exists():
         rec = json.loads(rec_path.read_text())
         src = src or rec.get("source_path")
-        exporter = rec.get("exporter", exporter)
+        exporter = exporter or rec.get("exporter")
+    exporter = exporter or "cartographer/export_ast.sc"
     if not src:
         print(f"reproduce_ast: no --source and no provenance record at "
               f"{rec_path}; there is nothing to reproduce *from*. This is the gap "
               f"scripts/provenance.py record exists to close.", file=sys.stderr)
         return 2
-    srcp = Path(src)
+    srcp = Path(src).resolve()
     if not srcp.is_dir():
         print(f"reproduce_ast: source tree {srcp} is absent. Cannot reproduce; this is "
               f"UNVERIFIED, not a pass.", file=sys.stderr)
+        return 2
+
+    exporter_path = Path(exporter)
+    if not exporter_path.is_absolute():
+        exporter_path = P.REPO / exporter_path
+    try:
+        P.exporter_sources(exporter_path)
+    except (OSError, ValueError) as error:
+        print(f"reproduce_ast: cannot read exporter source dependencies: {error}", file=sys.stderr)
         return 2
 
     try:
@@ -110,18 +120,18 @@ def main() -> int:
         cpg = work / "cpg.bin"
         print(f"reproduce_ast: joern-parse {srcp}  (Joern {pin})")
         r = subprocess.run([str(cli / "joern-parse"), str(srcp), "--output", str(cpg)],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, cwd=work)
         if r.returncode != 0 or not cpg.exists():
             print(f"reproduce_ast: joern-parse failed (rc={r.returncode})\n"
                   f"{r.stdout[-2000:]}{r.stderr[-2000:]}", file=sys.stderr)
             return 2
         fresh = work / art.name
         print(f"reproduce_ast: {exporter}")
-        r = subprocess.run([str(cli / "joern"), "--script", exporter,
+        r = subprocess.run([str(cli / "joern"), "--script", str(exporter_path),
                             "--param", f"cpgPath={cpg}", "--param", f"out={fresh}"],
-                           capture_output=True, text=True, cwd=str(P.REPO))
-        if not fresh.exists():
-            print(f"reproduce_ast: the exporter produced nothing (rc={r.returncode})\n"
+                           capture_output=True, text=True, cwd=work)
+        if r.returncode != 0 or not fresh.is_file():
+            print(f"reproduce_ast: export failed (rc={r.returncode}, output={fresh.is_file()})\n"
                   f"{r.stdout[-3000:]}{r.stderr[-2000:]}", file=sys.stderr)
             return 2
         for line in r.stdout.splitlines():
@@ -145,7 +155,6 @@ def main() -> int:
         return 1
     finally:
         shutil.rmtree(work, ignore_errors=True)
-        shutil.rmtree(P.REPO / "workspace", ignore_errors=True)
 
 
 if __name__ == "__main__":

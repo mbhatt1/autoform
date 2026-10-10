@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+  "scan_complete": true,
+  "files": [
+    {
+      "path": "numbers.py",
+      "kind": "regular",
+      "category": "source",
+      "language": "python",
+      "supported": true,
+      "sha256": "c1e8f031322e46cecd6a160065573a4b0344705d909dd9be9cedd56e48671395",
+      "bytes": 109,
+      "mode": 420
+    }
+  ],
+  "languages": {
+    "python": {
+      "supported": true,
+      "frontend": "PYTHONSRC",
+      "files": [
+        "numbers.py"
+      ],
+      "supported_files": [
+        "numbers.py"
+      ],
+      "unsupported_files": [],
+      "extensions": [
+        ".py"
+      ]
+    }
+  },
+  "errors": [],
+  "excluded": [],
+  "counts": {
+    "files": 1,
+    "regular_files": 1,
+    "symlinks": 0,
+    "special_files": 0,
+    "source_files": 1,
+    "supported_source_files": 1,
+    "unsupported_source_files": 0,
+    "auxiliary_files": 0,
+    "unclassified_files": 0,
+    "hashed_files": 1,
+    "total_bytes": 109,
+    "errors": 0,
+    "excluded": 0
+  },
+  "fingerprint": "1a2026657949c3d11ce5d8d9a959e6610b66c435843a583614e6fdcf20e2c3f2"
+}

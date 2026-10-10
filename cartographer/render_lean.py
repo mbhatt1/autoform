@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Render the language-neutral JSON AST as a Lean 4 `Autoform.Core.Program`.
 
-Deterministic printer. The only judgement it makes is name sanitisation; everything
-else is a direct structural mapping, so the output is diffable and reviewable.
+Deterministic translation. Ordinary nodes map structurally to Core; suspended
+generator bodies are compiled to explicit heap frames by generator_lowering.py.
 
 Two invariants this file exists to protect:
 
@@ -16,7 +16,13 @@ Two invariants this file exists to protect:
 Usage: render_lean.py ast.json Out.lean [ModuleName]
 """
 import json
-import threading, sys, re, os
+import threading, sys, re, os, glob
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
+import deep_json
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from generator_lowering import lower_generators
+from python_truth_lowering import lower_truth_conditions
+from python_truth_values import lower_truth_values
 
 # Break a term across lines once its flat form would push past this column. Purely
 # cosmetic: the layout below is whitespace-insensitive because every term is
@@ -114,253 +120,109 @@ def _field(n, key, kind):
         raise ValueError(f"{kind} node {n.get('k')!r} is missing required field {key!r}")
     return n[key]
 
-def expr_shape(n):
+def lean_default(n):
+    """A `DefaultValue` from the on-disk shapes a parameter default may take.
+
+    Two forms, both time-invariant: a literal, and a reference to an in-program
+    function. Anything else is not a default Core can bind at call time, and the
+    exporter is supposed to have holed the definition rather than reach here.
+    """
+    if isinstance(n, dict) and n.get("k") == "fnref":
+        return f"(.fnref {lean_str(_field(n, 'v', 'default function reference'))})"
+    return f"(.lit {lean_lit(n)})"
+
+
+def lean_lit(n):
+    """A `Lit` from the same on-disk literal shapes `expr_shape` accepts.
+
+    Used only for literal parameter defaults. Deliberately narrow: anything that is not
+    one of the five literal forms is not a literal default, and the exporter is supposed
+    to have holed the definition rather than reach here. Raising keeps a silent
+    mistranslation from being the failure mode if it ever does.
+    """
     if not isinstance(n, dict):
-        raise ValueError(f"expression node is not an object: {n!r}")
+        raise ValueError(f"default is not an object: {n!r}")
     k = n.get("k")
-    f = lambda key: _field(n, key, "expr")
-    if k == "int":    return ".lit", [("atom", f"(.int {lean_int(f('v'))})")]
-    if k == "str":    return ".lit", [("atom", f"(.str {lean_str(f('v'))})")]
-    if k == "bool":   return ".lit", [("atom", f"(.bool {lean_bool(f('v'))})")]
-    if k == "unit":   return ".lit", [("atom", ".unit")]
-    if k == "float":  return ".lit", [("atom", f"(.float (Fl.ofBits {lean_float_bits(f('v'))}))")]
-    if k == "name":   return ".name", [("atom", lean_str(f('v')))]
-    if k == "binop":  return ".binop", [("atom", lean_str(f('op'))), ("e", f('a')), ("e", f('b'))]
-    if k == "unop":   return ".unop", [("atom", lean_str(f('op'))), ("e", f('a'))]
-    if k == "index":  return ".index", [("e", f('a')), ("e", f('b'))]
-    if k == "call":   return ".call", [("atom", lean_str(f('f'))), ("es", f('args'))]
-    if k == "hole":   return ".hole", [("atom", lean_str(f('label')))]
-    # `003-box-address-taken-locals`: unconditional, constructor-free box allocation.
-    # See `data-model.md` for the on-disk shape and `Expr.boxNew` (`Syntax.lean`) for
-    # its semantics.
-    if k == "boxNew": return ".boxNew", [("e", f('e'))]
-    # `006-reduce-remaining-holes`, Story 5: `boxNew` generalised to N fields. The
-    # wire format keeps plain string keys (`data-model.md`'s `[["<key>", <expr>],
-    # ...]`); each key is wrapped as an ordinary `{"k":"str",...}` expr node here so
-    # the existing `("ps", ...)` pair-list machinery (already used by `dictE`)
-    # renders it with no further changes -- `Expr.boxFields`'s own Lean signature is
-    # `List (Expr × Expr)` for exactly this reason (reusing `evalPairs`, already
-    # proven fuel-monotone, rather than a second list-evaluator).
-    if k == "boxFields":
-        pairs = [[{"k": "str", "v": key}, val] for key, val in f('fields')]
-        return ".boxFields", [("ps", pairs)]
-    # `010-reach-90pct-hole-free` US1/US5: a plain, unit-filled numeric-range
-    # box (`export_ast.sc`'s own `boxRangeExpr` -- see its doc comment for the
-    # full argument and the live experiment that motivated this) -- rendered
-    # as a COMPUTED Lean list (`List.range n |>.map ...`) instead of unrolling
-    # `n` literal pairs the way `"boxFields"` above does. Evaluates to exactly
-    # the same `List (Expr × Expr)` value a literal `[("0", .unit), ("1",
-    # .unit), ...]` of length `n` would, so `Expr.boxFields`'s own semantics
-    # (`evalPairs`) are completely unaffected -- only the SOURCE TEXT spelling
-    # the argument differs, and it differs at CONSTANT size regardless of `n`,
-    # avoiding the elaboration-recursion-depth wall a literal list of this
-    # shape hits at real buffer sizes (confirmed: `ArrayRepExperiment.lean`).
-    if k == "boxFieldsRange":
-        n = f('n')
-        if not isinstance(n, int) or n < 0:
-            raise ValueError(f"boxFieldsRange node has invalid n: {n!r}")
-        atom = (f"((List.range {n}).map (fun i => "
-                f"(Expr.lit (Lit.str s!\"{{i}}\"), Expr.lit Lit.unit)))")
-        return ".boxFields", [("atom", atom)]
-    # `010-reach-90pct-hole-free`: `boxFieldsRange` above needs `n` known at EXPORT
-    # time (it bakes the literal into the generated source text) -- no help for a
-    # `malloc(len)`-shaped C allocation, whose size the exporter can never know
-    # until the program runs. `Expr.boxArray` (`Syntax.lean`) takes a LENGTH
-    # EXPRESSION instead of a literal count, evaluated once at runtime; this is
-    # the ordinary `("e", ...)` single-sub-expression shape every other
-    # one-argument constructor here already uses (`boxNew`, `derefIref`, ...), not
-    # a new rendering pattern.
-    if k == "boxArray": return ".boxArray", [("e", f('n'))]
-    if k == "irefIndex": return ".irefIndex", [("e", f('a')), ("e", f('i'))]
-    if k == "irefField": return ".irefField", [("e", f('a')), ("atom", lean_str(f('f')))]
-    if k == "derefIref": return ".derefIref", [("e", f('p'))]
-    # `009-reduce-remaining-holes-4`: `*p`/`p[i]` on a `char*` byte-cursor -- read
-    # the byte at offset `b` of the base string `a`. See `Syntax.lean`'s own
-    # `Expr.strByte` doc comment for why this is a separate constructor from
-    # `.index` rather than a new case on it.
-    if k == "strByte": return ".strByte", [("e", f('a')), ("e", f('b'))]
-    # `009-reduce-remaining-holes-4`: the substring of `a` from offset `b`
-    # onward -- a byte cursor (`strByte`, above) handed WHOLE to another
-    # function partway through being walked. See `Syntax.lean`'s own
-    # `Expr.strFrom` doc comment. Missed on the first pass (found live: a real
-    # Colab run of the full, unbounded corpus hit `unknown expr node kind
-    # 'strFrom'` on `jim_strstr`, autosetup/jimsh0.c, the first real-corpus
-    # function to actually reach this shape) -- `strByte` alone was added here
-    # and verified via local fixtures, but `strFrom` was verified only via
-    # `lake env lean` fixtures and the exporter's own JSON output, never
-    # actually run through this renderer until a real corpus function used it.
-    if k == "strFrom": return ".strFrom", [("e", f('a')), ("e", f('b'))]
-    # --- objects, containers, control ---
-    if k == "field":  return ".field", [("e", f('a')), ("atom", lean_str(f('f')))]
-    if k == "mcall":  return ".mcall", [("e", f('recv')), ("atom", lean_str(f('m'))), ("es", f('args'))]
-    if k == "alloc":  return ".alloc", [("atom", lean_str(f('cls'))), ("es", f('args'))]
-    if k == "fnref":  return ".fnref", [("atom", lean_str(f('v')))]
-    # A function value that reads variables of an enclosing function. `fnref` is the
-    # cheaper form and is used wherever the exporter proved there is nothing to capture.
-    if k == "closure": return ".closure", [("atom", lean_str(f('f')))]
-    # A *class* that captures its defining scope: instances carry the captured frame, so
-    # their methods can read the enclosing function's variables. `closure` names a
-    # function and cannot stand in for this.
-    if k == "classClosure": return ".classClosure", [("atom", lean_str(f('c')))]
-    if k == "listE":  return ".listE", [("es", f('items'))]
-    if k == "tupleE": return ".tupleE", [("es", f('items'))]
-    if k == "dictE":  return ".dictE", [("ps", f('pairs'))]
-    if k == "cond":   return ".cond", [("e", f('c')), ("e", f('t')), ("e", f('e'))]
-    if k == "isOp":   return ".isOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
-    if k == "inOp":   return ".inOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
-    # --- the calling convention: `f(*xs, k=v, **d)` ---
-    # Only meaningful directly inside a call's argument list; `Semantics.evalList` is the
-    # only consumer, and anywhere else the interpreter holes rather than inventing a value.
-    if k == "starred":  return ".starred", [("e", f('a'))]
-    if k == "kwargE":   return ".kwargE", [("atom", lean_str(f('n'))), ("e", f('a'))]
-    if k == "dstarred": return ".dstarred", [("e", f('a'))]
-    raise ValueError(f"unknown expr node kind {k!r} (node: {json.dumps(n)[:200]})")
+    f = lambda key: _field(n, key, "literal default")
+    if k == "int":   return f"(.int {lean_int(f('v'))})"
+    if k == "str":   return f"(.str {lean_str(f('v'))})"
+    if k == "bool":  return f"(.bool {lean_bool(f('v'))})"
+    if k == "unit":  return ".unit"
+    if k == "float": return f"(.float (Fl.ofBits {lean_float_bits(f('v'))}))"
+    raise ValueError(f"parameter default is not a literal: {k!r}")
+
+
+# Each field is a child kind and wire key, in constructor argument order. String
+# and boolean atoms are encoded here; all other tags are walked by the printer.
+_EXPR_FIELDS = {
+    "name": "str:v", "binop": "str:op e:a e:b", "unop": "str:op e:a",
+    "index": "e:a e:b", "slice": "e:a e:lo e:hi e:st",
+    "call": "str:f es:args", "callV": "e:f es:args", "hole": "str:label",
+    "boxNew": "e:e", "boxArray": "e:n", "irefIndex": "e:a e:i",
+    "irefField": "e:a str:f", "derefIref": "e:p",
+    "strByte": "e:a e:b", "strFrom": "e:a e:b", "field": "e:a str:f",
+    "mcall": "e:recv str:m es:args", "alloc": "str:cls es:args",
+    "fnref": "str:v", "closure": "str:f", "classClosure": "str:c",
+    "listE": "es:items", "tupleE": "es:items", "dictE": "ps:pairs",
+    "cond": "e:c e:t e:e", "isOp": "bool:neg e:a e:b",
+    "inOp": "bool:neg e:a e:b", "starred": "e:a",
+    "kwargE": "str:n e:a", "dstarred": "e:a",
+}
+_STMT_FIELDS = {
+    "skip": "", "brk": "", "cont": "", "holeS": "str:label",
+    "exprS": "e:e", "assign": "str:x e:e", "ret": "e:e", "seq": "s:a s:b",
+    "ifte": "e:c s:t s:e", "loop": "e:c s:body", "breakBlock": "s:body",
+    "setField": "e:r str:f e:v", "setIndex": "e:r e:i e:v",
+    "delIndex": "e:a e:i", "setSlice": "e:r e:lo e:hi e:st e:v",
+    "delSlice": "e:r e:lo e:hi e:st", "setDerefIref": "e:p e:v",
+    "forIn": "str:x e:e s:body", "tryCatch": "s:body str:x s:handler",
+    "tryFinally": "s:body s:fin", "raise": "e:e", "del": "str:x",
+    "setGlobal": "str:x e:e", "declGlobal": "str:x",
+}
+_HEADS = {"callV": "callValue", "exprS": "expr", "holeS": "hole"}
+_ATOMS = {"str": lean_str, "bool": lean_bool}
+
+
+def _shape(n, kind, fields):
+    if not isinstance(n, dict):
+        noun = "expression" if kind == "expr" else "statement"
+        raise ValueError(f"{noun} node is not an object: {n!r}")
+    k = n.get("k")
+    f = lambda key: _field(n, key, kind)
+    if kind == "expr":
+        if k in ("int", "str", "bool", "unit", "float"):
+            return ".lit", [("atom", lean_lit(n))]
+        if k == "boxFields":
+            # Core uses expression pairs for both field dictionaries and dictE.
+            return ".boxFields", [("ps", [
+                [{"k": "str", "v": key}, val] for key, val in f("fields")])]
+        if k == "boxFieldsRange":
+            size = f("n")
+            if not isinstance(size, int) or size < 0:
+                raise ValueError(f"boxFieldsRange node has invalid n: {size!r}")
+            atom = (f"((List.range {size}).map (fun i => "
+                    '(Expr.lit (Lit.str s!"{i}"), Expr.lit Lit.unit)))')
+            return ".boxFields", [("atom", atom)]
+    if k not in fields:
+        raise ValueError(f"unknown {kind} node kind {k!r} (node: {json.dumps(n)[:200]})")
+    children = []
+    for spec in fields[k].split():
+        tag, key = spec.split(":")
+        value = f(key)
+        children.append(("atom", _ATOMS[tag](value)) if tag in _ATOMS else (tag, value))
+    return "." + _HEADS.get(k, k), children
+
+
+def expr_shape(n):
+    return _shape(n, "expr", _EXPR_FIELDS)
+
 
 def stmt_shape(n):
-    if not isinstance(n, dict):
-        raise ValueError(f"statement node is not an object: {n!r}")
-    k = n.get("k")
-    f = lambda key: _field(n, key, "stmt")
-    if k == "skip":     return ".skip", []
-    if k == "brk":      return ".brk", []
-    if k == "cont":     return ".cont", []
-    if k == "holeS":    return ".hole", [("atom", lean_str(f('label')))]
-    if k == "exprS":    return ".expr", [("e", f('e'))]
-    if k == "assign":   return ".assign", [("atom", lean_str(f('x'))), ("e", f('e'))]
-    if k == "ret":      return ".ret", [("e", f('e'))]
-    if k == "seq":      return ".seq", [("s", f('a')), ("s", f('b'))]
-    if k == "ifte":     return ".ifte", [("e", f('c')), ("s", f('t')), ("s", f('e'))]
-    if k == "loop":     return ".loop", [("e", f('c')), ("s", f('body'))]
-    # `007-reduce-remaining-holes-2` US4: absorbs a `break` from `body` without also
-    # absorbing a `continue` (unlike `.loop`, which catches both) -- `switch` lowers to
-    # this wrapping its `ifte`-chain dispatch, so `break` inside a case ends only the
-    # switch, never an enclosing loop.
-    if k == "breakBlock": return ".breakBlock", [("s", f('body'))]
-    # --- objects, iteration, exceptions ---
-    if k == "setField": return ".setField", [("e", f('r')), ("atom", lean_str(f('f'))), ("e", f('v'))]
-    if k == "setIndex": return ".setIndex", [("e", f('r')), ("e", f('i')), ("e", f('v'))]
-    if k == "setDerefIref": return ".setDerefIref", [("e", f('p')), ("e", f('v'))]
-    if k == "forIn":    return ".forIn", [("atom", lean_str(f('x'))), ("e", f('e')), ("s", f('body'))]
-    if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]
-    # `try: body finally: fin`. Distinct from `tryCatch` because it intercepts *every* way
-    # control leaves the body — return/break/continue as well as exceptions — and then
-    # re-raises that outcome unless the finalizer itself leaves abnormally.
-    if k == "tryFinally": return ".tryFinally", [("s", f('body')), ("s", f('fin'))]
-    if k == "raise":    return ".raise", [("e", f('e'))]
-    if k == "del":      return ".del", [("atom", lean_str(f('x')))]
-    # --- module-level scope ---
-    if k == "setGlobal":  return ".setGlobal", [("atom", lean_str(f('x'))), ("e", f('e'))]
-    if k == "declGlobal": return ".declGlobal", [("atom", lean_str(f('x')))]
-    raise ValueError(f"unknown stmt node kind {k!r} (node: {json.dumps(n)[:200]})")
+    return _shape(n, "stmt", _STMT_FIELDS)
+
 
 SHAPE = {"e": expr_shape, "s": stmt_shape}
 
-# ---------------------------------------------------------------------------
-# Printing
-# ---------------------------------------------------------------------------
-
-def flat(node, kind) -> str:
-    """Single-line rendering. Always fully parenthesised (except nullary constructors)."""
-    head, children = SHAPE[kind](node)
-    if not children:
-        return head
-    return "(" + head + " " + " ".join(flat_child(c) for c in children) + ")"
-
-class _RawNewline(Exception):
-    """An atom contained a literal newline — fall back to the uncapped path.
-
-    `render` returns the flat form unconditionally when it contains a newline, so the
-    capped variant must not silently disagree. JSON escapes newlines, so this should be
-    unreachable; it exists so that "should be" is not load-bearing."""
-
-
-def flat_capped(node, kind, cap):
-    """`flat(node, kind)` if it is at most `cap` characters, else `None`.
-
-    Why this exists: `render` computed `flat()` over the WHOLE subtree at every level
-    just to ask whether it fit in `WIDTH` columns, then threw the string away when it did
-    not. On a chain of n nested statements that is O(n^2) characters built and discarded,
-    and measured it was worse than that -- 250 statements rendered in 0.33 s, 2000 in
-    42 s, and 5000 did not finish. V8 has functions far deeper than 2000.
-
-    Since a flat form is only ever *used* when it fits in `WIDTH` (100) columns, anything
-    longer need never be constructed. This short-circuits as soon as the budget is blown,
-    so each node costs O(cap) instead of O(subtree), and the whole render is linear.
-    """
-    if cap < 0:
-        return None
-    head, children = SHAPE[kind](node)
-    if not children:
-        return head if len(head) <= cap else None
-    # "(" + head + " " + ... + ")"
-    budget = cap - (len(head) + 3)
-    if budget < 0:
-        return None
-    parts = []
-    for c in children:
-        piece = flat_child_capped(c, budget)
-        if piece is None:
-            return None
-        budget -= len(piece) + 1          # the separating space
-        if budget < -1:
-            return None
-        parts.append(piece)
-    out = "(" + head + " " + " ".join(parts) + ")"
-    return out if len(out) <= cap else None
-
-
-def flat_child_capped(c, cap):
-    tag, val = c
-    if tag == "atom":
-        if "\n" in val:
-            raise _RawNewline
-        return val if len(val) <= cap else None
-    if tag in ("e", "s"):
-        return flat_capped(val, tag, cap)
-    if tag in ("es", "ps"):
-        items = _seq(val)
-        budget = cap - 2                  # the brackets
-        if budget < 0:
-            return None
-        parts = []
-        for x in items:
-            piece = (flat_capped(x, "e", budget) if tag == "es"
-                     else _flat_pair_capped(x, budget))
-            if piece is None:
-                return None
-            budget -= len(piece) + 2      # ", "
-            if budget < -2:
-                return None
-            parts.append(piece)
-        out = "[" + ", ".join(parts) + "]"
-        return out if len(out) <= cap else None
-    raise AssertionError(tag)
-
-
-def _flat_pair_capped(p, cap):
-    if not (isinstance(p, list) and len(p) == 2):
-        raise ValueError(f"dictE pair must be a 2-element array, got {p!r}")
-    a = flat_capped(p[0], "e", cap - 4)
-    if a is None:
-        return None
-    b = flat_capped(p[1], "e", cap - 4 - len(a))
-    if b is None:
-        return None
-    out = "(" + a + ", " + b + ")"
-    return out if len(out) <= cap else None
-
-
-def flat_child(c) -> str:
-    tag, val = c
-    if tag == "atom":
-        return val
-    if tag in ("e", "s"):
-        return flat(val, tag)
-    if tag == "es":
-        return "[" + ", ".join(flat(x, "e") for x in _seq(val)) + "]"
-    if tag == "ps":
-        return "[" + ", ".join(_flat_pair(p) for p in _seq(val)) + "]"
-    raise AssertionError(tag)
 
 def _seq(val):
     if val is None:
@@ -369,120 +231,109 @@ def _seq(val):
         raise ValueError(f"expected a JSON array, got {val!r}")
     return val
 
-def _flat_pair(p):
-    if not (isinstance(p, list) and len(p) == 2):
-        raise ValueError(f"dictE pair must be a 2-element array, got {p!r}")
-    return "(" + flat(p[0], "e") + ", " + flat(p[1], "e") + ")"
 
-def _render_seq_chain(node, col) -> str:
-    """Render a `Stmt.seq` whose flat form already failed to fit at `col`, without one
-    Python stack frame per statement.
+class _Term:
+    """A measured document: no subtree strings are built or repeatedly flattened."""
+    __slots__ = ("tag", "head", "children", "size")
 
-    `.seq(a, b)` is right-associated, so a function with N consecutive top-level
-    statements is a chain N deep. The fully-recursive walk (`render` -> `render_child` ->
-    `render` for `b`, all the way down) turns that into N nested Python calls, which is
-    exactly the wall `docs/scale.md` measured at 247 statements (independent of total
-    repo size — `sqlparse` at 8.8k lines failed, `requests` at 12k lines did not, because
-    the trigger is one file's statement count). Raising `sys.setrecursionlimit` and the
-    thread stack size (`main`, below) moved that cliff without removing it; this removes
-    it, by walking the spine with an explicit `while` loop instead of the call stack.
+    def __init__(self, tag, head, children):
+        self.tag, self.head, self.children = tag, head, children
+        if tag == "atom":
+            self.size = len(head)
+        else:
+            overhead = len(head) + len(children) + 2 if tag == "node" else 2 * len(children)
+            self.size = overhead + sum(child.size for child in children)
 
-    Reproduces `render()`'s output byte-for-byte: at every link in the spine, the same
-    flat-then-structural decision `render()` itself makes is made here too, so a
-    sub-chain short enough to fit on one line still renders flat, exactly as it would
-    have under full recursion. Real nesting (if/loop bodies) is not the measured problem
-    and is not touched — each individual statement in the chain still renders through the
-    ordinary recursive `render`, only as deep as that one statement's own structure.
+
+def _print(value, kind, col=None, cap=None):
+    """Measure once, then emit once, using explicit stacks for every tree shape.
+
+    `col=None` selects flat output. Layout uses the same measured documents, with
+    leading commas for lists and capped continuation indentation. The output buffer
+    contains only final fragments, so deep chains take linear time and space.
     """
-    heads = []              # (statement node, its column), outermost first
-    cur, cur_col = node, col
-    while True:
-        if not (isinstance(cur, dict) and cur.get("k") == "seq"):
-            tail_text = render(cur, "s", cur_col)
-            break
-        try:
-            one = flat_capped(cur, "s", WIDTH - cur_col)
-            if one is not None:
-                tail_text = one
-                break
-        except _RawNewline:
-            one = flat(cur, "s")
-            if cur_col + len(one) <= WIDTH or "\n" in one:
-                tail_text = one
-                break
-        inner = min(cur_col + INDENT, MAX_INDENT)
-        heads.append((cur["a"], inner))
-        cur_col = inner
-        cur = cur["b"]
-    acc = tail_text
-    for head_node, head_col in reversed(heads):
-        pad = " " * head_col
-        head_text = render(head_node, "s", head_col)
-        acc = "(.seq\n" + pad + head_text + "\n" + pad + acc + ")"
-    return acc
+    pending, measured = [(kind, value)], []
+    while pending:
+        tag, value = pending.pop()
+        if tag == "finish":
+            layout, head, count = value
+            children = measured[-count:]
+            del measured[-count:]
+            measured.append(_Term(layout, head, children))
+            continue
+        if tag == "atom":
+            measured.append(_Term(tag, value, []))
+            continue
+        if tag in SHAPE:
+            head, children = SHAPE[tag](value)
+            layout = "node"
+            if not children:
+                measured.append(_Term("atom", head, []))
+                continue
+        elif tag in ("es", "ps"):
+            children = [("e" if tag == "es" else "pair", item) for item in _seq(value)]
+            head, layout = "", "list"
+            if not children:
+                measured.append(_Term("atom", "[]", []))
+                continue
+        elif tag == "pair":
+            if not (isinstance(value, list) and len(value) == 2):
+                raise ValueError(f"dictE pair must be a 2-element array, got {value!r}")
+            head, layout = "", "pair"
+            children = [("e", item) for item in value]
+        else:
+            raise AssertionError(tag)
+        pending.append(("finish", (layout, head, len(children))))
+        pending.extend(reversed(children))
+    root, = measured
+    if cap is not None and root.size > cap:
+        return None
+    output, pending = [], [(root, col)]
+    while pending:
+        term, col = pending.pop()
+        if isinstance(term, str):
+            output.append(term)
+            continue
+        if term.tag == "atom":
+            output.append(term.head)
+            continue
+        fits = col is None or col + term.size <= WIDTH
+        inner = None if fits else min(col + INDENT, MAX_INDENT)
+        if term.tag == "node":
+            prefix, suffix = "(" + term.head, ")"
+            separator = " " if fits else "\n" + " " * inner
+            prefix += separator
+        elif term.tag == "list":
+            prefix, suffix = ("[", "]") if fits else ("[ ", " ]")
+            separator = ", " if fits else "\n" + " " * col + ", "
+        else:
+            prefix, suffix = "(", ")"
+            separator = ", " if fits else ",\n" + " " * inner
+        output.append(prefix)
+        pending.append((suffix, None))
+        for index in range(len(term.children) - 1, -1, -1):
+            pending.append((term.children[index], inner))
+            if index:
+                pending.append((separator, None))
+    return "".join(output)
+
+
+def flat(node, kind) -> str:
+    return _print(node, kind)
+
+
+def flat_capped(node, kind, cap):
+    return _print(node, kind, cap=cap)
+
 
 def render(node, kind, col) -> str:
-    """Render `node` starting at column `col`, wrapping if the flat form is too wide.
+    """Wrap at WIDTH; the caller supplies indentation for the first line."""
+    return _print(node, kind, col)
 
-    The returned string's first line is *not* indented (the caller has already placed the
-    cursor at `col`); continuation lines carry their own indentation.
-    """
-    try:
-        one = flat_capped(node, kind, WIDTH - col)
-        if one is not None:
-            return one
-    except _RawNewline:
-        one = flat(node, kind)
-        if col + len(one) <= WIDTH or "\n" in one:
-            return one
-    if kind == "s" and isinstance(node, dict) and node.get("k") == "seq":
-        return _render_seq_chain(node, col)
-    head, children = SHAPE[kind](node)
-    if not children:
-        # A nullary constructor's flat form IS its head. The capped flatten returns None
-        # when the head alone overruns the column budget, and returning that None here
-        # was a real regression: it propagated into a string join several frames up and
-        # surfaced as a TypeError, not as a wrong render. Caught by check_render.
-        return head
-    inner = min(col + INDENT, MAX_INDENT)
-    pad = " " * inner
-    parts = [render_child(c, inner) for c in children]
-    return "(" + head + "\n" + "\n".join(pad + p for p in parts) + ")"
 
-def render_child(c, col) -> str:
-    tag, val = c
-    if tag == "atom":
-        return val
-    if tag in ("e", "s"):
-        return render(val, tag, col)
-    if tag in ("es", "ps"):
-        items = _seq(val)
-        if not items:
-            return "[]"
-        one = flat_child(c)
-        if col + len(one) <= WIDTH:
-            return one
-        # Leading-comma layout: every element starts at the same column, so the block
-        # stays readable and each line is independently diffable.
-        pad = " " * col
-        deeper = min(col + INDENT, MAX_INDENT)
-        rendered = ([render(x, "e", deeper) for x in items] if tag == "es"
-                    else [render_pair(p, deeper) for p in items])
-        body = ("\n" + pad + ", ").join(rendered)
-        return "[ " + body + " ]"
-    raise AssertionError(tag)
-
-def render_pair(p, col) -> str:
-    one = _flat_pair(p)
-    if col + len(one) <= WIDTH:
-        return one
-    inner = min(col + INDENT, MAX_INDENT)
-    return ("(" + render(p[0], "e", inner) + ",\n" + " " * inner
-            + render(p[1], "e", inner) + ")")
-
-# Kept as the public entry points other tooling may import.
 def expr(n) -> str:
     return flat(n, "e")
+
 
 def stmt(n) -> str:
     return flat(n, "s")
@@ -509,7 +360,12 @@ def ident(name: str) -> str:
 # (`Autoform/Lang/Core/Syntax.lean`) is the real fix; this table just has to point at it.
 DIALECT = {".py": ".python", ".c": ".cLike", ".h": ".cLike", ".cpp": ".cLike",
            ".cc": ".cLike", ".cxx": ".cLike", ".hh": ".cLike", ".hpp": ".cLike",
-           ".java": ".cLike", ".kt": ".cLike", ".go": ".cLike",
+           # `.java`/`.go` are real constructors (`Autoform.Core.Dialect.java`/`.go`,
+           # `Syntax.lean`): 64-bit Go `int`, value strings, boxed arrays/slices, Java's
+           # reference `==` as a named hole. Kotlin/JVM shares Java's integer model and
+           # boolean operators, so it rides `.java`; its structural string `==` lands on
+           # the same conservative hole.
+           ".java": ".java", ".kt": ".java", ".go": ".go",
            ".js": ".javascript", ".ts": ".javascript", ".tsx": ".javascript",
            ".jsx": ".javascript", ".mjs": ".javascript", ".cjs": ".javascript"}
 
@@ -525,6 +381,11 @@ def infer_dialect(funcs) -> str:
     extension is an error, not an assumption.
     """
     exts = [os.path.splitext(f.get("file", ""))[1] for f in funcs]
+    unknown = sorted({e for e in exts if e and e not in DIALECT})
+    if unknown:
+        raise SystemExit("render_lean: cannot infer dialect — unrecognized extensions: %s. "
+                         "Use a supported source frontend or formalize the compiled binary "
+                         "with autoform.sh --machine." % unknown)
     votes = [DIALECT[e] for e in exts if e in DIALECT]
     if not votes:
         seen = sorted({e for e in exts if e})
@@ -534,7 +395,93 @@ def infer_dialect(funcs) -> str:
             "  Add the extension to DIALECT (with its real integer-division and\n"
             "  string semantics) rather than letting it default." % (seen or "[]",
                                                                     sorted(DIALECT)))
-    return max(set(votes), key=votes.count)
+    dialects = sorted(set(votes))
+    if len(dialects) != 1:
+        raise SystemExit("render_lean: mixed source dialects %s cannot share one Core program. "
+                         "Translate each dialect separately, or formalize the linked binary "
+                         "with autoform.sh --machine; majority voting changes program semantics."
+                         % dialects)
+    return dialects[0]
+
+def program_exc_classes(funcs) -> str:
+    """The `Program.excClasses` literal: the corpus's own exception classes, as the module
+    initializers carry them (`exceptionClasses`), deduplicated and sorted. `Stmt.raise`
+    accepts these names exactly as it accepts the builtin ones (Python reference §8.4.1:
+    a handler matches by class or base class, so the name is what matters)."""
+    names = set()
+    for f in funcs:
+        for n in (f.get("exceptionClasses") or []):
+            if not isinstance(n, str):
+                raise ValueError(f"render_lean: malformed exceptionClasses entry {n!r}")
+            names.add(n)
+    return ", ".join(lean_str(n) for n in sorted(names))
+
+
+def program_properties(funcs) -> str:
+    """The `Program.properties` literal: every `(class, name)` a `@property` getter was
+    recorded under, aggregated across the module initializers, deduplicated and sorted.
+
+    Keyed by class as well as name, so two classes with a same-named property are not a
+    conflict -- `evalExpr` dispatches on `(o.cls, f)` and picks the right one. Contrast
+    `builtinBases`, which is keyed by class name alone and therefore has to drop a class
+    recorded with two different bases.
+    """
+    pairs = set()
+    for f in funcs:
+        for pair in (f.get("classProperties") or []):
+            if (not isinstance(pair, list) or len(pair) != 2
+                    or not all(isinstance(x, str) for x in pair)):
+                raise ValueError(f"render_lean: malformed classProperties entry {pair!r}")
+            pairs.add((pair[0], pair[1]))
+    return ", ".join("({}, {})".format(lean_str(c), lean_str(n)) for c, n in sorted(pairs))
+
+
+def program_classes(funcs) -> str:
+    """Render qualified class namespaces without collapsing duplicate identities."""
+    declarations = []
+    allowed = {'name', 'shortName', 'bases', 'attributes',
+               'definitionBarrier', 'inheritanceBarrier', 'slots'}
+    for function in funcs:
+        rows = function.get('classDeclarations', [])
+        if not isinstance(rows, list):
+            raise ValueError('classDeclarations must be a list')
+        for row in rows:
+            if (not isinstance(row, dict) or set(row) - allowed
+                    or not {'name', 'shortName', 'bases', 'attributes'} <= set(row)
+                    or any(not isinstance(row[key], str) or not row[key]
+                           for key in ('name', 'shortName'))
+                    or not isinstance(row['bases'], list)
+                    or any(not isinstance(base, str) or not base for base in row['bases'])
+                    or not isinstance(row['attributes'], list)):
+                raise ValueError('malformed class declaration')
+            fields = ['name := ' + lean_str(row['name']),
+                      'shortName := ' + lean_str(row['shortName']),
+                      'bases := [' + ', '.join(map(lean_str, row['bases'])) + ']']
+            attributes = []
+            for attribute in row['attributes']:
+                if (not isinstance(attribute, dict) or set(attribute) != {'name', 'kind', 'value'}
+                        or attribute['kind'] not in ('method', 'property', 'stored', 'slot', 'opaque')
+                        or any(not isinstance(attribute[key], str) or not attribute[key]
+                               for key in ('name', 'value'))):
+                    raise ValueError('malformed class attribute')
+                attributes.append('(' + lean_str(attribute['name']) + ', .'
+                                  + attribute['kind'] + ' ' + lean_str(attribute['value']) + ')')
+            fields.append('attributes := [' + ', '.join(attributes) + ']')
+            if 'slots' in row:
+                slots = row['slots']
+                if (not isinstance(slots, list)
+                        or any(not isinstance(name, str) or not name for name in slots)
+                        or len(set(slots)) != len(slots)):
+                    raise ValueError('malformed class slot layout')
+                fields.append('slots := some [' + ', '.join(map(lean_str, slots)) + ']')
+            for key in ('definitionBarrier', 'inheritanceBarrier'):
+                if key in row:
+                    if not isinstance(row[key], str) or not row[key]:
+                        raise ValueError('malformed class lookup barrier')
+                    fields.append(key + ' := some ' + lean_str(row[key]))
+            declarations.append((row['name'], '{ ' + ', '.join(fields) + ' }'))
+    return ', '.join(rendered for _, rendered in sorted(declarations))
+
 
 def render_func(f, nm) -> list:
     params = ", ".join(lean_str(p) for p in f.get("params", []))
@@ -543,10 +490,84 @@ def render_func(f, nm) -> list:
     # variadic parameters renders byte-identically to the way it did before the calling
     # convention existed. Both fields default to `none` in `Core.Func`.
     variadic = []
+    if 'analysisBody' in f:
+        variadic.append("  , analysisBody := some " + render(f['analysisBody'], 's', 10))
     if f.get("vararg") is not None:
         variadic.append(f"  , vararg := some {lean_str(f['vararg'])}")
     if f.get("kwarg") is not None:
         variadic.append(f"  , kwarg := some {lean_str(f['kwarg'])}")
+    if 'pythonSignature' in f:
+        signature = f['pythonSignature']
+        keys = ('positionalOnly', 'keywordOnly', 'required')
+        if (not isinstance(signature, dict) or not set(keys) <= set(signature)
+                or set(signature) - set(keys) - {'isMethod', 'defaults', 'receiverKind', 'classAttrDefaults', 'receiverName'}):
+            raise ValueError('invalid Python signature fields')
+        if 'isMethod' in signature and type(signature['isMethod']) is not bool:
+            raise ValueError('invalid Python method classification')
+        # The only receiver kind Core distinguishes is the class of a `@classmethod`.
+        # Anything else is not a value this renderer knows how to bind, and inventing
+        # one is exactly the silent mistranslation a raise here prevents.
+        if 'receiverKind' in signature and signature['receiverKind'] != 'class':
+            raise ValueError('unknown Python receiver kind: %r' % (signature['receiverKind'],))
+        ordinary = set(f.get('params', [])) - {f.get('vararg'), f.get('kwarg')}
+        for key in keys:
+            values = signature[key]
+            if (not isinstance(values, list) or not all(isinstance(x, str) for x in values)
+                    or len(set(values)) != len(values) or not set(values) <= ordinary):
+                raise ValueError('invalid Python signature parameters: ' + key)
+        if set(signature['positionalOnly']) & set(signature['keywordOnly']):
+            raise ValueError('overlapping Python parameter kinds')
+        fields = ', '.join(key + ' := [' + ', '.join(map(lean_str, signature[key])) + ']'
+                           for key in keys)
+        if 'isMethod' in signature:
+            fields += ', isMethod := some ' + str(signature['isMethod']).lower()
+        if 'receiverKind' in signature:
+            fields += ', receiverKind := some ' + lean_str(signature['receiverKind'])
+        # The stripped instance receiver's name, kept so `kwargsRejected` can refuse a
+        # keyword of that name (`o.f(self=1)` on `def f(self, **kw)`). It was stripped, so
+        # it must NOT also be an ordinary parameter, and it is a receiver, so the function
+        # must be a method.
+        if 'receiverName' in signature:
+            name = signature['receiverName']
+            if (not isinstance(name, str) or not name or name in f.get('params', [])
+                    or signature.get('isMethod') is not True):
+                raise ValueError('invalid Python receiver name: %r' % (name,))
+            fields += ', receiverName := some ' + lean_str(name)
+        defaults = signature.get('defaults') or []
+        if defaults:
+            # A default names an ordinary parameter, names it once, and never names a
+            # required one -- "required" is defined as "has no default", so an overlap
+            # would mean the two fields disagree about the same parameter.
+            if not isinstance(defaults, list):
+                raise ValueError('invalid Python defaults')
+            names = [d[0] for d in defaults]
+            if (not all(isinstance(d, list) and len(d) == 2 and isinstance(d[0], str)
+                        for d in defaults)
+                    or len(set(names)) != len(names)
+                    or not set(names) <= ordinary
+                    or set(names) & set(signature['required'])):
+                raise ValueError('invalid Python defaults')
+            rendered = ', '.join(f'({lean_str(nm)}, {lean_default(v)})' for nm, v in defaults)
+            fields += ', defaults := [' + rendered + ']'
+        class_attrs = signature.get('classAttrDefaults') or []
+        if class_attrs:
+            # `(parameter, class, mangled attribute)`. A parameter has ONE default, so it
+            # may not also appear in `defaults`; and a defaulted parameter is not
+            # `required`, for the same reason as above.
+            lit_names = {d[0] for d in (signature.get('defaults') or [])}
+            names = [d[0] for d in class_attrs]
+            if (not isinstance(class_attrs, list)
+                    or not all(isinstance(d, list) and len(d) == 3
+                               and all(isinstance(x, str) for x in d) for d in class_attrs)
+                    or len(set(names)) != len(names)
+                    or not set(names) <= ordinary
+                    or set(names) & set(signature['required'])
+                    or set(names) & lit_names):
+                raise ValueError('invalid Python class-attribute defaults')
+            rendered = ', '.join(f'({lean_str(p)}, {lean_str(c)}, {lean_str(a)})'
+                                 for p, c, a in class_attrs)
+            fields += ', classAttrDefaults := [' + rendered + ']'
+        variadic.append('  , pythonSignature := some { ' + fields + ' }')
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",
         f"def {nm} : Func :=",
@@ -557,16 +578,26 @@ def render_func(f, nm) -> list:
         "",
     ]
 
-def _run_main():
-    src, dst = sys.argv[1], sys.argv[2]
-    module = sys.argv[3] if len(sys.argv) > 3 else "Translated"
-    with open(src) as fh:
-        funcs = json.load(fh)
-    dialect = infer_dialect(funcs)
+def shard_size(argv):
+    """`--shard-functions N` (or `AUTOFORM_SHARD_FUNCTIONS`): split the definitions into
+    part modules of at most N functions. 0 or absent renders one module, byte-identical
+    to the unsharded output, which is what every tracked render pin is a hash of."""
+    value = os.environ.get("AUTOFORM_SHARD_FUNCTIONS", "0")
+    if "--shard-functions" in argv:
+        i = argv.index("--shard-functions")
+        value = argv[i + 1]
+        del argv[i:i + 2]
+    try:
+        n = int(value)
+    except ValueError:
+        raise SystemExit(f"render_lean: --shard-functions needs an integer, got {value!r}")
+    if n < 0:
+        raise SystemExit("render_lean: --shard-functions must be >= 0")
+    return n
 
-    out = [
-        "import Autoform.Lang.Core.Semantics",
-        "",
+
+def module_options(count):
+    return [
         "-- Lean's default `maxRecDepth` (512) is a guard against runaway elaboration, not",
         "-- a statement about reasonable programs. A deep-embedded function body is one",
         "-- term, so the elaborator's recursion depth tracks the *source's* nesting depth:",
@@ -579,7 +610,7 @@ def _run_main():
         "-- which elaborates as nested cons cells -- one frame or more per function, and",
         "-- Ansible has 5,546. So the limit has to scale with the module's function count,",
         "-- not with how deep its code happens to be.",
-        f"set_option maxRecDepth {max(8000, 8 * len(funcs) + 8000)}",
+        f"set_option maxRecDepth {max(8000, 8 * count + 8000)}",
         "",
         "-- Lean's default `maxHeartbeats` (200000) budgets ONE declaration's own",
         "-- elaboration cost, separately from `maxRecDepth` above (which bounds nesting",
@@ -598,6 +629,31 @@ def _run_main():
         "-- against a genuine runaway elaboration bug while someone is editing them).",
         "set_option maxHeartbeats 0",
         "",
+    ]
+
+
+def part_paths(dst, module):
+    """The part directory of a sharded render: `<dir of dst>/<module>/PartNNNN.lean`."""
+    return os.path.join(os.path.dirname(os.path.abspath(dst)), module)
+
+
+def _run_main():
+    argv = sys.argv[1:]
+    shard = shard_size(argv)
+    src, dst = argv[0], argv[1]
+    module = argv[2] if len(argv) > 2 else "Translated"
+    funcs = lower_generators(deep_json.load(src))
+    dialect = infer_dialect(funcs)
+    if dialect == '.python':
+        funcs = lower_truth_values(lower_truth_conditions(funcs))
+    auxiliary = [helper for function in funcs
+                 for kind in ('generatorHelpers', 'truthHelpers', 'decoratedEntries')
+                 for helper in function.get(kind, [])]
+
+    out = [
+        "import Autoform.Lang.Core.Semantics",
+        "",
+        *module_options(len(funcs)),
         "/-!",
         f"# {module} — machine-generated",
         "",
@@ -619,17 +675,80 @@ def _run_main():
     ]
     names = []
     seen = set()
-    for f in funcs:
+    rendered = []
+    for f in funcs + auxiliary:
         nm = ident(f["name"])
         while nm in seen:
             nm += "'"
         seen.add(nm)
         names.append(nm)
         try:
-            out.extend(render_func(f, nm))
+            rendered.append(render_func(f, nm))
         except ValueError as e:
             raise SystemExit(f"render_lean: in function {f.get('name')!r} "
                              f"(from {f.get('file','?')}): {e}")
+    # A sharded render puts the definitions in part modules that import only the
+    # semantics, never each other, so `lake build` elaborates them in parallel and each
+    # `lean` process holds one part, not the corpus. The root module keeps everything
+    # else -- the import list, `moduleInits` and `program` -- so every name downstream
+    # (`Autoform.Generated.<M>.program`, each `def`) is the same as unsharded.
+    part_dir = part_paths(dst, module)
+    parts = ([rendered[k:k + shard] for k in range(0, len(rendered), shard)]
+             if shard and len(rendered) > shard else [])
+    stale = sorted(glob.glob(os.path.join(part_dir, "Part*.lean")))
+    for path in stale:
+        os.remove(path)
+    if parts:
+        os.makedirs(part_dir, exist_ok=True)
+        part_modules = []
+        # Each part also carries its slice of the function list: the root then assembles
+        # `program.funcs` by appending them, so the 10,000-element literal that took the
+        # root module 500 s to elaborate on Django becomes twelve 1,000-element literals
+        # elaborated in parallel and a dozen `++`s. Same list, by `rfl`.
+        part_lists = []
+        rendered_names = names[:len(rendered)]
+        for k, chunk in enumerate(parts, 1):
+            part = f"Part{k:04d}"
+            part_modules.append(f"Autoform.Generated.{module}.{part}")
+            lo = (k - 1) * shard
+            chunk_names = [n for n in rendered_names[lo:lo + len(chunk)]]
+            part_lists.append((part, [n for n, f in zip(chunk_names, funcs[lo:lo + len(chunk)])]))
+            body = [
+                "import Autoform.Lang.Core.Semantics",
+                "",
+                # The module-wide count, not the part's: the limit also has to cover the
+                # deepest single body (a module initializer of a few hundred statements
+                # is a term that deep), which the whole-module formula covered because
+                # the list term dominated. Django's part 10 hit the limit at the part's
+                # own count. A limit never reached costs nothing.
+                *module_options(len(funcs)),
+                "/-!",
+                f"# {module}, part {k} of {len(parts)} — machine-generated",
+                "",
+                "Emitted by `cartographer/render_lean.py --shard-functions`; the module",
+                f"`Autoform.Generated.{module}` imports every part and assembles `program`.",
+                "Do not edit: regenerate.",
+                "-/",
+                "",
+                f"namespace Autoform.Generated.{module}",
+                "open Autoform.Core",
+                "",
+            ]
+            for lines in chunk:
+                body.extend(lines)
+            own = [n for n in chunk_names if n in set(names[:len(funcs)])]
+            body.append(f"/-- This part's slice of `program.funcs`, in program order. -/")
+            body.append(f"def {part}.partFuncs : List Func := [" + ", ".join(own) + "]")
+            body.append("")
+            body.append(f"end Autoform.Generated.{module}")
+            with open(os.path.join(part_dir, part + ".lean"), "w") as fh:
+                fh.write("\n".join(body))
+        out[0:1] = ["import " + m for m in part_modules]
+    else:
+        if os.path.isdir(part_dir) and not os.listdir(part_dir):
+            os.rmdir(part_dir)
+        for lines in rendered:
+            out.extend(lines)
 
     # Module-level bindings are exported as zero-argument *initializer* functions, one
     # per source file, whose bodies are runs of `Stmt.setGlobal`. Running them is what
@@ -663,24 +782,50 @@ def _run_main():
                          "Core.BuiltinBase has no constructor for them".format(unknown))
     bb = ", ".join("({}, {})".format(lean_str(c), base_ctor[bases[c]])
                    for c in sorted(bases))
+    props = program_properties(funcs)
+    excs = program_exc_classes(funcs)
+    classes = program_classes(funcs)
 
+    extra = ""
+    if auxiliary:
+        extra += ", auxiliaryFuncs := [" + ", ".join(names[len(funcs):]) + "]"
+    notes = []
+    if classes:
+        extra += ", classDecls := [" + classes + "]"
+        notes.append("`classDecls` records qualified class namespaces and ordered bases;")
+        notes.append("unresolved ancestry remains an explicit lookup boundary.")
     if bb:
+        extra += ", builtinBases := [" + bb + "]"
+        notes.append("`builtinBases` lists the classes whose base is a builtin type, so that")
+        notes.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`.")
+    if props:
+        extra += ", properties := [" + props + "]"
+        notes.append("`properties` lists every `@property` as `(class, name)`, so that an")
+        notes.append("attribute read of one runs the getter instead of missing the field.")
+    if excs:
+        extra += ", excClasses := [" + excs + "]"
+        notes.append("`excClasses` lists the program's own exception classes, so that")
+        notes.append("`raise` of one is a represented exception and handlers can match it.")
+    if notes:
         out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention).")
         out.append("")
-        out.append("`builtinBases` lists the classes whose base is a builtin type, so that")
-        out.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`. -/")
-        out.append("def program : Program := { dialect := " + dialect
-                   + ", builtinBases := [" + bb + "], funcs := [")
+        out.extend(notes[:-1])
+        out.append(notes[-1] + " -/")
     else:
         out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
-        out.append("def program : Program := { dialect := " + dialect + ", funcs := [")
-    out.append(",\n".join("  " + n for n in names))
-    out.append("] }")
+    if parts:
+        out.append("def program : Program := { dialect := " + dialect + extra + ", funcs :=")
+        out.append("  " + " ++ ".join(f"{part}.partFuncs" for part, _ in part_lists) + " }")
+    else:
+        out.append("def program : Program := { dialect := " + dialect + extra + ", funcs := [")
+        out.append(",\n".join("  " + n for n in names[:len(funcs)]))
+        out.append("] }")
     out.append("")
     out.append(f"end Autoform.Generated.{module}")
     with open(dst, "w") as fh:
         fh.write("\n".join(out))
-    print(f"rendered {len(funcs)} functions -> {dst}")
+    print(f"rendered {len(funcs)} functions -> {dst}"
+          + (f" ({len(parts)} parts under {os.path.relpath(part_dir)})" if parts else ""))
 
 def main():
     """Render on a thread with a large stack.

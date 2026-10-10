@@ -1,0 +1,136 @@
+{
+ "module": "PipelineKotlin",
+ "corpus": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/examples/source/kotlin",
+ "mode": "native",
+ "interpreter_fuel": 5000,
+ "initializer_fuel": 5000,
+ "cross_runtime_evidence": true,
+ "self_recorded_families": [
+  "charact"
+ ],
+ "self_recorded_note": "`charact_*` right-hand sides are this interpreter's own output. They are characterization/regression theorems and are NOT cross-implementation evidence; only `conform_*` is, and it needs a runtime this repository can drive.",
+ "families_unavailable": [],
+ "subjects_considered": 3,
+ "subject_population": "observed",
+ "max_subjects": null,
+ "only_subjects": null,
+ "excluded_subjects": [],
+ "functions": 4,
+ "call_closed": 4,
+ "artifacts": {
+  "docstrings": 0,
+  "doctests": 0,
+  "asserts": 0,
+  "raises": 0,
+  "pbt_files": 0,
+  "pbt_properties": 0,
+  "test_files": 0
+ },
+ "observations": {
+  "calls": 15,
+  "in_core": 15,
+  "tests": [],
+  "skipped": {
+   "skip_varargs": 0,
+   "skip_unencodable_args": 0,
+   "skip_unencodable_ret": 0,
+   "runtime": "kotlin",
+   "evidence": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/artifacts/pipeline/PipelineKotlin/conformance.json"
+  }
+ },
+ "candidates": 3,
+ "refuted": 0,
+ "not_checked": 0,
+ "vacuous": 0,
+ "vacuity_checks": {},
+ "vacuity_rate_pct": 0.0,
+ "emitted": 3,
+ "proved": 3,
+ "open_obligations": 0,
+ "build_clean": true,
+ "artifact_hashes": {
+  "ast": "25ce60f0729fcdc1c4411a090b1d2c029cb1eb7e5354b001aea54e24be8f5863",
+  "model": "d72c6a6553b92621ff2c447087932aad4e00cf1207d94abef61d7caced363b0c",
+  "conformance": "3f365f5f953e9456b172b1e93a388f1e68f06016e557e3f322f6b0647123f845",
+  "proof": "ac205176a5fd3f7c5505d91b9e4c0223f18b8a38cb55dc21ef72632d9e78b23f"
+ },
+ "mutation_sample": null,
+ "fuel_independent": 3,
+ "fuel_obligations_remaining": 0,
+ "fuel_blocked_reasons": {},
+ "outOfFuel_cases": {},
+ "by_family": {
+  "conform": {
+   "candidates": 3,
+   "refuted": 0,
+   "vacuous": 0,
+   "proved": 3
+  }
+ },
+ "specs": [
+  {
+   "id": "conform_numbers_add_long_long_long",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.add:long(long,long)",
+   "definition": "f_numbers_add_long_long_long_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_shift_long_long_int",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.shift:long(long,int)",
+   "definition": "f_numbers_shift_long_long_int_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_word_int_int_int",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.word:int(int,int)",
+   "definition": "f_numbers_word_int_int_int_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  }
+ ],
+ "not_checked_gates": [
+  "scripts/mutate.py \u2014 run separately; a surviving mutant means the spec is vacuous in the sufficient sense",
+  "scripts/audit_all.py \u2014 axiom basis of the emitted theorems"
+ ]
+}

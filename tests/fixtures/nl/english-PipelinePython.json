@@ -1,0 +1,59 @@
+[
+ {
+  "function": "numbers.py:<module>.add",
+  "summary": "Adds two values with Python +.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "For all integers a and b, add(a, b) returns a + b.",
+    "kind": "postcondition",
+    "evidence": []
+   },
+   {
+    "id": "p2",
+    "text": "For all strings a and b, add(a, b) returns the concatenation of a and b.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "numbers.py:<module>.quotient",
+  "summary": "Floor division a // b.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "If b is 0, quotient(a, b) raises ZeroDivisionError.",
+    "kind": "exception",
+    "evidence": []
+   },
+   {
+    "id": "p2",
+    "text": "For integers a and b with b nonzero, quotient(a, b) returns the floor of a divided by b.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ },
+ {
+  "function": "numbers.py:<module>.fraction",
+  "summary": "True division a / b.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "If b is 0, fraction(a, b) raises ZeroDivisionError.",
+    "kind": "exception",
+    "evidence": []
+   },
+   {
+    "id": "p2",
+    "text": "For integers a and b with b nonzero, fraction(a, b) returns a float equal to the correctly rounded quotient a / b.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ }
+]

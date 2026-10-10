@@ -1,0 +1,256 @@
+{
+ "module": "PipelineJS",
+ "corpus": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/examples/source/js",
+ "mode": "native",
+ "interpreter_fuel": 5000,
+ "initializer_fuel": 5000,
+ "cross_runtime_evidence": true,
+ "self_recorded_families": [
+  "charact"
+ ],
+ "self_recorded_note": "`charact_*` right-hand sides are this interpreter's own output. They are characterization/regression theorems and are NOT cross-implementation evidence; only `conform_*` is, and it needs a runtime this repository can drive.",
+ "families_unavailable": [],
+ "subjects_considered": 9,
+ "subject_population": "observed",
+ "max_subjects": null,
+ "only_subjects": null,
+ "excluded_subjects": [],
+ "functions": 10,
+ "call_closed": 10,
+ "artifacts": {
+  "docstrings": 0,
+  "doctests": 0,
+  "asserts": 0,
+  "raises": 0,
+  "pbt_files": 0,
+  "pbt_properties": 0,
+  "test_files": 0
+ },
+ "observations": {
+  "calls": 45,
+  "in_core": 45,
+  "tests": [],
+  "skipped": {
+   "skip_varargs": 0,
+   "skip_unencodable_args": 0,
+   "skip_unencodable_ret": 0,
+   "runtime": "node",
+   "evidence": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/artifacts/pipeline/PipelineJS/conformance.json"
+  }
+ },
+ "candidates": 9,
+ "refuted": 0,
+ "not_checked": 0,
+ "vacuous": 0,
+ "vacuity_checks": {},
+ "vacuity_rate_pct": 0.0,
+ "emitted": 9,
+ "proved": 9,
+ "open_obligations": 0,
+ "build_clean": true,
+ "artifact_hashes": {
+  "ast": "54fc33a47f8bd5d5cf44d171e99abe297c4fe693a144a333503cf4fcd1dbe742",
+  "model": "12858fad037a714a55582800a07a4413e78a56127a3d96e7ed004c892e5ed8cf",
+  "conformance": "ffa4c1e0b5d0dfe3781fb3b1c86d17158fee3200847db1c0db9083a912085044",
+  "proof": "4a8ba8b5905b02e28e9e375f6e95747c471809644e416ed980afc468be515fd3"
+ },
+ "mutation_sample": null,
+ "fuel_independent": 9,
+ "fuel_obligations_remaining": 0,
+ "fuel_blocked_reasons": {},
+ "outOfFuel_cases": {},
+ "by_family": {
+  "conform": {
+   "candidates": 9,
+   "refuted": 0,
+   "vacuous": 0,
+   "proved": 9
+  }
+ },
+ "specs": [
+  {
+   "id": "conform_numbers_js__program_add",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:add",
+   "definition": "f_numbers_js__program_add",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_bits",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:bits",
+   "definition": "f_numbers_js__program_bits",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_complement",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:complement",
+   "definition": "f_numbers_js__program_complement",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_shift",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:shift",
+   "definition": "f_numbers_js__program_shift",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_signed",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:signed",
+   "definition": "f_numbers_js__program_signed",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_signedAssign",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:signedAssign",
+   "definition": "f_numbers_js__program_signedAssign",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_unsigned",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:unsigned",
+   "definition": "f_numbers_js__program_unsigned",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_unsignedAssign",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:unsignedAssign",
+   "definition": "f_numbers_js__program_unsignedAssign",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_js__program_unsignedValue",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.js::program:unsignedValue",
+   "definition": "f_numbers_js__program_unsignedValue",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  }
+ ],
+ "not_checked_gates": [
+  "scripts/mutate.py \u2014 run separately; a surviving mutant means the spec is vacuous in the sufficient sense",
+  "scripts/audit_all.py \u2014 axiom basis of the emitted theorems"
+ ]
+}

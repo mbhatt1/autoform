@@ -1,0 +1,142 @@
+{
+  "status": "VALIDATED_INCLUDED_IN_INTEGRATION",
+  "workspace": "/Users/mbhatt/autoform/.autoform-work/slots-development",
+  "main_revision": "d8aec57",
+  "candidate_revision": "6274a62",
+  "parent_candidate_revision": "6f0e25e",
+  "scope": "Static Python slot layouts, qualified descriptor storage, dictionary availability, inherited descriptor reads and writes, layout compatibility, and faithful native slot snapshots.",
+  "source_sha256": {
+    "Autoform/FuelMono.lean": "0d918ccc389d8e63603f470ca708fbe5f1a3091a89a031d76c458dcbe06b4f8e",
+    "Autoform/Lang/Core/ClassHierarchy.lean": "d847e5393e0b6d6a8cfdbe6bbfdc0ca72ca56575ff88d8df3a3d7acbedbde7ac",
+    "Autoform/Lang/Core/ExcSafe.lean": "d4d1b791856b577897d2ddbb96c0988cbc10ce40a7db07a3009a08049e4a805a",
+    "Autoform/Lang/Core/Semantics.lean": "9d449417ec9c01d6923eb015a9311273a9aea46733c44d2af3fb8523498f1c9e",
+    "Autoform/Refine.lean": "203a5a0a810043bf4304893a73312595030283767e7974dbf24b96e5aa5bd6af",
+    "Autoform/Specs/CachetoolsSpec.lean": "e92b77b259960ddb3f675d7488179f0104d1bbb2da605f301c509f7be330f013",
+    "Autoform/SpecsGen/Basis.lean": "9ea49568876e05c8126e863a12ca45fca1011710628902ac87616ac66b532eda",
+    "cartographer/export_ast.sc": "4e8a6698d47d65b6bb8509be56fb362f1a864d35bd037ca3a29c6c8f6faa7b4c",
+    "cartographer/render_lean.py": "c5a824d3ac42a59fc5b545d106d974cbb9d8eb60c651b95917c8003e11746560",
+    "examples/python_control/slots.py": "6c2a92b5669429879e2aafc42b0c625ae2928f2f925a8bc9a6171e37dfa9d8f8",
+    "scripts/differential.py": "b9edd0bb3ee515433e9e99aa3b224788a15d73b8814e7ee6f096e32d178dd5ba",
+    "scripts/synth_specs.py": "dec8f7d98fc9abce6163c850e902b21d2d3a5963d6710136a94b5edc87865564",
+    "tests/test_python_slot_metadata.py": "61b22622289862b2ed15a36d9e05771fc9d5ce603c0cf33a923c3d608ea8993b",
+    "tests/test_python_slots.py": "8ac47f52aefba18c7bda2cd79604e43814331a3069a043728d1e341ce0209ba4",
+    "tests/test_source_slots.py": "f119f0d9d898ade79ceebc33063c8ad8c47877597b19299de373531506a576e8"
+  },
+  "checks": {
+    "source": {
+      "status": "PASS",
+      "log": "slots-source1.log",
+      "summary": "Twelve CPython comparisons and twelve kernel observations passed. The same command had one separate boundary-test harness error (EResult has no BEq); corrected and rechecked below."
+    },
+    "focused": {
+      "status": "PASS",
+      "log": "slots-focused2.log",
+      "summary": "82 passed in 14.34s; nine kernel descriptor/layout boundaries, source metadata barriers, native slot aliasing/shadowing and renderer regressions."
+    },
+    "proofs": {
+      "status": "PASS",
+      "log": "slots-proof-build3.log",
+      "summary": "65 jobs: interpreter, fuel monotonicity, exception safety, refinement, accessor basis, contracts, existing Cachetools specifications and V8 accessor regression."
+    },
+    "python": {
+      "status": "PASS",
+      "log": "slots-full-pytest1.log",
+      "summary": "826 passed, 60 skipped, 1 xfailed in 354.34s (0:05:54)"
+    },
+    "full_build": {
+      "status": "PASS",
+      "log": "slots-full-build1.log",
+      "summary": "Build completed successfully: 479 jobs."
+    },
+    "fresh_audit": {
+      "status": "PASS",
+      "log": "slots-audit.log",
+      "report": "artifacts/interpreter-recovery/slots-audit.json",
+      "snapshot": "STABLE",
+      "kernel": "VERIFIED",
+      "declarations": 7385
+    },
+    "pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/slots-validation",
+      "revision": "6274a62",
+      "log": "slots-pipeline1.log",
+      "report": "artifacts/pipeline/SlotsRecovery/run.json",
+      "intermediate": {
+        "source": "PASS",
+        "core_oracle": "PASS",
+        "conformance": {
+          "attempted": 75,
+          "agree": 75,
+          "divergences": 0,
+          "inconclusive": 0,
+          "basis": "python-class-slots-v6"
+        },
+        "proved": 15,
+        "open": 0,
+        "later_stages": "running"
+      },
+      "execution_status": "completed_with_gaps",
+      "stage_exit_codes": {
+        "source": 0,
+        "core-oracle": 0,
+        "mutation": 1,
+        "restore-build": 0,
+        "audit": 0,
+        "contracts": 0,
+        "assurance": 1
+      },
+      "comparisons": 75,
+      "divergences": 0,
+      "proved": 15,
+      "open_obligations": 0,
+      "holes": 0,
+      "audit_pass": true,
+      "mutation": {
+        "tested": 30,
+        "theorem_attributions": {
+          "killed": 25,
+          "survived": 5,
+          "inconclusive": 0
+        }
+      },
+      "coverage": {
+        "exercised": 15,
+        "exported": 17
+      }
+    },
+    "runtime_audit": {
+      "status": "PASS",
+      "report": "artifacts/interpreter-recovery/slots-runtime-audit.json",
+      "log": "slots-runtime-audit.log",
+      "declarations": 2648,
+      "snapshot": "STABLE",
+      "kernel": "VERIFIED",
+      "note": "Fresh semantics-root replay; full Autoform root audit still pending."
+    },
+    "source_regressions": {
+      "status": "PASS",
+      "log": "slots-source-regressions2.log",
+      "summary": "10 passed in 375.31s; final source/native/kernel slots, inheritance, class-attribute, object-lookup and bound-call checks."
+    }
+  },
+  "measurement_basis": "python-class-slots-v6",
+  "remaining_review": [
+    "Class descriptor objects, dynamic slot iterables, slot deletion, imported-base contracts, custom metaclasses and class namespace mutation remain gaps.",
+    "No fresh corpus re-land or arbitrary-codebase completion is claimed.",
+    "Fixture source roots currently live below the main checkout. The generic corpus-commit helper reports that parent commit even though these fixtures are ignored; retain source hashes and do not treat that field as a committed corpus revision.",
+    "Mutation evidence includes constructors whose observation only pins None, not receiver post-state. The native oracle and generated conformance law need heap-effect observations; do not waive these surviving mutations."
+  ],
+  "research": [
+    {
+      "url": "https://docs.python.org/3.11/reference/datamodel.html#slots",
+      "finding": "Slots are descriptors; ordinary subclasses gain a dictionary unless they declare slots; multiple layouts require compatible bases."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/python/cpython/v3.11.9/Objects/typeobject.c",
+      "finding": "best_base compares solid bases by ancestry; extra_ivars excludes newly added dictionary and weak-reference storage from ordinary slot-layout conflicts."
+    }
+  ],
+  "live_jobs": {},
+  "integration": "Integrated validation and source promotion are recorded in integration-validation.json; later integrated runtime/tooling fixes supersede the intermediate candidate basis."
+}

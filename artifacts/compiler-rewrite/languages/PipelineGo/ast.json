@@ -1,0 +1,312 @@
+[
+ {
+  "name": "numbers.Add",
+  "file": "numbers.go",
+  "sourceName": "Add",
+  "paramTypes": [
+   "int64",
+   "int64"
+  ],
+  "returnType": "int64",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:i64:+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.Div",
+  "file": "numbers.go",
+  "sourceName": "Div",
+  "paramTypes": [
+   "int64",
+   "int64"
+  ],
+  "returnType": "int64",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:i64:/",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.Shift",
+  "file": "numbers.go",
+  "sourceName": "Shift",
+  "paramTypes": [
+   "uint64",
+   "uint"
+  ],
+  "returnType": "uint64",
+  "paramIntegerTypes": [
+   "u64",
+   "u64"
+  ],
+  "returnIntegerType": "u64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:u64:<<",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.Right",
+  "file": "numbers.go",
+  "sourceName": "Right",
+  "paramTypes": [
+   "int64",
+   "uint"
+  ],
+  "returnType": "int64",
+  "paramIntegerTypes": [
+   "i64",
+   "u64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:i64:>>",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.Inc",
+  "file": "numbers.go",
+  "sourceName": "Inc",
+  "paramTypes": [
+   "int64"
+  ],
+  "returnType": "int64",
+  "paramIntegerTypes": [
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "cast:i64",
+     "a": {
+      "k": "binop",
+      "op": "num:go:i64:+",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.Bump",
+  "file": "numbers.go",
+  "sourceName": "Bump",
+  "paramTypes": [
+   "int8"
+  ],
+  "returnType": "int8",
+  "paramIntegerTypes": [
+   "i8"
+  ],
+  "returnIntegerType": "i8",
+  "params": [
+   "a"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "cast:i8",
+     "a": {
+      "k": "binop",
+      "op": "num:go:i8:+",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": 1
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.Word",
+  "file": "numbers.go",
+  "sourceName": "Word",
+  "paramTypes": [
+   "int",
+   "int"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:i64:+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.ContextShift",
+  "file": "numbers.go",
+  "sourceName": "ContextShift",
+  "paramTypes": [
+   "uint"
+  ],
+  "returnType": "uint32",
+  "paramIntegerTypes": [
+   "u64"
+  ],
+  "returnIntegerType": "u32",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:u32:<<",
+    "a": {
+     "k": "int",
+     "v": "1"
+    },
+    "b": {
+     "k": "name",
+     "v": "n"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.Constant",
+  "file": "numbers.go",
+  "sourceName": "Constant",
+  "paramTypes": [],
+  "returnType": "uint64",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "u64",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "int",
+    "v": "9223372036854775808"
+   }
+  }
+ }
+]

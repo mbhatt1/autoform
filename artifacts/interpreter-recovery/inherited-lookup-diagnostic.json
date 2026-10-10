@@ -1,0 +1,69 @@
+{
+  "status": "CONFIRMED_GAP",
+  "scope": "Two minimal inherited-attribute reads from the fresh Cachetools source model, with own-class controls. These establish a missing lookup mechanism, not attribution of every corpus divergence.",
+  "workspace": "/private/tmp/autoform-class-attribute-work",
+  "source": "/private/tmp/ct-v717/cachetools/__init__.py",
+  "source_sha256": "bdc70bd5dec0be9fb69241dad5badd53482a92d9bffbc86770c0aadac5e528d4",
+  "inputs": {
+    "generated_model": "/private/tmp/autoform-cachetools-object-lookup-work/Autoform/Generated/Cachetools.lean",
+    "generated_model_sha256": "7c79c7e430ff34a5126742d0634eb75224219a108fcf3a4633885ead70bf385f",
+    "semantics_sha256": "40beae86ae91209203f781d72fd6ca9887746ffbe0549d213228dff8452aec1e",
+    "driver": "/private/tmp/autoform-inherited-lookup-diagnostic.lean",
+    "driver_sha256": "f9b7c1f54589efd2f93d2a7ad9552249015b70bc98bf02eb78b2bc08e62ed142",
+    "driver_suffix": "\nopen Autoform.Core Autoform.Generated.Cachetools\ndef lookup (cls field : String) : EResult :=\n  let ctx : Ctx :=\n    { dialect := program.dialect, table := program.table\n    , properties := program.properties, builtinBases := program.builtinBases\n    , excClasses := program.excClasses }\n  (evalExpr ctx 80 [{ cls := cls, fields := [(\"_TimedCache__timer\", .int 77)] }]\n    [(\"receiver\", .ref 0)] (.field (.name \"receiver\") field)).2\ndef main : IO Unit := do\n  for (cls, field) in [(\"Cache\", \"getsizeof\"), (\"FIFOCache\", \"getsizeof\"),\n      (\"_TimedCache\", \"timer\"), (\"TTLCache\", \"timer\")] do\n    IO.println (cls ++ \".\" ++ field ++ \": \" ++ reprStr (lookup cls field))\n"
+  },
+  "native_setup": "For each class, object.__new__(class), assign _TimedCache__timer = 77, then getattr(instance, attribute). No constructor or application method is called.",
+  "native": [
+    {
+      "class": "Cache",
+      "attribute": "getsizeof",
+      "native": {
+        "kind": "fn",
+        "qualname": "Cache.getsizeof"
+      }
+    },
+    {
+      "class": "FIFOCache",
+      "attribute": "getsizeof",
+      "native": {
+        "kind": "fn",
+        "qualname": "Cache.getsizeof"
+      }
+    },
+    {
+      "class": "_TimedCache",
+      "attribute": "timer",
+      "native": {
+        "kind": "int",
+        "value": 77
+      }
+    },
+    {
+      "class": "TTLCache",
+      "attribute": "timer",
+      "native": {
+        "kind": "int",
+        "value": 77
+      }
+    }
+  ],
+  "lean": [
+    "Cache.getsizeof: Autoform.Core.EResult.val (Autoform.Core.Val.fn \"cachetools/__init__.py:<module>.Cache.getsizeof\")",
+    "FIFOCache.getsizeof: Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")",
+    "_TimedCache.timer: Autoform.Core.EResult.val (Autoform.Core.Val.int 77)",
+    "TTLCache.timer: Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+  ],
+  "command": "LEAN_NUM_THREADS=2 lake env lean --run /private/tmp/autoform-inherited-lookup-diagnostic.lean",
+  "log_sha256": "2a2b3662b3965c2d4c4f52e5791a71eda114c6ae0b88b5314a7c72d08b056903",
+  "observations": [
+    "Cache.getsizeof agrees: a callable value for Cache.getsizeof. FIFOCache.getsizeof instead raises AttributeError in Core.",
+    "_TimedCache.timer agrees: the stored value 77. TTLCache.timer instead raises AttributeError in Core."
+  ],
+  "required_followup": [
+    "Recover qualified class declarations and ordered bases from the source.",
+    "Use Python C3 order for known hierarchies, preserving uncertainty at unresolved external bases.",
+    "Select the first class attribute before applying data/non-data descriptor precedence.",
+    "Preserve the actual class for inherited classmethod binding and distinguish same-named classes.",
+    "Keep unresolved inheritance, custom hooks and descriptors visible instead of reviving free-function suffix fallback."
+  ]
+}

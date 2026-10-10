@@ -1,0 +1,57 @@
+{
+  "status": "INTEGRATED_AND_VERIFIED",
+  "date_utc": "2026-09-24T07:50:44.875297+00:00",
+  "source_revision": "4be0274df1adf5131910d84c2670047d14c19568",
+  "main_git_changes": "Uncommitted; main .git is read-only. Recoverable isolated commit and patch retained.",
+  "promoted_paths": 168,
+  "production_files_verified": 71,
+  "checks": {
+    "main-lean-build": {
+      "command": [
+        "/Users/mbhatt/.elan/bin/lake",
+        "build"
+      ],
+      "exit_code": 0,
+      "log": "artifacts/compiler-rewrite/logs/main-lean-build.log"
+    },
+    "main-docs": {
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "scripts/check_docs.py"
+      ],
+      "exit_code": 0,
+      "log": "artifacts/compiler-rewrite/logs/main-docs.log"
+    },
+    "main-specs": {
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "scripts/check_specs_fresh.py"
+      ],
+      "exit_code": 0,
+      "log": "artifacts/compiler-rewrite/logs/main-specs.log"
+    },
+    "main-focused": {
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "-m",
+        "pytest",
+        "tests/test_compiler_sources.py",
+        "tests/test_reproduce_ast.py",
+        "tests/test_render_lean.py",
+        "-q"
+      ],
+      "exit_code": 0,
+      "log": "artifacts/compiler-rewrite/logs/main-focused.log"
+    }
+  },
+  "prior_full_audit_snapshot": {
+    "status": "STABLE",
+    "snapshot_paths": 7943,
+    "present_artifacts": 7662,
+    "expected_absent_paths": 281,
+    "changed": [],
+    "scope": "Exact source, configuration and compiled-artifact hash comparison against the earlier completed whole-Autoform fresh replay. This is not a new full kernel replay."
+  },
+  "backup": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-promotion-backup",
+  "patch": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite.patch"
+}

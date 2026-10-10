@@ -42,9 +42,12 @@ Usage:
 e.g.  python3.11 scripts/core_oracle.py ast-Cachetools.json Cachetools ~/src/cachetools
 """
 import argparse, importlib.util, json, os, random, re, subprocess, sys, time
+import deep_json
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIFFERENTIAL = os.path.join(REPO, "scripts", "differential.py")
+sys.path.insert(0, os.path.join(REPO, "cartographer"))
+from generator_lowering import analysis_functions
 
 random.seed(20260819)          # deterministic: a moving oracle is not an oracle
 
@@ -146,7 +149,7 @@ def mtime_advisory(module):
 
 CORE_PROBE = """import Autoform.Ledger
 import Autoform.Generated.{mod}
-open Autoform.Core Autoform.Generated
+open Autoform.Core Autoform.Generated.{mod}
 
 #eval show IO Unit from do
   for n in program.coreNames do IO.println ("@@core@@" ++ n)
@@ -198,20 +201,19 @@ POOL = [("unit",), ("bool", True), ("bool", False),
 def walk(n, out=None):
     """Yield every dict node of an AST body."""
     if out is None: out = []
-    if isinstance(n, dict):
-        out.append(n)
-        for v in n.values(): walk(v, out)
-    elif isinstance(n, list):
-        for v in n: walk(v, out)
+    out.extend(deep_json.dict_nodes(n))
     return out
 
 
 def count_ast_holes(funcs):
-    """Total `hole` nodes in the AST bodies — a body-derived fingerprint that any
-    transpiler change moves, unlike the function-name set."""
+    """Count the same source coverage bodies that the renderer supplies to Core.
+
+    Frame compilation can introduce explicit refusals (delegation, captured cells),
+    so raw suspension markers are not yet the interpreter's hole inventory.
+    """
     n = 0
-    for f in funcs:
-        for node in walk(f.get("body")):
+    for f in analysis_functions(funcs):
+        for node in walk(f["body"]):
             # Two node kinds carry holes: `hole` in expression position and `holeS` in
             # statement position. Counting only `hole` undercounted V8Base by 324 and
             # made a matching AST look stale — a fingerprint that cries wolf gets
@@ -333,14 +335,16 @@ def testsuite_cases(ast_path, funcs, src_root, wanted, per_fn, tests_override, s
 # ------------------------------------------------------------------------ lean driver
 
 HEADER = """import Autoform.Generated.{mod}
-open Autoform.Core Autoform.Generated
+open Autoform.Core Autoform.Generated.{mod}
 
 private def gp : Heap × Ref := initGlobals program {fuel} {inits}
 private def h0 : Heap := gp.1
 private def gref : Ref := gp.2
 private def base : Nat := h0.length
 private def octx : Ctx :=
-  {{ dialect := program.dialect, table := program.table, globals := gref }}
+  {{ dialect := program.dialect, table := program.table, globals := gref,
+     builtinBases := program.builtinBases, properties := program.properties,
+     excClasses := program.excClasses, classDecls := program.classDecls }}
 
 private structure OCase where
   idx  : Nat
@@ -379,7 +383,7 @@ FOOTER = """
 def case_lit(i, c):
     slf = "none" if c["self"] is None else "(some (%s))" % lean_val(c["self"])
     chk = ", ".join('(%d, %s)' % (k, json.dumps(cls))
-                    for k, (cls, _) in enumerate(c["heap"]))
+                    for k, cell in enumerate(c["heap"]) for cls in [cell[0]])
     return ("  { idx := %d, objs := %s, fn := %s, slf := %s, args := [%s], chk := [%s] }"
             % (i, lean_heap(c["heap"]), json.dumps(c["name"]), slf,
                ", ".join(lean_val(a) for a in c["args"]), chk))
@@ -446,6 +450,7 @@ def main():
     ap.add_argument("-n", "--inputs", type=int, default=24,
                     help="synthetic inputs per function (default 24)")
     ap.add_argument("--tests", default=None)
+    ap.add_argument("--conformance", help="use the current native observations from differential.py")
     ap.add_argument("--no-tests", action="store_true")
     ap.add_argument("--fuel", type=int, default=5000)
     ap.add_argument("--out", default="core-oracle.json")
@@ -459,7 +464,7 @@ def main():
                     help="cases per Lean invocation (default 20)")
     a = ap.parse_args()
 
-    funcs = json.load(open(a.ast))
+    funcs = deep_json.load(a.ast)
     by_name = {f["name"]: f for f in funcs}
 
     # ---- 1. the artifact must be current before anything it says is evidence (§19)
@@ -538,7 +543,16 @@ def main():
     stats = {"skip_varargs": 0, "skip_unencodable_args": 0, "skip_unencodable_ret": 0,
              "skip_no_instance": 0, "test_runs": []}
     src_root = a.src_root
-    if src_root and not a.no_tests:
+    if a.conformance:
+        try:
+            recs, evidence = D.runtime_backends.load_observations(a.conformance, a.ast, src_root,
+                a.module, os.path.join(REPO, "Autoform", "Generated", a.module + ".lean"))
+        except (ValueError, OSError) as exc:
+            print("ABORT:", exc)
+            return 2
+        cases += [dict(r, origin="native") for r in recs if r["name"] in core_set]
+        stats["runtime"] = evidence["runtime"]
+    elif src_root and not a.no_tests:
         try:
             recs, src_root = testsuite_cases(a.ast, funcs, src_root, core_set,
                                              max(4, a.inputs // 4), a.tests, stats)
@@ -611,7 +625,7 @@ def main():
         p = per.get(c["name"])
         if p is None: continue
         p["cases"] += 1
-        if c["origin"] == "test-suite": p["real_cases"] += 1
+        if c["origin"] in ("test-suite", "native"): p["real_cases"] += 1
         line = got.get(i)
         if line is None:
             p["no_answer"] += 1; continue
@@ -626,7 +640,7 @@ def main():
             if lab.startswith("harness:"):    # apparatus, not artifact (§27)
                 p["no_answer"] += 1; p["answered"] -= 1; continue
             p["holes"][lab] = p["holes"].get(lab, 0) + 1
-            if c["origin"] == "test-suite": p["real_holes"] += 1
+            if c["origin"] in ("test-suite", "native"): p["real_holes"] += 1
             else: p["synth_holes"] += 1
             if len(p["hole_examples"]) < 4:
                 p["hole_examples"].append(

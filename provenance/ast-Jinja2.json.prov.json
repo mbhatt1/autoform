@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-Jinja2.json",
+ "artifact_bytes": 7899504,
+ "artifact_sha256": "c0978f07d574a127949eb1c046181569a58258eaba788fa9b063fd345c5ebd4f",
+ "command": "scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-sdist Jinja2",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "6a9c3ab5e6aed70f77b6e6516f455d8ce2af1b8ca74c3ce5977b6504f3f3d47e",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-sdist",
+ "source_revision": "tree-sha256:7449c52c1ef913abe97c05e1a5ff95285be0cc2a49ee927b1d946dc8504e4984:26files"
+}

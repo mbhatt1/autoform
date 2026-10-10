@@ -92,7 +92,9 @@ def ast_path(m: str, entry: dict) -> str | None:
 
 
 def render(ast: str, m: str, out: str) -> str | None:
-    r = subprocess.run([sys.executable, RENDER, ast, out, m],
+    # Pins are hashes of the single-module render; an inherited AUTOFORM_SHARD_FUNCTIONS
+    # must not turn a correct render into a mismatch.
+    r = subprocess.run([sys.executable, RENDER, ast, out, m, "--shard-functions", "0"],
                        capture_output=True, text=True, timeout=3600)
     if r.returncode != 0:
         return f"render failed ({r.returncode}): {(r.stderr or r.stdout)[-500:]}"

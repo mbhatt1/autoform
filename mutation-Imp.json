@@ -1,0 +1,3740 @@
+{
+  "file": "/Users/mbhatt/autoform/Autoform/Lang/Imp/Semantics.lean",
+  "module": "Autoform.Lang.Imp.Semantics",
+  "seed": 20260819,
+  "status": "OK",
+  "restored_build": {
+    "exit_code": 0,
+    "timeout": false,
+    "build_tail": ""
+  },
+  "operators": "lean-def",
+  "spec_file": null,
+  "spec_module": "Autoform.Lang.Imp.Semantics",
+  "decls": [
+    "evalBExpr",
+    "evalExpr",
+    "evalStmt"
+  ],
+  "mutants_generated": 39,
+  "mutants_run": 39,
+  "invalid": 12,
+  "inconclusive": 0,
+  "theorems": {
+    "evalStmt_sound": {
+      "killed": 7,
+      "survived": 20,
+      "score": 0.25925925925925924,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.25925925925925924,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalExpr_lit": {
+      "killed": 0,
+      "survived": 27,
+      "score": 0.0,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalExpr_add": {
+      "killed": 1,
+      "survived": 26,
+      "score": 0.037037037037037035,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.037037037037037035,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalExpr_sub": {
+      "killed": 1,
+      "survived": 26,
+      "score": 0.037037037037037035,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.037037037037037035,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalExpr_mul": {
+      "killed": 1,
+      "survived": 26,
+      "score": 0.037037037037037035,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.037037037037037035,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_tt": {
+      "killed": 1,
+      "survived": 26,
+      "score": 0.037037037037037035,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.037037037037037035,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_ff": {
+      "killed": 5,
+      "survived": 22,
+      "score": 0.18518518518518517,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.18518518518518517,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_le": {
+      "killed": 5,
+      "survived": 22,
+      "score": 0.18518518518518517,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.18518518518518517,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_eq": {
+      "killed": 3,
+      "survived": 24,
+      "score": 0.1111111111111111,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.1111111111111111,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_not": {
+      "killed": 3,
+      "survived": 24,
+      "score": 0.1111111111111111,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.1111111111111111,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_and": {
+      "killed": 2,
+      "survived": 25,
+      "score": 0.07407407407407407,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.07407407407407407,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_and_ne_or": {
+      "killed": 0,
+      "survived": 27,
+      "score": 0.0,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_tt_ne_ff": {
+      "killed": 0,
+      "survived": 27,
+      "score": 0.0,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalBExpr_le_ne_ge": {
+      "killed": 1,
+      "survived": 26,
+      "score": 0.037037037037037035,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.037037037037037035,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "lit:true->false",
+          "line": 30,
+          "decl": "evalBExpr",
+          "before": "  | .tt        => true",
+          "after": "  | .tt        => false"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 77,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+          "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>"
+        },
+        {
+          "op": "arm-delete",
+          "line": 84,
+          "decl": "evalStmt",
+          "before": "        | .hitHole h => .hitHole h",
+          "after": "        | .hitHole h => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 72,
+          "decl": "evalStmt",
+          "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+          "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    },
+    "evalStmt_seq_hole_propagates": {
+      "killed": 6,
+      "survived": 21,
+      "score": 0.2222222222222222,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.2222222222222222,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        }
+      ]
+    },
+    "evalStmt_loop_hole_propagates": {
+      "killed": 5,
+      "survived": 22,
+      "score": 0.18518518518518517,
+      "inconclusive": 0,
+      "scope": "all-mutants",
+      "coverage_score": 0.18518518518518517,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "cmp:\u2264->\u2265",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b"
+        },
+        {
+          "op": "bool:&&->||",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => evalBExpr s a || evalBExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 34,
+          "decl": "evalBExpr",
+          "before": "  | .not b     => !evalBExpr s b",
+          "after": "  | .not b     => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 82,
+          "decl": "evalStmt",
+          "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+          "after": "        | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arm-delete",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+1,   s, .skip          => .outOfFuel"
+        },
+        {
+          "op": "cmp:==->!=",
+          "line": 33,
+          "decl": "evalBExpr",
+          "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+          "after": "  | .eq a b    => evalExpr s a != evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 74,
+          "decl": "evalStmt",
+          "before": "      | .ok s'     => evalStmt n s' c\u2082",
+          "after": "      | .ok s'     => .outOfFuel"
+        },
+        {
+          "op": "arith:+->-",
+          "line": 24,
+          "decl": "evalExpr",
+          "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+          "after": "  | .add a b   => evalExpr s a - evalExpr s b"
+        },
+        {
+          "op": "lit:false->true",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "arm-delete",
+          "line": 35,
+          "decl": "evalBExpr",
+          "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+          "after": "  | .and a b   => true"
+        },
+        {
+          "op": "arith:*->/",
+          "line": 26,
+          "decl": "evalExpr",
+          "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+          "after": "  | .mul a b   => evalExpr s a / evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))"
+        },
+        {
+          "op": "arith:-->+",
+          "line": 25,
+          "decl": "evalExpr",
+          "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+          "after": "  | .sub a b   => evalExpr s a + evalExpr s b"
+        },
+        {
+          "op": "arm-delete",
+          "line": 70,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+          "after": "  | _+1,   s, .assign x e    => .outOfFuel"
+        },
+        {
+          "op": "cmp:\u2264-><",
+          "line": 32,
+          "decl": "evalBExpr",
+          "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+          "after": "  | .le a b    => evalExpr s a < evalExpr s b"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 71,
+          "decl": "evalStmt",
+          "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+          "after": "  | _+0,   _, .opaqueHole h  => .hitHole h"
+        },
+        {
+          "op": "offbyone:1->0",
+          "line": 69,
+          "decl": "evalStmt",
+          "before": "  | _+1,   s, .skip          => .ok s",
+          "after": "  | _+0,   s, .skip          => .ok s"
+        },
+        {
+          "op": "arm-delete",
+          "line": 31,
+          "decl": "evalBExpr",
+          "before": "  | .ff        => false",
+          "after": "  | .ff        => true"
+        },
+        {
+          "op": "ite-swap",
+          "line": 78,
+          "decl": "evalStmt",
+          "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+          "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081"
+        },
+        {
+          "op": "arm-delete",
+          "line": 76,
+          "decl": "evalStmt",
+          "before": "      | .hitHole h => .hitHole h",
+          "after": "      | .hitHole h => .outOfFuel"
+        }
+      ]
+    }
+  },
+  "mutants": [
+    {
+      "op": "offbyone:1->2",
+      "line": 69,
+      "decl": "evalStmt",
+      "before": "  | _+1,   s, .skip          => .ok s",
+      "after": "  | _+2,   s, .skip          => .ok s",
+      "verdict": "invalid"
+    },
+    {
+      "op": "cmp:\u2264->\u2265",
+      "line": 32,
+      "decl": "evalBExpr",
+      "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+      "after": "  | .le a b    => evalExpr s a \u2265 evalExpr s b",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "killed",
+        "evalBExpr_le": "killed",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "killed",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 25,
+      "decl": "evalExpr",
+      "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+      "after": "  | .sub a b   => n",
+      "verdict": "invalid"
+    },
+    {
+      "op": "offbyone:1->2",
+      "line": 77,
+      "decl": "evalStmt",
+      "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+      "after": "  | n+2,   s, .ite b c\u2081 c\u2082   =>",
+      "verdict": "invalid"
+    },
+    {
+      "op": "bool:&&->||",
+      "line": 35,
+      "decl": "evalBExpr",
+      "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+      "after": "  | .and a b   => evalBExpr s a || evalBExpr s b",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "killed",
+        "evalBExpr_and": "killed",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "lit:true->false",
+      "line": 30,
+      "decl": "evalBExpr",
+      "before": "  | .tt        => true",
+      "after": "  | .tt        => false",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "killed",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "killed",
+        "evalStmt_loop_hole_propagates": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 32,
+      "decl": "evalBExpr",
+      "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+      "after": "  | .le a b    => true",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "killed",
+        "evalBExpr_le": "killed",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 34,
+      "decl": "evalBExpr",
+      "before": "  | .not b     => !evalBExpr s b",
+      "after": "  | .not b     => true",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "killed",
+        "evalBExpr_not": "killed",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 33,
+      "decl": "evalBExpr",
+      "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+      "after": "  | .eq a b    => true",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "killed",
+        "evalBExpr_eq": "killed",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 82,
+      "decl": "evalStmt",
+      "before": "        | .ok s'     => evalStmt n s' (.loop b c)",
+      "after": "        | .ok s'     => .outOfFuel",
+      "verdict": {
+        "evalStmt_sound": "killed",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 69,
+      "decl": "evalStmt",
+      "before": "  | _+1,   s, .skip          => .ok s",
+      "after": "  | _+1,   s, .skip          => .outOfFuel",
+      "verdict": {
+        "evalStmt_sound": "killed",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "offbyone:1->0",
+      "line": 79,
+      "decl": "evalStmt",
+      "before": "  | n+1,   s, .loop b c     =>",
+      "after": "  | n+0,   s, .loop b c     =>",
+      "verdict": "invalid"
+    },
+    {
+      "op": "offbyone:1->0",
+      "line": 77,
+      "decl": "evalStmt",
+      "before": "  | n+1,   s, .ite b c\u2081 c\u2082   =>",
+      "after": "  | n+0,   s, .ite b c\u2081 c\u2082   =>",
+      "verdict": {
+        "evalStmt_sound": "killed",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "killed",
+        "evalStmt_loop_hole_propagates": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "offbyone:1->2",
+      "line": 72,
+      "decl": "evalStmt",
+      "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+      "after": "  | n+2,   s, .seq c\u2081 c\u2082     =>",
+      "verdict": "invalid"
+    },
+    {
+      "op": "arm-delete",
+      "line": 84,
+      "decl": "evalStmt",
+      "before": "        | .hitHole h => .hitHole h",
+      "after": "        | .hitHole h => .outOfFuel",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "killed",
+        "evalStmt_loop_hole_propagates": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "cmp:==->!=",
+      "line": 33,
+      "decl": "evalBExpr",
+      "before": "  | .eq a b    => evalExpr s a == evalExpr s b",
+      "after": "  | .eq a b    => evalExpr s a != evalExpr s b",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "killed",
+        "evalBExpr_eq": "killed",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 74,
+      "decl": "evalStmt",
+      "before": "      | .ok s'     => evalStmt n s' c\u2082",
+      "after": "      | .ok s'     => .outOfFuel",
+      "verdict": {
+        "evalStmt_sound": "killed",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "offbyone:1->2",
+      "line": 70,
+      "decl": "evalStmt",
+      "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+      "after": "  | _+2,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+      "verdict": "invalid"
+    },
+    {
+      "op": "arm-delete",
+      "line": 26,
+      "decl": "evalExpr",
+      "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+      "after": "  | .mul a b   => n",
+      "verdict": "invalid"
+    },
+    {
+      "op": "offbyone:0->1",
+      "line": 68,
+      "decl": "evalStmt",
+      "before": "  | 0,     _, _              => .outOfFuel",
+      "after": "  | 1,     _, _              => .outOfFuel",
+      "verdict": "invalid"
+    },
+    {
+      "op": "offbyone:1->0",
+      "line": 72,
+      "decl": "evalStmt",
+      "before": "  | n+1,   s, .seq c\u2081 c\u2082     =>",
+      "after": "  | n+0,   s, .seq c\u2081 c\u2082     =>",
+      "verdict": {
+        "evalStmt_sound": "killed",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "killed",
+        "evalStmt_loop_hole_propagates": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arith:+->-",
+      "line": 24,
+      "decl": "evalExpr",
+      "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+      "after": "  | .add a b   => evalExpr s a - evalExpr s b",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "killed",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "lit:false->true",
+      "line": 31,
+      "decl": "evalBExpr",
+      "before": "  | .ff        => false",
+      "after": "  | .ff        => true",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "killed",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "offbyone:1->2",
+      "line": 79,
+      "decl": "evalStmt",
+      "before": "  | n+1,   s, .loop b c     =>",
+      "after": "  | n+2,   s, .loop b c     =>",
+      "verdict": "invalid"
+    },
+    {
+      "op": "arm-delete",
+      "line": 35,
+      "decl": "evalBExpr",
+      "before": "  | .and a b   => evalBExpr s a && evalBExpr s b",
+      "after": "  | .and a b   => true",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "killed",
+        "evalBExpr_and": "killed",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arith:*->/",
+      "line": 26,
+      "decl": "evalExpr",
+      "before": "  | .mul a b   => evalExpr s a * evalExpr s b",
+      "after": "  | .mul a b   => evalExpr s a / evalExpr s b",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "killed",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "offbyone:1->2",
+      "line": 71,
+      "decl": "evalStmt",
+      "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+      "after": "  | _+2,   _, .opaqueHole h  => .hitHole h",
+      "verdict": "invalid"
+    },
+    {
+      "op": "offbyone:1->0",
+      "line": 70,
+      "decl": "evalStmt",
+      "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+      "after": "  | _+0,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arith:-->+",
+      "line": 25,
+      "decl": "evalExpr",
+      "before": "  | .sub a b   => evalExpr s a - evalExpr s b",
+      "after": "  | .sub a b   => evalExpr s a + evalExpr s b",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "killed",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 23,
+      "decl": "evalExpr",
+      "before": "  | .var x     => s.get x",
+      "after": "  | .var x     => n",
+      "verdict": "invalid"
+    },
+    {
+      "op": "arm-delete",
+      "line": 24,
+      "decl": "evalExpr",
+      "before": "  | .add a b   => evalExpr s a + evalExpr s b",
+      "after": "  | .add a b   => n",
+      "verdict": "invalid"
+    },
+    {
+      "op": "arm-delete",
+      "line": 70,
+      "decl": "evalStmt",
+      "before": "  | _+1,   s, .assign x e    => .ok (s.set x (evalExpr s e))",
+      "after": "  | _+1,   s, .assign x e    => .outOfFuel",
+      "verdict": {
+        "evalStmt_sound": "killed",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "cmp:\u2264-><",
+      "line": 32,
+      "decl": "evalBExpr",
+      "before": "  | .le a b    => evalExpr s a \u2264 evalExpr s b",
+      "after": "  | .le a b    => evalExpr s a < evalExpr s b",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "killed",
+        "evalBExpr_le": "killed",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "offbyone:1->0",
+      "line": 71,
+      "decl": "evalStmt",
+      "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+      "after": "  | _+0,   _, .opaqueHole h  => .hitHole h",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "offbyone:1->0",
+      "line": 69,
+      "decl": "evalStmt",
+      "before": "  | _+1,   s, .skip          => .ok s",
+      "after": "  | _+0,   s, .skip          => .ok s",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 31,
+      "decl": "evalBExpr",
+      "before": "  | .ff        => false",
+      "after": "  | .ff        => true",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "killed",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ite-swap",
+      "line": 78,
+      "decl": "evalStmt",
+      "before": "      if evalBExpr s b then evalStmt n s c\u2081 else evalStmt n s c\u2082",
+      "after": "      if evalBExpr s b then evalStmt n s c\u2082 else evalStmt n s c\u2081",
+      "verdict": {
+        "evalStmt_sound": "killed",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "survived",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 71,
+      "decl": "evalStmt",
+      "before": "  | _+1,   _, .opaqueHole h  => .hitHole h",
+      "after": "  | _+1,   _, .opaqueHole h  => .outOfFuel",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "killed",
+        "evalStmt_loop_hole_propagates": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "arm-delete",
+      "line": 76,
+      "decl": "evalStmt",
+      "before": "      | .hitHole h => .hitHole h",
+      "after": "      | .hitHole h => .outOfFuel",
+      "verdict": {
+        "evalStmt_sound": "survived",
+        "evalExpr_lit": "survived",
+        "evalExpr_add": "survived",
+        "evalExpr_sub": "survived",
+        "evalExpr_mul": "survived",
+        "evalBExpr_tt": "survived",
+        "evalBExpr_ff": "survived",
+        "evalBExpr_le": "survived",
+        "evalBExpr_eq": "survived",
+        "evalBExpr_not": "survived",
+        "evalBExpr_and": "survived",
+        "evalBExpr_and_ne_or": "survived",
+        "evalBExpr_tt_ne_ff": "survived",
+        "evalBExpr_le_ne_ge": "survived",
+        "evalStmt_seq_hole_propagates": "killed",
+        "evalStmt_loop_hole_propagates": "survived"
+      },
+      "timeout": false
+    }
+  ],
+  "coarse_attributions": 0,
+  "caught_by_pins_only": 0
+}

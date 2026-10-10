@@ -67,7 +67,15 @@ so re-rendering it is a separate change that also deletes declarations
 `Autoform/SpecsGen/Cachetools.lean` depends on. `scripts/check_render.py` reports that
 staleness today and still does; this file touches neither artifact. -/
 def cachetoolsWithBases : Program :=
-  { Autoform.Generated.Cachetools.program with builtinBases := [("_HashedTuple", .tuple)] }
+  { Autoform.Generated.Cachetools.program with
+    builtinBases := [("_HashedTuple", .tuple), ("cachetools/keys.py:<module>._HashedTuple", .tuple)] }
+
+-- RELAND (2026-10-09): the exporter now qualifies allocation identity
+-- (`Expr.alloc "cachetools/keys.py:<module>._HashedTuple"`), so the base has to be recorded
+-- under the qualified name too; with the short name alone `Expr.alloc` finds no base and
+-- the class-hierarchy gap answers instead. The render records both.
+#guard (Autoform.Generated.Cachetools.program.builtinBases.lookup
+          "cachetools/keys.py:<module>._HashedTuple") == some .tuple
 
 /-- The same program with `builtinBases` empty — exactly what STRATEGY.md §34 measured.
 
@@ -98,16 +106,22 @@ private def hashkeyFinds (p : Program) (args : List Val) (d : List (Val × Val))
               | none   => false
   | _      => false
 
--- BEFORE: `EResult.val (Val.ref 0)`, an opaque reference, where CPython says `(0,)`.
+-- BEFORE: a class-hierarchy hole (it was `EResult.val (Val.ref 0)`, an opaque
+-- reference, before the re-land), where CPython says `(0,)`.
 #eval runFunc cachetoolsBefore 200 "hashkey" [.int 0]
 
 -- AFTER: `EResult.val (Val.bobj "_HashedTuple" (Val.tuple [Val.int 0]))` — CPython's
 -- `hashkey(0)`, which is `(0,)` of type `_HashedTuple`.
 #eval runFunc cachetoolsWithBases 200 "hashkey" [.int 0]
 
--- The divergence, pinned: before the change the answer really was an opaque reference,
--- so nothing below is measuring something that already worked.
-#guard hashkeyIsRef cachetoolsBefore [.int 0] = true
+-- The divergence, pinned: before the change the answer was not CPython's, so nothing
+-- below is measuring something that already worked.
+-- CHANGED (re-land, 2026-10-09): without the base the answer used to be an opaque
+-- reference (`Val.ref`); the re-landed program declares `_HashedTuple` with an
+-- unresolvable builtin parent, so it is now the class-hierarchy hole instead -- a gap
+-- rather than a wrong value, the good direction. The guard states the new fact.
+#guard (match runFunc cachetoolsBefore 200 "hashkey" [.int 0] with
+        | .hole _ => true | _ => false) = true
 #guard hashkeyIsRef cachetoolsWithBases [.int 0] = false
 
 -- **THE PASS/FAIL CRITERION.** CPython: `hashkey(0) == (0,)` is `True`.

@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=77,<85"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autoform-lean"
+version = "0.1.0"
+description = "Joern and machine-code formalization with Lean runtime conformance proofs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0 AND MIT"
+license-files = ["LICENSE", "NOTICE", "licenses/*.txt"]
+dependencies = ["hypothesis>=6,<7"]
+keywords = ["formal-verification", "lean4", "joern", "semantics", "differential-testing", "assurance"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: POSIX",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+machine = ["pypcode==3.3.3", "pyelftools==0.33", "macholib==1.16.4", "pefile==2024.8.26"]
+test = ["pytest>=8,<9", "build>=1.2,<2", "twine>=6,<7", "packaging>=24,<27", "tomli>=2,<3; python_version < '3.11'"]
+
+[project.scripts]
+autoform = "autoform.cli:main"
+
+[project.urls]
+Repository = "https://github.com/mbhatt1/autoform"
+Issues = "https://github.com/mbhatt1/autoform/issues"
+Documentation = "https://github.com/mbhatt1/autoform/blob/main/docs/README.md"
+Installation = "https://github.com/mbhatt1/autoform/blob/main/docs/packaging.md"
+Support = "https://github.com/mbhatt1/autoform/blob/main/SUPPORT.md"
+Security = "https://github.com/mbhatt1/autoform/blob/main/SECURITY.md"
+
+[tool.pytest.ini_options]
+# Bare `pytest` at the repo root used to abort with hundreds of collection errors.
+# `artifacts/` holds scratch evidence from trial runs, including whole vendored
+# checkouts and *copies of this suite*, so rootdir collection hit duplicate test
+# module basenames ("import file mismatch") and imported third-party test files.
+# CI already ran `pytest tests/` and so never saw it; a contributor typing `pytest`
+# did. Pin the suite to tests/ and keep scratch/vendored trees out of collection.
+testpaths = ["tests"]
+# Setting norecursedirs REPLACES pytest's defaults rather than extending them, so the
+# stock entries are repeated here; dropping them un-ignores .hypothesis, .git and friends.
+norecursedirs = [
+  "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
+  "artifacts", "workspace", ".autoform-work", "gridsentinel",
+]
+
+[tool.setuptools]
+packages = ["autoform", "autoform.harness", "autoform.nl"]
+package-dir = {"" = "src"}
+include-package-data = false

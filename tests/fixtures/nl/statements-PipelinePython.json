@@ -1,0 +1,218 @@
+[
+ {
+  "id": "numbers_py__module__add__p1",
+  "function": "numbers.py:<module>.add",
+  "property": "p1",
+  "english": "add returns the sum of its arguments",
+  "lean_prop": "∀ (a : Int) (b : Int), (true) = true → (fun (r : EResult) => match r with | .val (.int x) => x == a + b | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.add\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.int x) => x == a + b | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__add__p2",
+  "function": "numbers.py:<module>.add",
+  "property": "p2",
+  "english": "add returns a minus b (false)",
+  "lean_prop": "∀ (a : Int) (b : Int), (true) = true → (fun (r : EResult) => match r with | .val (.int x) => x == a - b | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.add\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.int x) => x == a - b | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__add__p3",
+  "function": "numbers.py:<module>.add",
+  "property": "p3",
+  "english": "add is commutative in its result",
+  "lean_prop": "∀ (a : Int) (b : Int), (true) = true → (fun (r : EResult) => match r with | .val (.int x) => x == b + a | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.add\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.int x) => x == b + a | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__quotient__p1",
+  "function": "numbers.py:<module>.quotient",
+  "property": "p1",
+  "english": "dividing by zero raises ZeroDivisionError",
+  "lean_prop": "∀ (a : Int) (b : Int), (b == 0) = true → (fun (r : EResult) => match r with | .exn (.str \"ZeroDivisionError\") => true | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.quotient\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "b == 0",
+  "post": "match r with | .exn (.str \"ZeroDivisionError\") => true | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__quotient__p2",
+  "function": "numbers.py:<module>.quotient",
+  "property": "p2",
+  "english": "for nonzero b, quotient is floor division",
+  "lean_prop": "∀ (a : Int) (b : Int), (b != 0) = true → (fun (r : EResult) => match r with | .val (.int x) => x == Int.fdiv a b | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.quotient\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "b != 0",
+  "post": "match r with | .val (.int x) => x == Int.fdiv a b | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__quotient__p3",
+  "function": "numbers.py:<module>.quotient",
+  "property": "p3",
+  "english": "for nonzero b, quotient is Lean / (Euclidean; false for negative b)",
+  "lean_prop": "∀ (a : Int) (b : Int), (b != 0) = true → (fun (r : EResult) => match r with | .val (.int x) => x == a / b | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.quotient\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "b != 0",
+  "post": "match r with | .val (.int x) => x == a / b | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__quotient__p4",
+  "function": "numbers.py:<module>.quotient",
+  "property": "p4",
+  "english": "quotient never raises (false)",
+  "lean_prop": "∀ (a : Int) (b : Int), (true) = true → (fun (r : EResult) => match r with | .exn _ => false | _ => true) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.quotient\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .exn _ => false | _ => true",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__quotient__p5",
+  "function": "numbers.py:<module>.quotient",
+  "property": "p5",
+  "english": "vacuous precondition",
+  "lean_prop": "∀ (a : Int) (b : Int), (b > 1000000000000) = true → (fun (r : EResult) => match r with | .val _ => true | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.quotient\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "b > 1000000000000",
+  "post": "match r with | .val _ => true | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "numbers_py__module__fraction__p1",
+  "function": "numbers.py:<module>.fraction",
+  "property": "p1",
+  "english": "fraction by zero raises ZeroDivisionError",
+  "lean_prop": "∀ (a : Int) (b : Int), (b == 0) = true → (fun (r : EResult) => match r with | .exn (.str \"ZeroDivisionError\") => true | _ => false) (runFunc Autoform.Generated.PipelinePython.program 1000 \"numbers.py:<module>.fraction\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "b == 0",
+  "post": "match r with | .exn (.str \"ZeroDivisionError\") => true | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ }
+]

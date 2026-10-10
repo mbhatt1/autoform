@@ -39,9 +39,11 @@ import argparse
 import collections
 import datetime
 import hashlib
+import proof_artifacts
 import json
 import os
 import sys
+import deep_json
 
 TOOL = "autoform/sacm.py"
 TOOL_VERSION = "0.1"
@@ -216,8 +218,7 @@ class Case:
 # ---------------------------------------------------------------------------
 def load_json(path):
     try:
-        with open(path) as fh:
-            return json.load(fh)
+        return deep_json.load(path)
     except (OSError, ValueError):
         return None
 
@@ -233,14 +234,15 @@ def sha256(path):
 def walk_holes(node, out, path="body"):
     """Collect holes by label. `hole` is an Expr hole, `holeS` a Stmt hole; both carry
     the CPG node label that produced them, which is what makes them nameable."""
-    if isinstance(node, dict):
-        if node.get("k") in ("hole", "holeS"):
-            out.append((node.get("label", "<unlabelled>"), node["k"]))
-        for k, v in node.items():
-            walk_holes(v, out, f"{path}.{k}")
-    elif isinstance(node, list):
-        for i, v in enumerate(node):
-            walk_holes(v, out, f"{path}[{i}]")
+    work = [node]
+    while work:
+        item = work.pop()
+        if isinstance(item, dict):
+            if item.get("k") in ("hole", "holeS"):
+                out.append((item.get("label", "<unlabelled>"), item["k"]))
+            work.extend(item.values())
+        elif isinstance(item, list):
+            work.extend(item)
 
 
 def analyse_ast(ast):
@@ -395,7 +397,7 @@ def build_case(module, root):
             case_st, evidence_kind=TEST,
             scope={"functionsExercised": n_cov, "functionsTotal": population,
                    "quantifiedOver": "exercised subset"},
-            notes="TESTED, NOT PROVED: this is sampled execution against CPython, not a "
+            notes="TESTED, NOT PROVED: this is sampled execution against the source runtime, not a "
                   "theorem. It is the same fact the trust ledger reports as "
                   "`NOT PROVED : transpiler faithfulness — see conformance.json`. "
                   "The sample is what caught floored modulo, short-circuit evaluation, "
@@ -457,7 +459,7 @@ def build_case(module, root):
     ast = art["ast"]
     if ast is None:
         st = UNDEVELOPED
-        cov = c.claim("G3", f"Every function of {module} is translated without holes.",
+        cov = c.claim("G3", f"Every exported function of {module} is represented without holes.",
                       st, notes=f"ast-{module}.json absent.")
         fn_total = holefree = 0
         labels, sites, kinds = collections.Counter(), {}, {}
@@ -465,11 +467,11 @@ def build_case(module, root):
         fn_total, holefree, labels, sites, kinds = analyse_ast(ast)
         nholes = sum(labels.values())
         frac = holefree / fn_total if fn_total else 0.0
-        st = SUPPORTED if nholes == 0 else UNSUPPORTED
+        st = SUPPORTED if fn_total and nholes == 0 else UNSUPPORTED
         cov = c.claim(
-            "G3", f"Every function of {module} is translated without holes.", st,
-            expression="∀ f ∈ module, holeFree f",
-            notes=None if nholes == 0 else
+            "G3", f"Every exported function of {module} is represented without holes.", st,
+            expression="∀ f ∈ exportedAST, holeFree f",
+            notes="Exported AST only; unparsed source functions are outside this population." if fn_total and nholes == 0 else
             f"{fn_total - holefree}/{fn_total} functions contain at least one hole; "
             f"{nholes} hole occurrences across {len(labels)} distinct causes. Only the "
             f"{holefree}-function verifiable core is unconditionally analysable.")
@@ -480,6 +482,27 @@ def build_case(module, root):
                       "holeOccurrences": nholes, "distinctCauses": len(labels)},
                metric="verifiable-core-fraction", status=st)
         c.link("E2", cov, "SUPPORTS" if st == SUPPORTED else "COUNTERS")
+
+        # The dialect Core actually interpreted this language under is an assumption
+        # of the whole argument, not a footnote. `differential.py` sets
+        # `dialect_is_exact: false` for Java, Kotlin and Go -- all three run under
+        # `.cLike` -- and nothing used to read that flag, so the argument graph a
+        # reader walks from the top goal never mentioned it. A dialect mismatch is
+        # how this project's headline finding (floored vs truncated `%`) produced
+        # wrong answers for every C and Java program, so it is linked to the top
+        # goal exactly like a module-wide hole assumption.
+        conf_for_dialect = art["conformance"] if isinstance(art["conformance"], dict) else {}
+        if conf_for_dialect.get("dialect_is_exact") is False:
+            language = conf_for_dialect.get("language") or "this language"
+            dialect = conf_for_dialect.get("dialect_expected") or "an approximating"
+            did = c.assume(
+                "A.dialect:" + str(language),
+                f"Assumed: no behaviour of {module} depends on a difference between "
+                f"{language} and the `.{dialect}` dialect it was interpreted under. "
+                f"Core has no {language}-specific dialect. Operations the exporter "
+                f"could type use {language}-specific typed numeric semantics; any "
+                f"operation left untyped falls back to `.{dialect}`.")
+            c.link(did, top, "SUPPORTS")
 
         # The key move: each hole label becomes an explicit named Assumption.
         for label, n in labels.most_common():
@@ -610,8 +633,7 @@ def build_case(module, root):
         if led_ok:
             c.link("E6", core, "SUPPORTS")
 
-        # G3.2 — the claim people actually read G3.1 as making. Static analysis cannot
-        # discharge it; only execution can, and execution has covered 39% of the module.
+        # Execution evidence is limited to the inputs actually tried.
         exec_cov = (art["conformance"] or {}).get("functions_covered") \
             if isinstance(art["conformance"], dict) else None
 
@@ -669,18 +691,22 @@ def build_case(module, root):
             orr = orc.get("result") or {}
             claimed = (orc.get("claim") or {}).get("verifiable_core_static") or fn_total
             survived = orr.get("verifiable_core_executed") or 0
-            dyn_st, dyn_frac = (SUPPORTED, 1.0) if survived == claimed else \
-                (DEFEATED, survived / claimed if claimed else None)
+            refuted = orr.get("holed_on_some_input") or 0
+            dyn_st = DEFEATED if refuted else (SUPPORTED if survived == claimed else WEAK)
+            dyn_frac = survived / claimed if claimed else None
+            exec_cov = survived + refuted
             dyn_note = (f"Settled by execution, not estimated: {survived} of {claimed} "
                         f"claimed-core functions never holed on any input tried; "
                         f"{orr.get('holed_on_some_input')} did. See core-oracle.json.")
         dyn = c.claim(
             "G3.2",
-            f"The core of {module} is hole-free at RUNTIME: no execution of it reaches a "
-            f"hole on any input.",
-            dyn_st, evidence_kind=TEST if risk != 0 else STATIC,
+            (f"Executions of the core of {module} on the inputs tried did not reach a hole."
+             if orc_ok else
+             f"Static analysis identifies no construct in {module}'s core that can hole at runtime."),
+            dyn_st, evidence_kind=TEST if orc_ok or risk != 0 else STATIC,
             scope={"functionsExercised": exec_cov or 0, "functionsTotal": fn_total,
-                   "coverage": dyn_frac},
+                   "coverage": dyn_frac,
+                   "quantifiedOver": "tested inputs" if orc_ok else "static analysis"},
             notes=dyn_note)
         c.link(dyn, cov, "SUPPORTS")
         if dyn_st != SUPPORTED:
@@ -710,7 +736,8 @@ def build_case(module, root):
         # be attributed to this subject cannot support a claim about this subject. The
         # mutation gate currently runs over the Imp reference semantics, not over
         # translated modules, so its score is real but off-subject.
-        mut_attributable = module.lower() in mut_mod.lower() if mut_mod else False
+        mut_attributable = mut_mod in {module, 'Autoform.Generated.' + module,
+                                      'Autoform.Specs.' + module, 'Autoform.SpecsGen.' + module}
         if mut and not mut_attributable:
             killed, tot = 0, 0
             st = UNDEVELOPED
@@ -737,10 +764,17 @@ def build_case(module, root):
                 tot = len(rows)
             score = killed / tot if tot else 0.0
             st = SUPPORTED if tot and score >= 1.0 else (UNSUPPORTED if tot else UNDEVELOPED)
+            untested = sum(r.get("verdict") == "UNTESTED" for r in (mut.get("theorems") or {}).values()) if isinstance(mut, dict) else 0
+            inconclusive = (mut.get("inconclusive", 0) + mut.get("coarse_attributions", 0)) if isinstance(mut, dict) else 0
+            complete = (isinstance(mut, dict) and mut.get('status') == 'OK'
+                        and (mut.get('restored_build') or {}).get('exit_code') == 0)
+            if (untested or inconclusive or not complete) and st == SUPPORTED:
+                st = WEAK
             spec = c.claim("G4", "The specifications are non-vacuous.", st,
                            notes=None if st == SUPPORTED else
-                           f"{tot - killed} mutant(s) survived: those theorems do not "
-                           f"constrain the behaviour they appear to.")
+                           f"{tot - killed} on-subject mutant(s) survived, {untested} specification(s) "
+                           f"were untested, and {inconclusive} result(s) lack reliable attribution. "
+                           + ('' if complete else 'The mutation run or restoration build did not complete successfully.'))
             c.evid("E3", f"Mutation score: {killed}/{tot} mutants killed ({score:.1%}).",
                    artifact="mutation.json",
                    value={"killed": killed, "total": tot}, metric="mutation-score",
@@ -752,15 +786,33 @@ def build_case(module, root):
     # ---- G5 proof validity -------------------------------------------------
     ax = art["axioms"]
     ax_file = "axioms.json"
-    if ax is None and isinstance(art["audit"], dict) and art["audit"].get("axiom_sweep"):
+    if isinstance(art["audit"], dict) and art["audit"].get("axiom_sweep"):
         # Normalise the repo-wide audit sweep into the same shape.
         sweep = art["audit"]["axiom_sweep"]
         ax = {"axioms": sorted((sweep.get("axiom_histogram") or {})
-                               or sweep.get("declared_axioms") or []),
+                               or [a['name'] for a in sweep.get("declared_axioms", [])]),
               "theorems": sweep.get("declarations") or 0,
               "leaks": sweep.get("leaks") or [],
               "source": "audit.json:axiom_sweep (repo-wide, not module-scoped)"}
         ax_file = "audit.json"
+        audit = art["audit"]
+        ax['valid'] = (audit.get("verdict", {}).get("pass") is True and
+                       sweep.get('status') == 'CLEAN' and
+                       audit.get("lean4checker", {}).get("status") == "VERIFIED" and
+                       audit.get('lean4checker', {}).get('returncode') == 0)
+        ax['artifact_current'] = (
+            audit.get('lean4checker', {}).get('mode') == 'fresh'
+            and isinstance(audit.get('root_module'), str)
+            and proof_artifacts.replay_current(audit.get('repo'), audit.get('artifact_snapshot'),
+                                              audit['root_module']))
+        if audit.get("root_module") == "Autoform.SpecsGen." + module:
+            ax.update(module=module, theorems=sweep.get("root_theorems", 0),
+                      axioms=sweep.get("root_axioms", []),
+                      source="audit.json: generated proof module and independently replayed import closure")
+    elif isinstance(ax, dict):
+        # A legacy axiom dump has no binding to the current source or .olean.
+        # It may describe a past proof, but cannot override a current audit.
+        ax['artifact_current'] = False
     if ax is None:
         st = UNDEVELOPED
         pv = c.claim("G5", "All theorems about this module are kernel-checked and depend "
@@ -775,6 +827,8 @@ def build_case(module, root):
         n_thms = len(thms) if hasattr(thms, "__len__") else int(thms or 0)
         bad = [a for a in used if "sorry" in str(a).lower()]
         bad += [l for l in (ax.get("leaks") or []) if l not in bad]
+        if ax.get("valid") is False:
+            bad.append("audit or independent kernel replay did not pass")
         if bad:
             st = DEFEATED
         elif n_thms:
@@ -789,9 +843,14 @@ def build_case(module, root):
         # swept — so it is not UNDEVELOPED; but it is not module-scoped either, and
         # no module-specific theorem set exists, so it is capped at WEAK and the
         # part that *is* earned is asserted as a narrowed sibling.
-        repo_scoped = ax_file != "axioms.json"
-        g5_notes = [f"sorryAx present: {bad}"] if bad else \
+        repo_scoped = ax_file != "axioms.json" and ax.get("module") != module
+        g5_notes = [f"Proof validity failures: {bad}"] if bad else \
             ([] if n_thms else ["no theorems recorded — nothing to validate."])
+        if ax.get('artifact_current') is False and not bad:
+            if ORDER[st] >= ORDER[WEAK]:
+                st = WEAK
+            g5_notes.append('The replay is not bound to the current proof source and compiled imports; '
+                            'rerun the audit before relying on this claim.')
         if repo_scoped and not bad:
             if ORDER[st] >= ORDER[WEAK]:
                 st = WEAK
@@ -819,6 +878,8 @@ def build_case(module, root):
             # hedged: it is about the repository, and it is about the repository that
             # this module's semantics lives in.
             repo_st = DEFEATED if bad else (SUPPORTED if n_thms else UNSUPPORTED)
+            if repo_st == SUPPORTED and not ax.get('artifact_current'):
+                repo_st = WEAK
             chk = (art["audit"] or {}).get("lean4checker") \
                 if isinstance(art["audit"], dict) else None
             g51 = c.claim(

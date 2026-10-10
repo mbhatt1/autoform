@@ -1,0 +1,15 @@
+include build_support.py setup.py autoform.sh assure.sh
+include LICENSE NOTICE THIRD_PARTY.md SUPPORT.md SECURITY.md CONTRIBUTING.md
+recursive-include licenses *.txt
+include lakefile.toml lake-manifest.json lean-toolchain joern-version requirements*.txt
+include Autoform/Runtime.lean Autoform/Refine.lean Autoform/FuelMono.lean Autoform/Contracts.lean Autoform/Ledger.lean
+include Autoform/SpecsGen/Basis.lean Autoform/Generated/Cachetools.lean
+recursive-include Autoform/Lang *.lean
+recursive-include Autoform/Harness *.lean
+recursive-include Autoform/Tactics *.lean
+recursive-include scripts *.py *.tmpl *.mjs *.sh *.h
+recursive-include cartographer *.py *.sc *.scala *.sh
+recursive-include examples *.s *.asm *.py *.c *.cpp *.go *.java *.kt *.js *.ts *.json
+recursive-include docs *.md
+recursive-include tests *.py *.md
+global-exclude __pycache__ *.pyc *.mutate-backup

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "claims": [
+    {
+      "id": "owner_only",
+      "subject": "policy.py:<module>.authorize",
+      "description": "For every integer owner and caller, authorize exactly when their identifiers match.",
+      "statement": "∀ owner caller : Int, runFunc program 32 \"policy.py:<module>.authorize\" [.int owner, .int caller] = .val (.bool (owner == caller))"
+    }
+  ]
+}

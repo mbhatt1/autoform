@@ -272,9 +272,9 @@ theorem evalExpr_hole (l : String) :
 
 /-- Value-passing form for `unop`: the shape actually used when discharging obligations. -/
 theorem evalExpr_unop_val {a : Expr} {h₁ : Heap} {v : Val} (op : String)
-    (ha : evalExpr ctx k h ρ a = (h₁, .val v)) :
+    (ha : evalExpr ctx k h ρ a = (h₁, .val v)) (hop : op ≠ "!" := by decide) :
     evalExpr ctx (k+1) h ρ (.unop op a) = (h₁, applyUnop ctx.dialect op v) := by
-  simp [evalExpr, ha]
+  simp [evalExpr, ha, hop]
 
 /-- Value-passing form for `binop` at a **strict** operator. Note the heap threads
 left-to-right; this lemma is where that evaluation order is pinned.
@@ -293,19 +293,23 @@ theorem evalExpr_binop_val {a b : Expr} {h₁ h₂ : Heap} {x y : Val} (op : Str
 /-- `&&` does not evaluate its right operand once the left is falsy, and yields the
 **left operand itself** under Python value semantics (`0 and 5` is `0`, not `False`).
 Only C-like dialects collapse it to a boolean. -/
-theorem evalExpr_and_short {a b : Expr} {h₁ : Heap} {x : Val}
-    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = false) :
+theorem evalExpr_and_short {a b : Expr} {h₁ ht : Heap} {x : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val x))
+    (hx : evalTruthWith ctx h₁ x (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
     evalExpr ctx (k+1) h ρ (.binop "&&" a b)
-      = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false)) := by
-  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
+      = (ht, .val (if ctx.dialect.boolOpsAreValues then x else .bool false)) := by
+  simp [evalExpr, ha, hx, Val.truthy]
 
 /-- `||` does not evaluate its right operand once the left is truthy, and yields the
 **left operand itself** under Python value semantics (`5 or 0` is `5`, not `True`). -/
-theorem evalExpr_or_short {a b : Expr} {h₁ : Heap} {x : Val}
-    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = true) :
+theorem evalExpr_or_short {a b : Expr} {h₁ ht : Heap} {x : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val x))
+    (hx : evalTruthWith ctx h₁ x (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true))) :
     evalExpr ctx (k+1) h ρ (.binop "||" a b)
-      = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true)) := by
-  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
+      = (ht, .val (if ctx.dialect.boolOpsAreValues then x else .bool true)) := by
+  simp [evalExpr, ha, hx, Val.truthy]
 
 /-- A non-value in the left operand short-circuits and is propagated unchanged. This is
 what stops a hole in one operand from being silently absorbed. -/
@@ -314,15 +318,21 @@ theorem evalExpr_binop_stuck {a b : Expr} {h₁ : Heap} {r : EResult} (op : Stri
     evalExpr ctx (k+1) h ρ (.binop op a b) = (h₁, r) := by
   cases r <;> simp [evalExpr, ha] <;> exact absurd rfl (hr _)
 
-theorem evalExpr_cond_true {c t e : Expr} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true) :
-    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k h₁ ρ t := by
-  simp [evalExpr, hc, hv]
+theorem evalExpr_cond_true {c t e : Expr} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true))) :
+    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k ht ρ t := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
 
-theorem evalExpr_cond_false {c t e : Expr} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
-    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k h₁ ρ e := by
-  simp [evalExpr, hc, hv]
+
+theorem evalExpr_cond_false {c t e : Expr} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
+    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k ht ρ e := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
+
 
 theorem evalList_nil :
     evalList ctx (k+1) h ρ [] = (h, .inr ([], [])) := rfl
@@ -354,7 +364,7 @@ theorem execStmt_del (x : String) :
 
 theorem execStmt_ret_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
-    execStmt ctx (k+1) h ρ (.ret e) = (h₁, .ret v) := by simp [execStmt, he]
+    execStmt ctx (k+1) h ρ (.ret e) = (h₁, .ret v ρ) := by simp [execStmt, he]
 
 /-- Assignment binds locally, provided `x` was not declared `global` in this scope.
 The hypothesis is not decoration: `declGlobal` installs a marker that redirects the write
@@ -369,45 +379,66 @@ theorem execStmt_expr_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
     execStmt ctx (k+1) h ρ (.expr e) = (h₁, .normal ρ) := by simp [execStmt, he]
 
+/-- `raise e`, when `e` evaluates to a value the dialect raises AS IS. Python classifies
+the operand through `pythonRaise` (a represented exception name passes through; a class
+reference instantiates, a stray string is a `TypeError`), so under `.python` the lemma
+asks for that classification to be the identity; every other dialect throws what it was
+given, and the default discharges the hypothesis there. -/
 theorem execStmt_raise_val {e : Expr} {h₁ : Heap} {v : Val}
-    (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
-    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v) := by simp [execStmt, he]
+    (he : evalExpr ctx k h ρ e = (h₁, .val v))
+    (hr : ctx.dialect = .python → pythonRaise ctx.excClasses v = .exn v := by
+      intro hc; exact absurd hc (by decide)) :
+    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v ρ) := by
+  by_cases hd : ctx.dialect = .python
+  · simp [execStmt, he, hd, hr hd]
+  · simp [execStmt, he, hd]
 
 theorem execStmt_seq_normal {a b : Stmt} {h₁ : Heap} {ρ' : Env}
     (ha : execStmt ctx k h ρ a = (h₁, .normal ρ')) :
     execStmt ctx (k+1) h ρ (.seq a b) = execStmt ctx k h₁ ρ' b := by simp [execStmt, ha]
 
-theorem execStmt_seq_ret {a b : Stmt} {h₁ : Heap} {v : Val}
-    (ha : execStmt ctx k h ρ a = (h₁, .ret v)) :
-    execStmt ctx (k+1) h ρ (.seq a b) = (h₁, .ret v) := by simp [execStmt, ha]
+theorem execStmt_seq_ret {a b : Stmt} {h₁ : Heap} {v : Val} {ρ' : Env}
+    (ha : execStmt ctx k h ρ a = (h₁, .ret v ρ')) :
+    execStmt ctx (k+1) h ρ (.seq a b) = (h₁, .ret v ρ') := by simp [execStmt, ha]
 
-theorem execStmt_ifte_true {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true) :
-    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k h₁ ρ t := by
-  simp [execStmt, hc, hv]
+theorem execStmt_ifte_true {c : Expr} {t e : Stmt} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true))) :
+    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k ht ρ t := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
 
-theorem execStmt_ifte_false {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
-    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k h₁ ρ e := by
-  simp [execStmt, hc, hv]
 
-theorem execStmt_tryCatch_exn {b : Stmt} {x : String} {hd : Stmt} {h₁ : Heap} {v : Val}
-    (hb : execStmt ctx k h ρ b = (h₁, .exn v)) :
-    execStmt ctx (k+1) h ρ (.tryCatch b x hd) = execStmt ctx k h₁ (ρ.set x v) hd := by
+theorem execStmt_ifte_false {c : Expr} {t e : Stmt} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
+    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k ht ρ e := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
+
+
+theorem execStmt_tryCatch_exn {b : Stmt} {x : String} {hd : Stmt} {h₁ : Heap} {v : Val} {ρ' : Env}
+    (hb : execStmt ctx k h ρ b = (h₁, .exn v ρ')) :
+    execStmt ctx (k+1) h ρ (.tryCatch b x hd) = execStmt ctx k h₁ (ρ'.set x v) hd := by
   simp [execStmt, hb]
 
-theorem execStmt_loop_false {c : Expr} {body : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
-    execStmt ctx (k+1) h ρ (.loop c body) = (h₁, .normal ρ) := by
-  simp [execStmt, hc, hv]
+theorem execStmt_loop_false {c : Expr} {body : Stmt} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
+    execStmt ctx (k+1) h ρ (.loop c body) = (ht, .normal ρ) := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
+
 
 /-- One turn of the loop, when the body finishes normally. Unrolling a loop by hand is
 exactly this lemma applied `n` times. -/
-theorem execStmt_loop_step {c : Expr} {body : Stmt} {h₁ h₂ : Heap} {v : Val} {ρ' : Env}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true)
-    (hb : execStmt ctx k h₁ ρ body = (h₂, .normal ρ')) :
+theorem execStmt_loop_step {c : Expr} {body : Stmt} {h₁ ht h₂ : Heap} {v : Val} {ρ' : Env}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true)))
+    (hb : execStmt ctx k ht ρ body = (h₂, .normal ρ')) :
     execStmt ctx (k+1) h ρ (.loop c body) = execStmt ctx k h₂ ρ' (.loop c body) := by
-  simp [execStmt, hc, hv, hb]
+  simp [execStmt, hc, hv, hb, Val.truthy]
 
 theorem execFor_nil (x : String) (body : Stmt) :
     execFor ctx (k+1) h ρ x [] body = (h, .normal ρ) := rfl
@@ -418,13 +449,18 @@ hole, not a silent success. -/
 theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val)
     (kws : List (String × Val)) :
     applyFunc ctx (k+1) h fn self? vs kws =
-      (let base : Env := match self? with | some s => [("self", s)] | none => []
-       let ρ' := bindParams fn base vs kws
-       if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
+      (if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
+         (h, .exn (.str "TypeError")) else
+       -- Class-attribute defaults are seeded from the heap before `bindParams`; for a
+       -- function with none this is `.inr (selfEnv self?)` by unfolding.
+       match seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with
+       | .inl l     => (h, .hole l)
+       | .inr base' =>
+       let ρ' := bindParams fn base' vs kws
        match execStmt ctx k h ρ' fn.body with
-       | (h₁, .ret v)     => (h₁, .val v)
+       | (h₁, .ret v _)   => (h₁, .val v)
        | (h₁, .normal _)  => (h₁, .val .unit)
-       | (h₁, .exn v)     => (h₁, .exn v)
+       | (h₁, .exn v _)   => (h₁, .exn v)
        | (h₁, .hole l)    => (h₁, .hole l)
        | (h₁, .outOfFuel) => (h₁, .outOfFuel)
        | (h₁, _)          => (h₁, .hole "call:stray-control-flow")) := rfl
@@ -463,7 +499,8 @@ theorem applyUnop_int_neg (x : Int) :
 /-- The context `runFunc` builds internally. Exposed so that resolution facts can be
 stated and proved once per program. -/
 def ctxOf (p : Program) : Ctx :=
-  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases }
+  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
+    properties := p.properties, excClasses := p.excClasses, classDecls := p.classDecls }
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable
@@ -497,14 +534,24 @@ for all expressions because for the full language it is simply false as an uncon
 equation (a call can diverge), and the honest conditional version is listed as an open
 obligation at the end of this file. -/
 
-/-- The expression fragment that is pure and call-free. -/
+/-- The expression fragment that is pure and call-free.
+
+A COMPARISON is not in it. `==`, `!=` and the order operators dispatch to `__eq__`/`__lt__`/…
+when the left operand is a Python instance whose class defines them (`cmpDunderTarget`),
+and that is a call — it can touch the heap and it can run out of fuel. Truth tests
+(`!`, `&&`, `||`, and conditionals) can also call Python slots; arbitrary variables may
+hold such objects, so those forms are excluded from this syntactic fragment.
+`isCmpOp op = false`
+is the syntactic side condition that keeps `binop` call-free; a comparison on operands known
+to be scalars is handled by `evalExpr_binop_val` with its `binopNeedsHeap` premise instead. -/
 inductive PureE : Expr → Prop where
   | lit   (l : Lit)      : PureE (.lit l)
   | name  (x : String)   : PureE (.name x)
   | fnref (f : String)   : PureE (.fnref f)
-  | unop  {a} (op : String) : PureE a → PureE (.unop op a)
-  | binop {a b} (op : String) : PureE a → PureE b → PureE (.binop op a b)
-  | cond  {c t e} : PureE c → PureE t → PureE e → PureE (.cond c t e)
+  | unop  {a} (op : String) (hop : op ≠ "!") : PureE a → PureE (.unop op a)
+  | binop {a b} (op : String) (hop : isCmpOp op = false)
+      (hand : op ≠ "&&") (hor : op ≠ "||") :
+      PureE a → PureE b → PureE (.binop op a b)
 
 /-- Evaluation depth: the fuel needed to evaluate a pure expression. -/
 def edepth : Expr → Nat
@@ -541,31 +588,23 @@ theorem evalExpr_pure_fuel_indep (ctx : Ctx) :
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by simp [edepth] at h₁; omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by simp [edepth] at h₂; omega⟩
       rfl
-  | unop op _ ih =>
+  | unop op hop _ ih =>
       intro k₁ k₂ h ρ h₁ h₂
       simp only [edepth] at h₁ h₂
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
-      simp only [evalExpr, ih (k₁ := m₁) (k₂ := m₂) (h := h) (ρ := ρ) (by omega) (by omega)]
-  | binop op _ _ iha ihb =>
+      simp only [evalExpr, show (op == "!") = false from beq_eq_false_iff_ne.mpr hop, Bool.false_eq_true, if_false, ih (k₁ := m₁) (k₂ := m₂) (h := h) (ρ := ρ) (by omega) (by omega)]
+  | binop op hop hand hor _ _ iha ihb =>
       intro k₁ k₂ h ρ h₁ h₂
       simp only [edepth] at h₁ h₂
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
-      simp only [evalExpr, iha (h := h) (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
+      simp only [evalExpr, show (op == "&&") = false from beq_eq_false_iff_ne.mpr hand, show (op == "||") = false from beq_eq_false_iff_ne.mpr hor, Bool.false_or, Bool.false_eq_true, if_false, iha (h := h) (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
       rcases hA : evalExpr ctx m₂ h ρ _ with ⟨hA', rA⟩
+      -- `hop` rules the heap path (and the dunder call inside it) out syntactically.
       cases rA <;>
-        simp only [ihb (h := hA') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
-  | cond _ _ _ ihc iht ihe =>
-      intro k₁ k₂ h ρ h₁ h₂
-      simp only [edepth] at h₁ h₂
-      obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
-      obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
-      simp only [evalExpr, ihc (h := h) (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
-      rcases hC : evalExpr ctx m₂ h ρ _ with ⟨hC', rC⟩
-      cases rC <;>
-        simp only [iht (h := hC') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega),
-                   ihe (h := hC') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
+        simp only [ihb (h := hA') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega),
+                   binopNeedsHeap_arith _ _ _ hop, Bool.false_eq_true, if_false]
 
 /-- Monotonicity on the pure fragment, the form usually wanted. -/
 theorem evalExpr_pure_fuel_mono (ctx : Ctx) {e : Expr} (pe : PureE e) {k₁ k₂ : Nat}
@@ -592,7 +631,7 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           simp only [evalExpr]
           repeat' (first | rfl | split)
   | fnref f => intro k h ρ; cases k <;> rfl
-  | unop op _ ih =>
+  | unop op hop _ ih =>
       intro k h ρ; cases k with
       | zero => rfl
       | succ m =>
@@ -600,8 +639,8 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
         rcases hA : evalExpr ctx m h ρ _ with ⟨hA', rA⟩
         rw [hA] at ha; simp only at ha; subst ha
         simp only [evalExpr, hA]
-        cases rA <;> rfl
-  | binop op _ _ iha ihb =>
+        cases rA <;> simp [hop]
+  | binop op hop hand hor _ _ iha ihb =>
       intro k h ρ; cases k with
       | zero => rfl
       | succ m =>
@@ -613,37 +652,13 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           have hb := ihb (k := m) (h := hA') (ρ := ρ)
           rcases hB : evalExpr ctx m hA' ρ _ with ⟨hB', rB⟩
           rw [hB] at hb; simp only at hb; subst hb
-          simp only [evalExpr, hA, hB]
-          -- three cases: the two short-circuit exits (heap untouched by construction)
-          -- and the strict path (heap untouched by both induction hypotheses).
-          by_cases hs1 : (op == "&&" && !x.truthy) = true
-          · simp [hs1]
-          · by_cases hs2 : (op == "||" && x.truthy) = true
-            · simp [hs1, hs2]
-            · simp only [hs1, hs2, Bool.false_eq_true, if_false]
-              -- `==`/`!=` on a ref now branches through `Val.eqPy`. BOTH branches leave the
-              -- heap alone, so heap-inertness still holds; the branch just has to be taken.
-              -- `==`/`!=` on a ref branches through `Val.eqPy`. Both branches leave the
-              -- heap alone, so inertness still holds -- but `split` introduces the heap as
-              -- a fresh variable equated to `hB'` by a pair equation, so the branch has to
-              -- be taken AND that equation consumed.
-              cases rB <;> ((repeat' split) <;> (first | rfl | simp_all))
+          -- `hop` rules the heap path (and the dunder call inside it) out syntactically.
+          simp only [evalExpr, hA, hB,
+            show (op == "&&") = false from beq_eq_false_iff_ne.mpr hand,
+            show (op == "||") = false from beq_eq_false_iff_ne.mpr hor,
+            Bool.false_or, binopNeedsHeap_arith _ _ _ hop, Bool.false_eq_true, if_false]
+          cases rB <;> rfl
         | _ => simp only [evalExpr, hA]
-  | cond _ _ _ ihc iht ihe =>
-      intro k h ρ; cases k with
-      | zero => rfl
-      | succ m =>
-        have hc := ihc (k := m) (h := h) (ρ := ρ)
-        rcases hC : evalExpr ctx m h ρ _ with ⟨hC', rC⟩
-        rw [hC] at hc; simp only at hc; subst hc
-        simp only [evalExpr, hC]
-        cases rC with
-        | val v =>
-          by_cases hv : v.truthy
-          · simpa [hv] using iht (k := m) (h := hC') (ρ := ρ)
-          · simp only [hv, Bool.false_eq_true, if_false]
-            exact ihe (k := m) (h := hC') (ρ := ρ)
-        | _ => rfl
 
 /-! ## 3b. A loop rule, and a heap representation predicate
 
@@ -682,10 +697,11 @@ postcondition must hold. -/
 theorem execStmt_loop_rule (ctx : Ctx) (c : Expr) (body : Stmt) (B : Nat)
     (I : Nat → Heap → Env → Prop) (Q : Heap → Env → Prop)
     (hstep : ∀ m h ρ k, B ≤ k → I m h ρ →
-      ∃ h₁ v, evalExpr ctx k h ρ c = (h₁, .val v) ∧
-        (v.truthy = true →
-          ∃ m' h₂ ρ', m' < m ∧ execStmt ctx k h₁ ρ body = (h₂, .normal ρ') ∧ I m' h₂ ρ') ∧
-        (v.truthy = false → Q h₁ ρ)) :
+      ∃ h₁ v ht b, evalExpr ctx k h ρ c = (h₁, .val v) ∧
+        evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] []) = (ht, .val (.bool b)) ∧
+        (b = true →
+          ∃ m' h₂ ρ', m' < m ∧ execStmt ctx k ht ρ body = (h₂, .normal ρ') ∧ I m' h₂ ρ') ∧
+        (b = false → Q ht ρ)) :
     ∀ k m h ρ, I m h ρ → B + m + 1 ≤ k →
       ∃ h' ρ', execStmt ctx k h ρ (.loop c body) = (h', .normal ρ') ∧ Q h' ρ' := by
   intro k
@@ -693,15 +709,15 @@ theorem execStmt_loop_rule (ctx : Ctx) (c : Expr) (body : Stmt) (B : Nat)
   | zero => intro m h ρ _ hk; omega
   | succ k ih =>
     intro m h ρ hI hk
-    obtain ⟨h₁, v, hc, htrue, hfalse⟩ := hstep m h ρ k (by omega) hI
-    cases hv : v.truthy with
+    obtain ⟨h₁, v, ht, b, hc, htruth, htrue, hfalse⟩ := hstep m h ρ k (by omega) hI
+    cases hv : b with
     | false =>
-      refine ⟨h₁, ρ, ?_, hfalse hv⟩
-      simp [execStmt, hc, hv]
+      refine ⟨ht, ρ, ?_, hfalse hv⟩
+      simp [execStmt, hc, htruth, Val.truthy, hv]
     | true =>
       obtain ⟨m', h₂, ρ', hm', hb, hI'⟩ := htrue hv
       have hstep' : execStmt ctx (k+1) h ρ (.loop c body) = execStmt ctx k h₂ ρ' (.loop c body) := by
-        simp [execStmt, hc, hv, hb]
+        simp [execStmt, hc, htruth, Val.truthy, hv, hb]
       rw [hstep']
       exact ih m' h₂ ρ' hI' (by omega)
 
@@ -808,16 +824,43 @@ theorem evalExpr_field_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a : Expr} {h₁ : Heap} {r : Ref} {o : Obj} {f : String} {v : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
     (ho : h₁.get r = some o)
-    (hf : o.fields.find? (·.1 == f) = some (f, v)) :
+    (hf : o.fields.find? (·.1 == f) = some (f, v))
+    (hp : (ctx.dialect == .python &&
+      ctx.isProperty o.cls f) = false := by rfl)
+    (hgap : ctx.classLookupGap o.cls f = none := by rfl)
+    (hslot : ctx.readSlot o f = none := by rfl) :
     evalExpr ctx (k+1) h ρ (.field a f) = (h₁, .val v) := by
-  simp [evalExpr, ha, ho, hf]
+  simp [evalExpr, ha, ho, hf, hp, hgap, hslot]
 
 theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f : String} {w : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
-    (he : evalExpr ctx k h₁ ρ e = (h₂, .val w)) :
+    (he : evalExpr ctx k h₁ ρ e = (h₂, .val w))
+    -- Under JavaScript a property write on an OBJECT LITERAL lands in its boxed dict, not
+    -- in a field (`jsContainerField` is the read side); this equation is about the field
+    -- write, so it asks that the receiver is not one. Decided outright for every other
+    -- dialect, which is every corpus that uses it today.
+    (hjs : ctx.dialect = .javascript → ∀ kvs, h₂.payload r ≠ .dict kvs := by
+      intro hc; exact absurd hc (by decide))
+    (hwrite : ctx.fieldWriteCheck h₂ r f = .val .unit := by rfl)
+    (hkey : ctx.fieldWriteKey h₂ r f = f := by rfl) :
     execStmt ctx (k+1) h ρ (.setField a f e) = (h₂.setField r f w, .normal ρ) := by
-  simp [execStmt, ha, he]
+  by_cases hd : ctx.dialect = .javascript
+  · -- With `hnd` in context, `simp` reduces the payload `match` to its default arm itself.
+    have hnd := hjs hd
+    simp [execStmt, ha, he, hd]
+  · simp [execStmt, ha, he, hd, hwrite, hkey]
+
+/-- CHANGED: built-in container iteration precedes source method resolution. -/
+theorem evalExpr_mcall_container (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {result : Heap × EResult}
+    {m : String} {args : List Expr} {vs : List Val} {kws : List (String × Val)}
+    (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
+    (has : evalList ctx k h₁ ρ args = (h₂, .inr (vs, kws)))
+    (hm : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = some result)
+    (hat : ctx.usesAttributeCall h₁ r m = false) :
+    evalExpr ctx (k+1) h ρ (.mcall recv m args) = result := by
+  simp [evalExpr, hr, has, hm, hat]
 
 theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {o : Obj} {fn : Func}
@@ -826,33 +869,83 @@ theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     (has : evalList ctx k h₁ ρ args = (h₂, .inr (vs, kws)))
     (ho : h₂.get r = some o)
     (hcap : o.captured = [])
-    (hm : ctx.resolveMethod o.cls m = some fn) :
+    (hm : ctx.resolveMethod o.cls m = some fn)
+    -- A `@classmethod` takes the class as its first positional instead of the instance
+    -- under `self`, so this equation is about ordinary methods only. Every method any
+    -- corpus proves through this lemma is one, and the hypothesis is `rfl` on a concrete
+    -- `Func` -- stated so the day it is not, the lemma stops applying rather than lying.
+    (hcm : fn.isClassMethod = false := by rfl)
+    -- The corresponding source-method equation applies when the built-in container
+    -- protocol did not handle the call. Concrete non-__iter__ methods reduce this.
+    (hiter : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = none := by rfl)
+    (hat : ctx.usesAttributeCall h₁ r m = false := by rfl) :
     evalExpr ctx (k+1) h ρ (.mcall recv m args)
       = applyFunc ctx k h₂ fn (some (.ref r)) vs kws := by
-  simp [evalExpr, hr, has, ho, hm, hcap]
+  simp [evalExpr, hr, has, hiter, ho, hm, hcap, hcm, hat]
+
+/-- Python saves the callable attribute before evaluating arguments. This equation
+also permits getter effects: argument evaluation starts from the lookup's heap. -/
+theorem evalExpr_mcall_attribute (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {recv : Expr} {h₁ hc h₂ : Heap} {r : Ref} {fn : Func} {cap : Env}
+    {m : String} {args : List Expr} {vs : List Val} {kws : List (String × Val)}
+    (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
+    (hat : ctx.usesAttributeCall h₁ r m = true)
+    (hlookup : evalExpr ctx k h₁ (("<mcall:receiver>", .ref r) :: ρ)
+      (.field (.name "<mcall:receiver>") m) = (hc, .val (.clos fn.name cap)))
+    (has : evalList ctx k hc ρ args = (h₂, .inr (vs, kws)))
+    (hm : ctx.resolve fn.name = some fn) :
+    evalExpr ctx (k+1) h ρ (.mcall recv m args) =
+      applyClosure ctx k h₂ fn cap vs kws := by
+  rw [evalExpr, hr]
+  simp only [hat, if_true, hlookup, has, hm]
+
+/-- Binding only `self` is the ordinary method calling convention. -/
+theorem applyClosure_self (ctx : Ctx) (k : Nat) (h : Heap) (fn : Func)
+    (self : Val) (vs : List Val) (kws : List (String × Val)) :
+    applyClosure ctx k h fn [("self", self)] vs kws =
+      applyFunc ctx k h fn (some self) vs kws := by
+  cases k <;> rfl
 
 theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val}
     {kws : List (String × Val)} {fn : Func} {w : Val}
     (has : evalList ctx k h ρ args = (h₁, .inr (vs, kws)))
-    (hcap : (∀ c cap, ρ.get cls ≠ .clsClos c cap))
+    (hcap : ctx.allocationCaptures ρ cls = some [])
     -- `cls` is an ordinary class, not one with a builtin base: those allocate a
     -- `Val.bobj` and never reach `__init__` (see `Semantics.allocBuiltin`).
     (hbb : ctx.builtinBase cls = none)
-    (hm : ctx.resolveMethod cls "__init__" = some fn)
+    -- The constructor as `Semantics.evalExpr` finds it: `Ctx.resolveCtor` tries `__init__`
+    -- (Python) and then `<init>` (JavaScript, Java). A concrete `ctx` reduces it, so a
+    -- call site proves the premise by computation.
+    (hm : ctx.resolveCtor cls = some fn)
     (hinit : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
-        (some (.ref h₁.length)) vs kws = (h₃, .val w)) :
+        (some (.ref h₁.length)) vs kws = (h₃, .val w))
+    (hgap : ctx.constructionGap cls = none := by rfl)
+    (hcm : fn.isClassMethod = false := by rfl)
+    (hw : ctx.dialect = .python → w = .unit := by intro _; rfl) :
     evalExpr ctx (k+1) h ρ (.alloc cls args) = (h₃, .val (.ref h₁.length)) := by
-  have hc : (match ρ.get cls with | .clsClos _ c => c | _ => []) = ([] : List (String × Val)) := by
-    cases hg : ρ.get cls <;> simp [hg]
-    case clsClos c cap => exact absurd hg (hcap c cap)
-  simp only [evalExpr, has, hbb, hc, Heap.alloc, hm, hinit]
+  by_cases hd : ctx.dialect = .python
+  · simp [evalExpr, has, hbb, hgap, hcap, Heap.alloc, hm, hcm, hinit, hw hd]
+  · cases w <;> simp [evalExpr, has, hbb, hgap, hcap, Heap.alloc, hm, hcm, hinit, hd]
 
+/-- Snapshot iteration, for a subject that is not a boxed container.
+
+`hbox` is the statement change §4 of `docs/boxed-containers.md` requires: a `Val.ref`
+whose object carries a payload iterates LIVE, re-reading the container at every step, so
+it is not this equation. Every corpus today satisfies `hbox` vacuously -- nothing
+constructs a payload -- and it is stated rather than assumed so that the day something
+does, this theorem stops applying instead of quietly becoming false. -/
 theorem execStmt_forIn_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {x : String} {e : Expr} {body : Stmt} {h₁ : Heap} {v : Val} {vs : List Val}
-    (he : evalExpr ctx k h ρ e = (h₁, .val v)) (hv : v.iterable = some vs) :
+    (he : evalExpr ctx k h ρ e = (h₁, .val v)) (hv : v.iterable = some vs)
+    (hbox : ∀ r, v = .ref r → h₁.payload r = .none) :
     execStmt ctx (k+1) h ρ (.forIn x e body) = execFor ctx k h₁ ρ x vs body := by
-  simp [execStmt, he, hv]
+  -- A `ref` has no `iterable` (an instance iterates through the protocol, `forIn`'s
+  -- `__iter__` arm), so `hv` is contradictory there and the protocol's match need not
+  -- be reduced; every other constructor is the snapshot equation.
+  cases v <;> first
+    | (exfalso; simp [Val.iterable] at hv; done)
+    | simp_all [execStmt, he, hv]
 
 /-! ## 4. End-to-end: real translated functions
 
@@ -1124,7 +1217,7 @@ theorem poly_refines :
   refine forall_ge_of_forall_add (N := 9) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_poly rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf,
         CMathProgram, Marshal.toVal, applyBinop_c_mul h1, applyBinop_c_add h2,
         applyBinop_c_sub h3]
 
@@ -1142,7 +1235,7 @@ theorem poly_overflows (k : Nat) :
     runFunc CMathProgram (k + 9) "poly" [.int 100000, .int 100000, .int 0]
       = .val (.int 1409965408) := by
   rw [runFunc_of_resolve _ _ _ _ f_poly rfl]
-  simp only [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf, CMathProgram]
+  simp only [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf, CMathProgram]
   rfl
 
 /-- No fuel bound makes `poly` refine its mathematical model on the full domain. -/
@@ -1176,13 +1269,13 @@ theorem clamp_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_clamp rfl]
   by_cases h1 : x < lo
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, h1]
   · by_cases h2 : hi < x
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
             CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, applyBinop_int_gt,
             h1, h2]
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
             CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, applyBinop_int_gt,
             h1, h2]
 
@@ -1203,9 +1296,9 @@ theorem cdiv_refines :
   rw [runFunc_of_resolve _ _ _ _ f_cdiv rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_c_div hb hdom, hb]
 
@@ -1222,7 +1315,7 @@ theorem add_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_lib_py__module__add rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_lib_py__module__add, ctxOf,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_lib_py__module__add, ctxOf,
         SampleProgram, Marshal.toVal]
 
 /-! ### Python: `absval` from `ops.py` -/
@@ -1236,10 +1329,10 @@ theorem absval_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__absval rfl]
   by_cases h1 : x < 0
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
           f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
           f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
 
@@ -1254,14 +1347,14 @@ theorem cmpchain_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__cmpchain rfl]
   by_cases h1 : x < y
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
           f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
   · by_cases h2 : y < x
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
             f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
             applyBinop_int_lt, applyBinop_int_gt, h1, h2]
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
             f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
             applyBinop_int_lt, applyBinop_int_gt, h1, h2]
 
@@ -1282,9 +1375,9 @@ theorem fmod_refines :
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__fmod rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_py_mod a b hb, hb]
 
@@ -1307,9 +1400,9 @@ theorem fdiv_refines :
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__fdiv rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_py_div a b hb, hb]
 
@@ -1330,7 +1423,7 @@ theorem sample_id_reaches_hole (k : Nat) :
     runFunc SampleProgram (k + 10) "lib.py:<module>.sample_id" []
       = .hole "lit:unquoted" := by
   rw [runFunc_of_resolve _ _ _ _ f_lib_py__module__sample_id rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, evalList, Env.set,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, evalList, Env.set,
         f_lib_py__module__sample_id, ctxOf, SampleProgram]
 
 /-- No shallow specification refines `sample_id`, at any fuel bound, on any domain that
@@ -1446,13 +1539,14 @@ abbrev ctxC : Ctx := ctxOf CMathProgram
 theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
     (hfitN : Fits32 (triN (n.toNat + 1))) :
     ∀ m h ρ k, 4 ≤ k → sumtoInv n m h ρ →
-      ∃ h₁ v, evalExpr ctxC k h ρ (.binop "<=" (.name "i") (.name "n")) = (h₁, .val v) ∧
-        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
-          execStmt ctxC k h₁ ρ
+      ∃ h₁ v ht b, evalExpr ctxC k h ρ (.binop "<=" (.name "i") (.name "n")) = (h₁, .val v) ∧
+        evalTruthWith ctxC h₁ v (fun fn self => applyFunc ctxC k h₁ fn (some self) [] []) = (ht, .val (.bool b)) ∧
+        (b = true → ∃ m' h₂ ρ', m' < m ∧
+          execStmt ctxC k ht ρ
             (.seq (.assign "acc" (.binop "+" (.name "acc") (.name "i")))
                   (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))
             = (h₂, .normal ρ') ∧ sumtoInv n m' h₂ ρ') ∧
-        (v.truthy = false → sumtoPost n h₁ ρ) := by
+        (b = false → sumtoPost n ht ρ) := by
   intro m h ρ k hk hI
   obtain ⟨rfl, d, hdm, hnv, hiv, haccv, hga, hgi⟩ := hI
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 4 := ⟨k - 4, by omega⟩
@@ -1461,7 +1555,7 @@ theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
     rw [evalExpr_binop_val ctxC (k1+3) [] ρ "<=" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
           (evalExpr_name ctxC (k1+2) [] ρ "i" hiv) (evalExpr_name ctxC (k1+2) [] ρ "n" hnv)]
     rfl
-  refine ⟨[], .bool (decide ((d:Int) ≤ n)), hcond, ?_, ?_⟩
+  refine ⟨[], .bool (decide ((d:Int) ≤ n)), [], decide ((d:Int) ≤ n), hcond, by simp, ?_, ?_⟩
   · intro hv
     have hdn : (d:Int) ≤ n := by
       simpa [Val.truthy] using hv
@@ -1542,10 +1636,10 @@ theorem sumto_run (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
       hinv (by omega)
   obtain ⟨rfl, hacc⟩ := hpost
   have hret : execStmt ctxC (G+2) [] ρ' (.ret (.name "acc"))
-      = ([], .ret (.int (triN (n.toNat + 1)))) :=
+      = ([], .ret (.int (triN (n.toNat + 1))) ρ') :=
     execStmt_ret_val ctxC (G+1) [] ρ' (evalExpr_name ctxC G [] ρ' "acc" hacc)
   have hbody : execStmt ctxC (G+7) [] [("n", Val.int n)] f_sumto.body
-      = ([], .ret (.int (triN (n.toNat + 1)))) := by
+      = ([], .ret (.int (triN (n.toNat + 1))) ρ') := by
     simp only [f_sumto]
     rw [execStmt_seq_normal ctxC (G+6) [] _ s1,
         execStmt_seq_normal ctxC (G+5) [] _ s2,
@@ -1555,7 +1649,7 @@ theorem sumto_run (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
         hret]
   rw [triN_closed hn] at hbody
   simp only [f_sumto, ctxC] at hbody
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, f_sumto, Env.set, hbody]
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, f_sumto, Env.set, hbody]
 
 theorem sumto_refines :
     Refines₁ (α := Int) (β := Int)
@@ -1602,14 +1696,15 @@ def gcdPost (g : Nat) (h : Heap) (ρ : Env) : Prop :=
 
 theorem gcdish_step (g : Nat) :
     ∀ m h ρ k, 5 ≤ k → gcdInv g m h ρ →
-      ∃ h₁ v, evalExpr ctxS k h ρ (.binop "!=" (.name "b") (.lit (.int 0))) = (h₁, .val v) ∧
-        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
-          execStmt ctxS k h₁ ρ
+      ∃ h₁ v ht b, evalExpr ctxS k h ρ (.binop "!=" (.name "b") (.lit (.int 0))) = (h₁, .val v) ∧
+        evalTruthWith ctxS h₁ v (fun fn self => applyFunc ctxS k h₁ fn (some self) [] []) = (ht, .val (.bool b)) ∧
+        (b = true → ∃ m' h₂ ρ', m' < m ∧
+          execStmt ctxS k ht ρ
             (.seq (.assign "t" (.name "b"))
               (.seq (.assign "b" (.binop "%" (.name "a") (.name "b")))
                     (.assign "a" (.name "t"))))
             = (h₂, .normal ρ') ∧ gcdInv g m' h₂ ρ') ∧
-        (v.truthy = false → gcdPost g h₁ ρ) := by
+        (b = false → gcdPost g ht ρ) := by
   intro m h ρ k hk hI
   obtain ⟨rfl, x, y, hx, hy, hym, hgcd, hav, hbv, hga, hgb, hgt⟩ := hI
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 5 := ⟨k - 5, by omega⟩
@@ -1618,7 +1713,7 @@ theorem gcdish_step (g : Nat) :
     rw [evalExpr_binop_val ctxS (k1+4) [] ρ "!=" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
           (evalExpr_name ctxS (k1+3) [] ρ "b" hbv) (evalExpr_lit_int ctxS (k1+3) [] ρ 0)]
     rfl
-  refine ⟨[], .bool (!(y == 0)), hcond, ?_, ?_⟩
+  refine ⟨[], .bool (!(y == 0)), [], !(y == 0), hcond, by simp, ?_, ?_⟩
   · intro hv
     have hy0 : y ≠ 0 := by
       simp [Val.truthy] at hv; omega
@@ -1694,17 +1789,17 @@ theorem gcdish_run (a b : Int) (ha : 0 ≤ a) (hb : 0 ≤ b) (fuel : Nat)
   obtain ⟨rfl, hav⟩ := hpost
   have hskip : execStmt ctxS (G+3) [] ρ' .skip = ([], .normal ρ') := execStmt_skip ctxS (G+2) [] _
   have hret : execStmt ctxS (G+3) [] ρ' (.ret (.name "a"))
-      = ([], .ret (.int ((Int.gcd a b : Nat) : Int))) :=
+      = ([], .ret (.int ((Int.gcd a b : Nat) : Int)) ρ') :=
     execStmt_ret_val ctxS (G+2) [] ρ' (evalExpr_name ctxS (G+1) [] ρ' "a" hav)
   have hbody : execStmt ctxS (G+5) [] [("b", Val.int b), ("a", Val.int a)]
         f_ops_py__module__gcdish.body
-      = ([], .ret (.int ((Int.gcd a b : Nat) : Int))) := by
+      = ([], .ret (.int ((Int.gcd a b : Nat) : Int)) ρ') := by
     simp only [f_ops_py__module__gcdish]
     rw [execStmt_seq_normal ctxS (G+4) [] _ hloop,
         execStmt_seq_normal ctxS (G+3) [] _ hskip,
         hret]
   simp only [f_ops_py__module__gcdish, ctxS] at hbody
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, f_ops_py__module__gcdish, Env.set, hbody]
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, f_ops_py__module__gcdish, Env.set, hbody]
 
 theorem gcdish_refines :
     Refines₂ (α := Int) (β := Int) (γ := Int)
@@ -1768,35 +1863,56 @@ abbrev ctxT : Ctx := ctxOf CounterProgram
 
 def counterRep : HeapRep Int :=
   { cls := "Counter"
-  , abs := fun o => if o.captured = [] then
+  , abs := fun o => if o.captured = [] ∧ o.payload.toVal.isNone = true ∧
+                      o.fields.all (fun p => p.1 == "n") = true then
                       (match o.fields.find? (·.1 == "n") with
                        | some (_, .int i) => some i
                        | _                => none)
                     else none }
 
+/-- Counter owns only its numeric field. In particular, an instance cannot shadow
+`bump`, and it cannot masquerade as a boxed builtin container. -/
+theorem counter_layout {h : Heap} {r : Ref} {a : Int}
+    (hR : Represents counterRep h r a) {o : Obj} (ho : h.get r = some o) :
+    o.captured = [] ∧ o.payload = .none ∧ o.fields.all (fun p => p.1 == "n") = true := by
+  obtain ⟨o', ho', _, ha⟩ := hR
+  rw [ho] at ho'; cases ho'
+  simp only [counterRep] at ha
+  split at ha
+  · rename_i hl
+    refine ⟨hl.1, ?_, hl.2.2⟩
+    cases hp : o.payload <;> simp_all [Payload.toVal]
+  · simp at ha
+
 theorem counter_getField {h : Heap} {r : Ref} {a : Int}
     (hR : Represents counterRep h r a) : h.getField r "n" = .int a := by
-  obtain ⟨o, ho, _, ha⟩ := hR
-  simp only [counterRep] at ha
+  obtain ⟨o, ho, hc, ha⟩ := hR
+  have hl := counter_layout (⟨o, ho, hc, ha⟩ : Represents counterRep h r a) ho
+  simp only [counterRep, hl.1, hl.2.1, Payload.toVal, Option.isNone_none, hl.2.2, and_self, if_true] at ha
   simp only [Heap.getField, ho]
-  by_cases hcap : o.captured = [] <;> simp only [hcap, if_true, if_false, if_neg, reduceIte] at ha
-  · cases hf : o.fields.find? (·.1 == "n") with
-    | none => rw [hf] at ha; simp at ha
-    | some p =>
+  cases hf : o.fields.find? (·.1 == "n") with
+  | none => rw [hf] at ha; simp at ha
+  | some p =>
       obtain ⟨kk, w⟩ := p
       rw [hf] at ha
       cases w <;> simp at ha
       subst ha; rfl
-  · simp at ha
 
 theorem counter_set {h : Heap} {r : Ref} {a b : Int} (hR : Represents counterRep h r a) :
     Represents counterRep (h.setField r "n" (.int b)) r b := by
   obtain ⟨o, ho, hc, ha⟩ := hR
-  have hcap : o.captured = [] := by
-    by_cases hcap : o.captured = []
-    · exact hcap
-    · simp only [counterRep, if_neg hcap] at ha; simp at ha
-  exact Represents.update ⟨o, ho, hc, ha⟩ ho (by simp [counterRep, hcap])
+  have hl := counter_layout (⟨o, ho, hc, ha⟩ : Represents counterRep h r a) ho
+  exact Represents.update ⟨o, ho, hc, ha⟩ ho (by simp [counterRep, hl.1, hl.2.1, Payload.toVal, hl.2.2])
+
+theorem counter_missing_field {h : Heap} {r : Ref} {a : Int} {o : Obj}
+    (hR : Represents counterRep h r a) (ho : h.get r = some o)
+    {name : String} (hn : name ≠ "n") : o.fields.find? (·.1 == name) = none := by
+  have hl := (counter_layout hR ho).2.2
+  apply List.find?_eq_none.mpr
+  intro p hp
+  have hk := List.all_eq_true.mp hl p hp
+  simp only [beq_iff_eq] at hk
+  simp [hk, Ne.symm hn]
 
 /-- Suffix facts, needed because `String.endsWith` does not reduce definitionally. -/
 theorem ew1 : "cnt.py:<module>.Counter.__init__".endsWith ".Counter.bump" = false := by simp [String.endsWith]; decide
@@ -1806,15 +1922,18 @@ theorem ew4 : "cnt.py:<module>.Counter.__init__".endsWith ".Counter.__init__" = 
 theorem ew5 : "cnt.py:<module>.Counter.bump".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
 theorem ew6 : "cnt.py:<module>.total".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
 
+-- `resolveMethod` now tests suffixes with `strEndsWith`, which the kernel computes, so
+-- these are decided outright; the `ew*` facts above are kept as the record of what the
+-- library function needed (`strEndsWith_eq_endsWith` is the bridge between the two).
 theorem resolve_bump : ctxT.resolveMethod "Counter" "bump" = some f_counter_bump := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
-  rw [show ("." ++ "Counter" ++ "." ++ "bump") = ".Counter.bump" from rfl, ew1, ew2, ew3]
+  rfl
 
 theorem resolve_init : ctxT.resolveMethod "Counter" "__init__" = some f_counter_init := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
-  rw [show ("." ++ "Counter" ++ "." ++ "__init__") = ".Counter.__init__" from rfl, ew4, ew5, ew6]
+  rfl
+
+/-- The constructor as `Expr.alloc` finds it (`Ctx.resolveCtor`: `__init__` first). -/
+theorem resolveCtor_init : ctxT.resolveCtor "Counter" = some f_counter_init := by
+  simp only [Ctx.resolveCtor, resolve_init]
 
 
 
@@ -1822,11 +1941,9 @@ theorem counter_find {h : Heap} {r : Ref} {a : Int} (hR : Represents counterRep 
     ∃ o, h.get r = some o ∧ o.cls = "Counter" ∧
       o.fields.find? (·.1 == "n") = some ("n", .int a) ∧ o.captured = [] := by
   obtain ⟨o, ho, hc, ha⟩ := hR
-  have hcap : o.captured = [] := by
-    by_cases hcap : o.captured = []
-    · exact hcap
-    · simp only [counterRep, if_neg hcap] at ha; simp at ha
-  simp only [counterRep, if_pos hcap] at ha
+  have hl := counter_layout (⟨o, ho, hc, ha⟩ : Represents counterRep h r a) ho
+  have hcap := hl.1
+  simp only [counterRep, hl.1, hl.2.1, Payload.toVal, Option.isNone_none, hl.2.2, and_self, if_true] at ha
   refine ⟨o, ho, hc, ?_, hcap⟩
   cases hf : o.fields.find? (·.1 == "n") with
   | none => rw [hf] at ha; simp at ha
@@ -1843,7 +1960,9 @@ theorem counter_find {h : Heap} {r : Ref} {a : Int} (hR : Represents counterRep 
 theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
     (hR : Represents counterRep h r acc)
     (hc : ρ.find? (·.1 == "c") = some ("c", .ref r))
-    (hx : ρ.find? (·.1 == "x") = some ("x", .int iv)) :
+    (hx : ρ.find? (·.1 == "x") = some ("x", .int iv))
+    (hglobal : (h.get ctxT.globals).bind
+      (fun o => o.fields.find? (·.1 == classAttrKey "Counter" "bump")) = none) :
     execStmt ctxT (j+8) h ρ (.expr (.mcall (.name "c") "bump" [(.name "x")]))
       = (h.setField r "n" (.int (acc + iv)), .normal ρ) := by
   obtain ⟨o, ho, hcls, hfind, hcap⟩ := counter_find hR
@@ -1869,31 +1988,54 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
       (evalExpr_name ctxT (j+2) h _ "self" hslf) hplus
   have hret : execStmt ctxT (j+4) (h.setField r "n" (.int (acc + iv)))
         [("k", Val.int iv), ("self", Val.ref r)] (.ret ((Expr.name "self").field "n"))
-      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) :=
+      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv)) [("k", .int iv), ("self", .ref r)]) :=
     execStmt_ret_val ctxT (j+3) _ _
       (evalExpr_field_obj ctxT (j+2) _ _
         (evalExpr_name ctxT (j+1) _ _ "self" hslf) ho' hfind')
   have hbody : execStmt ctxT (j+5) h [("k", Val.int iv), ("self", Val.ref r)]
         f_counter_bump.body
-      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) := by
+      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv)) [("k", .int iv), ("self", .ref r)]) := by
     simp only [f_counter_bump]
     rw [execStmt_seq_normal ctxT (j+4) h _ hsf]
     exact hret
   have happ : applyFunc ctxT (j+6) h f_counter_bump (some (.ref r)) [Val.int iv] []
       = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
     rw [applyFunc_succ ctxT (j+5) h f_counter_bump (some (.ref r)) [Val.int iv] []]
-    simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+    simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
-      Bool.false_eq_true, if_false, bindParams_mk,
+      Bool.false_eq_true, if_false,
+      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
     rw [hbody]
   have hmc : evalExpr ctxT (j+7) h ρ (.mcall (.name "c") "bump" [(.name "x")])
       = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
-    rw [evalExpr_mcall_obj ctxT (j+6) h ρ
-      (evalExpr_name ctxT (j+5) h ρ "c" hc)
+    have hmiss := counter_missing_field hR ho (name := "bump") (by decide)
+    have hpay := (counter_layout hR ho).2.1
+    have hat : ctxT.usesAttributeCall h r "bump" = true := by
+      have hi : Iteration.resolveMethod "Counter" "bump" = none := rfl
+      simp [Ctx.usesAttributeCall, ho, hcls, hpay, hi, Payload.toVal,
+        ctxT, ctxOf, CounterProgram]
+    have hlookup : evalExpr ctxT (j+6) h (("<mcall:receiver>", .ref r) :: ρ)
+        (.field (.name "<mcall:receiver>") "bump") =
+          (h, .val (.clos f_counter_bump.name [("self", .ref r)])) := by
+      rw [evalExpr, evalExpr_name ctxT (j+4) h _ "<mcall:receiver>" (v := .ref r) (by simp)]
+      have hd : ctxT.dialect = .python := rfl
+      have hp : ctxT.properties = [] := rfl
+      have hmeta : ctxT.usesClassMetadata "Counter" = false := rfl
+      have hcd : ctxT.classDefines "Counter" "bump" = true := rfl
+      have hfn : f_counter_bump.isMethod = true := rfl
+      have hcm : f_counter_bump.isClassMethod = false := rfl
+      have hrt : f_counter_bump.name.startsWith "<runtime>." = false := by
+        rw [← strStartsWith_eq_startsWith]; rfl
+      simp only [classAttrKey, String.reduceAppend] at hglobal
+      simp [ho, hcls, hmiss, hcap, hpay, hglobal, hd, hp, Payload.toVal,
+        hcd, resolve_bump, hfn, hcm, hrt, Ctx.classLookupGap, Ctx.isProperty, Ctx.readSlot,
+        Ctx.classStorageKey, classAttrKey, hmeta]
+    rw [evalExpr_mcall_attribute ctxT (j+6) h ρ
+      (evalExpr_name ctxT (j+5) h ρ "c" hc) hat hlookup
       (evalList_cons_val ctxT (j+5) h ρ rfl (evalExpr_name ctxT (j+4) h ρ "x" hx)
         (evalList_nil ctxT (j+4) h ρ))
-      ho hcap (by rw [hcls]; exact resolve_bump)]
+      (by rfl), applyClosure_self]
     exact happ
   exact execStmt_expr_val ctxT (j+7) h ρ hmc
 
@@ -1923,7 +2065,12 @@ theorem total_for_step (S : Int) :
     have hx' : (ρ.set "x" (Val.int y)).find? (·.1 == "x") = some ("x", .int y) := by
       simp [Env.set]
     refine ⟨h.setField 0 "n" (.int (acc + y)), ρ.set "x" (Val.int y),
-      bump_step j hR hc' hx', ys', acc + y, rfl, ?_, counter_set hR, hc'⟩
+      bump_step j hR hc' hx' (by
+        obtain ⟨o, ho, hc, ha⟩ := hR
+        change (h.get 0).bind _ = none
+        rw [ho]
+        exact counter_missing_field ⟨o, ho, hc, ha⟩ ho (by decide)),
+      ys', acc + y, rfl, ?_, counter_set hR, hc'⟩
     simp only [isum] at hsum
     omega
 
@@ -1957,9 +2104,10 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         f_counter_init (some (.ref 0)) [Val.int 0] []
       = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }], .val .unit) := by
     rw [applyFunc_succ ctxT (G+8) _ f_counter_init (some (.ref 0)) [Val.int 0] []]
-    simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+    simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
-      Bool.false_eq_true, if_false, bindParams_mk,
+      Bool.false_eq_true, if_false,
+      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
     rw [hinitbody]
   have halloc : evalExpr ctxT (G+10) [] [("xs", Val.list (ys.map Val.int))]
@@ -1968,9 +2116,9 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
     have h := evalExpr_alloc_obj ctxT (G+9) [] [("xs", Val.list (ys.map Val.int))]
       (evalList_cons_val ctxT (G+8) [] _ rfl (evalExpr_lit_int ctxT (G+7) [] _ 0)
         (evalList_nil ctxT (G+7) [] _))
-      (by intro c cap; simp [Env.get])
+      (by rfl)
       (by simp [ctxT, ctxOf, CounterProgram, Ctx.builtinBase])
-      resolve_init hinit
+      resolveCtor_init hinit
     simpa using h
   have hgc : (Env.get ([("xs", Val.list (ys.map Val.int))] : Env) ("<glob>" ++ "c")).truthy = false := by
     simp [Env.get, Val.truthy]
@@ -1982,7 +2130,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
   have hR0 : Represents counterRep
       [{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }] 0 0 := by
     refine ⟨_, rfl, rfl, ?_⟩
-    simp [counterRep]
+    simp [counterRep, Payload.toVal]
   have hcc : ([("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))] : Env).find? (·.1 == "c")
       = some ("c", .ref 0) := by simp
   obtain ⟨h', ρ', hfor, hpost⟩ :=
@@ -2003,23 +2151,27 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         [("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))]
         (.forIn "x" (.name "xs") (.expr (.mcall (.name "c") "bump" [(.name "x")])))
       = (h', .normal ρ') := by
+    -- The subject is a `Val.list` VALUE, not a ref, so `hbox` holds vacuously: there is
+    -- no receiver to be boxed. This is the discharge every corpus makes today.
     rw [execStmt_forIn_val ctxT (G+9) _ _
-      (evalExpr_name ctxT (G+8) _ _ "xs" (by simp)) (rfl : (Val.list (ys.map Val.int)).iterable = _)]
+      (evalExpr_name ctxT (G+8) _ _ "xs" (by simp)) (rfl : (Val.list (ys.map Val.int)).iterable = _)
+      (by simp)]
     exact hfor
   have hret : execStmt ctxT (G+10) h' ρ' (.ret ((Expr.name "c").field "n"))
-      = (h', .ret (.int (isum ys))) :=
+      = (h', .ret (.int (isum ys)) ρ') :=
     execStmt_ret_val ctxT (G+9) _ _
       (evalExpr_field_obj ctxT (G+8) _ _ (evalExpr_name ctxT (G+7) _ _ "c" hc') ho' hfind')
   have hbody : execStmt ctxT (G+12) [] [("xs", Val.list (ys.map Val.int))] f_counter_total.body
-      = (h', .ret (.int (isum ys))) := by
+      = (h', .ret (.int (isum ys)) ρ') := by
     simp only [f_counter_total]
     rw [execStmt_seq_normal ctxT (G+11) [] _ hassign,
         execStmt_seq_normal ctxT (G+10) _ _ hforIn]
     exact hret
   rw [applyFunc_succ ctxT (G+12) [] f_counter_total none [Val.list (ys.map Val.int)] []]
-  simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+  simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
     List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
-    Bool.false_eq_true, if_false, bindParams_mk,
+    Bool.false_eq_true, if_false,
+      seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv, bindParams_mk,
     List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
   rw [hbody]
 

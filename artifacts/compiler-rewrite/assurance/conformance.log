@@ -1,0 +1,10 @@
+language: python (.py x4) -> runtime cpython
+test suite: none discovered under /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python (pass --tests DIR)
+cases recorded from the test suite: 0
+cases constructed for methods the suite never called: 0 (0 functions)
+
+module CompilerRewrite (/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python, cpython)
+measurement basis: python-deadlines-v4+trace-returns-v1+heap-graph-v1
+functions: 5 total, 5 hole-free, 3 exercised, 3 COMPARED (60% of all, 60% of hole-free)
+conformance: 15/15 agree (100%) vs cpython, 0 divergences, 0 INCONCLUSIVE (hole / outOfFuel / unrepresentable)
+  by origin random      agree 15, diverge 0, inconclusive 0

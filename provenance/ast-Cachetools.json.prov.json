@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-Cachetools.json",
+ "artifact_bytes": 766819,
+ "artifact_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
+ "command": "scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.7-sdist Cachetools",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "642df7684639cfa6dbfe42fe0a038783259e195175c39080d4e14d97b56d4912",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.7-sdist",
+ "source_revision": "tree-sha256:49cb5656b594bd27bd84aa1508661bea0a02a65697a95349afb202f07c7f908f:9files"
+}

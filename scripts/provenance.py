@@ -24,7 +24,7 @@ WHAT A RECORD MUST MAKE POSSIBLE
     everything needed to *rebuild* the CPG and re-run the export:
 
         source_path       where the tree was
-        source_revision   git commit of that tree, or, when it is not a checkout,
+        source_revision   git commit of a clean tracked tree, or otherwise
                           `tree-sha256:<digest>` — a content digest over the tree, which
                           is a reproducible identifier a later regeneration can re-derive
         command           the exact command line, so regeneration is not a reconstruction
@@ -152,7 +152,15 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-SKIP_DIRS = {".git", "__pycache__", ".lake", "node_modules", ".mypy_cache"}
+def exporter_sources(path: Path) -> dict[str, str]:
+    from compiler_sources import source_files
+    return {relrepo(p): sha256_file(p) for p in source_files(path)}
+
+
+# Tool caches only: never source a frontend would parse, so they neither demote a
+# checkout to the digest fallback nor enter the digest.
+SKIP_DIRS = {".git", "__pycache__", ".lake", "node_modules", ".mypy_cache",
+             ".pytest_cache", ".hypothesis", ".ruff_cache"}
 
 
 def tree_sha256(root: Path) -> str:
@@ -161,7 +169,7 @@ def tree_sha256(root: Path) -> str:
     The fallback identity for a tree that is not a git checkout (the Linux corpora here
     are unpacked tarballs).  It is reproducible -- a later regeneration re-derives the
     same digest from the same bytes -- which is the whole requirement.  It is not a
-    substitute for a revision when a revision exists, and `record` prefers the revision.
+    substitute for a clean tracked revision, which `record` prefers when applicable.
     """
     h = hashlib.sha256()
     files = []
@@ -180,22 +188,48 @@ def tree_sha256(root: Path) -> str:
     return f"tree-sha256:{h.hexdigest()}:{len(files)}files"
 
 
-def source_revision(src: Path) -> str:
-    """git revision if the tree is a checkout, else a content digest. Never a guess."""
+def git_source_commit(src: Path) -> str | None:
+    """Return a commit only when it identifies this source subtree's current files.
+
+    Git searches parent directories. An ignored or untracked fixture below a checkout
+    therefore has a HEAD without being part of that revision. Likewise, a dirty tree
+    cannot be reproduced from HEAD. Both cases need the content digest fallback.
+    """
+    src = Path(src).resolve()
     try:
-        out = subprocess.run(
-            ["git", "-C", str(src), "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=30,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            rev = out.stdout.strip()
-            dirty = subprocess.run(
-                ["git", "-C", str(src), "status", "--porcelain"],
-                capture_output=True, text=True, timeout=60,
-            ).stdout.strip()
-            return f"git:{rev}" + ("+dirty" if dirty else "")
+        def git(*args):
+            return subprocess.run(["git", "-C", str(src), *args],
+                                  capture_output=True, timeout=60)
+
+        head = git("rev-parse", "--verify", "HEAD")
+        tracked = git("ls-tree", "-r", "--name-only", "-z", "HEAD", "--", ".")
+        if head.returncode or tracked.returncode or not tracked.stdout:
+            return None
+        if git("diff", "--quiet", "HEAD", "--", ".").returncode:
+            return None
+        for ignored in (False, True):
+            args = ["ls-files", "--others", "--exclude-standard", "-z"]
+            if ignored:
+                args.append("--ignored")
+            extra = git(*args, "--", ".")
+            if extra.returncode:
+                return None
+            for raw in extra.stdout.split(b"\0"):
+                if raw and not any(part in SKIP_DIRS for part in Path(os.fsdecode(raw)).parts):
+                    return None
+        return head.stdout.decode("ascii").strip()
     except (OSError, subprocess.SubprocessError):
-        pass
+        return None
+
+
+def source_revision(src: Path) -> str:
+    """A reproducible clean Git revision or a digest of the actual source tree."""
+    src = Path(src)
+    if not src.is_dir():
+        raise FileNotFoundError(f"source root is not an existing directory: {src}")
+    revision = git_source_commit(src)
+    if revision is not None:
+        return f"git:{revision}"
     return tree_sha256(src)
 
 
@@ -238,6 +272,11 @@ def cmd_record(args) -> int:
         print(f"provenance: no such exporter script {exporter_abs}", file=sys.stderr)
         return 2
     try:
+        compiler_files = exporter_sources(exporter_abs)
+    except (OSError, ValueError) as error:
+        print(f"provenance: cannot fingerprint exporter sources: {error}", file=sys.stderr)
+        return 2
+    try:
         det = detect_joern()
     except JoernAbsent as e:
         print(f"provenance: cannot record — {e}", file=sys.stderr)
@@ -254,6 +293,7 @@ def cmd_record(args) -> int:
         "cpg_schema_version": det["cpg_schema_version"],
         "exporter": relrepo(exporter_abs),
         "exporter_sha256": sha256_file(exporter_abs),
+        "exporter_sources": compiler_files,
         "source_path": str(src),
         "source_revision": source_revision(src),
         "command": args.command,

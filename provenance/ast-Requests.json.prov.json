@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-Requests.json",
+ "artifact_bytes": 2710996,
+ "artifact_sha256": "bcc46786c2f1a099a778db6e2ecf9cd96a57db90125c8c85f9f9e65cfed3b16b",
+ "command": "scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/requests-2.32.5-sdist Requests",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "6a9c3ab5e6aed70f77b6e6516f455d8ce2af1b8ca74c3ce5977b6504f3f3d47e",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/Users/mbhatt/.cache/autoform/corpora/requests-2.32.5-sdist",
+ "source_revision": "tree-sha256:7b6d024cb59b08cf9ed83c2a4a90abc88b89538cd0d7e244064fbe98d7869a3a:18files"
+}

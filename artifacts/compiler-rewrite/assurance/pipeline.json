@@ -1,0 +1,8 @@
+{
+  "module": "CompilerRewrite",
+  "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+  "stage": "complete",
+  "exit_code": 0,
+  "status": "passed",
+  "finished_at": "2026-09-24T07:36:01.293807+00:00"
+}

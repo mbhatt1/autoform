@@ -1,0 +1,17 @@
+{
+  "exit_code": 0,
+  "command": [
+    "/Users/mbhatt/joern/joern-cli/joern",
+    "-J-Xmx6g",
+    "--script",
+    "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/cartographer/export_ast.sc",
+    "--param",
+    "cpgPath=/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/autoform-compiler-modules-4cbj_lej/python.cpg.bin",
+    "--param",
+    "out=/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/autoform-final-compiler-smoke-1zelp3ps/ast.json"
+  ],
+  "log": "/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/autoform-final-compiler-smoke-1zelp3ps/export.log",
+  "python_fixture_ast_sha256": "4b7227dd4eea775bec2f9b9f0035ec4751d37ace4876b384a6e5f8514096a829",
+  "baseline_ast_byte_identical": true,
+  "purpose": "Compile all final Scala units after removing spaces from two blank lines."
+}

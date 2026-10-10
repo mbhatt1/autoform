@@ -634,13 +634,47 @@ This is the vacuity class `#audit_depends` **cannot** see — `evalStmt_sound` d
 
 The fix was to pin `evalBExpr` against something not defined in terms of itself — the
 integer order and equality on `evalExpr`'s results (`Characterization` section in
-`Autoform/Lang/Imp/Semantics.lean`). Re-running the gate: **8 killed / 0 survived, 100%,
-HAS TEETH**.
+`Autoform/Lang/Imp/Semantics.lean`). Re-running the gate then reported **8 killed / 0
+survived, 100%, HAS TEETH**.
 
-*Caveat on the measurement:* when a mutant makes the module fail to compile, every theorem
-in that module is recorded as having killed it, so per-theorem attribution is coarse. The
-aggregate claim (these mutants are now caught) is sound; the per-theorem breakdown is not
-yet trustworthy and should be refined by isolating theorems into separate modules.
+**That 100% is withdrawn.** It was produced while `error_lines` could not parse this
+toolchain's diagnostics, so no kill was attributable to any individual theorem. With the
+regex fixed, the coarse fallback removed, and a startup calibration (`error_lines_sanity`)
+that refuses to score at all when diagnostics cannot be attributed, the gate has been re-run
+over **all 39 mutants** — 12 invalid, 27 scored, 0 coarse, 0 inconclusive
+(`mutation-Imp.json`):
+
+**24 of 27 scored mutants are killed by some theorem in the file.** The 3 survivors are
+`_+1` → `_+0` on `evalStmt`'s fuel patterns and are *equivalent mutants*: `| 0, _, _` is
+the first arm, so `_+0` is shadowed at zero fuel and identical above it.
+
+The re-run is worth more than the number, because it found two gaps the 100% had hidden:
+
+1. **`evalExpr` was constrained by nothing.** The characterization pinned `evalBExpr`
+   *against* `evalExpr` and stopped there, so `+`→`-`, `-`→`+` and `*`→`/` survived every
+   theorem in the file — the same vacuity class, one level further down. Fixed by
+   `evalExpr_add`/`_sub`/`_mul`.
+2. **A hole under a loop could be relabelled as exhausted fuel.** Replacing
+   `.hitHole h => .hitHole h` with `.hitHole h => .outOfFuel` was caught by nothing:
+   `evalStmt_sound` constrains only `.ok`. That mutant erases the `outOfFuel` / `hitHole`
+   distinction §5 rests on — untranslated code would read as a resource limit. Fixed by
+   `evalStmt_seq_hole_propagates` / `evalStmt_loop_hole_propagates`.
+
+A third observation is about the gate, not the specification: the explicitly-shaped
+`≠`/`∃` theorems score 0%, 0% and 3.7%, not because they are vacuous but because they are
+**shadowed**. A mutation that would refute one first breaks the `@[simp] rfl` lemma the
+proof goes *through*; Lean reports the error at that lemma, admits it with `sorryAx`, and
+`simp` then discharges the downstream theorem from a false hypothesis. Per-theorem scores
+in a file with a `simp` characterization set therefore understate detection, and the union
+is the quantity to read.
+
+*Caveat on the measurement, resolved:* this used to read "when a mutant makes the module
+fail to compile, every theorem in that module is recorded as having killed it, so
+per-theorem attribution is coarse." That fallback no longer exists — a build failure
+carrying no diagnostic attributable to the mutated file or the spec file is recorded
+INCONCLUSIVE and excluded from the score, and a run containing one cannot pass. The
+remaining limit on per-theorem attribution is the `simp`-shadowing described above, which
+understates rather than inflates.
 
 ### Tier 3: audit, portfolio, assurance case
 
@@ -1900,6 +1934,12 @@ outcome §29/§31 warn about (a category that moves rather than closes) did not 
 at `keysProgramHoled` — `methodkey` *as the transpiler used to emit it* — so the
 worked example is explicitly historical.
 
+CHANGED (2026-10-09, re-land): `methodkey_refines` is retired. The current exporter reads
+`hashkey` through the module object at call time, as Python does, so the two-function
+slice run from the empty heap no longer has an answer; the theorem was true only of the
+statically bound translation. The note in `Autoform/Contracts.lean` says why it was deleted
+rather than restated.
+
 ### Nine arguments were being dropped in silence
 
 `**kwargs` and `k = v` arrive from `pysrc2cpg` with `ARGUMENT_INDEX = -1` and an
@@ -2191,12 +2231,31 @@ function count as 208, 209, 233 and 238. They are consistent as a sequence and c
 as a set, because both the numerator and the denominator moved, sometimes in the same
 revision. This section states the current values and what moved.
 
-**Current, from `ledger-Cachetools.json`, regenerated after the last exporter change:**
+**Current, from `ledger-Cachetools.json`, regenerated after the 2026-09-21 re-land of
+cachetools v7.1.7 (`provenance/ast-Cachetools.json.prov.json`):**
 
     functions        209
-    hole-free        180
-    verifiable core  101
-    holes            40
+    hole-free        207
+    verifiable core  107
+    holes            3
+
+(Later the same day -- object protocol on user instances, value-callees, receiver-then-
+collectors binding, comprehension lowering -- took the 22 holes to 3, all three the
+f-strings with non-literal parts in `_DescriptorBase`, and moved `Cache.get`/`pop`/
+`setdefault` into the core; conformance 245 agree / 0 diverge. The 97 below is the figure
+the exhaustive call analysis produced on the morning's artifact.)
+
+(97, not 108: on the same day the ledger's call analysis was found to have a wildcard arm
+that skipped `tryFinally` -- every Python `with` block -- so calls inside one were
+invisible and eleven functions were counted closed that are not. `Analysis.sCalls` and
+`eCalls` are now exhaustive over the constructors, and `dynamic-hole risk` rose from 867
+to 1,067 for the same reason. Milestone 3's `scripts/external_callees.py` is what found
+it: its independent mirror of `Ctx.resolvable` reported 92 open hole-free functions where
+the ledger reported 81, and the difference was exactly the `with` bodies.)
+
+(The previous artifact read 209 / 180 / 101 / 40; what closed the difference is the
+`control:TRY-exception-representation`, `call:python-property-access`,
+`call:python-defaults` and `op:delete-index` labels going to zero -- README's hole table.)
 
 What moved the denominator: `<metaClassCallHandler>` synthetics were excluded (§31),
 removing 30 functions of which 18 had counted as hole-free — padding in both the numerator
@@ -3206,3 +3265,236 @@ excluded, measured after: 0 lines from worktree paths, `VERDICT: PASS` unchanged
 The worktrees are mine, created during this session's work. The contamination was
 self-inflicted and the fix belongs in the gate regardless -- a checkout of the repository
 inside the repository is a thing that will happen again.
+
+## 57. The production-readiness pass
+
+Twenty-six commits on `production-readiness`, `eb09757..a8680ba`. Recorded in the form the
+rest of this file uses: the number, then the lesson, because the lesson is the part that
+transfers. Six of the twenty-six removed no holes at all and were the most valuable six --
+every one was a case where a claim this project made about itself turned out to be wrong,
+and only a measurement could have said so.
+
+### 57.1 The 100% is withdrawn, and the re-run found two gaps it had hidden
+
+§14's "8 killed / 0 survived, 100%, HAS TEETH" for `Autoform/Lang/Imp/*` was never
+attributable: `mutate.py`'s `error_lines` regex did not match this toolchain's
+diagnostics, so every kill was the coarse "the build failed, credit everyone" fallback.
+Both are gone. Re-run over **all 39 mutants** with attribution working (0 coarse, 0
+inconclusive): **24 of 27 scored mutants are killed by some theorem.** The 3 survivors are
+`_+1` -> `_+0` on `evalStmt`'s fuel patterns -- equivalent mutants, since `| 0, _, _` is
+the first arm, so `_+0` is shadowed at zero and identical above it.
+
+Two things the 100% concealed. `evalExpr` was constrained by nothing -- `+`->`-`, `-`->`+`,
+`*`->`/` survived every theorem in the file; the characterisation had stopped one level
+short. And a hole reached under a loop could be relabelled `outOfFuel` with no theorem
+objecting, which is the `hole`/`outOfFuel` distinction this whole project rests on. Both
+pinned (`evalExpr_add`/`_sub`/`_mul`, `evalStmt_seq_hole_propagates`,
+`evalStmt_loop_hole_propagates`). A third observation is about the apparatus: the
+`∃`-shaped characterisation theorems score 0%, 0% and 3.7% not because they are vacuous
+but because they are **shadowed** -- the mutation breaks the `@[simp] rfl` lemma they are
+proved *through*, Lean admits it with `sorryAx`, and `simp` discharges the downstream
+theorem from a false hypothesis. Per-theorem scores understate detection in a file with a
+`simp` characterisation set; the union is the number to read.
+
+`error_lines_sanity`, promised by a comment across two toolchain versions and never
+written, now exists -- as a pure function over the build output the run already captured.
+Its first draft shelled out to `lean` under the harness's stubbed `HOME`, which starved
+`test_stage_deadline_restores_mutation_source`. A gate's calibration must not be the
+slowest thing in the gate.
+
+### 57.2 `check_provenance` exited 1, so it was in no workflow; now it is a required gate
+
+Three violations blocked it. One was closed with evidence: `ast-Cachetools.json`'s source
+was recorded as "not identified anywhere in the repository". A fresh export of
+**cachetools v7.1.7** -- the only release predating the artifact's 2026-08-22 regeneration
+-- reproduces its exact 209-entry `(name, file)` set across all five modules. That is what
+identifies a revision; a version number in a comment would not. It still DIFFERS (six new
+per-function keys; 105 of 209 bodies after discounting them), so it stays in the backlog
+with `reproduction_attempted: true` and a public tag as its `source_hint` in place of a
+dead scratch path. The other two are recorded as the weakest class the file has: they name
+the commit that changed the artifact and nothing about the tree it came from.
+
+The gate passing means **0 of 14 attributed, all 14 named.** What it now prevents is a new
+unattributed artifact, and a regenerated one silently keeping an entry that no longer
+describes it.
+
+### 57.3 Re-exporting the stale corpus would cost 86 functions, and was not done
+
+The obvious remedy for "every tracked AST predates the character-literal fix" is to
+re-export. Tried end to end on v7.1.7:
+
+| | committed AST | fresh export |
+|---|---|---|
+| holes | 26 across 25 functions | **134 across 111 functions** |
+
+None of it is a bug. Every new label is the exporter declining to model a Python construct
+it cannot model faithfully, which is the design commitment working. But it means a tracked
+corpus is *evidence about the exporter that produced it*, and replacing it that day would
+have produced a worse artifact rather than a refreshed one: 98 theorems break, most of them
+theorems about functions that have become holes, where the honest fix is deletion. Not
+landed. The labels that made up the 134 became the work list for the rest of the pass, and
+at its end the same export measured **97**.
+
+### 57.4 Calling conventions: three kinds of default, one left
+
+`def f(x, n=1)` holed the whole definition because Python evaluates a default once, when
+the `def` runs, and Core has no function-object state. Right reason, wrong scope. A
+**literal** is time-invariant; so is a **reference to an in-program function** --
+`k=keys.hashkey` stores `keys.hashkey` itself, the same object however often it is looked
+up; so is an **attribute of an imported module** -- `timer=time.monotonic` -- which binds
+the same opaque `<absent:external>` marker `absentModule` already uses for the import, so
+that "bound to something unmodellable" does not take the literals beside it down too.
+`DefaultValue` is `lit | fnref` and nothing else; the closed type is the check.
+Resolution of a dotted name requires **exactly one** method in the program to match,
+because two classes defining `__getitem__` make the source text ambiguous and picking one
+is a silent wrong answer. `call:python-defaults` **53 -> 1** on cachetools. The one left is
+`Cache.pop(default=__marker)`, a class-attribute sentinel: reading it needs the heap at
+bind time and `bindParams` is heap-free. For that default, and only that one, the original
+"function-object state" note was correct.
+
+`@staticmethod` closed for the same shape of reason: its entire content is "bind no
+receiver", which `isMethod: False` already says, leaving no decorator residue to refuse.
+The adversarial fixture `@staticmethod def static(self, a)` keeps `self` as an ordinary
+parameter -- CPython binds `C.static(1, 2)` to `self=1` -- and it un-holed
+`Cache.getsizeof`, the exact function whose spec broke in §57.3.
+
+### 57.5 A Python trap named itself in prose, and `except ValueError:` could not catch it
+
+`numToE` turns a numeric trap into `.exn (.str r)`, and `r` is read downstream as the
+raised exception's **class name**. `NumConfig.python` traps on shift count, and the trap
+carried `"negative shift count"`:
+
+    1 << -1      Core: .exn (.str "negative shift count")      CPython: ValueError
+
+`Numeric.lean`'s own dialect table said `ValueError` the whole time. The documentation was
+right, the implementation was not, and nothing compared them. Fixed with
+`shiftCountFault : Option String`, `none` by default so no other dialect moves;
+`python_shiftCount_trap` is the theorem that keeps it fixed.
+
+Found while checking whether the `control:TRY-exception-representation` guard was
+redundant. It looked so -- "every exception Core makes is a represented name" -- and the
+method here is that such claims get checked. Every producer in `Stdlib.lean` is now a
+theorem (`makeException_excSafe`, `raiseValue_excSafe`, `python_shiftCount_trap`), and
+the guard **stays**: `Stmt.raise` raises its operand's value directly, without passing
+through `raiseValue`. That the exporter only ever emits safe `Stmt.raise`s is a property
+of the exporter, not of Core. Removing the guard needs a well-formedness predicate on
+programs plus preservation over the interpreter, and the re-raise case makes that an
+environment invariant rather than a syntactic check. Three lemmas and one precisely stated
+obligation, in place of folklore.
+
+### 57.6 A `@property` read computed `unit` -- silently, in the tracked corpus
+
+`c.currsize` calls a getter in Python. The exporter lowered it to a field read;
+`Cache.__init__` stores the name-mangled `_Cache__currsize`; no field called `currsize`
+exists; `evalExpr` answers a missing field on an ordinary object with `unit`, with no hole:
+
+    c.currsize      CPython 1      Core unit
+
+`make_info` in `ast-Cachetools.json` reads `cache.currsize` and `cache.maxsize` this way,
+and the ledger counted those functions as translated. Well-typed, hole-free, and wrong.
+Property reads now hole (`call:python-property-access`), which **raised** the cachetools
+count 108 -> 126 across 18 sites. A metric that falls when a silent wrong answer is
+corrected was measuring the wrong thing. It took two passes: patching `callExpr`'s field
+branch changed nothing, because a plain `return c.prop` goes through `exprV`, the
+prelude-aware translator. A test now asserts both sites refuse it.
+
+The general case -- any missing attribute is `unit` where Python raises `AttributeError` --
+was priced rather than guessed: **171 declarations across 36 files, 136 in generated
+specs**, because `applyFunc_ret_field_self` claims an accessor returns its field for *every*
+receiver. Not done, and the harder question is on record: holing is the conservative
+choice and `AttributeError` the faithful one, and which is right depends on whether Core's
+object model is complete -- a claim about the project, not a refactor.
+
+### 57.7 `nonlocal` was filed under "needs semantics"; Core already expressed it
+
+The exporter comment said `Expr.closure` captures by value, so a write cannot reach the
+owning frame, and an `assign` would be silently wrong. Right about `assign`, wrong about
+Core. Capturing a `Val.ref` by value still shares the object behind it -- that is a closure
+cell, and `boxNew`/`field`/`setField` already do it; `Semantics.lean` carries the
+`hits += 1` shape as a `#guard_msgs` answering `2`. What actually blocked it was the
+exporter translating one method at a time. The fix reused `boxedLocals`, the machinery
+built for C address-taken locals: the defining scope gets the box and the allocation
+prologue; the closure gets the same `field`/`setField` treatment and explicitly **no**
+prologue, or it would rebind the name to a fresh box and destroy the alias.
+
+The safety condition is the whole content. The box must exist when the closure captures
+it, so the name must be bound at the top level of the defining function **before the first
+nested `def`**. `counter()` -> 2 as in CPython; the `if`-bound variant still holes. The
+first draft translated the unsafe case too, because the child's set was taken from its
+declaration instead of intersected with what the parent actually boxed -- it would have
+read a field off an integer. A fixture caught it before it was measured on anything.
+`scope:nonlocal-write` **8 -> 0**.
+
+### 57.8 Boxed containers: steps 1-4, then the switchover -- and the number I got wrong
+
+Steps 3 and 4 -- `setIndex`, `delIndex`, mutating builtins through the payload, and live
+iteration with `Obj.version` checked per step -- landed **inert**, each verified against
+CPython on a hand-built heap, at a total cost of three `FuelMono` cases, two `substS`
+matches and one statement change (`execStmt_forIn_val` now carries `hbox`).
+`Stdlib.lean` did not change at all, as §2 of the design predicted.
+
+The switchover -- `.listE`/`.dictE` allocate -- was then implemented, measured at **163
+broken declarations across 34 files**, and I concluded it needed the V8 corpus and
+stopped. **That was wrong.** 33 of the 34 files were `SpecsGen/V8Base`, and V8Base is
+`.cLike`. Only Python boxes, so no `.cLike` corpus can hold a payload, so no `.cLike` spec
+needs to say it does not. One dialect gate on the container-attribute rule turned **163
+into 3**. I had the right measurement, drew the wrong inference, and had used it to justify
+stopping.
+
+Four requirements the design document does not mention, each found by the build or a
+failing test: boxing must be **dialect-gated** (a C aggregate initializer is a value);
+splatting must **unbox** (`*xs` inspects `Val.iterable` structurally); an attribute read on
+a boxed container must **hole** (`{'a': 1}.a` was a hole and would have become `unit`);
+`Expr.index` must **unbox** (the first aliasing test failed on it). Verified:
+
+    a=[1,2]; b=a; b[0]=9; a[0]        Core 9           CPython 9
+    a=[1]; b=[1]; a==b / a is b       true / false     True / False
+
+Then the oracle was re-run: **`conformance.json` came back byte-identical.** No regression
+in the strongest available form; no improvement either, because the 256 inconclusive cases
+are `call:set`, `call:type`, `warnings.warn`, `expr:genExp` -- containers were never this
+corpus's limit. A migration judged by whether the headline moved would have been abandoned
+at step 1; one that *claimed* it moved would have been wrong.
+
+The design document's `Val.eqPy` status was stale (it *was* landed), its evaluation order
+for `a[b] = c` was wrong (CPython: `c`, then `a`, then `b`), and its "35 sites in
+`Generated`" holds only over tracked renders -- the naive grep over a dev checkout gives
+15,068. All corrected in place.
+
+### 57.9 The numeric suite, run rather than cited
+
+`test_joern_native_numeric` is parameterised over the language matrix and gated behind
+`AUTOFORM_TEST_JOERN=1`, so it sits among the 45 skipped tests of every ordinary run and
+had not been executed. Run in full against `cc`, `node`, `javac`, `go`: **5 passed, 2
+xfailed, no open numeric divergence.** Both `xfail`s are `strict` and neither is numeric.
+`indexSnapshot` needs JS arrays to have identity -- which §57.8 now provides, leaving the
+`__ecma.Array.factory` translation, the `.javascript` boxing gate, and `push` returning
+the new **length** where Python's `append` returns `None`. `indexString` is UTF-16
+indexing. "No known divergence" and "the suite was run and says so" are different claims.
+
+### 57.10 Property dispatch: implemented, proved fuel-monotone, blocked on provability
+
+Making `c.prop` *run* its getter was built twice. A `Ctx.properties` field cost **289
+broken declarations** -- every `Ctx` literal in `Contracts.lean` disagreed with `ctxOf`
+about a field it did not mention. A marker name in the existing table
+(`<property>currsize`) needs no new field, so every `Ctx` term stays byte-identical, and
+the dialect gate then collapses all 120 V8Base accessor uses, leaving three in
+`Cachetools`. Those three **cannot discharge their side condition**: `ctx.resolve
+(propertyGetter fld) = none` requires proving a name *absent* from the table, `Ctx.resolve`
+suffix-matches with `String` operations the kernel will not reduce cheaply, and `rfl` and
+`simp` both fail at 209 entries. Finding a name short-circuits; proving one absent is a
+full scan.
+
+So the recommendation reverses: carry the property list on `Program`/`Ctx` after all,
+where absence is `[] = []`, and align the handful of `Ctx` construction sites that produced
+the 289. The design that was cheaper to *write* was far more expensive to *prove*, and
+which one mattered was not visible until the proof was attempted.
+
+### 57.11 Two apparatus errors of my own, for the record
+
+`check_render` "exited 0 at baseline" -- it did not; I had piped it to `tail` and captured
+`tail`'s exit code. It has always exited 3 on a dev checkout, from 25 untracked build
+products under `Autoform/Generated/`. The same build products nearly produced a false
+finding about the boxed-containers plan (15,068 against 35). Untracked build products in
+the source tree are a standing hazard for anyone who measures by grep, and both incidents
+now sit in the documents they could have misled.

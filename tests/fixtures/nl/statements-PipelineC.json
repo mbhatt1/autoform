@@ -1,0 +1,154 @@
+[
+ {
+  "id": "wrap__p1",
+  "function": "wrap",
+  "property": "p1",
+  "english": "wrap returns (a + b) mod 2^32",
+  "lean_prop": "∀ (a : Int) (b : Int), (true) = true → (fun (r : EResult) => match r with | .val (.int x) => x == (a + b) % 4294967296 | _ => false) (runFunc Autoform.Generated.PipelineC.program 1000 \"wrap\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.int x) => x == (a + b) % 4294967296 | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "wrap__p2",
+  "function": "wrap",
+  "property": "p2",
+  "english": "wrap returns a + b (false: overflow)",
+  "lean_prop": "∀ (a : Int) (b : Int), (true) = true → (fun (r : EResult) => match r with | .val (.int x) => x == a + b | _ => false) (runFunc Autoform.Generated.PipelineC.program 1000 \"wrap\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.int x) => x == a + b | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "bump__p1",
+  "function": "bump",
+  "property": "p1",
+  "english": "bump returns (a + 1) mod 256",
+  "lean_prop": "∀ (a : Int), (true) = true → (fun (r : EResult) => match r with | .val (.int x) => x == (a + 1) % 256 | _ => false) (runFunc Autoform.Generated.PipelineC.program 1000 \"bump\" [.int a]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.int x) => x == (a + 1) % 256 | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "add__p1",
+  "function": "add",
+  "property": "p1",
+  "english": "add returns a + b when it does not overflow",
+  "lean_prop": "∀ (a : Int) (b : Int), (-9223372036854775808 <= a + b && a + b <= 9223372036854775807) = true → (fun (r : EResult) => match r with | .val (.int x) => x == a + b | _ => false) (runFunc Autoform.Generated.PipelineC.program 1000 \"add\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "-9223372036854775808 <= a + b && a + b <= 9223372036854775807",
+  "post": "match r with | .val (.int x) => x == a + b | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "right__p1",
+  "function": "right",
+  "property": "p1",
+  "english": "right returns a >>> b for b < 32",
+  "lean_prop": "∀ (a : Int) (b : Int), (b < 32) = true → (fun (r : EResult) => match r with | .val (.int x) => x == Int.ofNat (a.toNat >>> b.toNat) | _ => false) (runFunc Autoform.Generated.PipelineC.program 1000 \"right\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "b < 32",
+  "post": "match r with | .val (.int x) => x == Int.ofNat (a.toNat >>> b.toNat) | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "right__p2",
+  "function": "right",
+  "property": "p2",
+  "english": "right always returns a value (false: shift >= width)",
+  "lean_prop": "∀ (a : Int) (b : Int), (true) = true → (fun (r : EResult) => match r with | .val _ => true | _ => false) (runFunc Autoform.Generated.PipelineC.program 1000 \"right\" [.int a, .int b]) = true",
+  "binders": [
+   {
+    "name": "a",
+    "type": "Int",
+    "val": ".int a"
+   },
+   {
+    "name": "b",
+    "type": "Int",
+    "val": ".int b"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val _ => true | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "literal__p1",
+  "function": "literal",
+  "property": "p1",
+  "english": "literal returns 2147483649",
+  "lean_prop": "(true) = true → (fun (r : EResult) => match r with | .val (.int x) => x == 2147483649 | _ => false) (runFunc Autoform.Generated.PipelineC.program 1000 \"literal\" []) = true",
+  "binders": [],
+  "pre": "true",
+  "post": "match r with | .val (.int x) => x == 2147483649 | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ }
+]

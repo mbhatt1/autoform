@@ -1,0 +1,136 @@
+{
+ "module": "PipelineTS",
+ "corpus": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/examples/source/ts",
+ "mode": "native",
+ "interpreter_fuel": 5000,
+ "initializer_fuel": 5000,
+ "cross_runtime_evidence": true,
+ "self_recorded_families": [
+  "charact"
+ ],
+ "self_recorded_note": "`charact_*` right-hand sides are this interpreter's own output. They are characterization/regression theorems and are NOT cross-implementation evidence; only `conform_*` is, and it needs a runtime this repository can drive.",
+ "families_unavailable": [],
+ "subjects_considered": 3,
+ "subject_population": "observed",
+ "max_subjects": null,
+ "only_subjects": null,
+ "excluded_subjects": [],
+ "functions": 4,
+ "call_closed": 4,
+ "artifacts": {
+  "docstrings": 0,
+  "doctests": 0,
+  "asserts": 0,
+  "raises": 0,
+  "pbt_files": 0,
+  "pbt_properties": 0,
+  "test_files": 0
+ },
+ "observations": {
+  "calls": 15,
+  "in_core": 15,
+  "tests": [],
+  "skipped": {
+   "skip_varargs": 0,
+   "skip_unencodable_args": 0,
+   "skip_unencodable_ret": 0,
+   "runtime": "node",
+   "evidence": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/artifacts/pipeline/PipelineTS/conformance.json"
+  }
+ },
+ "candidates": 3,
+ "refuted": 0,
+ "not_checked": 0,
+ "vacuous": 0,
+ "vacuity_checks": {},
+ "vacuity_rate_pct": 0.0,
+ "emitted": 3,
+ "proved": 3,
+ "open_obligations": 0,
+ "build_clean": true,
+ "artifact_hashes": {
+  "ast": "316cb23e071036a1414ac21f2a50ed6878e44ba6d81b32600cee0e049a729989",
+  "model": "b95d214a73adbb9f77ab0a828d9006703f9eb7ea397c48f08232b0715e68496a",
+  "conformance": "6c07175392308bd6737134d49779170533747b2860c23afc86a7c87c74c3db2e",
+  "proof": "1214a4c51a59a07512296ee0263721aac58634a816884bc3f5024cee0c0da198"
+ },
+ "mutation_sample": null,
+ "fuel_independent": 3,
+ "fuel_obligations_remaining": 0,
+ "fuel_blocked_reasons": {},
+ "outOfFuel_cases": {},
+ "by_family": {
+  "conform": {
+   "candidates": 3,
+   "refuted": 0,
+   "vacuous": 0,
+   "proved": 3
+  }
+ },
+ "specs": [
+  {
+   "id": "conform_numbers_ts__program_constant",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.ts::program:constant",
+   "definition": "f_numbers_ts__program_constant",
+   "kind": "law",
+   "domain": 1,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 1,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_ts__program_shift",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.ts::program:shift",
+   "definition": "f_numbers_ts__program_shift",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_ts__program_unsigned",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.ts::program:unsigned",
+   "definition": "f_numbers_ts__program_unsigned",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  }
+ ],
+ "not_checked_gates": [
+  "scripts/mutate.py \u2014 run separately; a surviving mutant means the spec is vacuous in the sufficient sense",
+  "scripts/audit_all.py \u2014 axiom basis of the emitted theorems"
+ ]
+}

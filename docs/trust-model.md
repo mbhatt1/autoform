@@ -59,6 +59,20 @@ following was found here rather than by inspection:
 * Python private name mangling (`__x` → `_Cls__x` inside a class body): a silently wrong
   field read returning `unit`.
 
+**Other runtimes.** The same script has backends for Node (JavaScript, and TypeScript
+through `--experimental-strip-types`), the JVM (Java; Kotlin through a compiled
+`@JvmStatic` thunk) and Go, selected by file extension or `--language`. They do less
+than the CPython tracer and the report says so in its `measurement_basis`: there is no
+test suite to trace, so each backend calls the corpus's own module-scope / static /
+package-level functions on a fixed, per-type argument pool, skips and COUNTS every
+signature it cannot encode (receivers, objects, promises, multi-value returns), and
+records `runtime_version`. What such a run establishes is that Core agrees with the
+runtime on those calls; what it does not establish is anything about the calls it
+skipped, which is why `backend_skipped_total` sits beside `agree` in the report. As of
+this writing each backend has been executed end to end only on the in-repo fixtures
+(`tests/test_differential_backends.py`), not on the language corpora in
+`docs/languages.md`.
+
 Three discipline rules the oracle operates under:
 
 * **Outcomes are three-valued, never two**: agree / diverge / INCONCLUSIVE. A case that
@@ -91,17 +105,28 @@ transpiler output — and rebuilds `Autoform/Specs/<M>Spec.lean`, so the file mu
 subject of the theorems. Stating specifications about generated code by import rather than
 by copying terms into the spec file is what makes this possible.
 
-Measurement caveat: when a mutant makes a module fail to compile, every theorem in that
-module is recorded as having killed it, so per-theorem attribution is coarse. The aggregate
-claim is sound; the per-theorem breakdown is not yet trustworthy.
+The gate credits a kill only when a build diagnostic identifies that theorem. It uses
+full file paths, including when the generated model and proof share a basename. A broken
+implementation is an invalid mutant; a timeout, dependency error or unattributed failure
+is inconclusive. Neither counts as a kill. Inconclusive checks and a failed restoration
+build prevent the gate from passing. Timed-out compiler process groups are terminated
+before restoration so they cannot keep writing stale build artifacts.
 
 ### 2.3 Axiom sweep + `leanchecker --fresh` — catches *unsound proofs*
 
 `scripts/audit_all.py`, three independent checks:
 
+Before these checks, the audit builds its root module from the current sources and asks
+Lean which compiled imports it actually resolves. It hashes the project sources, build
+configuration, compiled import files (including optional proof-body parts), and any
+`--evidence` reports. Changes during replay invalidate the result. The automatic pipeline
+binds its source observations, specification and mutation reports to this snapshot.
+
 1. **Axiom sweep** — every declaration in the built library is asked what it stands on via
    `Lean.collectAxioms`. `sorryAx` means "not proved at all"; `Lean.ofReduceBool` /
    `ofReduceNat` mean "the Lean compiler was trusted". Either is a trusted-code leak.
+   A failed sweep command, project-declared axioms and nonstandard assumptions also fail
+   the audit, even if the command emitted a JSON payload.
 2. **Source sweep** — greps for the escape hatches that do not appear as axioms: `sorry`,
    `partial`, `unsafe`, `native_decide`, `@[implemented_by]`, `axiom`. Comments and
    docstrings are stripped first, so prose *about* `sorry` is not reported as one. The Core
@@ -125,6 +150,13 @@ installing a bogus declaration with `Environment.addDeclCore (doCheck := false)`
 tampering with a copy of this project's own build tree. Both are rejected; the untampered
 control passes. "Exit 0" is also the shape a no-op takes, so a green result from an
 unexercised checker establishes nothing.
+
+`guarantee.json` additionally requires the named conformance theorems to occur in the
+audited root module, checks the generation-input hashes, and rechecks the artifact
+snapshot before publishing claims. Changed or missing evidence withholds the guarantee.
+These hashes detect stale or altered artifacts under a trusted runner; they are not a
+signature authenticating a report supplied by an adversary. Repository acquisition,
+builds and native execution still require a restricted environment for untrusted code.
 
 ### 2.4 Execution — catches *coverage claims that static analysis flatters*
 
@@ -228,9 +260,10 @@ the tool.
 * **A verified core is not a verified repository.** The whole codebase will never be
   formalized; that is a design decision. Everything outside the core is covered by declared
   assumptions and boundary contracts.
-* **The axiom sweep is repo-wide, not module-scoped.** It bounds the axiom basis of
-  everything in the repository, including the semantics a given module is interpreted by,
-  but it is not evidence about theorems specific to that module. G5 is capped accordingly.
+* **The axiom sweep has an explicit root module.** A root of `Autoform` supplies repository
+  evidence; a generated proof root supplies its own theorem inventory and imported
+  dependencies. Repository evidence alone cannot support a claim about a different
+  proof module. Historical reports without current artifact bindings remain weaker.
 * **The proof portfolio does not prove much yet.** Tiers 1–2 are real (including
   `bv_decide`, whose LRAT certificate is kernel-checked, so it adds no trusted code); the
   external SMT path produces an *opinion recorded on an open obligation* and cannot close a

@@ -1,0 +1,18 @@
+[
+  {
+    "language": "python",
+    "functions": 10,
+    "ast_byte_identical": true,
+    "ast_sha256": "4307dd4f790ddbeb61b87d9c98f83950caf2bcc5ff11780e1e525263ed35d7e5",
+    "census_byte_identical": true,
+    "census_sha256": "21e6fac21ad59db556adc217bb05cef025a104f92f5e13a1d591826c358f61be"
+  },
+  {
+    "language": "c",
+    "functions": 8,
+    "ast_byte_identical": true,
+    "ast_sha256": "1958a872ea4ca71e014295f4f0aea4260c6f7b2122f2a47069b936f79850acdb",
+    "census_byte_identical": true,
+    "census_sha256": "68ebd59fda82dee6ecc590cffc3e464aae80ae7ac42e0a33b6ae1a8aa0b2d90f"
+  }
+]

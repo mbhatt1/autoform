@@ -1,0 +1,12 @@
+{"verifiableCore": 10,
+ "nodes": 68,
+ "module": "PipelineJS",
+ "holesByLabel": [],
+ "holes": 0,
+ "holeFree": 10,
+ "functions": 10,
+ "dynamicHoleRisk": 8,
+ "dialect": "javascript",
+ "contractsUsed": [],
+ "closedByTranslation": 10,
+ "closedByContract": 0}

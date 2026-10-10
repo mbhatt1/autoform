@@ -1,0 +1,266 @@
+[
+ {
+  "name": "numbers.py:<module>.add",
+  "file": "numbers.py",
+  "sourceName": "add",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "a",
+    "b"
+   ],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "numbers.py:<module>.quotient",
+  "file": "numbers.py",
+  "sourceName": "quotient",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "//",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "a",
+    "b"
+   ],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "numbers.py:<module>.fraction",
+  "file": "numbers.py",
+  "sourceName": "fraction",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "py:/",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "a",
+    "b"
+   ],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "<module-objects>:<module>",
+  "file": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setGlobal",
+    "x": "<module>numbers.py",
+    "e": {
+     "k": "alloc",
+     "cls": "<module>numbers.py",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>numbers.py"
+     },
+     "f": "add",
+     "v": {
+      "k": "fnref",
+      "v": "numbers.py:<module>.add"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "<module>numbers.py"
+      },
+      "f": "fraction",
+      "v": {
+       "k": "fnref",
+       "v": "numbers.py:<module>.fraction"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setField",
+       "r": {
+        "k": "name",
+        "v": "<module>numbers.py"
+       },
+       "f": "quotient",
+       "v": {
+        "k": "fnref",
+        "v": "numbers.py:<module>.quotient"
+       }
+      },
+      "b": {
+       "k": "skip"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.py:<module>",
+  "file": "numbers.py",
+  "sourceName": "<module>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setField",
+    "r": {
+     "k": "name",
+     "v": "<module>numbers.py"
+    },
+    "f": "add",
+    "v": {
+     "k": "fnref",
+     "v": "numbers.py:<module>.add"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>numbers.py"
+     },
+     "f": "quotient",
+     "v": {
+      "k": "fnref",
+      "v": "numbers.py:<module>.quotient"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "<module>numbers.py"
+      },
+      "f": "fraction",
+      "v": {
+       "k": "fnref",
+       "v": "numbers.py:<module>.fraction"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "skip"
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

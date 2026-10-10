@@ -1,0 +1,32 @@
+Picked up JAVA_TOOL_OPTIONS:  -Dfile.encoding=UTF-8
+Picked up JAVA_TOOL_OPTIONS:  -Dfile.encoding=UTF-8
+executing /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/cartographer/formalization_graph.sc with params=Map(cpgPath -> /var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/cpg.bin, out -> /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/formalization-graph.json)
+Creating project `cpg.bin` for CPG at `/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/cpg.bin`
+Creating working copy of CPG to be safe
+Loading base CPG from: /private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/workspace/cpg.bin/cpg.bin.tmp
+[INFO ] initialising from existing storage (/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/workspace/cpg.bin/cpg.bin.tmp)
+Overlay dataflowOss already exists - skipping
+The graph has been modified. You may want to use the `save` command to persist changes to disk.  All changes will also be saved collectively on exit
+[INFO ] Start of pass: io.joern.x2cpg.frontendspecific.pysrc2cpg.ImportsPass
+[INFO ] Pass io.joern.x2cpg.frontendspecific.pysrc2cpg.ImportsPass completed in 11 ms (66% on mutations). 0 + 0 changes committed from 0 parts.
+[INFO ] Start of pass: io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonImportResolverPass
+[INFO ] Pass io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonImportResolverPass completed in 12 ms (11% on mutations). 0 + 0 changes committed from 0 parts.
+[INFO ] Start of pass: io.joern.x2cpg.frontendspecific.pysrc2cpg.DynamicTypeHintFullNamePass
+[INFO ] Pass io.joern.x2cpg.frontendspecific.pysrc2cpg.DynamicTypeHintFullNamePass completed in 2 ms (63% on mutations). 0 + 0 changes committed from 0 parts.
+[INFO ] Start of pass: io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonInheritanceNamePass
+[INFO ] Pass io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonInheritanceNamePass completed in 2 ms (78% on mutations). 0 + 0 changes committed from 0 parts.
+[INFO ] Start of pass: io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonTypeRecovery
+[INFO ] Pass io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonTypeRecovery completed in 27 ms (17% on mutations). 3 + 0 changes committed from 2 parts.
+[INFO ] Start of pass: io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonTypeRecovery
+[INFO ] Pass io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonTypeRecovery completed in 7 ms (34% on mutations). 3 + 0 changes committed from 2 parts.
+[INFO ] Start of pass: io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonTypeHintCallLinker
+[INFO ] Pass io.joern.x2cpg.frontendspecific.pysrc2cpg.PythonTypeHintCallLinker completed in 7 ms (30% on mutations). 1 + 0 changes committed from 1 parts.
+[INFO ] Start of pass: io.joern.x2cpg.passes.callgraph.NaiveCallLinker
+[INFO ] Pass io.joern.x2cpg.passes.callgraph.NaiveCallLinker completed in 3 ms (19% on mutations). 0 + 0 changes committed from 1 parts.
+[INFO ] Start of pass: io.joern.x2cpg.passes.base.AstLinkerPass
+[INFO ] Pass io.joern.x2cpg.passes.base.AstLinkerPass completed in 1 ms (41% on mutations). 0 + 0 changes committed from 1 parts.
+wrote 4 methods to /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/formalization-graph.json
+pure leaves (work-queue head): 0
+[INFO ] writing to storage at `/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/workspace/cpg.bin/cpg.bin.tmp`
+[INFO ] closed graph at /private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/workspace/cpg.bin/cpg.bin.tmp
+closing/saving project `cpg.bin`

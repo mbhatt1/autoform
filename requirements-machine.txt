@@ -1,0 +1,6 @@
+# Optional binary/assembly frontend (Python >=3.10).
+# The source frontend remains dependency-free.
+pypcode==3.3.3
+pyelftools==0.33
+macholib==1.16.4
+pefile==2024.8.26

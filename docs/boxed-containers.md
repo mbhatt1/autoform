@@ -1,7 +1,24 @@
 # Boxed containers for Core
 
-**Status: steps 1 and 2 landed; steps 3-5 unimplemented.** Read this before changing
-`Syntax.lean` or `Semantics.lean`.
+**Status: steps 1-5 and THE SWITCHOVER are landed; the migration this document
+describes is complete, for Python AND JavaScript.** Under either dialect a list or
+dict literal allocates
+into the heap, containers have identity, `setIndex`/`delIndex` and every
+`MethodResult.mutating` builtin write through the payload, iteration re-reads the
+container and a dict raises `RuntimeError` when it changes mid-loop, and `==`/`is`
+distinguish equal contents from the same object. Aliasing works — `a = [1,2]; b = a;
+b[0] = 9` makes `a[0]` nine, as in CPython — and each of those claims is a `#guard` in
+`Semantics.lean` (`aliasProg`, `setIdx*`, `delIdx*`, `mcallOn`, `shrinkLoop`), checked on
+every build. Slices — §9 item 3 — are landed too: `xs[a:b]`, `xs[a:b] = ys` and `del xs[a:b]`,
+checked against CPython. Under every other dialect a container literal is still a value, on purpose:
+a C aggregate initializer has no identity to share. Read this before changing
+`Syntax.lean` or `Semantics.lean`; the history below explains why each piece has the
+shape it has, and §6b records the two ways it nearly went wrong.
+
+What remains is §9's named exclusions — slices, `del xs[a:b]` — and the exporter's side
+of `op:delete-index`, which is deliberately still a hole (§2). The switchover's effect
+on the oracle was measured and is recorded in §6c: byte-identical, and that is the
+result.
 
 Step 2 landed WITHOUT re-typing `applyBinop`, which this document proposed and which is the
 wrong trade: 155 call sites, and it destroys the reducible scalar path that `Refine.lean`'s
@@ -16,6 +33,15 @@ depend on the fuel budget, which breaks `evalExpr_pure_fuel_indep` outright -- t
 fragment includes `binop`. `Val.eqFuel h = h.length + 64` is derived from the heap, which is
 equal across two runs differing only in evaluator fuel because the pure fragment is
 heap-inert.
+
+**Correction: the `Val.eqPy` half IS landed.** The paragraph below says it is not, and
+that was true when it was written. `Val.eqPy`/`eqPyL`/`eqPyP` are defined in `Syntax.lean`
+and diverted to from the one `evalExpr` call site behind `binopNeedsHeap`, exactly as the
+header describes. It handles `.ref` operands through `Heap.payload`, with reference
+identity short-circuiting first, and is checked against CPython: two distinct refs with
+equal payloads are `==`, unequal payloads are not, and `a == a` is true without
+descending. So the largest mechanical cost this document anticipated has already been
+paid, and what remains before the switchover is smaller than the text below implies.
 
 Step 2 splits into two halves that are NOT equally separable. `Val.identical` (the `is` half,
 section 5) is landed: it is total, heap-free, and touches one call site, and it made `is`
@@ -162,6 +188,11 @@ path in `Semantics.lean` should find the receiver being *evaluated* and nothing 
 
 ### `Stmt.setIndex e i v` — `e[i] = v`
 
+**Evaluation order, corrected.** The pseudocode below evaluates the target first. CPython
+does not: for `a[b] = c` it evaluates **c, then a, then b** (checked by execution, not by
+reading the grammar). `execStmt` follows CPython; read the sketch for the payload cases,
+not for the order.
+
 ```
 eval e ↝ .ref r        ; anything else is not a hole any more:
                          .tuple/.str/.int ↝ .exn (.str "TypeError")
@@ -176,29 +207,47 @@ else match Heap.payload r with
   | .tuple _  => .exn (.str "TypeError")
   | .none     => .exn (.str "TypeError")   -- unless __setitem__ resolved above
 ```
-with `i` a slice → `Expr.hole "setIndex:slice"` (§8, item 3).
+with `i` a slice → **landed as its own statement**, `Stmt.setSlice` (see §9 item 3).
 
 `Stdlib.dictSet` already implements CPython's replace-in-place / append-at-end rule, so
 key order stays observable and correct.
 
 ### `del d[k]` / `del xs[i]`
 
-Needs a new statement — the current holes `op:delete-index` exist because there is no
-constructor to translate to:
+**Landed.** The constructor exists and `execStmt` implements it:
 
 ```lean
 | delIndex : Expr → Expr → Stmt      -- `del e[i]`
 ```
 
+Adding a `Stmt` constructor cost 63 missing-case errors, all of them in `Semantics.lean`
+plus two `substS` matches in `Contracts.lean` and one `FuelMono` case — mechanical, and
+the only real content is the `execStmt` case itself. Evaluation order here is target then
+index; there is no RHS, so `setIndex`'s surprise does not arise.
+
+The exporter now emits it, for Python only. It was held back until the switchover on
+purpose: before containers boxed, translating `del xs[i]` would have turned a static hole
+into a statement that holed at run time — the same behaviour, a smaller static hole count,
+and a hole-freedom number that improved without anything being translated. With list and
+dict literals allocating, `delIndex` mutates the payload in place, so the statement runs.
+Under any other dialect the container is a value with no identity, and `op:delete-index`
+stays a hole.
+
 Semantics mirror `setIndex`: `.dict` → `dictDel`, missing key → `KeyError`; `.list` →
 `dropAt`, out of range → `IndexError`; `.tuple`/non-container → `TypeError`. Both helpers
 already exist in `Stdlib.lean`.
 
-`del xs[a:b]` (`op:delete-slice`) stays a hole. See §8.
+`del xs[a:b]` (`op:delete-slice`) is `Stmt.delSlice` — landed, see §9 item 3.
 
 ### `list.append`, `dict.pop`, and the rest of `MethodResult.mutating`
 
-**`Stdlib.lean` does not change at all.** It already returns `.mutating result newRecv`.
+**Landed, and `Stdlib.lean` did not change at all** — as predicted. It already returns
+`.mutating result newRecv`, and the adapters `Payload.toVal`/`Payload.ofVal` are the whole
+interface. The precedence is the one §1 specifies: the user class is consulted first and
+only a miss reaches the payload. A mutating builtin whose new receiver is not a container
+holes (`mcall:<m>:payload-kind-changed`) rather than changing what the object is, and a
+keyword call to a builtin keeps the existing refusal.
+
 The wiring in `evalExpr`'s `.mcall` case becomes:
 
 ```
@@ -260,21 +309,29 @@ Both fall out of the design without a special case.
 
 ## 4. Iteration
 
-`for x in xs` currently reads `Val.iterable : Val → Option (List Val)` and iterates a
-*snapshot*. After boxing there is a choice:
+`execForRef` iterates a boxed list live, re-reading its payload at each index.
+Appending can extend the loop; deleting can shorten it. A tuple payload is immutable,
+so re-reading equals a snapshot. Unboxed sequences use `execFor`.
 
-* **CPython's `list_iterator` holds the list object and an index.** Appending during
-  iteration extends the loop; deleting shortens it. Modelling this means `execFor` carries
-  `(Ref, Nat)` rather than `List Val` and re-reads the payload each step.
-* **CPython's `dict` iterator raises** `RuntimeError: dictionary changed size during
-  iteration`. This is what `Obj.version` is for: the iterator records the version at
-  creation and the loop head compares. Cheap, and it turns a currently-invisible wrong
-  answer into a modelled exception.
+Python dictionary loops now allocate an `Iteration.dictionaryObject` and use the
+ordinary `__next__` driver. Replacing values preserves iteration. A size change raises
+`RuntimeError` and remains an error on subsequent calls, even after size is restored.
+A changed key layout at unchanged size is `iterator:dict-keys-changed`: Core has no
+representation of CPython's dictionary slots, so it cannot faithfully predict which
+keys are visited after deletions and insertions. The old `Obj.version` check rejected
+valid value updates; that branch in `execForRef` is now used only by other dialects.
 
-Snapshot iteration must not be retained past this change. It is currently harmless because
-nothing can mutate a container mid-loop; boxing is what makes the case reachable. Landing
-boxing and snapshot iteration together would introduce a silent wrong answer in the same
-commit that removes one.
+Explicit `iter(container)` and `container.__iter__()` allocate heap objects that retain
+the source reference and index. Once exhausted, an iterator stays exhausted even if
+the source grows. These objects also support `next(iterator, default)` and iteration
+inside suspended generator frames. Sequence-protocol and callable/sentinel iterators
+run user callbacks through the same fuel-bounded evaluator.
+
+Cost: an eighth clause in `FuelMono`'s simultaneous induction — live iteration is a
+separate recursive function, so it needs its own fuel-monotonicity case rather than
+riding on `execFor`'s — and one statement change, `execStmt_forIn_val`, which now carries
+`hbox` saying the subject is not a boxed container. Every corpus discharges `hbox`
+vacuously today.
 
 For an unboxed `Val.tuple` or `Val.str`, snapshot iteration remains exactly right.
 
@@ -369,11 +426,93 @@ migration cost that buys something.
 
 ---
 
+## 6b. The switchover, attempted and priced
+
+Making `.listE`/`.dictE` allocate was tried end to end and reverted. It is smaller than
+this document expects in one way and blocked in exactly the way it predicts in another.
+
+**Three things it needs that are not written down here.**
+
+1. **Boxing must be dialect-gated.** A C aggregate initializer is a value — `int a[] =
+   {7,8,9}` has no identity to share, and `Dialect.fieldsOnDicts` reads it by field name.
+   Boxing unconditionally makes C wrong in the commit that makes Python right. The C
+   tests in `Semantics.lean` caught this immediately.
+2. **Splatting has to look through the box.** `*xs` and `**kw` inspect `Val.iterable` and
+   `strKeyed` structurally, which silently stop seeing a container once it is a `Val.ref`.
+   A `Val.unbox` view fixes it, and `FuelMono`'s two splat cases follow.
+3. **An attribute read on a boxed container must hole.** `{'a': 1}.a` is an
+   `AttributeError` in Python and was a hole before the switchover; afterwards the
+   receiver IS an object, so the missing field falls through to the `unit` fallback
+   (docs/languages.md §13) and the switchover introduces a silent wrong answer in the
+   commit that removes several. Holing it restores the old behaviour with a sharper
+   label.
+
+**What blocks it**, measured rather than estimated: **163 errors across 34 files, all but
+one in generated `SpecsGen` specs** (`Cachetools` plus 33 `V8Base` parts). The single
+cause is item 3. `applyFunc_ret_field_self` and its documented twin claim "an accessor
+returns the field it names" for every receiver, and a boxed container is now a receiver
+that answers a hole instead. Excluding it is one hypothesis — `hbox : ∀ o, h.get r = some
+o → o.payload = .none` — and two lines of proof. Every *generated* spec that uses those
+lemmas then has to carry the same conjunct in its `MRefines` domain, which means changing
+`scripts/synth_specs.py` and regenerating, which means re-stating what those theorems
+claim.
+
+That is the "cannot be sliced into a piece that leaves the corpora verifying" this
+document warns about, arrived at from the other direction. The remaining work is not
+semantics — all of it above compiles and agrees with CPython — it is regenerating 163
+specifications under a changed domain.
+
+**Resolved: 163 became 3, by gating item 3 on the dialect.** The first attempt priced
+this at 163 errors across 34 files and concluded it needed the V8 corpus, which this
+repository does not have. That conclusion was wrong, and the reason is worth keeping:
+33 of the 34 files are `SpecsGen/V8Base/Part*`, and **V8Base is `.cLike`**. Only Python
+boxes, so no `.cLike` corpus can ever hold a payload, so no `.cLike` spec needs to say
+that it does not. Making the container-attribute hole conditional on the dialect drops
+all 120 `V8Base` uses of the accessor lemma out of the cascade — the lemma's obligation
+becomes `ctx.dialect = .python → ...`, whose default tactic discharges it for them
+outright.
+
+What was left: three `Cachetools` specs, which now carry the conjunct explicitly (and
+`scripts/synth_specs.py` emits it, so a regeneration stays in agreement), and one
+`CallingConvention` proof needing `Heap.alloc` unfolded.
+
+**A fourth undocumented requirement, found by the first aliasing test failing:**
+`Expr.index` must unbox as well. `xs[0]` reads through a `Val.ref` after the switchover
+and holes without it.
+
+## 6c. What the switchover did to the corpus: nothing measurable, and that is the result
+
+The oracle was re-run on `cachetools` immediately after the switchover, against CPython,
+same corpus and same command as the tracked baseline:
+
+    209/209 agree, 0 divergences, 256 INCONCLUSIVE
+
+`conformance.json` came back **byte-identical to the committed file**. Not "close" — git
+reports the working tree clean after the run.
+
+Two things follow, and the second is more useful than the first.
+
+**No regression, in the strongest available form.** Boxing every Python list and dict
+literal, rerouting `==` through the heap, unboxing at four call sites and changing what
+`for` iterates did not move a single compared case.
+
+**And no improvement either, because containers were never this corpus's limit.** The
+inconclusive cases are `call:set`, `call:type`, `mcall:warnings.warn`, `expr:genExp` —
+unmodelled builtins and generator expressions. Not one of them is a container-identity
+case. The aliasing that now works (§6b) is real and checked against CPython, and
+`cachetools` does not exercise it in any case the oracle can reach.
+
+This is the same lesson `README.md` states as "coverage, not agreement, is the limit",
+arriving from a new direction: a capability can be genuinely added, verified against the
+runtime, and leave every headline number exactly where it was. A migration judged by
+whether the number moved would have been abandoned at step 1 — and a migration that
+*claimed* the number moved would have been wrong.
+
 ## 7. Migration cost, measured
 
 Counts taken from this repository, not estimated:
 
-### `Autoform/Refine.lean` — 2,067 lines, 115 theorems
+### `Autoform/Refine.lean` — 2,110 lines, 115 theorems
 
 | | count | why |
 |---|--:|---|
@@ -407,7 +546,11 @@ because `Env` is untouched. Every scope stays a value; only the heap grows.
 
 ### `Autoform/Generated/*.lean`
 
-35 sites mention `setIndex`/`listE`/`dictE`. **None need regeneration.** The AST is
+38 sites mention `setIndex`/`listE`/`dictE` — **count the tracked renders only**.
+Measuring `Autoform/Generated/*.lean` on a working tree gives 15,068 across 15 files,
+because most of that directory is untracked local build products (the same ones that make
+`check_render` exit 3 on a dev checkout). `git ls-files 'Autoform/Generated/*.lean' | xargs
+grep` is the measurement this figure means. **None need regeneration.** The AST is
 unchanged; only its meaning changes. This is the deep-embedding payoff: a semantics change
 that re-verifies six corpora without re-running Joern.
 
@@ -476,11 +619,20 @@ Stated explicitly so they are not rediscovered as divergences.
 2. **`is` / `id` on unboxed values** (`int`, `str`, `bool`, `float`, `tuple`). CPython
    interns small integers and some strings; none of it is specified. Hole
    `is:unboxed-value-identity`.
-3. **Slice assignment and slice deletion** (`xs[a:b] = …`, `del xs[a:b]`). Needs a slice
-   *value* with tri-state `start`/`stop`/`step`, plus CPython's extended-slice length
-   rules (`xs[::2] = [...]` requires matching lengths, `xs[a:b] = ...` does not). Holes
-   `setIndex:slice`, `op:delete-slice` until Core has a slice value. Boxing is a
-   prerequisite for that work, not a substitute.
+3. **Slices — landed, and no longer in this list.** `Expr.slice`, `Stmt.setSlice` and
+   `Stmt.delSlice`, with `Stdlib.sliceBounds` reproducing CPython's `slice.indices`
+   normalisation (negative bounds count from the end, both clamp, a negative step flips
+   the defaults, a zero step is `ValueError`) and `Stdlib.listSetSlice` its two assignment
+   rules — a unit step replaces the range whatever the RHS length, an extended step demands
+   equal lengths. The tri-state bound this item asked for is NOT a new `Option` type: an
+   omitted bound is `.lit .unit`, because that is what Python means by it — `xs[None:2]`
+   *is* `xs[:2]`, `slice(None, 2, None)`. A slice read allocates a fresh list (a slice is a
+   copy, which is the whole reason `xs[:]` is an idiom), gated on the dialect like every
+   other allocation. Twenty `#guard`s in `Semantics.lean` carry CPython's answers. What
+   was not verifiable without the frontend running: whether pysrc2cpg spells an omitted
+   bound as a `None` literal or by omitting the child; the exporter accepts the former and
+   holes (`op:slice-shape`) on any child count other than three, so the failure mode of a
+   wrong guess is a hole, not a wrong answer.
 4. **Anything observing deallocation**: `weakref`, `__del__`, refcount-driven finalisation.
    The heap is append-only and never collects. `cachetools` uses `functools` machinery
    that touches weakrefs; those functions must remain holes rather than being modelled
@@ -516,3 +668,55 @@ step 4 and must not be attributed to step 1.
 
 Step 3 is the one that can regress the conformance number while being correct. Report
 before/after per step rather than a single delta, as §17 requires.
+
+In the event the order was 1, the `is` half of 2, 3 (`setIndex`/`delIndex`/mutating,
+inert), 4 (iteration, inert), then the switchover — and the `==` half of 2 turned out to
+have been landed already. Every inert step was verified on a hand-built heap before
+anything could reach it, which is what made the switchover's diff small enough to read.
+
+## 11. How to extend
+
+Two extensions people will want, and the shape each one has.
+
+### Adding a container method
+
+`Stdlib.method` speaks `Val.list`/`Val.dict`/`Val.tuple` and returns either
+`.pure result` or `.mutating result newReceiver`. It does not know about boxes, and it
+should not learn: the adapters `Payload.toVal` and `Payload.ofVal` in `Syntax.lean` are
+the whole interface, and `.mcall`'s payload branch in `Semantics.lean` is the only place
+that uses them. So a new method is:
+
+1. a case in `Stdlib.methodCore`, returning `.mutating` iff it changes the receiver, with
+   the new receiver as a container `Val` of the **same** kind — a `.list` in, a `.list`
+   out. `Payload.ofVal` refuses anything else (`mcall:<m>:payload-kind-changed`), because
+   writing back a different kind would change what the object *is*;
+2. nothing in `.mcall`, `FuelMono` or the adapters — they are generic over the method;
+3. a `#guard` beside `mcallOn` in `Semantics.lean` with CPython's answer, and, if the
+   method is reachable from a corpus, a differential case.
+
+The precedence is fixed and is Python's: the user class is consulted first and only a
+miss reaches the payload, so a `dict` subclass overriding `pop` keeps winning. A method
+that needs keyword arguments still holes (`keyword-to-builtin`); `Stdlib.method` has no
+keyword convention and silently dropping keywords is a bug this project has already fixed
+once.
+
+### Adding a dialect whose containers are reference types
+
+JavaScript is the live case (`docs/typed-numerics.md`: the `indexSnapshot` xfail). There
+are exactly **two gates**, both in `Semantics.lean`, both currently `ctx.dialect ==
+.python`:
+
+* the allocation in `.listE`/`.dictE` — admit the dialect and its literals become
+  `Val.ref`s with a payload;
+* the container-attribute rule in `.field` — admit it there too, or `arr.foo` on a boxed
+  array falls through to the `unit` fallback and the dialect gains a silent wrong answer
+  in the same change that gives it identity (this is item 3 of §6b).
+
+Then three things that are not gates: `Val.unbox` is already dialect-independent, so
+splatting and indexing work unchanged; every accessor theorem in `SpecsGen/Basis.lean`
+carries `hbox : ctx.dialect = .python → …`, whose default tactic discharges it for any
+dialect that does not box, so admitting a new one moves that obligation onto that
+dialect's specs; and `Stdlib.methodCore` returns `none` for `.javascript`, so the
+container methods need their own semantics — `push` returns the new **length**, not
+`None`, and routing it to Python's `append` because the shapes match would be wrong.
+Measure the oracle before and after, per §17.

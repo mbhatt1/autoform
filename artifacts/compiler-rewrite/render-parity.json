@@ -1,0 +1,127 @@
+{
+  "baseline_revision": "5a1305b",
+  "baseline_python_sources": "git snapshot including all compiler and script dependencies",
+  "corpora": 17,
+  "rendered_bytes": 7977726,
+  "cases": [
+    {
+      "ast": "ast-CMath.json",
+      "ast_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
+      "render_sha256": "d3a662ae60f3eb5133ea14d12d4d5f99afc5d7bd066eff2b7e3d8297d4a86cb2",
+      "bytes": 4746,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-Cachetools.json",
+      "ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
+      "render_sha256": "85f6a8f851ff598fb1fe38dd289c4931e2890bee8b96093d145f95ad0d548885",
+      "bytes": 355919,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-Click.json",
+      "ast_sha256": "74726948e19319897d80aadb3650dbcb95f61082ea9d3e2c7b7a70674e07add7",
+      "render_sha256": "31d057413873128df80db50e085fde1e73b121d668dba11f1b896948f41e04f8",
+      "bytes": 1445688,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-Jinja2.json",
+      "ast_sha256": "5a3fdf3ccafd361896f5d255838ad31d3d08ad7a3b9811ffbbf564ea73cb81e2",
+      "render_sha256": "f1b961305c126a14575fae10488e8a01cbab4cd0201ce8f3fefbfbeadd4672f5",
+      "bytes": 2011983,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-LangC.json",
+      "ast_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
+      "render_sha256": "2135c3a723e8aa804323777fecfbaece00a3436b09d20da2bba1a033c1fd5f64",
+      "bytes": 77043,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-LangGo.json",
+      "ast_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
+      "render_sha256": "7c7941c3cc0210c7a63359ea6b1ef64c816cb7432491801856df629d4b274e71",
+      "bytes": 179215,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-LangJS.json",
+      "ast_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
+      "render_sha256": "cffd21dde521f7cc0c91f021e34de0484b2adb54e5f61edc11758dd26c6e31a9",
+      "bytes": 49832,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-LangJava.json",
+      "ast_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
+      "render_sha256": "590f4f8ea7c646208a5e1e85e3af99a8b795257075d3a5525a7e5dd18721dfc3",
+      "bytes": 803234,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-LangKt.json",
+      "ast_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
+      "render_sha256": "6709e9bf29ee070fe6deec794264e19a652a6d42458010a134262d977ceadcd6",
+      "bytes": 4396,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-LangTS.json",
+      "ast_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
+      "render_sha256": "90861a61a8281e335f62d08f15731c7f0aafa6a37d06db107ee3cd15c270d4b6",
+      "bytes": 117420,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-LinuxLibSample.json",
+      "ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
+      "render_sha256": "b41fc8183c2ec42e7c56b7758ccd39bd5140c276387e8e9708d28ea403ca5a23",
+      "bytes": 4501,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-Requests.json",
+      "ast_sha256": "fc5b713532907335036aac654f1196c90702611df31c85339804d379aa494692",
+      "render_sha256": "47caa07d99e40cfa8bb60154e0f75a73b2ffbc8e3c8487746155c1b79c686b0b",
+      "bytes": 866131,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-Sample.json",
+      "ast_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
+      "render_sha256": "fafaff9de5ca5c603a98fe9c98c883022adf7529946470fd3b2a2156c6967aed",
+      "bytes": 5627,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-Stress.json",
+      "ast_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
+      "render_sha256": "7a37d691a93225662c46024b8308969147b4365bfd71e36e37376cb9bc0cff27",
+      "bytes": 4942,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-V8Base.json",
+      "ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
+      "render_sha256": "c93fb9363dcce65e6cbf537df74bf12eaf89c905f9d0cc3b3a8dbe75f1017809",
+      "bytes": 1819606,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-V8BaseSample.json",
+      "ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
+      "render_sha256": "6cd7c869b0897bfe07e9eaa7c433b14c60b237dbea111af035c6f0a612e1af75",
+      "bytes": 4786,
+      "byte_identical": true
+    },
+    {
+      "ast": "ast-V8Numbers.json",
+      "ast_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
+      "render_sha256": "8a8343b8bd9a50b174a4aab8bcc3043074548d6f958c868702d22e2962c87513",
+      "bytes": 222657,
+      "byte_identical": true
+    }
+  ]
+}

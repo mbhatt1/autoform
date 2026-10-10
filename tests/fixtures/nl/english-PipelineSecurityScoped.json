@@ -1,0 +1,21 @@
+[
+ {
+  "function": "policy.py:<module>.authorize",
+  "summary": "Grants access when the caller owns the resource.",
+  "model": "hand-written fixture",
+  "properties": [
+   {
+    "id": "p1",
+    "text": "authorize(owner, caller) returns True exactly when owner equals caller.",
+    "kind": "postcondition",
+    "evidence": []
+   },
+   {
+    "id": "p2",
+    "text": "For any string x, authorize(x, x) returns True.",
+    "kind": "postcondition",
+    "evidence": []
+   }
+  ]
+ }
+]

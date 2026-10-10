@@ -12,7 +12,7 @@ open Autoform.Generated.V8Base
 
 namespace Autoform.SpecsGen.V8Base.Part41
 
-theorem heappure_v8_base_Hasher___init_at_FUEL : ((dom_heappure_v8_base_Hasher___init).all (lawHeapPreserved C FUEL f_v8_base_Hasher___init__)) = true := by rfl
+theorem heappure_v8_base_Hasher___init_at_FUEL : ((dom_heappure_v8_base_Hasher___init).all (lawHeapPreserved C FUEL f_v8_base_Hasher___init__)) = true := by decide +kernel
 
 -- Transported to every fuel budget at or above FUEL.
 theorem heappure_v8_base_Hasher___init : ∀ fuel, FUEL ≤ fuel → ((dom_heappure_v8_base_Hasher___init).all (lawHeapPreserved C fuel f_v8_base_Hasher___init__)) = true := by
@@ -21,7 +21,7 @@ theorem heappure_v8_base_Hasher___init : ∀ fuel, FUEL ≤ fuel → ((dom_heapp
     (fun c hgc hlc =>
       lawHeapPreserved_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_Hasher___init__.body = true))
         (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+    (by rfl) (by decide +kernel)
 
 
 def ob_heappure_v8_base_Hasher___init : Prop :=

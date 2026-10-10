@@ -1,6 +1,8 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
+import Autoform.Lang.Core.TypedNumeric
 import Autoform.Lang.Core.Stdlib
+import Autoform.Lang.Core.Iteration
 
 /-!
 # Core — semantics
@@ -68,6 +70,8 @@ def Dialect.idiv : Dialect → Int → Int → Int
   | .python,     a, b => Int.fdiv a b
   | .cLike,      a, b => Int.tdiv a b
   | .javascript, a, b => Int.fdiv a b
+  | .java,       a, b => Int.tdiv a b
+  | .go,         a, b => Int.tdiv a b
 
 /-- Integer remainder under a dialect. See `idiv` — unused, kept exhaustive and
 consistent with it. -/
@@ -75,18 +79,36 @@ def Dialect.imod : Dialect → Int → Int → Int
   | .python,     a, b => Int.fmod a b
   | .cLike,      a, b => Int.tmod a b
   | .javascript, a, b => Int.fmod a b
+  | .java,       a, b => Int.tmod a b
+  | .go,         a, b => Int.tmod a b
 
 
-/-- Result of executing a statement: how control left it. -/
+/-- Result of executing a statement: how control left it and the locals at that point.
+Handlers and finalizers run in this environment, including after a return or exception. -/
 inductive Ctl where
   | normal    : Env → Ctl
-  | ret       : Val → Ctl
+  | ret       : Val → Env → Ctl
   | brk       : Env → Ctl
   | cont      : Env → Ctl
-  | exn       : Val → Ctl
+  | exn       : Val → Env → Ctl
   | hole      : String → Ctl
   | outOfFuel : Ctl
   deriving Repr, Inhabited
+
+/-- Locals at a language-level exit. Interpreter failures have no resumable state. -/
+def Ctl.env (fallback : Env) : Ctl → Env
+  | .normal ρ | .ret _ ρ | .brk ρ | .cont ρ | .exn _ ρ => ρ
+  | _ => fallback
+
+/-- Resume a pending exit after a normally completing finalizer, retaining its writes.
+The value of a pending return or exception was already evaluated and stays unchanged. -/
+def Ctl.withEnv (ρ : Env) : Ctl → Ctl
+  | .normal _ => .normal ρ
+  | .ret v _ => .ret v ρ
+  | .brk _ => .brk ρ
+  | .cont _ => .cont ρ
+  | .exn v _ => .exn v ρ
+  | other => other
 
 /-- Lift a machine-integer outcome into an evaluation outcome.
 
@@ -157,14 +179,14 @@ def flCmp (d : Dialect) : Val → Val → Option Ordering
       | .python => Fl.cmpIntv n y                     -- exact, no conversion
       -- `comparesIntFloatExactly d = false` for both: JS has no separate int type to be
       -- exact about, so it promotes like C.
-      | .cLike | .javascript =>
+      | .cLike | .javascript | .java | .go =>
           match (d.toFConfig).ofInt n with
           | .ok x => Fl.cmpv x y
           | _     => none
   | .float x, .int n   =>
       (match d with
        | .python => Fl.cmpIntv n x
-       | .cLike | .javascript =>
+       | .cLike | .javascript | .java | .go =>
            match (d.toFConfig).ofInt n with
            | .ok y => Fl.cmpv y x
            | _     => none).map Ordering.swap
@@ -184,6 +206,10 @@ def ordToE (op : String) (o : Option Ordering) : EResult :=
 
 /-- Binary operators where at least one operand is a float. -/
 def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
+  let op := match op with
+    | "py:/" | "js:/" => "/"
+    | "js:+" => "+" | "js:-" => "-" | "js:*" => "*" | "js:%" => "%"
+    | other => other
   match op with
   | "&&" => .val (.bool (a.truthy && b.truthy))
   | "||" => .val (.bool (a.truthy || b.truthy))
@@ -197,7 +223,7 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                    | "-" => fc.sub x y
                    | "*" => fc.mul x y
                    | "/" => fc.div x y
-                   | _   => fc.pyMod x y)
+                   | _   => if d == .python then fc.pyMod x y else fc.fmod x y)
         -- a failed promotion (Python's `OverflowError` on a huge int) is the answer
       | some r, some (.ok _) => fresToE r
       | some (.ok _), some r => fresToE r
@@ -211,24 +237,186 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- `x ** y` on floats is `pow`, which IEEE does define, but which this model does not
   -- implement. See `Float.lean`'s "what is deliberately NOT modelled".
   | "**" => .hole "float:pow"
-  | _    => .hole s!"binop:{op}"
+  | _    => match d with
+            | .python => .hole s!"numeric:typed-op-in-python:{op}"
+            | _       => TypedNumeric.binary op a b
 
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
 Only a REFERENCE forces it: two distinct objects with equal contents are `==` in Python, and
-no structural compare of two refs can see that. Everything else stays on `applyBinop`, which
-is heap-free and reducible -- the property `Refine.lean` is built on. Named rather than
-inlined so proofs can discharge it by `simp` on concrete operands. -/
+no structural compare of two refs can see that. The order operators join `==`/`!=` here
+because a Python class can define `__lt__` and friends (`cmpDunderTarget`), which needs the
+receiver's class off the heap. Everything else stays on `applyBinop`, which is heap-free
+and reducible -- the property `Refine.lean` is built on. Named rather than inlined so
+proofs can discharge it by `simp` on concrete operands. -/
+def isCmpOp (op : String) : Bool :=
+  op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">="
+
 def binopNeedsHeap (op : String) (x y : Val) : Bool :=
-  (op == "==" || op == "!=") && (x.kind == 8 || y.kind == 8)
+  isCmpOp op && (x.kind == 8 || y.kind == 8)
 
 @[simp] theorem binopNeedsHeap_int_left (op : String) (i : Int) (y : Val) :
-    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") && y.kind == 8) := by
+    binopNeedsHeap op (.int i) y = (isCmpOp op && y.kind == 8) := by
   simp [binopNeedsHeap, Val.kind]
 
 @[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
-    (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
-  simp [binopNeedsHeap, beq_iff_eq, h, h2]
+    (h : isCmpOp op = false) : binopNeedsHeap op x y = false := by
+  simp [binopNeedsHeap, h]
+
+/-! ## JavaScript: `typeof`, `===`, `==`
+
+Three operators whose meaning is fixed by ECMA-262 and which Core used to answer with
+Python's (`===` and `==` were the same `Val.beq`; `typeof` was a hole). Every rule below
+names the specification clause it implements, and every place the rule is WEAKER than the
+clause says so and answers `none`/a hole rather than a guess.
+
+**`null` and `undefined` are one value here.** Core has a single `Val.unit`; JavaScript
+has two distinct primitives. They agree under `==` (§7.2.13 steps 2-3) and disagree under
+`===` (§7.2.14: different types) and `typeof` (`"object"` vs `"undefined"`). Core answers
+as if the value were `undefined`: `x === null` is therefore `true` for an `undefined` `x`,
+and `typeof null` is `"undefined"` where Node says `"object"`. That is a silent
+divergence, recorded in docs/languages.md §16.G with the two idioms it can bite. -/
+
+/-- ECMA-262 §13.5.3 `typeof`, the "typeof Operator Results" table: Undefined →
+`"undefined"`, Null → `"object"`, Boolean → `"boolean"`, Number → `"number"`, String →
+`"string"`, an object with a [[Call]] → `"function"`, any other object → `"object"`.
+Core's `int` and `float` are both JavaScript Numbers; `unit` answers for `undefined` (see
+the module note on `null`). -/
+def jsTypeof : Val → String
+  | .int _ | .float _               => "number"
+  | .str _                          => "string"
+  | .bool _                         => "boolean"
+  | .unit                           => "undefined"
+  | .fn _ | .clos _ _ | .clsClos _ _ => "function"
+  | _                               => "object"
+
+/-- ECMA-262 §7.2.14 IsStrictlyEqual: different types → `false`; Numbers by
+`Number::equal` (`NaN ≠ NaN`, `+0 = -0`, which `FConfig.cmp` implements); otherwise
+SameValueNonNumber -- strings by code units, booleans by value, `undefined`/`null` with
+themselves, objects by identity (a `Val.ref` IS the identity). An `int` and a `float` are
+both Numbers, so they compare numerically (`Fl.cmpIntv`). Functions compare by name,
+which is identity for a corpus function. -/
+def jsStrictEq : Val → Val → Bool
+  | .int x,   .int y   => x == y
+  | .float x, .float y => (Dialect.javascript.toFConfig).eq x y
+  | .int x,   .float y => Fl.cmpIntv x y == some .eq
+  | .float x, .int y   => Fl.cmpIntv y x == some .eq
+  | .str x,   .str y   => x == y
+  | .bool x,  .bool y  => x == y
+  | .unit,    .unit    => true
+  | .ref x,   .ref y   => x == y
+  | .fn x,    .fn y    => x == y
+  | _,        _        => false
+
+/-- `ToNumber` of a String (ECMA-262 §7.1.4.1.1 StringToNumber), for the strings Core can
+decide: whitespace-only is `+0`; a decimal integer literal is that integer. Anything
+else -- a fraction, an exponent, hex, or a non-numeric string (whose answer would be NaN)
+-- is `none`, and the caller holes rather than guess which of those it was. -/
+def jsIntOfStr (s : String) : Option Int :=
+  let t := s.trim
+  if t.isEmpty then some 0 else t.toInt?
+
+/-- ECMA-262 §7.2.13 IsLooselyEqual, the decidable part. Step 1: same type →
+IsStrictlyEqual. Steps 2-4: `null`/`undefined` equal each other and nothing else (one
+value in Core, see the module note). Steps 9-10: a Boolean is compared as `ToNumber` of
+it (`true` → 1, `false` → 0). Steps 5-8: a Number against a String compares against
+`ToNumber(string)`, decided when `jsIntOfStr` decides it. Steps 11-12 (an Object against
+a primitive goes through ToPrimitive) and the BigInt/Symbol steps are `none`: the caller
+holes with the two kinds in the label. -/
+def jsLooseEq (x y : Val) : Option Bool :=
+  let num : Val → Val := fun v => match v with
+    | .bool b => .int (if b then 1 else 0)
+    | v       => v
+  match num x, num y with
+  | .unit,    .unit    => some true
+  | .unit,    _        => some false
+  | _,        .unit    => some false
+  | .int a,   .str s   => (jsIntOfStr s).map (· == a)
+  | .str s,   .int a   => (jsIntOfStr s).map (· == a)
+  | .float a, .str s   => (jsIntOfStr s).map (fun n => Fl.cmpIntv n a == some .eq)
+  | .str s,   .float a => (jsIntOfStr s).map (fun n => Fl.cmpIntv n a == some .eq)
+  | a,        b        => if a.kind == b.kind || (a.kind ≤ 3 && b.kind ≤ 3)
+                          then some (jsStrictEq a b) else none
+
+/-- Explicit language operators for newly exported terms. Keeping this dispatch
+separate also keeps reduction of the legacy integer operators inexpensive. -/
+def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match op, a, b with
+  -- New exports distinguish Python true division from the legacy floor-division
+  -- spelling in previously generated terms. Round the ratio once, including big
+  -- integers whose individual conversion to float would overflow.
+  | "py:/", .int x, .int y =>
+      if y == 0 then .exn (.str "ZeroDivisionError")
+      else
+        let q := Format.binary64.round (xor (x < 0) (y < 0)) x.natAbs y.natAbs
+        if q.isInf then .exn (.str "OverflowError") else .val (.float q)
+  | "js:+", .str x, .str y => .val (.str (x ++ y))
+  | "js:+", _, _ => match d with
+                  | .javascript => flBinop .javascript "+" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:-", _, _ => match d with
+                  | .javascript => flBinop .javascript "-" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:*", _, _ => match d with
+                  | .javascript => flBinop .javascript "*" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:/", _, _ => match d with
+                  | .javascript => flBinop .javascript "/" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:%", _, _ => match d with
+                  | .javascript => flBinop .javascript "%" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  -- JavaScript equality (see the `jsStrictEq`/`jsLooseEq` notes for the clauses).
+  -- Emitted by the exporter for `.js`/`.ts` files only; outside `.javascript` they are
+  -- refused like the arithmetic `js:` operators above.
+  | "js:===", x, y => match d with
+                     | .javascript => .val (.bool (jsStrictEq x y))
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:!==", x, y => match d with
+                     | .javascript => .val (.bool (!jsStrictEq x y))
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:==", x, y  => match d with
+                     | .javascript => match jsLooseEq x y with
+                                     | some r => .val (.bool r)
+                                     | none   => .hole s!"js:loose-eq:{x.kind}-{y.kind}"
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:!=", x, y  => match d with
+                     | .javascript => match jsLooseEq x y with
+                                     | some r => .val (.bool (!r))
+                                     | none   => .hole s!"js:loose-eq:{x.kind}-{y.kind}"
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "py:/", _, _ => flBinop .python "/" a b
+  | _, _, _ => match d with
+               -- Python never reaches a typed operator (the exporter emits none for it,
+               -- and their traps name themselves in the family's own terms, not as Python
+               -- classes -- see `ExcSafe.lean`). An ORDINARY operator on operands no rule
+               -- above covers keeps the `binop:<op>` label it always had, so a `+` on a
+               -- builtin-based instance is not misreported as a typed-numeric refusal.
+               | .python => if (TypedNumeric.parse op).isSome
+                              then .hole s!"numeric:typed-op-in-python:{op}"
+                              else .hole s!"binop:{op}"
+               | _       => TypedNumeric.binary op a b
+
+/-- JLS §5.1.3, the first step of a floating-point → integral narrowing: `NaN` is `0`;
+otherwise the value is rounded toward zero and, if it does not fit the intermediate type
+(`long` when the target is `long`, else `int`), saturates to that type's smallest or
+largest value -- an infinity is "too small"/"too large" by the same rule. The second step
+(narrowing the `int` to `byte`/`short`/`char`) is `IntType.wrap`, JLS §5.1.3's "discards
+all but the n lowest order bits". `FConfig.toInt` is the round-toward-zero truncation;
+it refuses NaN and infinities, which is exactly where the two saturating arms take over. -/
+def javaFloatToIntegral (ty : IntType) (f : Fl) : Int :=
+  let mid : IntType := match ty with
+    | .signed .w64 | .unsigned .w64 => .signed .w64
+    | _                             => .signed .w32
+  let lo := (IntType.lo mid).getD 0
+  let hi := (IntType.hi mid).getD 0
+  let step1 : Int :=
+    if f.isNaN then 0
+    else if f.isInf then (if f.signBit then lo else hi)
+    else match FConfig.toInt FConfig.cDouble f with
+      | .ok n    => if n < lo then lo else if n > hi then hi else n
+      | .error _ => 0
+  IntType.wrap ty step1
 
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
@@ -237,6 +425,10 @@ source dialect: Python gets bignums, C-like gets 32-bit two's-complement. -/
 def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
+  -- JavaScript equality is decided on the VALUES' kinds by `languageBinop`, before the
+  -- numeric arms below: `1 === 1.0` has an `int` and a `float` operand, which the
+  -- `flBinop` arms would otherwise claim for an operator they do not know.
+  | "js:===", _, _ | "js:!==", _, _ | "js:==", _, _ | "js:!=", _, _ => languageBinop d op a b
   | "+",  .int x,   .int y   => numToE (nc.add x y)
   -- Item 6: a C `char*` is not a Python `str`. In C, `+` on pointers is POINTER
   -- ARITHMETIC and `<`/`>`/`==` compare ADDRESSES, not contents. Core has one `Val.str`
@@ -290,11 +482,15 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
       else .hole "str:pointer-compare-not-modelled"
   -- `==` on strings compares contents in Python and addresses in C. `Val.beq` is
   -- structural, so it is right for Python and wrong for C.
+  -- Java is the third case: strings are values, but `==` is REFERENCE equality, and
+  -- Core's one `Val.str` cannot say whether two equal contents are one object.
   | "==", .str _, .str _ =>
-      if d.stringsAreValues then .val (.bool (Val.beq a b))
+      if d.stringEqIsReference then .hole "str:reference-equality"
+      else if d.stringsAreValues then .val (.bool (Val.beq a b))
       else .hole "str:pointer-equality-not-modelled"
   | "!=", .str _, .str _ =>
-      if d.stringsAreValues then .val (.bool (!Val.beq a b))
+      if d.stringEqIsReference then .hole "str:reference-equality"
+      else if d.stringsAreValues then .val (.bool (!Val.beq a b))
       else .hole "str:pointer-equality-not-modelled"
   -- Floats, including mixed `int`/`float`. Placed before the generic `==`/`!=` so that
   -- the dialect split on comparison (see `flCmp`) is not bypassed by `Val.beq`.
@@ -370,7 +566,7 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- of the expression is the RIGHT operand under value semantics.
   | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
   | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | _, _, _              => .hole s!"binop:{op}"
+  | _, _, _              => languageBinop d op a b
 
 /-!
 ### Operator equations
@@ -419,6 +615,32 @@ wrapped to `-2147483648`, the same confirmed-wrong answer `applyBinop_c_add` abo
 give (32-bit wraparound). -/
 example : applyBinop .javascript "+" (.int 2147483647) (.int 1) = .val (.int 2147483648) := rfl
 #eval applyBinop .javascript "+" (.int 2147483647) (.int 1)  -- val (int 2147483648)
+
+/-! ### Java and Go, split from `.cLike` (docs/languages.md §5, §6)
+
+Untagged Java arithmetic is `int`: 32-bit and wrapping, like `javac`/HotSpot. Untagged Go
+arithmetic is `int`: 64-bit and wrapping. Strings are values in both — `+` concatenates —
+and `==` on two strings is content equality in Go but REFERENCE equality in Java, which
+Core's one `Val.str` cannot decide, so it is the hole `str:reference-equality` rather than
+either wrong answer. Every claim here is a `#guard`, not an oracle: no Java or Go runtime
+is compared against yet (the support matrix's last column). -/
+example : applyBinop .java "+" (.int 2147483647) (.int 1) = .val (.int (-2147483648)) := by rfl
+example : applyBinop .java "*" (.int 100000) (.int 100000) = .val (.int 1410065408) := by rfl
+example : applyBinop .go "+" (.int 2147483647) (.int 1) = .val (.int 2147483648) := by rfl
+example : applyBinop .go "+" (.int 9223372036854775807) (.int 1) = .val (.int (-9223372036854775808)) := by rfl
+example : applyBinop .go "*" (.int 100000) (.int 100000) = .val (.int 10000000000) := by rfl
+example : applyBinop .java "+" (.str "a") (.str "b") = .val (.str "ab") := by rfl
+example : applyBinop .go "+" (.str "a") (.str "b") = .val (.str "ab") := by rfl
+example : applyBinop .java "==" (.str "a") (.str "a") = .hole "str:reference-equality" := by rfl
+example : applyBinop .java "!=" (.str "a") (.str "b") = .hole "str:reference-equality" := by rfl
+example : applyBinop .go "==" (.str "a") (.str "a") = .val (.bool true) := by rfl
+example : applyBinop .cLike "==" (.str "a") (.str "a") = .hole "str:pointer-equality-not-modelled" := by rfl
+-- `&&`/`||` yield booleans in both, as in C — the one thing `.cLike` had right for them.
+example : applyBinop .java "||" (.int 0) (.int 5) = .val (.bool true) := by rfl
+example : applyBinop .go "&&" (.int 1) (.int 0) = .val (.bool false) := by rfl
+-- `/` truncates toward zero in both; `-7 / 2` is `-3`.
+example : applyBinop .java "/" (.int (-7)) (.int 2) = .val (.int (-3)) := by rfl
+example : applyBinop .go "%" (.int (-7)) (.int 3) = .val (.int (-1)) := by rfl
 
 /-! ### Float equations, and the two that must not regress
 
@@ -473,6 +695,13 @@ abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
 /-- Built-in unary operators. -/
 def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   match op, a with
+  -- Source normalization distinguishes statically invalid raise operands from
+  -- strings that might be the current representation of an exception instance.
+  -- evalExpr evaluates the operand first, preserving its own errors and effects.
+  | "py:raise-invalid", _ =>
+      if d == .python then .exn (.str "TypeError") else .hole "raise:wrong-dialect"
+  | "py:raise", value =>
+      if d == .python then Stdlib.raiseValue value else .hole "raise:wrong-dialect"
   -- Negation goes through `NumConfig` for the same reason the binary operators do:
   -- `-INT_MIN` is not representable, so under a fixed-width dialect it must wrap, trap,
   -- or become a hole — never the unrepresentable number. This path was left unchecked
@@ -482,6 +711,10 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- where "subtract from zero" would not be (`0.0 - 0.0 = 0.0`, but `-(0.0) = -0.0`).
   | "-", .float f => .val (.float f.neg)
   | "!", x      => .val (.bool (!x.truthy))
+  -- `typeof e`, ECMA-262 §13.5.3 -- `jsTypeof` carries the table and the `null` caveat.
+  | "js:typeof", x => match d with
+                     | .javascript => .val (.str (jsTypeof x))
+                     | _           => .hole "numeric:js-op-outside-javascript:typeof"
   -- `~x` — **bitwise** complement, which is not `!x`. Joern spells the two
   -- `<operator>.not` and `<operator>.logicalNot`; this exporter previously mapped *both*
   -- onto `"!"`, so `~0` translated to `false`. `bnot` is `-x-1` wrapped to the dialect's
@@ -509,6 +742,17 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   | "cast:u8",  .int x => .val (.int (IntType.wrap (.unsigned .w8) x))
   | "cast:i16", .int x => .val (.int (IntType.wrap (.signed .w16) x))
   | "cast:u16", .int x => .val (.int (IntType.wrap (.unsigned .w16) x))
+  -- JLS §5.1.3, floating-point to an integral type, Java only. Step one: NaN is 0;
+  -- otherwise round toward zero, and a value outside `int`/`long` (an infinity or a
+  -- large magnitude) saturates to that type's smallest or largest value. Step two: for
+  -- `byte`, `short`, `char` the `int` result is narrowed again by discarding all but the
+  -- low-order bits (`IntType.wrap`). C leaves out-of-range float→int undefined
+  -- (C17 §6.3.1.4), so no other dialect gets this rule.
+  | "cast:i8",  .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w8) f))  else .hole "cast:float-to-int:non-java"
+  | "cast:i16", .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w16) f)) else .hole "cast:float-to-int:non-java"
+  | "cast:u16", .float f => if d == .java then .val (.int (javaFloatToIntegral (.unsigned .w16) f)) else .hole "cast:float-to-int:non-java"
+  | "cast:i32", .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w32) f)) else .hole "cast:float-to-int:non-java"
+  | "cast:i64", .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w64) f)) else .hole "cast:float-to-int:non-java"
   | "cast:i32", .int x => .val (.int (IntType.wrap (.signed .w32) x))
   | "cast:u32", .int x => .val (.int (IntType.wrap (.unsigned .w32) x))
   | "cast:i64", .int x => .val (.int (IntType.wrap (.signed .w64) x))
@@ -522,7 +766,19 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   | "cast:u32", .bool b => .val (.int (if b then 1 else 0))
   | "cast:i64", .bool b => .val (.int (if b then 1 else 0))
   | "cast:u64", .bool b => .val (.int (if b then 1 else 0))
-  | _, _        => .hole s!"unop:{op}"
+  | _, _        =>
+      if op.startsWith "py:exception:" then
+        if d != .python then .hole "exception:wrong-dialect"
+        else match a with
+          | .tuple args => Stdlib.makeException (op.drop "py:exception:".length).toString args
+          | _ => .hole "exception:argument-shape"
+      -- A typed operator carries its own language family and its traps name
+      -- themselves in that language's terms (`panic:...`), not as Python exception
+      -- classes. The exporter never emits one for a Python file; refusing it here is
+      -- what makes `applyUnop_excSafe` a theorem rather than a convention.
+      else match d with
+        | .python => .hole s!"numeric:typed-op-in-python:{op}"
+        | _       => TypedNumeric.unary op a
 
 /-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
 than against `applyUnop`'s own definition. -/
@@ -576,18 +832,178 @@ def valIn (x c : Val) : EResult :=
 /-- Function table, keyed by name. -/
 abbrev FuncTable := List (String × Func)
 
+/-- The globals-frame key under which a **class attribute** is stored.
+
+Class bodies are not executed as functions in Core, so a class-level binding like
+`__marker = object()` has no frame of its own to live in. It lives in the one globals frame,
+under a key no source language can spell: `<classattr>Cache._Cache__marker`. The exporter
+writes it from the module-objects initialiser; `applyFunc` reads it for a class-attribute
+default and `evalExpr` reads it when `self.<attr>` misses the instance's own fields. One
+key format, defined once, so the two readers cannot disagree with the writer. -/
+@[simp] def classAttrKey (cls attr : String) : String := "<classattr>" ++ cls ++ "." ++ attr
+
+/-- The base environment of a call: `self` bound if there is a receiver. Named so that a
+proof about `applyFunc` has a stable term to case on -- `simp only [applyFunc]` leaves it
+folded -- and `@[simp]` so that every proof unfolding `applyFunc` with plain `simp`
+reduces it exactly as it reduced the inline `match` this replaces. -/
+@[simp] def selfEnv : Option Val → Env
+  | some s => [("self", s)]
+  | none   => []
+
 /-- Everything the interpreter needs: the callable functions and the source dialect. -/
 structure Ctx where
   dialect : Dialect
   table   : FuncTable
+  classDecls : List ClassDecl := []
   /-- Classes whose base is a builtin type — see `Program.builtinBases`. -/
   builtinBases : List (String × BuiltinBase) := []
   /-- Heap address of the module-level bindings frame. Globals must be mutable and must
   outlive any single call, so they live on the heap rather than in `Env`. -/
   globals : Ref := 0
+  /-- `(class, name)` of every `@property` -- see `Program.properties`. Every `Ctx` built
+  from a `Program` (`ctxOf`, `runFunc`, `initGlobals`, `runMain`, `ctx_fold`) must pass it
+  through, or the contexts disagree and every proof that folds one into the other breaks:
+  that disagreement is what a `Ctx` field costs, and it is confined to those sites. -/
+  properties : List (String × String) := []
+  /-- The program's own exception classes -- see `Program.excClasses`. Passed through by
+  every `Ctx` built from a `Program`, like `properties`. -/
+  excClasses : List String := []
 
 /-- Build a function table from a program. -/
-def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
+def Program.table (p : Program) : FuncTable :=
+  (p.funcs ++ p.auxiliaryFuncs).map (fun f => (f.name, f))
+
+/-! ### Name matching the kernel can compute
+
+Name matching runs during kernel-checked execution as well as native execution.
+These helpers use character lists and structural recursion to keep concrete lookups
+cheap to reduce. The agreement lemmas connect them to the library's string operations.
+This is a reduction-cost choice, not a restriction on what the Lean kernel can prove. -/
+
+/-- Structural prefix matching for executable proofs of attribute lookup. -/
+def strStartsWith (s pre : String) : Bool := pre.toList.isPrefixOf s.toList
+
+@[simp] theorem strStartsWith_eq_startsWith (s pre : String) :
+    strStartsWith s pre = s.startsWith pre := by
+  unfold strStartsWith String.startsWith
+  rw [Bool.eq_iff_iff, List.isPrefixOf_iff_prefix, String.Slice.startsWith_string_iff,
+      String.copy_toSlice]
+
+/-- `suffix` is a suffix of `s`, decided on the character lists. -/
+def strEndsWith (s suffix : String) : Bool := suffix.toList.isSuffixOf s.toList
+
+/-- The structural test agrees with the library's byte-position one. -/
+theorem strEndsWith_eq_endsWith (s suffix : String) : strEndsWith s suffix = s.endsWith suffix := by
+  unfold strEndsWith String.endsWith
+  rw [Bool.eq_iff_iff, List.isSuffixOf_iff_suffix, String.Slice.endsWith_string_iff,
+      String.copy_toSlice]
+
+/-- The last dotted segment of a character list; the whole list when there is no dot,
+the empty list when the dot is last -- the same answers as `(s.splitOn ".").getLastD s`. -/
+def lastDotSegment : List Char → List Char → List Char
+  | [],          acc => acc.reverse
+  | '.' :: rest, _   => lastDotSegment rest []
+  | c :: rest,   acc => lastDotSegment rest (c :: acc)
+
+/-- Everything before the last `.`; empty when there is none -- the same answer as
+`".".intercalate (s.splitOn ".").dropLast`. -/
+def dropLastDotSegment (cs : List Char) : List Char :=
+  match cs.reverse.dropWhile (· != '.') with
+  | []          => []
+  | _ :: before => before.reverse
+
+-- Agreement with the `splitOn` forms this replaces, on the shapes Joern emits: a file
+-- part with dots, the `<meta>` marker, a bare name, a trailing dot.
+#guard String.mk (lastDotSegment "cachetools/__init__.py:<module>.Cache".toList []) == "Cache"
+#guard String.mk (lastDotSegment "Cache".toList []) == "Cache"
+#guard String.mk (lastDotSegment "a.b.".toList []) == ""
+#guard String.mk (dropLastDotSegment "d.py:<module>.C.make".toList) == "d.py:<module>.C"
+#guard String.mk (dropLastDotSegment "make".toList) == ""
+#guard strEndsWith "cnt.py:<module>.Counter.bump" ".Counter.bump" == true
+#guard strEndsWith "cnt.py:<module>.Counter.__init__" ".Counter.bump" == false
+#guard strEndsWith "x" "" == true
+#guard strEndsWith "" ".x" == false
+
+/-- A private adapter for methods on builtin containers and runtime iterators.
+The captured receiver retains its identity; argument collectors preserve the normal
+method-call convention. Only reserved names can resolve to this adapter. -/
+def boundMethodAdapter (name : String) : Func :=
+  { name := "<bound-method>." ++ name,
+    params := ["<bound:args>", "<bound:kwargs>"],
+    vararg := some "<bound:args>", kwarg := some "<bound:kwargs>",
+    body := .ret (.mcall (.name "<bound:self>") name
+      [.starred (.name "<bound:args>"), .dstarred (.name "<bound:kwargs>")]) }
+
+/-- The reserved name of a Python function bound to an instance through a class attribute.
+It is not a builtin method name (`Stdlib.knowsMethod` has no `<function>`), so it cannot be
+confused with `boundMethodAdapter`. -/
+def boundFunctionName : String := "<bound-method>.<function>"
+
+/-- A **bound method** of a function stored as a class attribute. Language Reference
+§3.2.8.4 ("Instance methods"): when an instance method object is called, "the underlying
+function is called, inserting the class instance in front of the argument list". The
+captured `<bound:function>` is the stored value itself -- a function, a closure or a boxed
+function object -- so calling the adapter applies it exactly as `Expr.callValue` does,
+with the receiver as the first positional argument and the rest passed through. -/
+def boundFunctionAdapter : Func :=
+  { name := boundFunctionName,
+    params := ["<bound:args>", "<bound:kwargs>"],
+    vararg := some "<bound:args>", kwarg := some "<bound:kwargs>",
+    body := .ret (.callValue (.name "<bound:function>")
+      [.name "<bound:self>", .starred (.name "<bound:args>"), .dstarred (.name "<bound:kwargs>")]) }
+
+/-- The bound-method value of `function` for the instance at `receiver`. -/
+def boundFunctionValue (function : Val) (receiver : Ref) : Val :=
+  .clos boundFunctionName [("<bound:function>", function), ("<bound:self>", .ref receiver)]
+
+/-- Resolve the reserved adapter name, without making its short name a source callable. -/
+def resolveBoundMethod (name : String) : Option Func :=
+  if name == boundFunctionName then some boundFunctionAdapter else
+  if strStartsWith name "<bound-method>." then
+    let method := String.ofList (name.toList.drop 15)
+    if Stdlib.knowsMethod .python method || method == "__iter__" || method == "__next__" then
+      some (boundMethodAdapter method)
+    else none
+  else none
+
+/-- Binding a builtin method is supported only for the exact represented builtin
+class. An inherited builtin on a user subclass still needs an explicit model that
+freezes the descriptor independently of later instance writes. -/
+def builtinMethodValue (object : Obj) (receiver : Ref) (name : String) : Option Val :=
+  let supported :=
+    match object.cls, object.payload with
+    | "list", .list _ =>
+        ["append", "insert", "extend", "clear", "remove", "pop", "copy", "count", "index", "__iter__"].contains name
+    | "dict", .dict _ =>
+        ["get", "keys", "values", "items", "copy", "pop", "popitem", "setdefault", "update", "clear", "__iter__"].contains name
+    | "tuple", .tuple _ => ["count", "index", "__iter__"].contains name
+    | _, _ => (Iteration.resolveMethod object.cls name).isSome
+  if supported then
+    some (.clos (boundMethodAdapter name).name [("<bound:self>", .ref receiver)])
+  else none
+
+/-- A classmethod closure captures its actual class receiver. Removing that ordinary
+parameter from the callable signature lets normal closure application bind the rest;
+the original function name remains intact for lexical module resolution. -/
+def Func.bindClassReceiver (fn : Func) : Option (Func × String) :=
+  match fn.pythonSignature, fn.params with
+  | some signature, receiver :: rest =>
+      if signature.receiverKind == some "class" && fn.vararg != some receiver &&
+          fn.kwarg != some receiver && !signature.keywordOnly.contains receiver then
+        let boundSignature := { signature with
+          isMethod := some false, receiverKind := none,
+          receiverName := if signature.positionalOnly.contains receiver then none else some receiver,
+          positionalOnly := signature.positionalOnly.filter (· != receiver),
+          required := signature.required.filter (· != receiver),
+          defaults := signature.defaults.filter (·.1 != receiver),
+          classAttrDefaults := signature.classAttrDefaults.filter (·.1 != receiver) }
+        some ({ fn with params := rest, pythonSignature := some boundSignature }, receiver)
+      else none
+  | _, _ => none
+
+def resolveClassBound (table : FuncTable) (name : String) : Option Func :=
+  let original := String.ofList (name.toList.drop 14)
+  ((table.find? (·.1 == original)).bind (fun entry => entry.2.bindClassReceiver)).map Prod.fst
 
 /-- Resolve a callable by exact name, else by suffix.
 
@@ -598,18 +1014,50 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
   match ctx.table.find? (·.1 == n) with
   | some (_, f) => some f
   | none        =>
+    if strStartsWith n "<bound-method>." then resolveBoundMethod n else
+    if strStartsWith n "<class-bound>." then resolveClassBound ctx.table n else
     -- Scan for a *unique* suffix match, stopping as soon as a second one is seen.
     -- The previous form built the full match list with `filter`, so every miss
     -- allocated across the whole table — on Django's 10,623 functions that made the
     -- ledger run 363s, 55x the cost of a corpus 5x smaller. This is still linear per
     -- lookup (the asymptotic fix is an index on `Ctx`, recorded as an open item), but
-    -- it no longer allocates and it exits early on the ambiguous case.
+    -- it no longer allocates and it exits early on the ambiguous case. The suffix test
+    -- is `strEndsWith`, so a concrete miss REDUCES in the kernel (see above).
     let suffix := "." ++ n
     let rec go : FuncTable → Option Func → Option Func
       | [],           acc      => acc
-      | (k, f) :: ps, none     => if k.endsWith suffix then go ps (some f) else go ps none
-      | (k, _) :: ps, some f   => if k.endsWith suffix then none else go ps (some f)
+      | (k, f) :: ps, none     => if strEndsWith k suffix then go ps (some f) else go ps none
+      | (k, _) :: ps, some f   => if strEndsWith k suffix then none else go ps (some f)
     go ctx.table none
+
+/-- The callee of a by-name call `f(args)`.
+
+A bare Python name is looked up in the enclosing scopes, the module and then the builtins
+(Language Reference §4.2.2); it never names a method, which is reachable only through a
+receiver or its class. `Ctx.resolve`'s unique-suffix fallback does not know that: on
+Jinja2, `set()` resolved to the program's only `….set`, `_MemcachedClient.set`, and raised
+an arity `TypeError` where CPython builds an empty set. A bare name whose resolution is a
+declared class's method is therefore not resolved here, and the call goes on to the
+value, dunder and builtin paths. Dotted names and other dialects are unchanged. -/
+def Ctx.resolveCall (ctx : Ctx) (f : String) : Option Func :=
+  match ctx.resolve f with
+  | some fn =>
+      if ctx.dialect == .python && !f.toList.contains '.' &&
+          ctx.classDecls.any (fun d => fn.name == d.name ++ "." ++ f)
+      then none else some fn
+  | none => none
+
+theorem Ctx.resolveCall_resolve {ctx : Ctx} {f : String} {fn : Func}
+    (h : ctx.resolveCall f = some fn) : ctx.resolve f = some fn := by
+  unfold Ctx.resolveCall at h
+  cases hr : ctx.resolve f with
+  | none => rw [hr] at h; cases h
+  | some g =>
+      rw [hr] at h
+      dsimp only at h
+      split at h
+      · cases h
+      · exact h
 
 /-! ## The calling convention
 
@@ -634,41 +1082,104 @@ def strKeyed : Val → Option (List (String × Val))
         | _,      _         => none) (some [])
   | _ => none
 
-/-- The parameters that receive positional arguments: every parameter except the
-variadic ones. -/
+/-- Parameters that receive positional arguments, excluding variadic collectors
+and recovered Python keyword-only parameters. -/
 def Func.posParams (fn : Func) : List String :=
-  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p
+  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p &&
+    !(fn.pythonSignature.map (fun s => s.keywordOnly.contains p)).getD false
+
+/-- Parameters which can be supplied by name. A positional-only name belongs in
+`**kwargs` when that collector exists; it must not overwrite the positional value. -/
+def Func.keywordParams (fn : Func) : List String :=
+  match fn.pythonSignature with
+  | none => fn.posParams
+  | some signature => fn.params.filter fun p =>
+      fn.vararg != some p && fn.kwarg != some p && !signature.positionalOnly.contains p
+
+/-- The parameters of `fn` that have a literal default, and that default.
+
+Named rather than inlined into `bindParams` so that a caller can state "this function has
+no defaults" as a rewritable hypothesis. Proofs about a specific rendered function
+discharge it by `rfl`; without a name they would have to rewrite under a `match` on
+`pythonSignature`, which `simp` will not do reliably. -/
+def Func.literalDefaults (fn : Func) : List (String × DefaultValue) :=
+  match fn.pythonSignature with
+  | some sig => sig.defaults
+  | none     => []
+
+/-- The class-attribute defaults of `fn` (see `PythonSignature.classAttrDefaults`). Named,
+like `literalDefaults`, so "this function has none" is one rewritable hypothesis
+(`hcad : fn.classAttrDefaults = []`) rather than a `match` on `pythonSignature`. -/
+@[simp] def Func.classAttrDefaults (fn : Func) : List (String × String × String) :=
+  match fn.pythonSignature with
+  | some sig => sig.classAttrDefaults
+  | none     => []
+
+/-- Was parameter `p` supplied by this call? Positionally if it is among the first
+`vs.length` positional parameters, or by keyword. This is the same reading of a call
+`signatureRejected` uses, and it is what "a default applies exactly when the parameter was
+not passed" means for a default that cannot be seeded ahead of the arguments. -/
+@[simp] def paramSupplied (fn : Func) (p : String) (vs : List Val)
+    (kws : List (String × Val)) : Bool :=
+  (fn.posParams.take vs.length).contains p || (kws.map Prod.fst).contains p
+
+/-- Seed class-attribute defaults into a base environment, reading each from the globals
+frame. Structurally recursive on the list so that `[]` -- every function without such a
+default -- reduces to `.inr base` by unfolding alone, with no heap read.
+
+A supplied parameter is skipped: the default is never needed, and resolving it anyway
+would let a call that passed every argument hole on a class attribute it never used. A
+default that is needed and whose class attribute is not in the globals frame is a hole,
+named for the parameter, never a guess -- `unit` here would make `default is self.__marker`
+true for a caller who passed `None`, which is a wrong answer where CPython returns the
+`None`. -/
+@[simp] def seedClassAttrs (ctx : Ctx) (h : Heap) (fn : Func) (base : Env) (vs : List Val)
+    (kws : List (String × Val)) : List (String × String × String) → Sum String Env
+  | [] => .inr base
+  | (p, cls, attr) :: rest =>
+      if paramSupplied fn p vs kws then seedClassAttrs ctx h fn base vs kws rest
+      else
+        match (h.get ctx.globals).bind (fun g => g.fields.find? (·.1 == classAttrKey cls attr)) with
+        | some (_, v) => seedClassAttrs ctx h fn (Env.set base p v) vs kws rest
+        | none        => .inl s!"default:{p}:class-attr-unresolved"
+
+@[simp] def seedClassAttrDefaults (ctx : Ctx) (h : Heap) (fn : Func) (base : Env)
+    (vs : List Val) (kws : List (String × Val)) : Sum String Env :=
+  seedClassAttrs ctx h fn base vs kws fn.classAttrDefaults
 
 /-- Bind a call's arguments into the callee's environment.
 
-The rule is CPython's, minus default values (which Core does not model):
+Argument validation happens in `applyFunc` and `applyClosure` before execution.
+This helper constructs the environment for a valid call:
 
 * positional arguments fill `posParams` left to right;
 * leftovers go to `vararg` as a `tuple` — an empty one when there are none, which is
   why `def f(*a)` called with no arguments binds `a` to `()` rather than to `unit`;
-* a keyword argument naming a positional parameter binds that parameter;
+* a keyword argument naming a keyword-capable parameter binds that parameter;
 * every other keyword argument goes to `kwarg` as a `dict` with `str` keys.
 
-Two deliberate departures, both recorded rather than hidden:
-
-* **Surplus positional arguments are dropped when there is no `*args`.** CPython raises
-  `TypeError`. This is the behaviour `applyFunc` already had (`params.zip vs` truncates),
-  and it is left alone here so that this change is about starred arguments only.
-* **A keyword argument matching no parameter is dropped here** when there is no
-  `**kwargs`. `bindParams` is only the binding half; `kwargsRejected` below detects that
-  case and `applyFunc` turns it into CPython's `TypeError` before the body ever runs, so
-  the drop is never observable. Nothing previously produced keyword arguments, so this
-  cannot change any existing behaviour. -/
+Surplus positional arguments and unexpected keywords are rejected by the callers.
+Recovered Python signatures also reject missing required parameters and duplicate
+bindings. Default values remain unsupported by source translation. Functions with
+legacy metadata (`pythonSignature = none`) retain their historical binding behavior;
+this helper alone is not a Python call validator. -/
 def bindParams (fn : Func) (base : Env) (vs : List Val)
     (kws : List (String × Val)) : Env :=
+  -- Literal defaults are seeded FIRST, so any argument actually supplied overwrites
+  -- them. Ordering it this way keeps the rule "a default applies exactly when the
+  -- parameter was not passed" without needing to ask whether each name is already
+  -- bound. For a function with no defaults the list is empty and this `foldl` reduces
+  -- to `base`, so every previously rendered corpus keeps the term it had.
+  let base  := fn.literalDefaults.foldl
+                  (fun (e : Env) (d : String × DefaultValue) => Env.set e d.1 d.2.toVal) base
   let ps    := fn.posParams
   let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
   let rest  := vs.drop ps.length
   let ρ₁    := match fn.vararg with
                | some a => Env.set ρ₀ a (.tuple rest)
                | none   => ρ₀
-  let named := kws.filter (fun kv => ps.contains kv.1)
-  let extra := kws.filter (fun kv => !ps.contains kv.1)
+  let named := kws.filter (fun kv => fn.keywordParams.contains kv.1)
+  let extra := kws.filter (fun kv => !fn.keywordParams.contains kv.1)
   let ρ₂    := named.foldl (fun (e : Env) (x, v) => Env.set e x v) ρ₁
   match fn.kwarg with
   | some k => Env.set ρ₂ k (.dict (extra.map fun kv => (.str kv.1, kv.2)))
@@ -684,10 +1195,9 @@ theorem `surplusPositional_is_a_known_divergence`, now
 direction: a call the real program rejects loudly runs to completion in Core and every
 theorem about it is a theorem about a program CPython never executes.
 
-Only a *surplus* is rejected. Too few arguments is still not an error here, because Core
-does not model default values: `def k(a=None)` renders as `params := ["a"]`, so raising
-on an under-supplied call would reject calls CPython accepts. That asymmetry is
-deliberate and is the reason this is not simply an arity equality test.
+This check rejects only a surplus. `signatureRejected` separately checks missing
+required parameters when Python signature metadata is present. Legacy functions
+without that metadata cannot distinguish required parameters from defaults.
 
 A `*args` parameter absorbs any surplus, so a callee with `vararg` is never rejected. -/
 def posRejected (fn : Func) (vs : List Val) : Bool :=
@@ -705,7 +1215,7 @@ needed for the same reason — a proof about a literal `Func` cannot fire a hypo
 lemma without first deciding which `fn` it is about. -/
 @[simp] theorem posRejected_mk (name : String) (params : List String) (body : Stmt)
     (vs : List Val) :
-    posRejected ⟨name, params, body, none, none⟩ vs
+    posRejected { name := name, params := params, body := body } vs
       = decide (params.length < vs.length) := by
   have : (List.filter (fun p => none != some p) params) = params := by
     simp [List.filter_eq_self]
@@ -716,23 +1226,54 @@ lemma without first deciding which `fn` it is about. -/
 drop it, which is the silently-wrong shape this project keeps catching, so the check is
 separate and `applyFunc` turns it into the exception. -/
 def kwargsRejected (fn : Func) (kws : List (String × Val)) : Bool :=
-  fn.kwarg.isNone && kws.any (fun kv => !fn.posParams.contains kv.1)
+  (fn.kwarg.isNone && kws.any (fun kv => !fn.keywordParams.contains kv.1)) ||
+  -- `def f(self, **kw)` called as `o.f(self=1)`: the bound receiver already fills `self`,
+  -- and CPython raises `TypeError: got multiple values for argument 'self'`. The exporter
+  -- stripped `self` from `params`, so without this the keyword would land in `**kw`
+  -- silently -- see `PythonSignature.receiverName`.
+  (match fn.pythonSignature with
+   | some sig => match sig.receiverName with
+                 | some r => kws.any (fun kv => kv.1 == r)
+                 | none   => false
+   | none => false)
 
 /-- A call with no keyword arguments can never be rejected. -/
 @[simp] theorem kwargsRejected_nil (fn : Func) : kwargsRejected fn [] = false := by
-  simp [kwargsRejected]
+  unfold kwargsRejected
+  simp only [List.any_nil, Bool.and_false, Bool.false_or]
+  split <;> (try split) <;> rfl
+
+/-- Validate already evaluated arguments against a recovered Python signature.
+Captured locals cannot supply missing parameters. Positional-only keywords may
+enter `**kwargs`, but cannot satisfy a required positional-only parameter.
+Duplicate keyword expansion must also be checked during argument evaluation to
+preserve the timing of an error relative to later argument effects. -/
+def signatureRejected (fn : Func) (vs : List Val) (kws : List (String × Val)) : Bool :=
+  match fn.pythonSignature with
+  | none => false
+  | some signature =>
+      let positional := fn.posParams.take vs.length
+      let named := (kws.map Prod.fst).filter fn.keywordParams.contains
+      signature.required.any (fun p => !(positional ++ named).contains p) ||
+        named.any positional.contains ||
+        decide ((kws.map Prod.fst).eraseDups.length < kws.length)
+
+@[simp] theorem signatureRejected_legacy (name : String) (params : List String)
+    (body : Stmt) (vararg kwarg : Option String) (vs : List Val) (kws : List (String × Val)) :
+    signatureRejected { name := name, params := params, body := body,
+                        vararg := vararg, kwarg := kwarg } vs kws = false := rfl
 
 /-- A function with no variadic parameters, called with no keyword arguments, binds
 exactly what `applyFunc` bound before the calling convention existed. This is the
 compatibility equation: every corpus rendered before starred arguments were modelled has
 `vararg = none` and `kwarg = none`, so nothing about it changed. -/
 theorem bindParams_plain {fn : Func} (base : Env) (vs : List Val)
-    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) :
+    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) (h3 : fn.pythonSignature = none) :
     bindParams fn base vs [] =
       (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base := by
   have : (List.filter (fun p => none != some p) fn.params) = fn.params := by
     simp [List.filter_eq_self]
-  simp [bindParams, Func.posParams, h1, h2, this]
+  simp [bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, h1, h2, h3, this]
 
 /-- The same equation in the shape a rendered corpus actually presents: a `Func` literal
 with both variadic fields at their `none` defaults. Stated separately because the
@@ -740,9 +1281,9 @@ hypothesis form of `bindParams_plain` cannot fire on a literal without first dec
 which `fn` it is about. -/
 @[simp] theorem bindParams_mk (name : String) (params : List String) (body : Stmt)
     (base : Env) (vs : List Val) :
-    bindParams ⟨name, params, body, none, none⟩ base vs [] =
+    bindParams { name := name, params := params, body := body } base vs [] =
       (params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base :=
-  bindParams_plain base vs rfl rfl
+  bindParams_plain base vs rfl rfl rfl
 
 /-- The short class name behind a class VALUE.
 
@@ -752,19 +1293,411 @@ split the whole name, because the FILE part contains dots
 (`cachetools/__init__.py:<module>.Cache<meta>`). Named rather than inlined so that proofs
 about the `mcall` case have a term to talk about. -/
 def classNameOfValue (g : String) : String :=
-  let base := if g.endsWith "<meta>" then g.dropRight 6 else g
-  (base.splitOn ".").getLastD base
+  -- Structural on the character list (`lastDotSegment`), for the same reason as
+  -- `strEndsWith`: this runs on every method call through a class value, and a proof by
+  -- computation that reaches it must be able to unfold it.
+  let cs := g.toList
+  let base := if strEndsWith g "<meta>" then (cs.reverse.drop 6).reverse else cs
+  String.mk (lastDotSegment base [])
 
-/-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
+/-- A `@classmethod`: the recovered signature says the receiver is the class. -/
+def Func.isClassMethod (fn : Func) : Bool :=
+  fn.pythonSignature.bind (·.receiverKind) == some "class"
+
+/-- The class VALUE that owns a method, rebuilt from the method's qualified name.
+
+A classmethod reached through an INSTANCE (`c.make(3)`) still receives the class, and the
+instance's `Obj` only carries the short class name. The method's own name carries the
+qualified one -- `d.py:<module>.C.make` -- so dropping its last dotted segment and adding
+the exporter's `<meta>` marker gives exactly the value `typeValue` emits for `C`. Splitting
+on `.` is safe here because the file part's dots are never the LAST segment. -/
+def Func.ownerClassValue (fn : Func) : Val :=
+  .fn (String.mk (dropLastDotSegment fn.name.toList) ++ "<meta>")
+
+def Ctx.classKeyOfValue (ctx : Ctx) (owner : String) : String :=
+  if ctx.classDecls.isEmpty then classNameOfValue owner
+  else if strEndsWith owner "<meta>" then String.ofList (owner.toList.reverse.drop 6).reverse
+  else owner
+
+/-- Class namespace mutation needs shared class-object state. Function boxing
+cannot implement it, because existing instances must observe the same change. -/
+def Ctx.isSharedClassValue (ctx : Ctx) (value : Val) : Bool :=
+  ctx.dialect == .python && !ctx.classDecls.isEmpty &&
+    match value with
+    | .fn owner | .clsClos owner _ => strEndsWith owner "<meta>"
+    | _ => false
+
+def Ctx.usesClassMetadata (ctx : Ctx) (cls : String) : Bool :=
+  ctx.dialect == .python && !ctx.classDecls.isEmpty && !strStartsWith cls "<" &&
+    !["object", "list", "dict", "tuple", "str", "int", "float", "bool", "set"].contains cls
+
+def Ctx.classLookup (ctx : Ctx) (cls attr : String) : ClassLookup :=
+  ClassHierarchy.lookup ctx.classDecls cls attr
+
+def Ctx.classLookupGap (ctx : Ctx) (cls attr : String) : Option String :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls attr with
+    | .blocked reason | .found _ (.opaque reason) => some reason
+    | .found _ (.method name) | .found _ (.property name) =>
+        if (ctx.table.find? (·.1 == name)).isSome then none
+        else some ("class-attribute:unresolved-function:" ++ name)
+    | _ => none
+  else none
+
+def Ctx.isProperty (ctx : Ctx) (cls attr : String) : Bool :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls attr with | .found _ (.property _) => true | _ => false
+  else ctx.properties.any (fun pair => pair.1 == cls && pair.2 == attr)
+
+/-- Slot descriptors read their declaring class's storage before the instance
+dictionary. An uninitialized slot raises even when a dictionary entry exists. -/
+def Ctx.readSlot (ctx : Ctx) (object : Obj) (attr : String) : Option EResult :=
+  if ctx.usesClassMetadata object.cls then
+    match ctx.classLookup object.cls attr with
+    | .found _ (.slot key) =>
+        some (match object.fields.find? (·.1 == key) with
+          | some (_, value) => .val value
+          | none => .exn (.str "AttributeError"))
+    | _ => none
+  else none
+
+def Ctx.fieldWriteKey (ctx : Ctx) (heap : Heap) (receiver : Ref) (attr : String) : String :=
+  if ctx.dialect != .python || ctx.classDecls.isEmpty then attr else
+  match heap.get receiver with
+  | some object =>
+    if ctx.usesClassMetadata object.cls then
+      match ctx.classLookup object.cls attr with | .found _ (.slot key) => key | _ => attr
+    else attr
+  | none => attr
+
+def Ctx.classStorageKey (ctx : Ctx) (cls attr : String) : String :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls attr with
+    | .found _ (.stored key) => key
+    | _ => "<absent-class-storage>"
+  else classAttrKey cls attr
+
+/-- May this stored class-attribute value implement the descriptor protocol?
+
+Language Reference §3.3.2.4 ("Invoking Descriptors"): a class attribute whose type defines
+`__get__`, `__set__` or `__delete__` is a descriptor, and attribute access on an instance
+calls those hooks. Core does not execute them. An instance of a recovered source class is
+therefore a possible descriptor unless its complete namespace proves all three hooks
+absent (an unresolved hierarchy answers "possible"), and an external value
+(`<absent:...>`) is unknown. Functions, closures, builtins, containers and the
+exporter's private boxes are not source classes and answer `false`; functions bind as
+methods instead (`Ctx.storedAttributeValue`). -/
+def Ctx.descriptorObject (ctx : Ctx) (heap : Heap) : Val → Bool
+  | .ref addr =>
+      match heap.get addr with
+      | some object => ctx.usesClassMetadata object.cls &&
+          ["__get__", "__set__", "__delete__"].any fun hook =>
+            match ctx.classLookup object.cls hook with
+            | .absent => false
+            | _ => true
+      | none => false
+  | .fn owner => strStartsWith owner "<absent:"
+  | _ => false
+
+/-- The gap an instance write must report instead of shadowing a stored descriptor. -/
+def Ctx.storedDescriptorGap (ctx : Ctx) (heap : Heap) (key attr : String) : Option String :=
+  match (heap.get ctx.globals).bind (fun globals => globals.fields.find? (·.1 == key)) with
+  | some (_, value) =>
+      if ctx.descriptorObject heap value then some s!"class-attribute:{attr}:descriptor-object"
+      else none
+  | none => none
+
+/-- Is this stored value a Python FUNCTION, i.e. a non-data descriptor whose `__get__`
+returns a bound method? A translated function (`.fn`/`.clos` naming a table entry) or a
+boxed function object is; a class value, builtin, bound method (the reserved `<...>`
+closures) or any other value is not, and reads back unchanged. -/
+def Ctx.bindsAsFunction (ctx : Ctx) (heap : Heap) : Val → Bool
+  | .fn owner => (ctx.table.find? (·.1 == owner)).isSome
+  | .clos owner _ => !strStartsWith owner "<" && (ctx.table.find? (·.1 == owner)).isSome
+  | .ref addr =>
+      match heap.get addr with
+      | some object => object.cls == "<function>"
+      | none => false
+  | _ => false
+
+/-- A stored class attribute read through an instance whose own dictionary missed.
+
+This is where a decorated method (`@deco def m(self)` in a class body, bound at
+definition time to `deco(m)`) is read. A function is a non-data descriptor (Language
+Reference §3.3.2.4; "Instance methods", §3.2.8.4), so the instance gets a bound method;
+a possible descriptor object is a named gap; anything else (the `object()` sentinels) is
+the stored value itself. -/
+def Ctx.storedAttributeValue (ctx : Ctx) (heap : Heap) (receiver : Ref) (attr : String)
+    (value : Val) : EResult :=
+  if ctx.descriptorObject heap value then .hole s!"class-attribute:{attr}:descriptor-object"
+  else if ctx.bindsAsFunction heap value then .val (boundFunctionValue value receiver)
+  else .val value
+
+def classMethodValue (fn : Func) (receiver : Val) (captured : List (String × Val)) : EResult :=
+  match fn.bindClassReceiver with
+  | some (_, parameter) =>
+      .val (.clos ("<class-bound>." ++ fn.name) ((parameter, receiver) :: captured))
+  | none => .hole "class-method:variadic-or-unrecovered-receiver"
+
+def Ctx.instanceClassValue (ctx : Ctx) (object : Obj) : Val :=
+  let owner := (ClassHierarchy.canonicalName ctx.classDecls object.cls).getD object.cls ++ "<meta>"
+  if object.captured.isEmpty then .fn owner else .clsClos owner object.captured
+
+def Ctx.allocationCaptures (ctx : Ctx) (environment : Env) (cls : String) :
+    Option (List (String × Val)) :=
+  if ctx.classDecls.isEmpty then
+    some (match environment.get cls with | .clsClos _ captured => captured | _ => [])
+  else
+    let short := String.ofList (lastDotSegment cls.toList [])
+    match environment.find? (·.1 == short) with
+    | none => some []
+    | some (_, .clsClos owner captured) =>
+        if ctx.classKeyOfValue owner == cls then some captured else none
+    | some (_, .fn owner) => if ctx.classKeyOfValue owner == cls then some [] else none
+    | some _ => none
+
+/-- A class VALUE reached as a callee: `.fn "m.py:<module>.C<meta>"` for a `from m
+import C` binding read out of the importing module, or `.clsClos` for a class defined
+inside a function and passed around. Calling it constructs an instance (Language
+Reference §3.3.1: `type.__call__`), so `Expr.callValue` re-dispatches to the `alloc`
+rule with the arguments it has already evaluated. `none` for every other value. -/
+def classValueOwner : Val → Option String
+  | .fn owner | .clsClos owner _ => if strEndsWith owner "<meta>" then some owner else none
+  | _ => none
+
+/-- The private bindings a class-value call hands to `alloc`. `<class-call:…>` cannot be a
+source identifier, so nothing in `ρ` is shadowed. -/
+def classCallArgName (i : Nat) : String := "<class-call:arg" ++ toString i ++ ">"
+def classCallKwName (k : String) : String := "<class-call:kw:" ++ k ++ ">"
+
+/-- `alloc` re-evaluates these names, which the environment below binds to the values
+`evalList` already produced, so argument evaluation order and effects happen once. -/
+def classCallArgs (vs : List Val) (kws : List (String × Val)) : List Expr :=
+  (List.range vs.length).map (fun i => .name (classCallArgName i)) ++
+  kws.map (fun kv => .kwargE kv.1 (.name (classCallKwName kv.1)))
+
+/-- The class value is bound under both its allocation key and its short name, so both
+`Ctx.allocationCaptures` lookups (legacy `Env.get cls`, metadata `find? short`) see it. -/
+def classCallEnv (cls : String) (value : Val) (vs : List Val) (kws : List (String × Val))
+    (ρ : Env) : Env :=
+  (cls, value) :: (String.ofList (lastDotSegment cls.toList []), value) ::
+  (((List.range vs.length).zip vs).map (fun iv => (classCallArgName iv.1, iv.2)) ++
+   kws.map (fun kv => (classCallKwName kv.1, kv.2)) ++ ρ)
+
+/-- The ordinary allocator is valid only for the builtin allocation slot and an
+ordinary initializer descriptor. Custom `__new__` needs its own returned-object
+and subtype checks before an initializer can be selected. -/
+def Ctx.constructionGap (ctx : Ctx) (cls : String) : Option String :=
+  if ctx.usesClassMetadata cls then
+    -- A subclass of a contracted external ABC with an abstract method still unimplemented
+    -- cannot be instantiated in CPython (`TypeError`); Core does not model that refusal's
+    -- message, so it is a named gap rather than a constructed instance.
+    match (ClassHierarchy.canonicalName ctx.classDecls cls).bind (fun owner =>
+        match ClassHierarchy.linearize ctx.classDecls owner with
+        | .complete order => ClassHierarchy.unimplementedAbstract ctx.classDecls order
+        | _ => none) with
+    | some name => some ("class-construction:abstract-method:" ++ name)
+    | none =>
+    match ctx.classLookup cls "__new__" with
+    | .found "__builtin.object" (.opaque _) =>
+        match ctx.classLookup cls "__init__" with
+        | .found "__builtin.object" (.opaque _) | .found _ (.method _) => none
+        | .blocked reason | .found _ (.opaque reason) => some reason
+        | _ => some "class-construction:initializer-descriptor"
+    | .blocked reason => some reason
+    | _ => some "class-construction:custom-new"
+  else none
+
+/-- Check a Python instance write before changing its dictionary. A recovered
+getter-only property rejects writes; opaque descriptors and custom assignment
+hooks require their own execution models. -/
+def Ctx.fieldWriteCheck (ctx : Ctx) (heap : Heap) (receiver : Ref) (attr : String) :
+    EResult :=
+  if ctx.dialect != .python || ctx.classDecls.isEmpty then .val .unit else
+  match heap.get receiver with
+  | none => .val .unit
+  | some object =>
+    if ctx.usesClassMetadata object.cls then
+      match ctx.classLookup object.cls "__setattr__" with
+      | .found "__builtin.object" (.opaque _) =>
+        match ctx.classLookup object.cls attr with
+        | .blocked reason | .found _ (.opaque reason) => .hole reason
+        | .found _ (.property _) => .exn (.str "AttributeError")
+        | .found _ (.slot _) => .val .unit
+        | .found _ (.stored key) =>
+            match ctx.storedDescriptorGap heap key attr with
+            | some reason => .hole reason
+            | none => if ClassHierarchy.allowsDict ctx.classDecls object.cls then .val .unit
+                      else .exn (.str "AttributeError")
+        | _ => if ClassHierarchy.allowsDict ctx.classDecls object.cls then .val .unit
+               else .exn (.str "AttributeError")
+      | .blocked reason => .hole reason
+      | _ => .hole "class-assignment:custom-setattr"
+    else .val .unit
+
+/-- An absent translated constructor is a default object initializer only when
+the recovered hierarchy reaches that builtin slot. Unknown ancestry is a gap. -/
+def Ctx.defaultConstructor (ctx : Ctx) (cls : String) (receiver : Ref)
+    (args : List Val) (keywords : List (String × Val)) : EResult :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls "__init__" with
+    | .found "__builtin.object" (.opaque _) =>
+        if args.isEmpty && keywords.isEmpty then .val (.ref receiver)
+        else .exn (.str "TypeError")
+    | .blocked reason | .found _ (.opaque reason) => .hole reason
+    | _ => .hole "class-construction:unresolved-initializer"
+  else .val (.ref receiver)
+
+/-- Read an attribute through a Python class value, without binding an instance.
+
+The class marker retains the qualified owner. Recovered declarations select the
+first namespace in the C3 order and bind classmethods to the actual receiver class.
+Property descriptor objects and unknown namespace behavior remain named gaps. -/
+def Ctx.readClassAttribute (ctx : Ctx) (heap : Heap) (owner : String)
+    (captured : List (String × Val)) (attr : String) : EResult :=
+  if ctx.dialect != .python || !strEndsWith owner "<meta>" then
+    .hole s!"field:{attr}:non-object"
+  else
+    let receiver := if captured.isEmpty then Val.fn owner else Val.clsClos owner captured
+    if !ctx.classDecls.isEmpty then
+      match ctx.classLookup (ctx.classKeyOfValue owner) attr with
+      | .blocked reason | .found _ (.opaque reason) => .hole reason
+      | .absent => .exn (.str "AttributeError")
+      | .found _ (.property _) => .hole s!"class-attribute:{attr}:property-descriptor"
+      | .found _ (.slot _) => .hole s!"class-attribute:{attr}:slot-descriptor"
+      | .found _ (.stored key) =>
+          match (heap.get ctx.globals).bind (fun globals => globals.fields.find? (·.1 == key)) with
+          | some (_, value) =>
+              -- Through the CLASS a function is the plain function (no binding); a
+              -- possible descriptor object would run `__get__(None, cls)`.
+              if ctx.descriptorObject heap value then
+                .hole s!"class-attribute:{attr}:descriptor-object"
+              else .val value
+          | none => .hole s!"class-attribute:{attr}:uninitialized-storage"
+      | .found _ (.method name) =>
+          match ctx.table.find? (·.1 == name) with
+          | none => .hole s!"class-attribute:{attr}:unresolved-function"
+          | some (_, fn) =>
+              if fn.isClassMethod then classMethodValue fn receiver captured
+              else if captured.isEmpty then .val (.fn fn.name)
+              else if fn.isMethod then .hole s!"class-attribute:{attr}:captured-unbound-method"
+              else .val (.clos fn.name captured)
+    else
+    let cls := classNameOfValue owner
+    if ctx.properties.any (fun p => p.1 == cls && p.2 == attr) then
+      .hole s!"class-attribute:{attr}:property-descriptor"
+    else
+      let qualified := String.mk (owner.toList.reverse.drop 6).reverse ++ "." ++ attr
+      match ctx.table.find? (·.1 == qualified) with
+      | some (_, fn) =>
+          if captured.isEmpty then .val (.fn fn.name)
+          else if fn.isMethod || fn.isClassMethod then
+            .hole s!"class-attribute:{attr}:captured-unbound-method"
+          else .val (.clos fn.name captured)
+      | none => .hole s!"class-attribute:{attr}:unresolved"
+
+/-- A Java method's qualified name carries its erased signature --
+`pkg.Cls.<init>:void(java.util.Map,boolean)` -- because the JVM overloads on it
+(JLS §8.4.9 overloading, §8.8 constructors). Core has no overloads and matches methods by
+dotted suffix, so the signature is dropped before the suffix test: everything from the
+LAST `:` on, but only when the name ends in `)`, which no Python name
+(`a.py:<module>.C.f`) does. Structural over `List Char`, so the kernel reduces it. -/
+def stripSig (k : String) : String :=
+  match k.toList.reverse with
+  | ')' :: _ =>
+      match k.toList.reverse.dropWhile (· != ':') with
+      | _ :: before => String.mk before.reverse
+      | []          => k
+  | _ => k
+
+#guard stripSig "com.google.gson.Foo.<init>:void(java.util.Map,boolean)" == "com.google.gson.Foo.<init>"
+#guard stripSig "a.py:<module>.C.f" == "a.py:<module>.C.f"
+#guard stripSig "plain" == "plain"
+
+/-- Resolve a class method. Python never falls back to an unrelated free function;
+other dialects retain their legacy suffix fallback. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
-  match ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) with
+  match if ctx.dialect == .python then Iteration.resolveMethod cls meth else none with
+  | some fn => some fn
+  | none =>
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls meth with
+    | .found _ (.method name) | .found _ (.property name) =>
+        (ctx.table.find? (·.1 == name)).map Prod.snd
+    | _ => none
+  else
+  match ctx.table.filter (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
-  | []          => ctx.resolve meth
+  | []          => if ctx.dialect == .python then none else ctx.resolve meth
 
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
 def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
-  ctx.table.any (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))
+  if ctx.usesClassMetadata cls then (ctx.resolveMethod cls meth).isSome else
+  (ctx.dialect == .python && (Iteration.resolveMethod cls meth).isSome) ||
+  ctx.table.any (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth))
+
+/-- Python resolves an ordinary callable attribute before evaluating its arguments.
+Builtin container methods and the interpreter's iterator methods keep their dedicated
+execution paths. User fields, properties and methods on container subclasses still
+use attribute lookup, including any getter effects. -/
+def Ctx.usesAttributeCall (ctx : Ctx) (h : Heap) (r : Ref) (name : String) : Bool :=
+  ctx.dialect == .python &&
+    match h.get r with
+    | none => false
+    | some object =>
+        !(Iteration.resolveMethod object.cls name).isSome && object.cls != "<generator>" &&
+        (object.payload.toVal.isNone || object.fields.any (·.1 == name) ||
+          ctx.classDefines object.cls name ||
+          ctx.isProperty object.cls name)
+
+/-- The constructor a class instance creation runs. Python spells it `__init__`; Java
+spells it `<init>` (JLS §15.9.4: "the selected constructor is invoked" -- and the
+frontend names every constructor `<init>`, §8.8 gives them the class's own name in
+source). One lookup, two spellings; a class with neither is created uninitialised, which
+is what Python does for a class without `__init__` and what a Java class with only the
+default constructor (§8.8.9) does. -/
+def Ctx.resolveCtor (ctx : Ctx) (cls : String) : Option Func :=
+  match ctx.resolveMethod cls "__init__" with
+  | some f => some f
+  | none   => ctx.resolveMethod cls "<init>"
+
+/-- The user-class method a container operation on an ORDINARY instance dispatches to.
+
+`x in c`, `c[k]`, `c[k] = v` and `del c[k]` on an instance are `c.__contains__(x)`,
+`c.__getitem__(k)`, `c.__setitem__(k, v)` and `c.__delitem__(k)` in Python. This is
+`some (r, fn)` exactly when `c` is a reference to an ordinary instance -- payload `.none`,
+so a boxed container keeps its structural path -- whose class DEFINES the method itself
+(`classDefines`, so a free function that happens to be called `__getitem__` is not
+mistaken for it), under `.python`. Everything else is `none` and the caller falls back to
+the structural behaviour, including the hole it had before. The `Func` is the one
+`resolveMethod` finds, which is what `FuelMono`'s context hypothesis is stated over. -/
+def Ctx.dunderOn (ctx : Ctx) (h : Heap) (c : Val) (name : String) : Option (Ref × Func) :=
+  match c with
+  | .ref r =>
+      if ctx.dialect == .python then
+        match h.get r with
+        | some o =>
+            match o.payload with
+            | .none =>
+                if ctx.classDefines o.cls name then
+                  match ctx.resolveMethod o.cls name with
+                  | some fn => some (r, fn)
+                  | none    => none
+                else none
+            | _ => none
+        | none => none
+      else none
+  | _ => none
+
+/-- A dispatched dunder is a resolved method, so `FuelMono`'s and `ExcSafe`'s hypotheses
+about `resolveMethod` cover it. -/
+theorem Ctx.dunderOn_resolves {ctx : Ctx} {h : Heap} {c : Val} {name : String} {r : Ref}
+    {fn : Func} (hd : ctx.dunderOn h c name = some (r, fn)) :
+    ∃ cls, ctx.resolveMethod cls name = some fn := by
+  unfold Ctx.dunderOn at hd
+  repeat' split at hd
+  all_goals first | (cases hd; exact ⟨_, by assumption⟩) | cases hd
 
 /-- The builtin base of a class, if the exporter recorded one. -/
 def Ctx.builtinBase (ctx : Ctx) (cls : String) : Option BuiltinBase :=
@@ -841,6 +1774,334 @@ def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : 
         | .str,   _         => .hole s!"alloc:builtin-base:{cls}:str-of-non-str"
     | _ => .hole s!"alloc:builtin-base:{cls}:multiple-args"
 
+/-- A JavaScript property read on a boxed container. An object literal's own keys are
+its properties (`{a: 1}.a`), an array's `length` is its element count, and any other
+name is `undefined` -- never an exception, which is what makes `jsContainerField_ne_exn`
+in `ExcSafe.lean` one line. `.none` is unreachable from the caller (it is gated on
+`Payload.toVal.isSome`) and stays a hole so the gate can never be quietly weakened. -/
+def jsContainerField (p : Payload) (f : String) : EResult :=
+  match p with
+  | .list vs  => if f == "length" then .val (.int vs.length) else .val .unit
+  | .dict kvs => match Stdlib.dictGet kvs (.str f) with
+                 | some v => .val v
+                 | none   => .val .unit
+  | .tuple _  => .val .unit
+  | .none     => .hole s!"field:{f}:on-container"
+
+/-- What a Python `raise e` does with the value `e` evaluated to.
+
+Two kinds of value reach `Stmt.raise` from the exporter, and they must be told apart:
+
+* a value produced by the `py:exception:<Name>` constructor operator, or an
+  already-caught exception being re-raised. In Core's encoding an exception IS the `.str`
+  naming its class, so such a value is `.str name` with `name ∈ Stdlib.excNames`, and
+  raising it means raising exactly that -- `.exn v`;
+* anything else, which `Stdlib.raiseValue` classifies: a builtin class reference
+  instantiates, a string that is not an exception name is a `TypeError` as in CPython,
+  and an object Core cannot model holes.
+
+`raiseValue` deliberately holes on a `.str` that IS an exception name ("ambiguous"): at
+a dynamic `raise <expr>` site, which the exporter routes through the `py:raise` unop, a
+bare string equal to `"ValueError"` cannot be told from the exception. At `Stmt.raise`
+the exporter has already made that distinction -- it emits this statement only on the
+constructor path and the re-raise path -- so the represented-name case short-circuits
+before `raiseValue` would call it ambiguous. The two paths are separated by the
+EXPORTER; the value alone cannot separate them, and this comment is where that lives.
+
+Either way every exception this produces names a represented class
+(`pythonRaise_excSafe`, `Autoform/Lang/Core/ExcSafe.lean`), which is the invariant that
+lets the try/except lowering drop `control:TRY-exception-representation`. -/
+def pythonRaise (extra : List String) (v : Val) : EResult :=
+  match v with
+  -- A represented name -- a builtin (`Stdlib.excNames`) or a class the program itself
+  -- defines as an exception (`Ctx.excClasses`) -- is raised as is. Python reference
+  -- §8.4.1: the handler match is by class or base class, so the class NAME is what a
+  -- handler needs, and the hierarchy is expanded by the exporter into each accepted set.
+  | .str name => if Stdlib.excNames.contains name || extra.contains name then .exn v
+                 else Stdlib.raiseValue v
+  | _         => Stdlib.raiseValue v
+
+/-! ## Value dunders on ordinary instances
+
+Python lets a class redefine what a VALUE means for its instances: `a == b` is
+`a.__eq__(b)`, `a < b` is `a.__lt__(b)`, `len(a)` is `a.__len__()`, `bool(a)` is
+`a.__bool__()` (or, failing that, `a.__len__() != 0`), `hash`/`str`/`repr` likewise. Core
+answered all of these structurally -- identity for `==`, a hole for `<`, a hole for `len`
+-- which for a class that defines the dunder is a silent wrong answer, not a gap. The two
+helpers below decide WHETHER a dunder applies; the interpreter makes the call, so fuel
+monotonicity and exception safety go through the ordinary `applyFunc` induction.
+
+Both are gated on `.python` and on the receiver being an ordinary instance -- a heap
+object with no container payload (a boxed list compares by contents, `Val.eqPy`) and not
+a module frame -- whose class DEFINES the method itself (`Ctx.classDefines`, not
+`resolveMethod`, so a free function named `__eq__` cannot be mistaken for a method).
+Only the LEFT operand dispatches; CPython's reflected `__gt__`-for-`<` fallback when
+`__lt__` returns `NotImplemented` is not modelled, and `NotImplemented` has no value here. -/
+
+/-- The dunder a comparison operator names. `!=` is resolved by `cmpDunderTarget`
+(`__ne__`, else the negation of `__eq__`, as CPython's default `__ne__` does). -/
+@[simp] def cmpDunderName : String → Option String
+  | "==" => some "__eq__"
+  | "<"  => some "__lt__"
+  | "<=" => some "__le__"
+  | ">"  => some "__gt__"
+  | ">=" => some "__ge__"
+  | _    => none
+
+/-- `(receiver, class, method, negate)` when `x op y` dispatches to a dunder on `x`;
+`none` means "compare structurally, as before". -/
+@[simp] def cmpDunderTarget (ctx : Ctx) (h : Heap) (op : String) (x : Val) :
+    Option (Ref × String × String × Bool) :=
+  if ctx.dialect != .python then none else
+  match x with
+  | .ref r =>
+    match h.get r with
+    | some o =>
+      if o.payload.toVal.isSome || strStartsWith o.cls "<module>" then none
+      else if op == "!=" then
+        if ctx.classDefines o.cls "__ne__" then some (r, o.cls, "__ne__", false)
+        else if ctx.classDefines o.cls "__eq__" then some (r, o.cls, "__eq__", true)
+        else none
+      else
+        match cmpDunderName op with
+        | some m => if ctx.classDefines o.cls m then some (r, o.cls, m, false) else none
+        | none   => none
+    | none => none
+  | _ => none
+
+/-- `(receiver, class, method)` when the builtin `f` applied to exactly one ordinary
+instance dispatches to that instance's class. `bool` falls back to `__len__` as CPython
+does; everything else names exactly one method. -/
+@[simp] def builtinDunderTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val) :
+    Option (Val × String × String) :=
+  if ctx.dialect != .python then none else
+  match vs with
+  | [.ref r] =>
+    match h.get r with
+    | some o =>
+      let pick (m : String) : Option (Val × String × String) :=
+        if ctx.classDefines o.cls m then some (.ref r, o.cls, m) else none
+      if f == "bool" || f == "<python-bool>" then
+        match pick "__bool__" with
+        | some target => some target
+        | none => pick "__len__"
+      else if Iteration.truthConsumer f && o.payload.toVal.isSome &&
+          (o.cls == "list" || o.cls == "tuple" || o.cls == "dict") &&
+          !ctx.classDefines o.cls "__iter__" then
+        some (.ref r, Iteration.consumerClass, f)
+      else if o.payload.toVal.isSome || strStartsWith o.cls "<module>" then none else
+      if Iteration.consumes f &&
+          (ctx.classDefines o.cls "__iter__" || ctx.classDefines o.cls "__getitem__") then
+        some (.ref r, Iteration.consumerClass, f)
+      else if f == "len" && (Iteration.iteratorClass o.cls || o.cls == "<generator>") then
+        some (.ref r, Iteration.consumerClass, "<length-error>")
+      else
+      match f with
+      | "len"  => pick "__len__"
+      | "hash" => pick "__hash__"
+      -- Data model § `object.__str__`: "The default implementation defined by the
+      -- built-in type `object` calls `object.__repr__()`", so `str(x)` on a class that
+      -- defines only `__repr__` runs `__repr__`.
+      | "str"  => match pick "__str__" with
+                  | some t => some t
+                  | none   => pick "__repr__"
+      | "repr" => pick "__repr__"
+      -- `iter(object)`: "the single argument must be a collection object which supports
+      -- the iterable protocol (the `__iter__()` method)" -- library/functions.html#iter.
+      -- The sequence-protocol fallback (`__getitem__` from 0) allocates an iterator
+      -- through the private factory method, retaining the receiver and its position.
+      -- `next(iterator)`: "Retrieve the next item from the iterator by calling its
+      -- `__next__()` method" -- library/functions.html#next; the two-argument form is
+      -- `nextDefaultTarget` below.
+      | "iter" | "<python-iter>" => match pick "__iter__" with
+                  | some target => some target
+                  | none => if ctx.classDefines o.cls "__getitem__" then
+                              some (.ref r, Iteration.factoryClass, "__iter__")
+                            else none
+      | "next" | "<python-next>" => pick "__next__"
+      | _      => none
+    | none => none
+  | [value] =>
+      if Iteration.truthConsumer f then
+        match value with
+        | .list _ | .tuple _ | .dict _ | .str _ => some (value, Iteration.consumerClass, f)
+        | _ => none
+      else none
+  | _ => none
+
+/-- `next(iterator, default)`: "If default is given, it is returned if the iterator is
+exhausted, otherwise `StopIteration` is raised" (library/functions.html#next). The
+receiver, its `__next__`, and the default -- when the first argument is an ordinary
+instance whose class defines `__next__`. -/
+def nextDefaultTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val) :
+    Option (Ref × Func × Val) :=
+  match f, vs with
+  | "next", [it, d] | "<python-next>", [it, d] =>
+      match ctx.dunderOn h it "__next__" with
+      | some (r, fn) => some (r, fn, d)
+      | none         => none
+  | _, _ => none
+
+theorem nextDefaultTarget_resolves {ctx : Ctx} {h : Heap} {f : String} {vs : List Val}
+    {r : Ref} {fn : Func} {d : Val} (hn : nextDefaultTarget ctx h f vs = some (r, fn, d)) :
+    ∃ cls, ctx.resolveMethod cls "__next__" = some fn := by
+  unfold nextDefaultTarget at hn
+  repeat' split at hn
+  all_goals first
+    | (cases hn; exact Ctx.dunderOn_resolves (by assumption))
+    | cases hn
+
+/-! ### The iteration protocol, driven from `for`
+
+`for` (reference/compound_stmts.html §8.3): "An iterator is created for that iterable.
+The first item provided by the iterator is then assigned to the target list ... This
+repeats for each item provided by the iterator. When the iterator is exhausted ... the
+loop terminates." The iterator is created as `iter()` does (library/functions.html#iter):
+the class's `__iter__()`, else the sequence protocol -- `__getitem__()` with integer
+arguments from `0` until `IndexError`. An iterator is driven as `library/stdtypes.html`
+"Iterator Types" says: `__next__()` "Return the next item from the iterator. If there are
+no further items, raise the `StopIteration` exception."
+
+Core drives a user iterator with a statement it synthesises and runs through `execStmt`.
+Each iterator reference has its own private binding, so nested loops cannot replace it
+through a shared temporary. Each step is `x = it.__next__()` inside a `tryCatch` whose handler
+breaks on `StopIteration` and re-raises anything else, and the body follows. `break`,
+`continue` and `return` in the body mean what §8.3 says because `.loop` already gives them
+that meaning, and "names in the target list are not deleted when the loop is finished"
+because the synthesised loop assigns `x` in the enclosing environment.
+
+Not modelled, and not pretended: the `else` clause (the exporter lowers it separately),
+and "once an iterator's `__next__()` method raises `StopIteration`, it must continue to
+do so" -- a property of the iterator's author, which Core neither checks nor relies on. -/
+
+/-- The synthesised loop's private names. `$` cannot start a Python identifier. -/
+def iterTmp : String := "$iter"
+def idxTmp  : String := "$idx"
+def excTmp  : String := "$exc"
+
+/-- Two loops may share a binding only when they share the same iterator object. -/
+def iteratorBinding (r : Ref) : String := iterTmp ++ toString r
+
+/-- `for x in it` over an ITERATOR (`__next__`), as one Core statement. -/
+def nextDriver (x : String) (body : Stmt) (iterator : Expr := .name iterTmp) : Stmt :=
+  .loop (.lit (.bool true))
+    (.seq (.tryCatch (.assign x (.mcall iterator "__next__" [])) excTmp
+             (.ifte (.binop "==" (.name excTmp) (.lit (.str "StopIteration")))
+                    .brk (.raise (.name excTmp))))
+          body)
+
+/-- Legacy sequence driver. Source `for` now allocates a sequence iterator and uses
+`nextDriver`, keeping each loop's position independent during nesting. -/
+def seqDriver (x : String) (body : Stmt) : Stmt :=
+  .seq (.assign idxTmp (.lit (.int 0)))
+    (.loop (.lit (.bool true))
+      (.seq (.tryCatch (.assign x (.index (.name iterTmp) (.name idxTmp))) excTmp
+               (.ifte (.binop "||"
+                         (.binop "==" (.name excTmp) (.lit (.str "IndexError")))
+                         (.binop "==" (.name excTmp) (.lit (.str "StopIteration"))))
+                      .brk (.raise (.name excTmp))))
+      (.seq (.assign idxTmp (.binop "+" (.name idxTmp) (.lit (.int 1))))
+            body)))
+
+/-- What the builtin makes of the dunder's answer. CPython type-checks it: `__len__` must
+return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
+`__bool__` a `bool`; and `bool()` through `__len__` is the length's truthiness. -/
+@[simp] def builtinDunderResult (f m : String) (v : Val) : EResult :=
+  match f, v with
+  | "len",  .int i  => if i < 0 then .exn (.str "ValueError")
+                       else if i > 2147483647 then .hole "truth:length-platform"
+                       else .val v
+  | "len", .bool b => .val (.int (if b then 1 else 0))
+  | "len", .ref _ | "len", .bobj _ _ | "len", .clsClos _ _ =>
+      .hole "length:index-protocol"
+  | "len",  _       => .exn (.str "TypeError")
+  | "hash", .int _  => .val v
+  | "hash", _       => .exn (.str "TypeError")
+  | "str",  .str _  => .val v
+  | "str",  _       => .exn (.str "TypeError")
+  | "repr", .str _  => .val v
+  | "repr", _       => .exn (.str "TypeError")
+  | "bool", .bool _ => .val v
+  | "bool", .int i  => if m == "__len__" then
+                        if i < 0 then .exn (.str "ValueError")
+                        else if i > 2147483647 then .hole "truth:length-platform"
+                        else .val (.bool (i != 0))
+                      else .exn (.str "TypeError")
+  | "bool", .ref _ | "bool", .bobj _ _ | "bool", .clsClos _ _ =>
+      if m == "__len__" then .hole "length:index-protocol" else .exn (.str "TypeError")
+  | "bool", _       => .exn (.str "TypeError")
+  | _, _            => .val v
+
+/-- __iter__ must return an iterator, not merely another iterable. -/
+def checkedBuiltinDunderResult (ctx : Ctx) (h : Heap) (f m : String) (v : Val) : EResult :=
+  if Iteration.isIter f then
+    if (ctx.dunderOn h v "__next__").isSome then .val v
+    else if Iteration.unknownResultProtocol h v then .hole "iterator:result-protocol"
+    else .exn (.str "TypeError")
+  else builtinDunderResult (if f == "<python-bool>" then "bool" else f) m v
+
+/-- Truth testing can run Python code. The caller supplies a smaller-fuel function
+application, so this helper preserves structural recursion and threads every effect.
+The private builtin name cannot be shadowed by a source-level `bool` binding. -/
+def evalTruthWith (ctx : Ctx) (h : Heap) (value : Val)
+    (apply : Func → Val → Heap × EResult) : Heap × EResult :=
+  if ctx.dialect == .python then
+    match builtinDunderTarget ctx h "<python-bool>" [value] with
+    | some (receiver, cls, method) =>
+        match ctx.resolveMethod cls method with
+        | some fn =>
+            match apply fn receiver with
+            | (h', .val v) => (h', builtinDunderResult "bool" method v)
+            | result => result
+        | none => (h, .hole "truth:dunder-unresolved")
+    | none => (h, Iteration.truthValue h value)
+  else (h, .val (.bool value.truthy))
+
+@[simp] theorem evalTruthWith_bool (ctx : Ctx) (h : Heap) (b : Bool) (apply) :
+    evalTruthWith ctx h (.bool b) apply = (h, .val (.bool b)) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer, Val.truthy]
+
+@[simp] theorem evalTruthWith_int (ctx : Ctx) (h : Heap) (i : Int) (apply) :
+    evalTruthWith ctx h (.int i) apply = (h, .val (.bool ((.int i : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_str (ctx : Ctx) (h : Heap) (s : String) (apply) :
+    evalTruthWith ctx h (.str s) apply = (h, .val (.bool ((.str s : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_list (ctx : Ctx) (h : Heap) (xs : List Val) (apply) :
+    evalTruthWith ctx h (.list xs) apply = (h, .val (.bool ((.list xs : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_tuple (ctx : Ctx) (h : Heap) (xs : List Val) (apply) :
+    evalTruthWith ctx h (.tuple xs) apply = (h, .val (.bool ((.tuple xs : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_dict (ctx : Ctx) (h : Heap) (xs : List (Val × Val)) (apply) :
+    evalTruthWith ctx h (.dict xs) apply = (h, .val (.bool ((.dict xs : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_float (ctx : Ctx) (h : Heap) (f : Fl) (apply) :
+    evalTruthWith ctx h (.float f) apply = (h, .val (.bool ((.float f : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_unit (ctx : Ctx) (h : Heap) (apply) :
+    evalTruthWith ctx h .unit apply = (h, .val (.bool false)) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer, Val.truthy]
+
+@[simp] theorem evalTruthWith_not_python (ctx : Ctx) (h : Heap) (v : Val) (apply)
+    (hd : ctx.dialect ≠ .python) :
+    evalTruthWith ctx h v apply = (h, .val (.bool v.truthy)) := by
+  simp [evalTruthWith, hd]
+
 mutual
 
 /-- Evaluate an expression, threading the heap. -/
@@ -880,26 +2141,26 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .dstarred _    => (h, .hole "op:starred-outside-call")
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op v)
+      | (h₁, .val v) =>
+          if op == "!" then
+            match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+            | (h₂, .val b) => (h₂, .val (.bool (!b.truthy)))
+            | result => result
+          else (h₁, applyUnop ctx.dialect op v)
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .binop op a b =>
       match evalExpr ctx n h ρ a with
       | (h₁, .val x) =>
-        -- `&&` and `||` must NOT evaluate their right operand when the left already
-        -- decides the answer. Eager evaluation was a genuine soundness bug, not a
-        -- conservative approximation: `scripts/differential.py` caught
-        -- `safemod(-11, 0)` returning 0 in CPython while Core raised ZeroDivisionError,
-        -- because `b != 0 and a % b == 0` evaluated the division anyway.
-        -- `and`/`or` are VALUE operators in Python and JavaScript: `a and b` is `a`
-        -- when `a` is falsy and `b` otherwise, so `pick(0, 5)` is `5`, not `True`.
-        -- Returning a bool was wrong for every Python program that uses them in
-        -- value position; it survived because cachetools only uses them in
-        -- conditions, where truthiness makes the two indistinguishable.
-        -- C is the opposite: `&&`/`||` genuinely yield 0/1.
-        if op == "&&" && !x.truthy then
-          (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false))
-        else if op == "||" && x.truthy then
-          (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true))
+        if op == "&&" || op == "||" then
+          match evalTruthWith ctx h₁ x (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) =>
+              if (op == "&&" && !test.truthy) || (op == "||" && test.truthy) then
+                (ht, .val (if ctx.dialect.boolOpsAreValues then x else .bool test.truthy))
+              else
+                match evalExpr ctx n ht ρ b with
+                | (h₂, .val y) => (h₂, applyBinop ctx.dialect op x y)
+                | result => result
+          | result => result
         else
           match evalExpr ctx n h₁ ρ b with
           | (h₂, .val y) =>
@@ -909,15 +2170,37 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- one `Refine.lean` needs reducible -- diverting here costs one call site
             -- instead of re-typing `applyBinop` and its 155 references.
             if binopNeedsHeap op x y then
-              match Val.eqPy h₂ (Val.eqFuel h₂) x y with
-              | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
-              | none   => (h₂, .outOfFuel)
+              -- A comparison whose LEFT operand is an ordinary instance of a class that
+              -- defines the dunder RUNS it (`cmpDunderTarget`); `!=` through `__eq__`
+              -- negates the truthiness of what `__eq__` returned.
+              match cmpDunderTarget ctx h₂ op x with
+              | some (r, cls, m, neg) =>
+                match ctx.resolveMethod cls m with
+                | some fn =>
+                  match applyFunc ctx n h₂ fn (some (.ref r)) [y] [] with
+                  | (h₃, .val v) =>
+                      if neg then
+                        match evalTruthWith ctx h₃ v (fun fn self => applyFunc ctx n h₃ fn (some self) [] []) with
+                        | (h₄, .val test) => (h₄, .val (.bool (!test.truthy)))
+                        | result => result
+                      else (h₃, .val v)
+                  | (h₃, e)      => (h₃, e)
+                | none => (h₂, .hole s!"binop:{op}:dunder-unresolved")
+              | none =>
+                if op == "==" || op == "!=" then
+                  match Val.eqPy h₂ (Val.eqFuel h₂) x y with
+                  | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
+                  | none   => (h₂, .outOfFuel)
+                else (h₂, applyBinop ctx.dialect op x y)
             else (h₂, applyBinop ctx.dialect op x y)
           | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .cond c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v) => if v.truthy then evalExpr ctx n h₁ ρ t else evalExpr ctx n h₁ ρ e
+      | (h₁, .val v) =>
+          match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) => if test.truthy then evalExpr ctx n ht ρ t else evalExpr ctx n ht ρ e
+          | result => result
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .isOp neg a b =>
       match evalExpr ctx n h ρ a with
@@ -939,7 +2222,20 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val x) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val c) =>
-            match valIn x c with
+            -- An ordinary instance whose class defines `__contains__`: `x in c` IS
+            -- `c.__contains__(x)`, and `not in` negates its truthiness -- CPython's
+            -- protocol. Boxed containers, builtin-based instances and immediates take
+            -- the structural path below; `.unbox` is what reads a boxed list or dict.
+            match ctx.dunderOn h₂ c "__contains__" with
+            | some (r, fn) =>
+                match applyFunc ctx n h₂ fn (some (.ref r)) [x] [] with
+                | (h₃, .val rv) =>
+                    match evalTruthWith ctx h₃ rv (fun fn self => applyFunc ctx n h₃ fn (some self) [] []) with
+                    | (h₄, .val test) => (h₄, .val (.bool (if neg then !test.truthy else test.truthy)))
+                    | result => result
+                | (h₃, res)     => (h₃, res)
+            | none =>
+            match valIn x (c.unbox h₂) with
             | .val (.bool r) => (h₂, .val (.bool (if neg then !r else r)))
             | r              => (h₂, r)
         | (h₂, r) => (h₂, r)
@@ -949,19 +2245,92 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
+          -- An ordinary instance whose class defines `__getitem__`: `c[k]` IS
+          -- `c.__getitem__(k)`. Checked first because the structural match below
+          -- cannot see a user class; boxed containers are `none` here and unaffected.
+          match ctx.dunderOn h₂ c "__getitem__" with
+          | some (r, fn) => applyFunc ctx n h₂ fn (some (.ref r)) [k] []
+          | none =>
           -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
-          match c.unbuiltin, k with
-          | .list vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
-              else (h₂, .exn (.str "IndexError"))
-          | .tuple vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
-              else (h₂, .exn (.str "IndexError"))
+          -- `.unbox` is the boxed-container case: after the switchover `xs[0]` reads
+          -- through a `Val.ref`, and without it a subscript of a list literal holes.
+          match (c.unbox h₂).unbuiltin, k with
+          | .list vs, .int i | .tuple vs, .int i =>
+              -- Python indexes relative to the end for negative integers.
+              -- Check the signed bound before toNat, which otherwise clamps a
+              -- negative index to zero and can make incorrect mutants survive.
+              let j := if ctx.dialect == .python && i < 0 then i + (vs.length : Int) else i
+              -- Out of range: Python raises, JavaScript answers `undefined`. Neither is
+              -- a hole -- both are values the language defines.
+              let outOfRange : EResult :=
+                if ctx.dialect == .javascript then .val .unit else .exn (.str "IndexError")
+              if j < 0 then (h₂, outOfRange)
+              else if hh : j.toNat < vs.length then (h₂, .val (vs[j.toNat]))
+              else (h₂, outOfRange)
+          -- JavaScript strings index by UTF-16 code unit. A hit is the one-unit string;
+          -- out of range is `undefined`; a lone surrogate has no `Char` and is refused
+          -- rather than replaced with `'\0'`. Python's `s[i]` keeps the hole it has:
+          -- codepoint indexing with `IndexError` is a separate piece of work.
+          | .str s, .int i =>
+              if ctx.dialect == .javascript then
+                match s.utf16At i with
+                | none   => (h₂, .val .unit)
+                | some u =>
+                    if u.isUTF16Surrogate then (h₂, .hole "index:js-lone-surrogate")
+                    else (h₂, .val (.str (String.singleton (Char.ofNat u))))
+              else (h₂, .hole "index:unsupported")
           | .dict kvs, key =>
               match kvs.find? (fun kv => Val.beq kv.1 key) with
               | some (_, v) => (h₂, .val v)
               | none        => (h₂, .exn (.str "KeyError"))
           | _, _ => (h₂, .hole "index:unsupported")
+        | (h₂, r) => (h₂, r)
+      | (h₁, r) => (h₁, r)
+  | n+1, h, ρ, .slice a lo hi st =>
+      -- `xs[lo:hi:st]` (`docs/boxed-containers.md` §9 item 3, now landed). Order is
+      -- receiver, lower, upper, step -- CPython's. A bound is an `Int`, or `unit` for
+      -- Python's `None` (the default for the step's direction); anything else is a
+      -- `TypeError`, and a zero step a `ValueError`, both as CPython reports them.
+      --
+      -- A slice is a NEW container. For a boxed list receiver that means a fresh boxed
+      -- list -- `ys = xs[:]` is the idiom for a copy precisely because it does not
+      -- alias -- gated on the dialect like every other allocation. A tuple slice is a
+      -- tuple value and a string slice a string; both are immutable in Python and need
+      -- no identity. `d[1:2]` on a dict is Python's "unhashable type: 'slice'".
+      match evalExpr ctx n h ρ a with
+      | (h₁, .val c) =>
+        match evalExpr ctx n h₁ ρ lo with
+        | (h₂, .val lv) =>
+          match evalExpr ctx n h₂ ρ hi with
+          | (h₃, .val hv) =>
+            match evalExpr ctx n h₃ ρ st with
+            | (h₄, .val sv) =>
+              match Stdlib.sliceBound lv, Stdlib.sliceBound hv, Stdlib.sliceBound sv with
+              | some lo', some hi', some st' =>
+                match (c.unbox h₄).unbuiltin with
+                | .list vs =>
+                    match Stdlib.sliceIndices vs.length lo' hi' st' with
+                    | none    => (h₄, .exn (.str "ValueError"))
+                    | some ks =>
+                        let picked := Stdlib.slicePick vs ks
+                        if ctx.dialect == .python then
+                          let (h₅, r) := h₄.alloc { cls := "list", fields := [], payload := .list picked }
+                          (h₅, .val (.ref r))
+                        else (h₄, .val (.list picked))
+                | .tuple vs =>
+                    match Stdlib.sliceIndices vs.length lo' hi' st' with
+                    | none    => (h₄, .exn (.str "ValueError"))
+                    | some ks => (h₄, .val (.tuple (Stdlib.slicePick vs ks)))
+                | .str s =>
+                    let cs := s.toList
+                    match Stdlib.sliceIndices cs.length lo' hi' st' with
+                    | none    => (h₄, .exn (.str "ValueError"))
+                    | some ks => (h₄, .val (.str (String.mk (ks.filterMap (cs[·]?)))))
+                | .dict _ => (h₄, .exn (.str "TypeError"))
+                | _       => (h₄, .hole "slice:unsupported")
+              | _, _, _ => (h₄, .exn (.str "TypeError"))
+            | (h₄, r) => (h₄, r)
+          | (h₃, r) => (h₃, r)
         | (h₂, r) => (h₂, r)
       | (h₁, r) => (h₁, r)
   -- `009-reduce-remaining-holes-4`: `Expr.strByte a b` -- read the byte at position
@@ -1007,24 +2376,135 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val (.ref r)) =>
         match h₁.get r with
         | some o =>
-          match o.fields.find? (·.1 == f) with
-          | some (_, v) => (h₁, .val v)
-          | none        => match o.captured.find? (·.1 == f) with
-                           | some (_, v) => (h₁, .val v)
-                           -- A **module object** — the exporter's representation of an
-                           -- imported module, marked by a class name beginning `<module>`
-                           -- that no `class` statement in any language can spell — carries
-                           -- exactly its top-level functions, classes and submodules. Its
-                           -- module-level *data* is not a field, because Core's single
-                           -- globals frame is not per-module and the value would have to
-                           -- be captured before the module body computed it. Answering
-                           -- `unit` for such an attribute is the silent wrong answer;
-                           -- naming the miss is the honest one. Ordinary objects keep the
-                           -- documented `unit` behaviour, so no existing corpus changes.
-                           | none        =>
-                             if o.cls.startsWith "<module>" then
-                               (h₁, .hole s!"module-attr:{f}")
-                             else (h₁, .val .unit)
+          match ctx.classLookupGap o.cls f with
+          | some reason => (h₁, .hole reason)
+          | none =>
+            match ctx.readSlot o f with
+            | some result => (h₁, result)
+            | none =>
+              -- Properties are data descriptors: the getter wins over a same-named
+              -- instance field. A local class's getter retains its lexical captures.
+              if ctx.dialect == .python &&
+                  ctx.isProperty o.cls f then
+                match ctx.resolveMethod o.cls f with
+                | some fn =>
+                    if o.captured.isEmpty then applyFunc ctx n h₁ fn (some (.ref r)) [] []
+                    else applyClosure ctx n h₁ fn (("self", .ref r) :: o.captured) [] []
+                | none => (h₁, .hole s!"property:{f}:unresolved")
+              else
+              match o.fields.find? (·.1 == f) with
+              | some (_, v) => (h₁, .val v)
+              | none        => match (if ctx.usesClassMetadata o.cls then none else o.captured.find? (·.1 == f)) with
+                               | some (_, v) => (h₁, .val v)
+                               -- A **module object** — the exporter's representation of an
+                               -- imported module, marked by a class name beginning `<module>`
+                               -- that no `class` statement in any language can spell — is
+                               -- Python's module namespace as an object: Language Reference
+                               -- §3.2.9 (Modules), "attribute references are translated to
+                               -- lookups in this dictionary, e.g. `m.x` is equivalent to
+                               -- `m.__dict__["x"]`". Its fields are its top-level functions,
+                               -- classes and submodules (written by `<module-objects>`) AND
+                               -- its module-level variables, written by the module's own body
+                               -- as each binding runs (§5.4.1: the body executes in that
+                               -- namespace) -- so the value is the one the body computed, not
+                               -- a pre-capture. A name the body never bound is, in CPython,
+                               -- an `AttributeError`; answering `unit` for it is the silent
+                               -- wrong answer, naming the miss is the honest one. Ordinary
+                               -- objects fall through to the arms below: `AttributeError`
+                               -- under `.python` (Language Reference §3.2.11), `unit` elsewhere.
+                               | none        =>
+                                 if strStartsWith o.cls "<module>" then
+                                   (h₁, .hole s!"module-attr:{f}")
+                                 -- A boxed container has no `__dict__` to miss into:
+                                 -- `{'a': 1}.a` is an AttributeError in Python and was a hole
+                                 -- before boxing. Answering `unit` would let the commit that
+                                 -- boxes containers introduce a silent wrong answer while
+                                 -- removing others. Gated on the dialect because only Python
+                                 -- boxes, so no `.cLike` corpus can reach a payload and none
+                                 -- of their specs need to say so.
+                                 -- JavaScript: a property read on a boxed container is
+                                 -- answered on the field path -- `xs.length` on an array, a
+                                 -- key on an object literal (`{a: 1}.a`), `undefined` for
+                                 -- anything else. `jsContainerField` is the whole table.
+                                 else if ctx.dialect == .javascript && o.payload.toVal.isSome then
+                                   (h₁, jsContainerField o.payload f)
+                                 -- A CLASS attribute read through an instance: `self.__marker`
+                                 -- where `__marker = object()` was bound in the class body.
+                                 -- Python's lookup falls from the instance to its class, and
+                                 -- that is the fallback here -- to the globals-frame key the
+                                 -- module initialiser wrote (`classAttrKey`). Python-only,
+                                 -- because only Python has class bodies and because that is
+                                 -- what keeps every `.cLike` accessor theorem out of the side
+                                 -- condition this adds. Not recursive, so fuel-monotonicity of
+                                 -- `.field` is unchanged.
+                                 --
+                                 -- A miss after all of that RAISES. Python Language Reference
+                                 -- §3.2.11 "Class instances": the instance dictionary, then the
+                                 -- class attributes, then `__getattr__` if the class has one;
+                                 -- §3.3.2 `object.__getattribute__` "should either return the
+                                 -- (computed) attribute value or raise an `AttributeError`
+                                 -- exception"; Library Reference "Built-in Exceptions":
+                                 -- `AttributeError` is "raised when an attribute reference or
+                                 -- assignment fails". Core has no `__getattr__`, so the miss is
+                                 -- the exception. The differential oracle priced the old
+                                 -- `unit` answer on click 8.2.1 (`ShellComplete.source_vars`,
+                                 -- docs/languages.md §10.9 and §16.A).
+                                 else if ctx.dialect == .python then
+                                   match (h₁.get ctx.globals).bind
+                                           (fun g => g.fields.find? (·.1 == ctx.classStorageKey o.cls f)) with
+                                   | some (_, v) => (h₁, ctx.storedAttributeValue h₁ r f v)
+                                   | none =>
+                                       if ctx.usesClassMetadata o.cls &&
+                                           (match ctx.classLookup o.cls f with
+                                            | .found _ (.stored _) => true | _ => false) then
+                                         (h₁, .hole s!"class-attribute:{f}:uninitialized-storage")
+                                       else
+                                       -- Reading an ordinary method produces a bound callable.
+                                       -- Class membership must be checked before suffix lookup:
+                                       -- an unrelated method with the same name is not a match.
+                                       if ctx.classDefines o.cls f then
+                                         match ctx.resolveMethod o.cls f with
+                                         | some fn =>
+                                             if strStartsWith fn.name "<runtime>." then
+                                               match builtinMethodValue o r f with
+                                               | some callable => (h₁, .val callable)
+                                               | none => (h₁, .hole "field:runtime-method")
+                                             else if ctx.usesClassMetadata o.cls && fn.isClassMethod then
+                                               (h₁, classMethodValue fn (ctx.instanceClassValue o) o.captured)
+                                             else if fn.isMethod && !fn.isClassMethod then
+                                               (h₁, .val (.clos fn.name (("self", .ref r) :: o.captured)))
+                                             else if !fn.isClassMethod && !o.captured.isEmpty then
+                                               (h₁, .val (.clos fn.name o.captured))
+                                             else (h₁, .val (.fn fn.name))
+                                         | none => (h₁, .hole "field:method-unresolved")
+                                       else if o.payload.toVal.isSome then
+                                         match builtinMethodValue o r f with
+                                         | some callable => (h₁, .val callable)
+                                         | none => (h₁, .hole s!"field:{f}:on-container")
+                                       -- Without recovered class metadata Core has no
+                                       -- hierarchy: `self.getsizeof` on an `LRUCache`
+                                       -- instance is `Cache.getsizeof` in CPython, but
+                                       -- `classDefines "LRUCache" "getsizeof"` cannot see
+                                       -- the base. Claiming `AttributeError` there was a
+                                       -- definite wrong answer (154 of 157 cachetools
+                                       -- divergences); the honest one is a named gap. The
+                                       -- exception is right once the MRO is complete, which
+                                       -- is exactly when `classLookupGap` above did not fire.
+                                       else if ctx.classDecls.isEmpty then
+                                         (h₁, .hole s!"field:{f}:unresolved-inheritance")
+                                       -- §3.3.2: `__getattr__` is called when the ordinary
+                                       -- lookup raises `AttributeError`, i.e. exactly here. Its
+                                       -- body is translated, but calling it from this
+                                       -- non-recursive read would change `.field`'s fuel
+                                       -- shape, so the miss is a named gap, not the exception.
+                                       else if ctx.classDefines o.cls "__getattr__" then
+                                         (h₁, .hole s!"field:{f}:__getattr__-hook")
+                                       else (h₁, .exn (.str "AttributeError"))
+                                 -- Every other dialect keeps `unit`: in JavaScript a missing
+                                 -- property IS `undefined` (ECMA-262 §10.1.8.1
+                                 -- OrdinaryGet step 3: "If desc is undefined, return
+                                 -- undefined"), and Core spells `undefined` as `.unit`.
+                                 else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
       -- `Dialect.fieldsOnDicts`), so `alg.cra_priority` is a lookup in it. A *missing*
@@ -1037,6 +2517,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             | some (_, v) => (h₁, .val v)
             | none        => (h₁, .hole s!"field:{f}:absent-from-aggregate")
           else (h₁, .hole s!"field:{f}:non-object")
+      -- JavaScript: `s.length` is the number of UTF-16 code units, not codepoints.
+      | (h₁, .val (.str s)) =>
+          if ctx.dialect == .javascript && f == "length" then (h₁, .val (.int s.jsLength))
+          else (h₁, .hole s!"field:{f}:non-object")
+      | (h₁, .val (.fn owner)) => (h₁, ctx.readClassAttribute h₁ owner [] f)
+      | (h₁, .val (.clsClos owner captured)) =>
+          (h₁, ctx.readClassAttribute h₁ owner captured f)
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
@@ -1044,7 +2531,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- shape we do not model and it says so.
   | n+1, h, ρ, .listE es =>
       match evalList ctx n h ρ es with
-      | (h₁, .inr (vs, []))  => (h₁, .val (.list vs))
+      -- THE SWITCHOVER. A Python or JavaScript list literal allocates: both languages'
+      -- arrays are objects with identity. NOT C -- an aggregate initializer is a value,
+      -- has no identity to share, and `Dialect.fieldsOnDicts` reads it by field name, so
+      -- boxing it would make C wrong in the commit that makes Python right. The dialect
+      -- predicate `boxesContainers` is where that line is drawn.
+      | (h₁, .inr (vs, []))  =>
+          if ctx.dialect.boxesContainers then
+            let (h₂, r) := h₁.alloc { cls := "list", fields := [], payload := .list vs }
+            (h₂, .val (.ref r))
+          else (h₁, .val (.list vs))
       | (h₁, .inr (_,  _))   => (h₁, .hole "op:keyword-in-literal")
       | (h₁, .inl r)         => (h₁, r)
   | n+1, h, ρ, .tupleE es =>
@@ -1054,14 +2550,28 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .inl r)         => (h₁, r)
   | n+1, h, ρ, .dictE kvs =>
       match evalPairs ctx n h ρ kvs with
-      | (h₁, .inr ps) => (h₁, .val (.dict ps))
+      | (h₁, .inr ps) =>
+          if ctx.dialect.boxesContainers then
+            -- Python §6.2.8: a repeated key keeps its first position and takes the last
+            -- value; a set display (§6.2.7, lowered to unit-valued pairs) holds
+            -- DISTINCT elements. `Stdlib.dictOfPairs` is that fold. A C aggregate
+            -- initializer (the unboxed branch) has no repeated keys to reconcile.
+            let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict (Stdlib.dictOfPairs ps) }
+            (h₂, .val (.ref r))
+          else (h₁, .val (.dict ps))
       | (h₁, .inl r)  => (h₁, r)
   | n+1, h, ρ, .call f args =>
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr (vs, kws)) =>
-        match ctx.resolve f with
-        | some fn => applyFunc ctx n h₁ fn none vs kws
+        match ctx.resolveCall f with
+        | some fn =>
+            -- A `@classmethod` called through its qualified name (`C.make(3)` lowered to a
+            -- direct call) is still bound to its class: CPython passes `cls` whether the
+            -- call goes through the class or an instance, so the class value goes in as
+            -- the first positional here exactly as it does at the `.mcall` sites.
+            if fn.isClassMethod then applyFunc ctx n h₁ fn none (fn.ownerClassValue :: vs) kws
+            else applyFunc ctx n h₁ fn none vs kws
         | none    =>
           -- Not a statically known function: it may be a function value or closure held
           -- in a variable (`f = g; f(x)`, decorators, callbacks).
@@ -1075,7 +2585,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                             -- `.`-call. `applyFunc` binds the receiver separately, so the head
                             -- has to be split off here, or it lands on `self`'s successor and
                             -- the call reports a spurious arity `TypeError`.
-                            if fn.isMethod && fn.vararg.isNone
+                            -- A `@classmethod` used as a VALUE (`f = C.make; f(3)`) is
+                            -- already bound to its class in Python, so the class is the
+                            -- first positional and there is no receiver to split off.
+                            if fn.isClassMethod then
+                              applyFunc ctx n h₁ fn none (fn.ownerClassValue :: vs) kws
+                            else if fn.isMethod && fn.vararg.isNone
                                && vs.length == fn.params.length + 1 then
                               applyFunc ctx n h₁ fn (some (vs.headD .unit)) vs.tail kws
                             else applyFunc ctx n h₁ fn none vs kws
@@ -1096,40 +2611,179 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                     | none    => (h₁, .hole s!"call:{g}")
             | _ => (h₁, .hole s!"call:{f}:not-callable")
           | _          =>
+            -- `next(it, default)`: the default "is returned if the iterator is exhausted"
+            -- (library/functions.html#next), i.e. when `__next__` raises `StopIteration`;
+            -- any other outcome of `__next__` is the call's outcome.
+            match nextDefaultTarget ctx h₁ f vs with
+            | some (r, fn, d) =>
+              if kws.isEmpty then
+                match applyFunc ctx n h₁ fn (some (.ref r)) [] [] with
+                | (h₂, .exn (.str "StopIteration")) => (h₂, .val d)
+                | (h₂, res)                          => (h₂, res)
+              else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+            | none =>
+            -- `len(x)`, `bool(x)`, `hash(x)`, `str(x)`, `repr(x)`, `iter(x)`, `next(x)` on
+            -- an ordinary instance whose class defines the dunder run the method
+            -- (`builtinDunderTarget`); the answer is type-checked as CPython does
+            -- (`builtinDunderResult`).
+            match builtinDunderTarget ctx h₁ f vs with
+            | some (r, cls, m) =>
+              if kws.isEmpty then
+                match ctx.resolveMethod cls m with
+                | some fn =>
+                  match applyFunc ctx n h₁ fn (some r) [] [] with
+                  | (h₂, .val v) => (h₂, checkedBuiltinDunderResult ctx h₂ f m v)
+                  | (h₂, e)      => (h₂, e)
+                | none => (h₁, .hole s!"call:{f}:dunder-unresolved")
+              else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+            | none =>
             -- Modelled stdlib is consulted LAST, so a user function of the same name
             -- always wins. `builtin` returns `none` for anything it cannot model
             -- faithfully, which falls through to a visible hole.
             -- `Stdlib.builtin` takes positional arguments only: a keyword argument to a
             -- builtin is *not* passed silently, it is a named hole.
             if kws.isEmpty then
-              match Stdlib.builtin ctx.dialect h₁ f vs with
+              -- A READ-ONLY builtin sees through a boxed container: `len(xs)` on a list
+              -- that allocates is `len` of its payload (`Val.unbox`), and the answer is a
+              -- scalar, so no identity is created or lost. Builtins that hand back a
+              -- container (`list`, `sorted`, ...) are deliberately NOT unboxed here: their
+              -- result would have to allocate to keep the identity model honest.
+              let vs' := if Stdlib.unboxesArgs f then vs.map (·.unbox h₁) else vs
+              match Stdlib.builtin ctx.dialect h₁ f vs' with
               | some (h₂, r) => (h₂, r)
-              | none         => (h₁, .hole s!"call:{f}")
+              | none         =>
+                  match Iteration.builtin ctx.dialect h₁ f vs with
+                  | some result => result
+                  | none => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+  | n+1, h, ρ, .callValue fe args =>
+      -- `f(x)(y)`, `d["k"](3)`: the callee is a VALUE. Evaluate it first (CPython's order),
+      -- then the arguments, then dispatch exactly as `call` does for a name bound to a
+      -- function value: a `.fn` resolves and applies (with the unbound-method and
+      -- `@classmethod` rules), a `.clos` applies with its captures, a boxed function object
+      -- calls what it carries. Anything else is not callable and says so. There is no
+      -- builtin fallback: a builtin reached as a value has no name to look up.
+      match evalExpr ctx n h ρ fe with
+      | (h₁, .val fv) =>
+        match evalList ctx n h₁ ρ args with
+        | (h₂, .inl r)  => (h₂, r)
+        | (h₂, .inr (vs, kws)) =>
+          -- A class value constructs: `LeftBox(3)` after `from ns_left import Box as
+          -- LeftBox` reads `.fn "ns_left.py:<module>.Box<meta>"` out of the module and
+          -- must allocate exactly as the lexical `alloc` form does.
+          match classValueOwner fv with
+          | some owner =>
+            let cls := ctx.classKeyOfValue owner
+            evalExpr ctx n h₂ (classCallEnv cls fv vs kws ρ) (.alloc cls (classCallArgs vs kws))
+          | none =>
+          match fv with
+          | .fn g      => match ctx.resolve g with
+                          | some fn =>
+                            if fn.isClassMethod then
+                              applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
+                            else if fn.isMethod && fn.vararg.isNone
+                               && vs.length == fn.params.length + 1 then
+                              applyFunc ctx n h₂ fn (some (vs.headD .unit)) vs.tail kws
+                            else applyFunc ctx n h₂ fn none vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .clos g cap => match ctx.resolve g with
+                          | some fn => applyClosure ctx n h₂ fn cap vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .ref addr  =>
+            match unboxFn h₂ addr with
+            | some (.fn g)      => match ctx.resolve g with
+                                   | some fn => applyFunc ctx n h₂ fn none vs kws
+                                   | none    => (h₂, .hole s!"call:{g}")
+            | some (.clos g cap) => match ctx.resolve g with
+                                    | some fn => applyClosure ctx n h₂ fn cap vs kws
+                                    | none    => (h₂, .hole s!"call:{g}")
+            | _ => (h₂, .hole "call:value:not-callable")
+          | _ => (h₂, .hole "call:value:not-callable")
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>
-        match evalList ctx n h₁ ρ args with
-        | (h₂, .inl e)  => (h₂, e)
-        | (h₂, .inr (vs, kws)) =>
-          match h₂.get r with
-          | none   => (h₂, .hole "mcall:dangling-ref")
-          | some o =>
-            match ctx.resolveMethod o.cls m with
-            | none    =>
-              -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
-              -- `resolveMethod` finds nothing; what it has is a *field* holding a
-              -- function value, and a module-level function takes no receiver. Calling
-              -- it with `self` bound would shift every argument by one, so the receiver
-              -- is dropped — which is exactly what CPython does for an attribute that is
-              -- a plain function rather than a class attribute.
-              --
-              -- Restricted to module objects on purpose. The same rule is *also* correct
-              -- for an ordinary instance attribute holding a function (`self.cb(x)` does
-              -- not pass `self` in CPython), and today that is the hole `mcall:C.cb`. But
-              -- that is a claim about every class in every corpus, and it is not what
-              -- this change is about; it stays a hole until it is measured on its own.
-              if o.cls.startsWith "<module>" then
+        if ctx.usesAttributeCall h₁ r m then
+          -- These private bindings cannot be source-level Python identifiers.
+          -- Save the attribute itself: arguments may replace the receiver's field.
+          match evalExpr ctx n h₁ (("<mcall:receiver>", .ref r) :: ρ)
+              (.field (.name "<mcall:receiver>") m) with
+          | (hc, .val callee) =>
+            match evalList ctx n hc ρ args with
+            | (h₂, .inl result) => (h₂, result)
+            | (h₂, .inr (vs, kws)) =>
+              match callee with
+              | .fn g      => match ctx.resolve g with
+                              | some fn =>
+                                if fn.isClassMethod then
+                                  applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
+                                else if fn.isMethod && fn.vararg.isNone
+                                   && vs.length == fn.params.length + 1 then
+                                  applyFunc ctx n h₂ fn (some (vs.headD .unit)) vs.tail kws
+                                else applyFunc ctx n h₂ fn none vs kws
+                              | none    => (h₂, .hole s!"call:{g}")
+              | .clos g cap => match ctx.resolve g with
+                              | some fn => applyClosure ctx n h₂ fn cap vs kws
+                              | none    => (h₂, .hole s!"call:{g}")
+              | .ref addr  =>
+                match unboxFn h₂ addr with
+                | some (.fn g)      => match ctx.resolve g with
+                                       | some fn => applyFunc ctx n h₂ fn none vs kws
+                                       | none    => (h₂, .hole s!"call:{g}")
+                | some (.clos g cap) => match ctx.resolve g with
+                                        | some fn => applyClosure ctx n h₂ fn cap vs kws
+                                        | none    => (h₂, .hole s!"call:{g}")
+                | _ => (h₂, .hole "call:value:not-callable")
+              | _ => (h₂, .hole "call:value:not-callable")
+          | result => result
+        else
+          match evalList ctx n h₁ ρ args with
+          | (h₂, .inl e)  => (h₂, e)
+          | (h₂, .inr (vs, kws)) =>
+            match Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws with
+            | some result => result
+            | none =>
+            match h₂.get r with
+            | none   => (h₂, .hole "mcall:dangling-ref")
+            | some o =>
+              match ctx.resolveMethod o.cls m with
+              | none    =>
+                -- Boxed containers, step 3 (`docs/boxed-containers.md` §2). The user class
+                -- has already been consulted and lost, so a container payload gets the
+                -- builtin behaviour -- on the payload, writing any mutation back through
+                -- `setPayload` so aliases observe it. Inert until something constructs a
+                -- payload; `Payload.toVal` is `none` for every object Core builds today.
+                match o.payload.toVal with
+                | some pay =>
+                    if kws.isEmpty then
+                      match Stdlib.method ctx.dialect h₂ pay m vs with
+                      | some (h₃, .pure res) => (h₃, res)
+                      | some (h₃, .mutating res nv) =>
+                          match Payload.ofVal nv with
+                          | some np => (h₃.setPayload r np, res)
+                          -- A mutating builtin whose new receiver is not a container.
+                          -- Writing it back would change what the object IS.
+                          | Option.none => (h₃, .hole s!"mcall:{m}:payload-kind-changed")
+                      | Option.none => (h₂, .hole s!"mcall:{o.cls}.{m}")
+                    -- Same refusal the unboxed path makes: `Stdlib.method` has no keyword
+                    -- calling convention, and dropping keywords silently is the bug the
+                    -- varargs work fixed.
+                    else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+                | Option.none =>
+                -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
+                -- `resolveMethod` finds nothing; what it has is a *field* holding a
+                -- function value, and a module-level function takes no receiver. Calling
+                -- it with `self` bound would shift every argument by one, so the receiver
+                -- is dropped — which is exactly what CPython does for an attribute that is
+                -- a plain function rather than a class attribute.
+                --
+                -- The same rule holds for an ORDINARY instance whose attribute holds a
+                -- function or closure: `self.cb(x)` does not pass `self` in CPython
+                -- either. It was kept module-only "until measured on its own"; the
+                -- differential oracle measured it on click 8.2.1 (`FuncParamType.convert`,
+                -- `self.func(value)`: three divergences, docs/languages.md §10.9), so the
+                -- lookup now runs for every object and only the hole LABELS still tell a
+                -- module object from an instance.
                 match o.fields.find? (·.1 == m) with
                 | some (_, .fn g)      =>
                     match ctx.resolve g with
@@ -1139,12 +2793,20 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                     match ctx.resolve g with
                     | some fn => applyClosure ctx n h₂ fn cap vs kws
                     | none    => (h₂, .hole s!"call:{g}")
-                | some _  => (h₂, .hole s!"module-call:{m}:not-a-function")
-                | none    => (h₂, .hole s!"module-attr:{m}")
-              else (h₂, .hole s!"mcall:{o.cls}.{m}")
-            | some fn =>
-              if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
-              else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs kws
+                | some _  =>
+                    if strStartsWith o.cls "<module>" then (h₂, .hole s!"module-call:{m}:not-a-function")
+                    else (h₂, .hole s!"mcall:{o.cls}.{m}:field-not-callable")
+                | none    =>
+                    if strStartsWith o.cls "<module>" then (h₂, .hole s!"module-attr:{m}")
+                    else (h₂, .hole s!"mcall:{o.cls}.{m}")
+              | some fn =>
+                -- `c.make(3)` on a `@classmethod`: Python passes the CLASS, not `c`, and
+                -- passes it as the first positional (the exporter kept `cls` in `params`),
+                -- so there is no receiver to inject under `self`.
+                if fn.isClassMethod then
+                  applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
+                else if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
+                else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs kws
       | (h₁, .val (.fn g)) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
@@ -1159,7 +2821,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           -- The class value's name is the exporter's `<meta>` marker on the qualified
           -- name; `resolveMethod` wants the short class name, which is its last dotted
           -- segment (the FILE part contains dots, so this cannot split on the whole name).
-          let short := classNameOfValue g
+          let short := ctx.classKeyOfValue g
           -- `classDefines`, NOT `resolveMethod`: the latter falls back to any free
           -- function of that name, which for an opaque external module (`time.monotonic`)
           -- would invent a method out of an unrelated global. A hole is the right answer
@@ -1167,7 +2829,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           if ctx.classDefines short m then
             match ctx.resolveMethod short m with
             | some fn =>
-                match vs with
+                -- `C.make(3)` on a `@classmethod`: the receiver IS this class value, and
+                -- it goes in as the first positional rather than as `self`. An unbound
+                -- ordinary method keeps the split-off rule below.
+                if fn.isClassMethod then
+                  applyFunc ctx n h₂ fn none ((.fn g) :: vs) kws
+                else match vs with
                 | recv :: rest => applyFunc ctx n h₂ fn (some recv) rest kws
                 | []           => (h₂, .hole s!"mcall:{short}.{m}:no-receiver")
             | none => (h₂, .hole s!"mcall:{m}:non-object")
@@ -1197,6 +2864,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .inl e)  => (h₂, e)
         | (h₂, .inr (_, _ :: _)) => (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
         | (h₂, .inr (vs, [])) =>
+          match Iteration.containerMethod ctx.dialect h₂ recv m vs [] with
+          | some result => result
+          | none =>
           match Stdlib.method ctx.dialect h₂ recv m vs with
           | some (h₃, .pure r)       => (h₃, r)
           -- A mutating container method cannot be honoured while containers are values:
@@ -1296,20 +2966,37 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .inr (vs, kws)) =>
         match ctx.builtinBase cls with
         -- `class X(tuple)` and friends: the instance IS the builtin, not an opaque
-        -- reference. See `Val.bobj`.
+        -- reference. See `Val.bobj`. Checked before the class-metadata gap: the
+        -- exporter cannot resolve `tuple` as a declared base, so the hierarchy is
+        -- `incomplete` for every builtin-based class and the gap would hide this
+        -- allocator entirely. `allocBuiltin` keeps its own `__init__`/`__eq__` refusals.
         | some b => (h₁, allocBuiltin ctx cls b vs)
+        | none =>
+        match ctx.constructionGap cls with
+        | some reason => (h₁, .hole reason)
         | none =>
         -- A class defined inside a function is a *value*; instances carry the bindings it
         -- captured, so its methods can read the enclosing scope.
-        let cap := match ρ.get cls with
-                   | .clsClos _ c => c
-                   | _            => []
+        match ctx.allocationCaptures ρ cls with
+        | none => (h₁, .hole "class-construction:dynamic-binding")
+        | some cap =>
         let (h₂, r) := h₁.alloc { cls := cls, fields := [], captured := cap }
-        match ctx.resolveMethod cls "__init__" with
-        | none    => (h₂, .val (.ref r))
+        match ctx.resolveCtor cls with
+        | none    => (h₂, ctx.defaultConstructor cls r vs kws)
         | some fn =>
-          match applyFunc ctx n h₂ fn (some (.ref r)) vs kws with
-          | (h₃, .val _)  => (h₃, .val (.ref r))
+          let initialized :=
+            if ctx.dialect == .python && fn.isClassMethod then
+              let classValue := ctx.instanceClassValue { cls := cls, fields := [], captured := cap }
+              if cap.isEmpty then applyFunc ctx n h₂ fn none (classValue :: vs) kws
+              else applyClosure ctx n h₂ fn cap (classValue :: vs) kws
+            else if cap.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
+            else applyClosure ctx n h₂ fn
+              (if fn.isMethod then ("self", .ref r) :: cap else cap) vs kws
+          match initialized with
+          | (h₃, .val .unit) => (h₃, .val (.ref r))
+          | (h₃, .val _)  =>
+              if ctx.dialect == .python then (h₃, .exn (.str "TypeError"))
+              else (h₃, .val (.ref r))
           | (h₃, .hole l) => (h₃, .hole l)
           | (h₃, e)       => (h₃, e)
 
@@ -1321,15 +3008,21 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
     List (String × Val) → Heap × EResult
   | 0,   h, _,  _,     _,  _   => (h, .outOfFuel)
   | n+1, h, fn, self?, vs, kws =>
-      let base : Env := match self? with
-                        | some s => [("self", s)]
-                        | none   => []
-      let ρ := bindParams fn base vs kws
-      if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
+      if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
+        (h, .exn (.str "TypeError")) else
+      -- Class-attribute defaults are resolved HERE, not in `bindParams`: they need the
+      -- heap, and `bindParams` is heap-free by design (re-typing it is the `applyBinop`
+      -- problem). Arity was already checked above, so a hole from this step is about a
+      -- class attribute, never about the call shape. For a function with no such
+      -- defaults this is `.inr (selfEnv self?)` by unfolding and nothing changes.
+      match seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with
+      | .inl l     => (h, .hole l)
+      | .inr base' =>
+      let ρ := bindParams fn base' vs kws
       match execStmt ctx n h ρ fn.body with
-      | (h₁, .ret v)    => (h₁, .val v)
+      | (h₁, .ret v _)  => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
-      | (h₁, .exn v)    => (h₁, .exn v)
+      | (h₁, .exn v _)  => (h₁, .exn v)
       | (h₁, .hole l)   => (h₁, .hole l)
       | (h₁, .outOfFuel)=> (h₁, .outOfFuel)
       | (h₁, _)         => (h₁, .hole "call:stray-control-flow")
@@ -1344,13 +3037,17 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
     List (String × Val) → Heap × EResult
   | 0,   h, _,  _,   _,  _   => (h, .outOfFuel)
   | n+1, h, fn, cap, vs, kws =>
-      let base : Env := cap
-      let ρ : Env := bindParams fn base vs kws
-      if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
+      if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
+        (h, .exn (.str "TypeError")) else
+      -- Same class-attribute seeding as `applyFunc`; the captured bindings are the base.
+      match seedClassAttrDefaults ctx h fn cap vs kws with
+      | .inl l     => (h, .hole l)
+      | .inr base' =>
+      let ρ : Env := bindParams fn base' vs kws
       match execStmt ctx n h ρ fn.body with
-      | (h₁, .ret v)     => (h₁, .val v)
+      | (h₁, .ret v _)   => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v _)   => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
       | (h₁, _)          => (h₁, .hole "call:stray-control-flow")
@@ -1376,7 +3073,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .starred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
+        match (v.unbox h₁).iterable with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some xs =>
           match evalList ctx n h₁ ρ as with
@@ -1393,7 +3090,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .dstarred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match strKeyed v with
+        match strKeyed (v.unbox h₁) with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some ks =>
           match evalList ctx n h₁ ρ as with
@@ -1438,13 +3135,13 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .expr e =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val _)     => (h₁, .normal ρ)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .setGlobal x e =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v)     => (h₁.setField ctx.globals x v, .normal ρ)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .assign x e =>
@@ -1452,30 +3149,55 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .val v)     =>
           if (ρ.get ("<glob>" ++ x)).truthy then (h₁.setField ctx.globals x v, .normal ρ)
           else (h₁, .normal (ρ.set x v))
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .ret e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .ret v)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .val v)     => (h₁, .ret v ρ)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .raise e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .exn v)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .val v)     =>
+          -- Python classifies the raised value (`pythonRaise`). Every other dialect throws
+          -- whatever it was given: Java and C++ throw arbitrary objects, and Core has no
+          -- exception-object representation to check them against.
+          if ctx.dialect == .python then
+            match pythonRaise ctx.excClasses v with
+            | .exn w     => (h₁, .exn w ρ)
+            | .hole l    => (h₁, .hole l)
+            | .val _     => (h₁, .hole "raise:non-exception-value")
+            | .outOfFuel => (h₁, .outOfFuel)
+          else (h₁, .exn v ρ)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .setField r f v =>
       match evalExpr ctx n h ρ r with
       | (h₁, .val (.ref addr)) =>
         match evalExpr ctx n h₁ ρ v with
-        | (h₂, .val vv)    => (h₂.setField addr f vv, .normal ρ)
-        | (h₂, .exn e)     => (h₂, .exn e)
+        -- JavaScript: `o.k = v` on an object literal writes the KEY of its boxed dict
+        -- (`jsContainerField` is the matching read); on anything else it is a field
+        -- write exactly as in Python. `setPayload` bumps the version, as every payload
+        -- write must.
+        | (h₂, .val vv)    =>
+            if ctx.dialect == .javascript then
+              match h₂.payload addr with
+              | .dict kvs => (h₂.setPayload addr (.dict (Stdlib.dictSet kvs (.str f) vv)), .normal ρ)
+              | _         => (h₂.setField addr f vv, .normal ρ)
+            else
+              match ctx.fieldWriteCheck h₂ addr f with
+              | .val _ => (h₂.setField addr (ctx.fieldWriteKey h₂ addr f) vv, .normal ρ)
+              | .exn ex => (h₂, .exn ex ρ)
+              | .hole reason => (h₂, .hole reason)
+              | .outOfFuel => (h₂, .outOfFuel)
+        | (h₂, .exn e)     => (h₂, .exn e ρ)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
       | (h₁, .val fv) =>
+        if ctx.isSharedClassValue fv then (h₁, .hole "class-assignment:shared-namespace") else
         -- A function is a heap object in Python, so an attribute write to one is legal.
         -- It is only expressible here when the receiver is a NAME: boxing rebinds that
         -- name to the new object, and a function value reached any other way has nowhere
@@ -1487,17 +3209,183 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
             let (h₂, addr) := boxFn h₁ fv
             match evalExpr ctx n h₂ ρ v with
             | (h₃, .val vv)    => (h₃.setField addr f vv, .normal (Env.set ρ x (.ref addr)))
-            | (h₃, .exn e)     => (h₃, .exn e)
+            | (h₃, .exn e)     => (h₃, .exn e ρ)
             | (h₃, .hole l)    => (h₃, .hole l)
             | (h₃, .outOfFuel) => (h₃, .outOfFuel)
           else (h₁, .hole s!"setField:{f}:non-object")
         | _ => (h₁, .hole s!"setField:{f}:non-object")
-      | (h₁, .exn e) => (h₁, .exn e)
+      | (h₁, .exn e) => (h₁, .exn e ρ)
       | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
-  | n+1, h, ρ, .setIndex _ _ _ =>
-      -- Container mutation needs boxed containers, which Core does not have yet.
-      (h, .hole "setIndex:immutable-containers")
+  | n+1, h, ρ, .setIndex e i v =>
+      -- Boxed containers, step 3 (`docs/boxed-containers.md` §2). A container that lives
+      -- in the heap as an `Obj` payload can be mutated; a `Val.list`/`Val.dict` *value*
+      -- still cannot, and keeps the hole -- that case is ignorance, not a TypeError.
+      -- Inert until something constructs a payload, which is deliberate: the same staging
+      -- step 1 used, so the semantics can be written and tested before the switchover
+      -- moves any number.
+      --
+      -- Order is v, then e, then i -- CPython evaluates the RHS FIRST. Confirmed by
+      -- execution, and it is not what §2's pseudocode shows.
+      match evalExpr ctx n h ρ v with
+      | (h₁, .val vv) =>
+        match evalExpr ctx n h₁ ρ e with
+        | (h₂, .val (.ref r)) =>
+          match evalExpr ctx n h₂ ρ i with
+          | (h₃, .val iv) =>
+            match h₃.payload r with
+            | .list vs =>
+                match iv with
+                | .int k =>
+                    match Stdlib.seqIndex vs.length k with
+                    | some j => (h₃.setPayload r (.list (vs.set j vv)), .normal ρ)
+                    | none   => (h₃, .exn (.str "IndexError") ρ)
+                | _ => (h₃, .exn (.str "TypeError") ρ)
+            | .dict kvs => (h₃.setPayload r (.dict (Stdlib.dictSet kvs iv vv)), .normal ρ)
+            -- A `tuple` SUBCLASS instance: immutable, and Python says so with a value.
+            | .tuple _  => (h₃, .exn (.str "TypeError") ρ)
+            -- An ordinary instance: `c[k] = v` IS `c.__setitem__(k, v)` when the class
+            -- defines it. A class that does not stays ignorance rather than becoming a
+            -- TypeError that would be wrong for a class that inherits one.
+            | .none     =>
+                match ctx.dunderOn h₃ (.ref r) "__setitem__" with
+                | some (_, fn) =>
+                    match applyFunc ctx n h₃ fn (some (.ref r)) [iv, vv] [] with
+                    | (h₄, .val _)     => (h₄, .normal ρ)
+                    | (h₄, .exn e)     => (h₄, .exn e ρ)
+                    | (h₄, .hole l)    => (h₄, .hole l)
+                    | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+                | none => (h₃, .hole "setIndex:immutable-containers")
+          | (h₃, .exn ex)   => (h₃, .exn ex ρ)
+          | (h₃, .hole l)   => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .val _)    => (h₂, .hole "setIndex:immutable-containers")
+        | (h₂, .exn ex)   => (h₂, .exn ex ρ)
+        | (h₂, .hole l)   => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)   => (h₁, .exn ex ρ)
+      | (h₁, .hole l)   => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .delIndex e i =>
+      -- `del e[i]` (`docs/boxed-containers.md` §2), mirroring `setIndex`. Order is e then
+      -- i -- there is no RHS here, and CPython evaluates target before index.
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val (.ref r)) =>
+        match evalExpr ctx n h₁ ρ i with
+        | (h₂, .val iv) =>
+          match h₂.payload r with
+          | .list vs =>
+              match iv with
+              | .int k =>
+                  match Stdlib.seqIndex vs.length k with
+                  | some j => (h₂.setPayload r (.list (Stdlib.dropAt vs j)), .normal ρ)
+                  | none   => (h₂, .exn (.str "IndexError") ρ)
+              | _ => (h₂, .exn (.str "TypeError") ρ)
+          | .dict kvs =>
+              if Stdlib.dictHas kvs iv then
+                (h₂.setPayload r (.dict (Stdlib.dictDel kvs iv)), .normal ρ)
+              else (h₂, .exn (.str "KeyError") ρ)
+          | .tuple _ => (h₂, .exn (.str "TypeError") ρ)
+          -- An ordinary instance: `del c[k]` IS `c.__delitem__(k)` when the class defines it.
+          | .none    =>
+              match ctx.dunderOn h₂ (.ref r) "__delitem__" with
+              | some (_, fn) =>
+                  match applyFunc ctx n h₂ fn (some (.ref r)) [iv] [] with
+                  | (h₃, .val _)     => (h₃, .normal ρ)
+                  | (h₃, .exn e)     => (h₃, .exn e ρ)
+                  | (h₃, .hole l)    => (h₃, .hole l)
+                  | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+              | none => (h₂, .hole "delIndex:immutable-containers")
+        | (h₂, .exn ex)    => (h₂, .exn ex ρ)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .val _)     => (h₁, .hole "delIndex:immutable-containers")
+      | (h₁, .exn ex)    => (h₁, .exn ex ρ)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .setSlice e lo hi st v =>
+      -- `xs[lo:hi:st] = v`. Order is v, then e, then lo, hi, st: CPython evaluates the
+      -- RHS first, exactly as for `setIndex`. The RHS is any iterable -- a boxed list is
+      -- looked through, a string contributes its characters -- and a non-iterable is a
+      -- `TypeError`. A unit step replaces the range whatever the RHS length; an extended
+      -- step requires equal lengths and is otherwise a `ValueError`. Both from CPython.
+      match evalExpr ctx n h ρ v with
+      | (h₁, .val vv) =>
+        match evalExpr ctx n h₁ ρ e with
+        | (h₂, .val (.ref r)) =>
+          match evalExpr ctx n h₂ ρ lo with
+          | (h₃, .val lv) =>
+            match evalExpr ctx n h₃ ρ hi with
+            | (h₄, .val hv) =>
+              match evalExpr ctx n h₄ ρ st with
+              | (h₅, .val sv) =>
+                match h₅.payload r with
+                | .list vs =>
+                    match Stdlib.sliceBound lv, Stdlib.sliceBound hv, Stdlib.sliceBound sv with
+                    | some lo', some hi', some st' =>
+                        match (vv.unbox h₅).iterable with
+                        | none    => (h₅, .exn (.str "TypeError") ρ)
+                        | some ys =>
+                            match Stdlib.listSetSlice vs lo' hi' st' ys with
+                            | .ok vs'    => (h₅.setPayload r (.list vs'), .normal ρ)
+                            | .error ex  => (h₅, .exn (.str ex) ρ)
+                    | _, _, _ => (h₅, .exn (.str "TypeError") ρ)
+                -- A `tuple` subclass instance is immutable; a dict cannot take a slice
+                -- key ("unhashable type: 'slice'"). Both are Python `TypeError`s.
+                | .tuple _ => (h₅, .exn (.str "TypeError") ρ)
+                | .dict _  => (h₅, .exn (.str "TypeError") ρ)
+                | .none    => (h₅, .hole "setSlice:immutable-containers")
+              | (h₅, .exn ex)    => (h₅, .exn ex ρ)
+              | (h₅, .hole l)    => (h₅, .hole l)
+              | (h₅, .outOfFuel) => (h₅, .outOfFuel)
+            | (h₄, .exn ex)    => (h₄, .exn ex ρ)
+            | (h₄, .hole l)    => (h₄, .hole l)
+            | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+          | (h₃, .exn ex)    => (h₃, .exn ex ρ)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .val _)     => (h₂, .hole "setSlice:immutable-containers")
+        | (h₂, .exn ex)    => (h₂, .exn ex ρ)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex ρ)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .delSlice e lo hi st =>
+      -- `del xs[lo:hi:st]`: receiver, then bounds. Removes exactly the positions the
+      -- slice denotes, so `del xs[::2]` works too.
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val (.ref r)) =>
+        match evalExpr ctx n h₁ ρ lo with
+        | (h₂, .val lv) =>
+          match evalExpr ctx n h₂ ρ hi with
+          | (h₃, .val hv) =>
+            match evalExpr ctx n h₃ ρ st with
+            | (h₄, .val sv) =>
+              match h₄.payload r with
+              | .list vs =>
+                  match Stdlib.sliceBound lv, Stdlib.sliceBound hv, Stdlib.sliceBound sv with
+                  | some lo', some hi', some st' =>
+                      match Stdlib.sliceIndices vs.length lo' hi' st' with
+                      | none    => (h₄, .exn (.str "ValueError") ρ)
+                      | some ks => (h₄.setPayload r (.list (Stdlib.listDelIdx vs ks)), .normal ρ)
+                  | _, _, _ => (h₄, .exn (.str "TypeError") ρ)
+              | .tuple _ => (h₄, .exn (.str "TypeError") ρ)
+              | .dict _  => (h₄, .exn (.str "TypeError") ρ)
+              | .none    => (h₄, .hole "delSlice:immutable-containers")
+            | (h₄, .exn ex)    => (h₄, .exn ex ρ)
+            | (h₄, .hole l)    => (h₄, .hole l)
+            | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+          | (h₃, .exn ex)    => (h₃, .exn ex ρ)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .exn ex)    => (h₂, .exn ex ρ)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .val _)     => (h₁, .hole "delSlice:immutable-containers")
+      | (h₁, .exn ex)    => (h₁, .exn ex ρ)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` an interior-pointer VALUE --
   -- requires the pointer operand to evaluate to `Val.iref r sel` and delegates,
   -- unconditionally, to the unchanged `Heap.setField`.
@@ -1506,11 +3394,11 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .val (.iref r sel)) =>
         match evalExpr ctx n h₁ ρ v with
         | (h₂, .val vv)    => (h₂.setField r sel.key vv, .normal ρ)
-        | (h₂, .exn e)     => (h₂, .exn e)
+        | (h₂, .exn e)     => (h₂, .exn e ρ)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
       | (h₁, .val _)      => (h₁, .hole "setDerefIref:non-iref")
-      | (h₁, .exn e)      => (h₁, .exn e)
+      | (h₁, .exn e)      => (h₁, .exn e ρ)
       | (h₁, .hole l)     => (h₁, .hole l)
       | (h₁, .outOfFuel)  => (h₁, .outOfFuel)
   | n+1, h, ρ, .seq a b =>
@@ -1519,38 +3407,48 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, r)          => (h₁, r)
   | n+1, h, ρ, .ifte c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v)     => if v.truthy then execStmt ctx n h₁ ρ t
-                            else execStmt ctx n h₁ ρ e
-      | (h₁, .exn v)     => (h₁, .exn v)
-      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .val v) =>
+          match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) => if test.truthy then execStmt ctx n ht ρ t else execStmt ctx n ht ρ e
+          | (ht, .exn ex) => (ht, .exn ex ρ)
+          | (ht, .hole l) => (ht, .hole l)
+          | (ht, .outOfFuel) => (ht, .outOfFuel)
+      | (h₁, .exn v) => (h₁, .exn v ρ)
+      | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .tryFinally body fin =>
       match execStmt ctx n h ρ body with
+      -- These are interpreter failures, not language exits. Running a finalizer
+      -- on a partial execution could turn unsupported or unfinished work into a proof.
+      | (h₁, .hole l) => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
       | (h₁, .normal ρ') => execStmt ctx n h₁ ρ' fin
       | (h₁, r) =>
-          -- The finalizer runs on every path. If it exits abnormally it *discards* the
+          -- The finalizer runs on every language exit. An abnormal exit discards the
           -- body's pending outcome: `try: return 1 finally: return 2` returns 2.
-          let ρ' := match r with
-                    | .normal e | .brk e | .cont e => e
-                    | _                            => ρ
-          match execStmt ctx n h₁ ρ' fin with
-          | (h₂, .normal _) => (h₂, r)
+          match execStmt ctx n h₁ (r.env ρ) fin with
+          | (h₂, .normal ρ') => (h₂, r.withEnv ρ')
           | (h₂, r')        => (h₂, r')
   | n+1, h, ρ, .tryCatch body x handler =>
       match execStmt ctx n h ρ body with
-      | (h₁, .exn v) => execStmt ctx n h₁ (ρ.set x v) handler
+      | (h₁, .exn v ρ') => execStmt ctx n h₁ (ρ'.set x v) handler
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
       | (h₁, .val v) =>
-          if v.truthy then
-            match execStmt ctx n h₁ ρ body with
-            | (h₂, .normal ρ') => execStmt ctx n h₂ ρ' (.loop c body)
-            | (h₂, .cont ρ')   => execStmt ctx n h₂ ρ' (.loop c body)
-            | (h₂, .brk ρ')    => (h₂, .normal ρ')
-            | (h₂, r)          => (h₂, r)
-          else (h₁, .normal ρ)
-      | (h₁, .exn v)     => (h₁, .exn v)
+          match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) =>
+              if test.truthy then
+                match execStmt ctx n ht ρ body with
+                | (h₂, .normal ρ') => execStmt ctx n h₂ ρ' (.loop c body)
+                | (h₂, .cont ρ')   => execStmt ctx n h₂ ρ' (.loop c body)
+                | (h₂, .brk ρ')    => (h₂, .normal ρ')
+                | (h₂, r)          => (h₂, r)
+              else (ht, .normal ρ)
+          | (ht, .exn ex) => (ht, .exn ex ρ)
+          | (ht, .hole l) => (ht, .hole l)
+          | (ht, .outOfFuel) => (ht, .outOfFuel)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `007-reduce-remaining-holes-2` US4: catches a `.brk` from its inner statement and
@@ -1565,12 +3463,105 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .forIn x e body =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
-        | some vs => execFor ctx n h₁ ρ x vs body
-        | none    => (h₁, .hole "forIn:non-iterable")
-      | (h₁, .exn v)     => (h₁, .exn v)
+        -- A boxed container iterates LIVE; everything else keeps the snapshot, which is
+        -- exactly right for a `Val.tuple` or `Val.str` and is all Core can do for an
+        -- unboxed `Val.list` anyway.
+        match v with
+        | .ref r =>
+            match h₁.payload r with
+            | .none =>
+                -- An ordinary instance. `iter()` first (`__iter__`, then the sequence
+                -- protocol), then drive what it returned -- see "The iteration protocol,
+                -- driven from `for`" above for the sections this follows.
+                match ctx.dunderOn h₁ v "__iter__" with
+                | some (ri, fn) =>
+                    match applyFunc ctx n h₁ fn (some (.ref ri)) [] [] with
+                    | (h₂, .val it) =>
+                        match ctx.dunderOn h₂ it "__next__" with
+                        | some (rit, _) =>
+                            let binding := iteratorBinding rit
+                            execStmt ctx n h₂ (ρ.set binding it) (nextDriver x body (.name binding))
+                        | none =>
+                            if Iteration.unknownResultProtocol h₂ it then
+                              (h₂, .hole "iterator:result-protocol")
+                            else (h₂, .exn (.str "TypeError") ρ)
+                    | (h₂, .exn e)     => (h₂, .exn e ρ)
+                    | (h₂, .hole l)    => (h₂, .hole l)
+                    | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+                | none =>
+                    match ctx.dunderOn h₁ v "__getitem__" with
+                    | some _ =>
+                        let (h₂, iterator) := h₁.alloc (Iteration.sequenceObject v)
+                        let binding := iteratorBinding iterator
+                        execStmt ctx n h₂ (ρ.set binding (.ref iterator)) (nextDriver x body (.name binding))
+                    | none   =>
+                        match v.iterable with
+                        | some vs => execFor ctx n h₁ ρ x vs body
+                        | none    => (h₁, .hole "forIn:non-iterable")
+            | .dict kvs =>
+                if ctx.dialect == .python then
+                  let (h₂, iterator) := h₁.alloc (Iteration.dictionaryObject (.ref r) kvs)
+                  let binding := iteratorBinding iterator
+                  execStmt ctx n h₂ (ρ.set binding (.ref iterator)) (nextDriver x body (.name binding))
+                else execForRef ctx n h₁ ρ x r 0 ((h₁.get r).elim 0 (·.version)) body
+            | .list _ | .tuple _ =>
+                execForRef ctx n h₁ ρ x r 0 ((h₁.get r).elim 0 (·.version)) body
+        | _ =>
+            match v.iterable with
+            | some vs => execFor ctx n h₁ ρ x vs body
+            | none    => (h₁, .hole "forIn:non-iterable")
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+
+/-- Live iteration over a **boxed** container (`docs/boxed-containers.md` §4).
+
+Snapshot iteration is wrong the moment a container can be mutated mid-loop, and §4 is
+explicit that it must not survive boxing: landing boxing beside a snapshot loop would
+introduce a silent wrong answer in the same change that removes one. So this re-reads the
+payload at every step instead of copying it once.
+
+A list loop holds the object and an index, so appending during the loop extends it
+and deleting shortens it. A tuple payload is immutable, so re-reading it is the same
+as a snapshot. Python dictionary loops use `Iteration.dictionaryObject` and
+`nextDriver` instead: replacing a value must not invalidate an iterator. The legacy
+version-based dictionary branch below serves the other dialects only. -/
+def execForRef (ctx : Ctx) :
+    Nat → Heap → Env → String → Ref → Nat → Nat → Stmt → Heap × Ctl
+  | 0,   h, _, _, _, _, _, _ => (h, .outOfFuel)
+  | n+1, h, ρ, x, r, i, ver, body =>
+      match h.payload r with
+      | .list vs =>
+          match vs[i]? with
+          | none   => (h, .normal ρ)
+          | some v =>
+            match execStmt ctx n h (ρ.set x v) body with
+            | (h₁, .normal ρ') => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .cont ρ')   => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .brk ρ')    => (h₁, .normal ρ')
+            | (h₁, res)        => (h₁, res)
+      | .tuple vs =>
+          match vs[i]? with
+          | none   => (h, .normal ρ)
+          | some v =>
+            match execStmt ctx n h (ρ.set x v) body with
+            | (h₁, .normal ρ') => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .cont ρ')   => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .brk ρ')    => (h₁, .normal ρ')
+            | (h₁, res)        => (h₁, res)
+      | .dict kvs =>
+          if ((h.get r).elim 0 (·.version)) != ver then
+            (h, .exn (.str "RuntimeError") ρ)
+          else
+            match kvs[i]? with
+            | none        => (h, .normal ρ)
+            | some (k, _) =>
+              match execStmt ctx n h (ρ.set x k) body with
+              | (h₁, .normal ρ') => execForRef ctx n h₁ ρ' x r (i+1) ver body
+              | (h₁, .cont ρ')   => execForRef ctx n h₁ ρ' x r (i+1) ver body
+              | (h₁, .brk ρ')    => (h₁, .normal ρ')
+              | (h₁, res)        => (h₁, res)
+      | .none => (h, .hole "forIn:non-iterable")
 
 /-- Run a loop body once per element of an already-computed sequence. -/
 def execFor (ctx : Ctx) : Nat → Heap → Env → String → List Val → Stmt → Heap × Ctl
@@ -1609,7 +3600,8 @@ for a self-contained function, and keeping it stable keeps the refinement layer'
 theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases, properties := p.properties,
+                     excClasses := p.excClasses, classDecls := p.classDecls }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args []).2
@@ -1623,7 +3615,8 @@ globals frame instead of the empty heap. Fresh objects must be allocated at indi
 def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases, properties := p.properties,
+                     excClasses := p.excClasses, classDecls := p.classDecls }
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
@@ -1645,7 +3638,8 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     (args : List Val) : EResult :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases, properties := p.properties,
+                     excClasses := p.excClasses, classDecls := p.classDecls }
   let rec runInits : Nat → Heap → List Func → Heap × Option String
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)
@@ -1738,9 +3732,10 @@ example : runFunc boxProg 200 "ns.narrow" [] = .val (.int 88) := by rfl
 example : runFunc boxProg 200 "ns.pick" [] = .val (.int 8) := by rfl
 
 /-! **The known hazard, stated rather than hidden.** `Expr.field` on an object that has
-no such field returns `unit`, not a hole — see the `.field` case above. So a C++ class
-whose constructor the exporter could not find translates to an object every one of whose
-fields reads `unit`, and nothing downstream will say so.
+no such field returns `unit` under `.cLike`, not a hole — see the `.field` case above
+(under `.python` the same miss raises `AttributeError`, docs/languages.md §16.A). So a C++
+class whose constructor the exporter could not find translates to an object every one of
+whose fields reads `unit`, and nothing downstream will say so.
 
 That is why `emit` renames C++ constructors to `__init__` instead of leaving `Expr.alloc`
 to allocate an empty object, and why `alloc:builtin-base:*` refuses construction it cannot
@@ -1971,8 +3966,10 @@ private def pyDesig : Program := { cBits with dialect := .python }
 /-- info: Autoform.Core.EResult.hole "field:cra_flags:absent-from-aggregate" -/
 #guard_msgs in #eval runFunc cBits 200 "ns.desigMissing" []
 -- The dialect split. `{'cra_priority': 100}.cra_priority` is an `AttributeError` in
--- Python, so under `.python` the same term is the hole it has always been.
-/-- info: Autoform.Core.EResult.hole "field:cra_priority:non-object" -/
+-- Python, so under `.python` the same term is the hole it has always been. The label
+-- sharpened when dicts became objects: the receiver IS an object now, just one whose
+-- payload is a container and which therefore has no `__dict__` to miss into.
+/-- info: Autoform.Core.EResult.hole "field:cra_priority:on-container" -/
 #guard_msgs in #eval runFunc pyDesig 200 "ns.desig" []
 -- The `for` with `continue`: `s = 27`, `i = 10` — cc: `forcont s=27 i=10`.
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 2710) -/
@@ -2074,13 +4071,93 @@ holds the function value. -/
 #guard_msgs in #eval runMain modProg 200 [modInit] "main.ref" []
 
 /-! The honesty check, and the reason a module object carries a marker class at all. An
-ordinary object answers `unit` for a field it does not have (`ns.unset`, above); a module
-object names the miss. Module-level *data* is absent from a module object on purpose —
+ordinary `.cLike` object answers `unit` for a field it does not have (`ns.unset`, above)
+and a Python one raises `AttributeError` (`attrMissProg`, below); a module object names
+the miss as a hole in every dialect. Module-level *data* is absent from a module object on purpose —
 Core has one globals frame for the whole program, so a module-level constant is not
 module-scoped and its value would have to be captured before the module body computed it
 — and this is what stops that decision from becoming a silent `unit`. -/
 /-- info: Autoform.Core.EResult.hole "module-attr:VERSION" -/
 #guard_msgs in #eval runMain modProg 200 [modInit] "main.attr" []
+
+/-! ## Module-level variables are module attributes
+
+Language Reference §3.2.9 (Modules): a module's namespace is a dictionary and `m.x` is
+`m.__dict__["x"]`; §5.4.1 (Loaders): the module body executes in that dictionary; §7.11
+(The `import` statement): `from m import x` stores "a reference to that value" in the
+importing namespace. So the exporter lowers a module-level binding `X = e` to the
+globals-frame write it always was PLUS a write of the module object's field `X`, and
+`from a import X` to a read of that field at import time -- the value `a`'s body bound,
+copied once, as CPython binds it. `a.X` stays a `.field` read at use time.
+
+    # a.py
+    LIMIT = 3
+    # b.py
+    from a import LIMIT
+    from a import LIMIT as L
+    import a
+    def f(): return LIMIT + 1
+    def viaAttr(): return a.LIMIT
+    def alias(): return L
+    def missing(): return a.NOPE
+
+CPython: `f()` is `4`, `viaAttr()` is `3`, `alias()` is `3`, `missing()` raises
+`AttributeError`. Core answers the first three exactly and refuses the fourth with the
+module object's named miss. The initializers run in import-dependency order (`a` before
+`b`, as §5.4 loads `a` when `b` first imports it); the last check shows what a WRONG
+order gives -- a named hole, never a value. -/
+def modVarProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "b.py:<module>.f", params := []
+      , body := .ret (.binop "+" (.name "LIMIT") (.lit (.int 1))) }
+    , { name := "b.py:<module>.viaAttr", params := []
+      , body := .ret (.field (.name "<module>a.py") "LIMIT") }
+    , { name := "b.py:<module>.alias", params := []
+      , body := .ret (.name "L") }
+    , { name := "b.py:<module>.missing", params := []
+      , body := .ret (.field (.name "<module>a.py") "NOPE") } ] }
+
+/-- `<module-objects>`: one object per module, allocated before any body runs. -/
+def modVarObjects : Func :=
+  { name := "<module-objects>:<module>", params := []
+  , body :=
+      .seq (.setGlobal "<module>a.py" (.alloc "<module>a.py" []))
+           (.setGlobal "<module>b.py" (.alloc "<module>b.py" [])) }
+
+/-- `a.py`'s body: `LIMIT = 3`, lowered by `bindName` -- the globals-frame write and the
+module object's field, in that order, so the field holds what the body computed. -/
+def modVarAInit : Func :=
+  { name := "a.py:<module>", params := []
+  , body :=
+      .seq (.setGlobal "LIMIT" (.lit (.int 3)))
+           (.setField (.name "<module>a.py") "LIMIT" (.name "LIMIT")) }
+
+/-- `b.py`'s body: the two `from a import` forms, each a field read at import time. -/
+def modVarBInit : Func :=
+  { name := "b.py:<module>", params := []
+  , body :=
+      .seq (.setGlobal "LIMIT" (.field (.name "<module>a.py") "LIMIT"))
+           (.setGlobal "L" (.field (.name "<module>a.py") "LIMIT")) }
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 4) -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.f" []
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 3) -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.viaAttr" []
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 3) -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.alias" []
+
+/-! `a.NOPE`: never bound, so the module object names the miss (CPython: `AttributeError`). -/
+/-- info: Autoform.Core.EResult.hole "module-attr:NOPE" -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.missing" []
+
+/-! The order matters, and getting it wrong is loud: with `b`'s body before `a`'s, the
+import-time read finds no field yet and the initializer stops at the named hole, exactly
+where CPython's `from a import LIMIT` would have been the statement that runs `a` first. -/
+/-- info: Autoform.Core.EResult.hole "module-attr:LIMIT" -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarBInit, modVarAInit] "b.py:<module>.f" []
 
 /-! ## f-strings
 
@@ -2102,10 +4179,1319 @@ def fstrProg : Program :=
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.str "v3!") -/
 #guard_msgs in #eval runFunc fstrProg 200 "greet" [.int 3]
 
-/-! The residue, named for what actually blocks it. CPython answers `'vx!'`; Core answers
-a hole at `str` rather than a wrong string, and the label points at `Stdlib`'s `str`, not
-at the f-string. -/
-/-- info: Autoform.Core.EResult.hole "call:str" -/
+/-! The former residue. `str` used to decline on a `.str` (it could not tell a string
+from an exception value), so this was the hole `call:str`; `Stdlib.strBuiltin` prints a
+string as itself now, and Core answers exactly what CPython answers: `'vx!'`. -/
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.str "vx!") -/
 #guard_msgs in #eval runFunc fstrProg 200 "greet" [.str "x"]
+
+/-- `Lit.toVal` is exactly what `evalExpr` produces for a literal.
+
+`Syntax.lean` claims this where `Lit.toVal` is defined, and the claim is load-bearing:
+`bindParams` uses `Lit.toVal` to bind a literal default without going through `evalExpr`,
+so if the two ever disagreed, a default would bind a different value than the same
+literal written out at the call site. That is a silent wrong answer, not a hole, which is
+the failure class this project spends its oracles on. Stated here rather than left to
+inspection so that a new `Lit` constructor cannot be added to one and not the other. -/
+@[simp] theorem Lit.toVal_agrees_with_evalExpr
+    (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (l : Lit) :
+    evalExpr ctx (n + 1) h ρ (.lit l) = (h, .val l.toVal) := by
+  cases l <;> rfl
+
+/-! ## A closure cell, from primitives Core already has
+
+`cartographer/export_ast.sc` holes every `nonlocal` write as `scope:nonlocal-write`, and
+its comment gives the reason: `Expr.closure` captures the environment **by value**, so a
+write can never be observed by the frame that owns the variable, and emitting an `assign`
+would produce a program that runs and quietly computes the wrong answer.
+
+That reason is correct about `assign` and wrong about Core. Capturing a `Val.ref` by value
+still shares the object it points at, which is exactly how a compiler implements a closure
+cell: `boxNew` allocates it, `field`/`setField` read and write through it. The program
+below is the `hits += 1` shape from `cachetools/_cached.py` -- two calls through a closure,
+and the owning frame sees both writes.
+
+So `scope:nonlocal-write` is **not** blocked on the trusted semantics. It is blocked on the
+exporter, which translates one method at a time, while converting a variable to a cell is a
+whole-scope rewrite: box it where it is defined, then rewrite every read and write of it in
+that scope and in every nested one. Missing a single read site yields a stale value with no
+hole marking it -- which is why this is still a hole and not a translation. -/
+private def cellProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "bump", params := []
+      , body := .setField (.name "cell") "v"
+                  (.binop "+" (.field (.name "cell") "v") (.lit (.int 1))) }
+    , { name := "outer", params := []
+      , body :=
+          .seq (.assign "cell" (.boxNew (.lit (.int 0))))
+          (.seq (.assign "f" (.closure "bump"))
+          (.seq (.expr (.call "f" []))
+          (.seq (.expr (.call "f" []))
+                (.ret (.field (.name "cell") "v"))))) } ] }
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 2) -/
+#guard_msgs in #eval runFunc cellProg 200 "outer" []
+
+/-! ## Value-callees: `f(x)(y)`, `d["k"](3)`, and a non-callable
+
+`Expr.callValue` applies whatever its callee EVALUATES to. Every expectation is CPython's:
+`mk(10)(2)` runs the closure `mk` returned; a function fetched out of a dict is called
+with the dict's element as callee; a CLASS value (`from m import C; C(2)`, or a class
+held in a variable) constructs an instance through the `alloc` rule; calling `5` is a
+`TypeError` in CPython and a named hole here, because Core does not raise on its own
+behalf for a shape it cannot dispatch. -/
+private def valueCallProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "inner", params := ["y"]
+      , body := .ret (.binop "+" (.name "y") (.name "k")) }
+    , { name := "mk", params := ["k"]
+      , body := .ret (.closure "inner") }
+    , { name := "twice", params := ["x"]
+      , body := .ret (.binop "*" (.name "x") (.lit (.int 2))) }
+    -- `mk(10)(2)`: the callee is itself a call.
+    , { name := "chained", params := []
+      , body := .ret (.callValue (.call "mk" [.lit (.int 10)]) [.lit (.int 2)]) }
+    -- `d = {"k": twice}; d["k"](3)`: the callee is an index into a dict of functions.
+    , { name := "fromDict", params := []
+      , body :=
+          .seq (.assign "d" (.dictE [(.lit (.str "k"), .fnref "twice")]))
+               (.ret (.callValue (.index (.name "d") (.lit (.str "k"))) [.lit (.int 3)])) }
+    -- `5(1)`: not callable.
+    , { name := "notCallable", params := []
+      , body := .ret (.callValue (.lit (.int 5)) [.lit (.int 1)]) }
+    -- `class Pt: def __init__(self, v): self.v = v` in module `m.py`, then
+    -- `P = Pt; P(4).v` -- or `from m import Pt; Pt(4).v` -- the class VALUE is the callee.
+    , { name := "m.py:<module>.Pt.__init__", params := ["v"]
+      , body := .setField (.name "self") "v" (.name "v") }
+    , { name := "viaClassValue", params := []
+      , body :=
+          .seq (.assign "P" (.fnref "m.py:<module>.Pt<meta>"))
+               (.ret (.field (.callValue (.name "P") [.lit (.int 4)]) "v")) }
+    -- Keyword arguments reach the constructor through the same re-dispatch.
+    , { name := "viaClassValueKw", params := []
+      , body := .ret (.field (.callValue (.fnref "m.py:<module>.Pt<meta>")
+                                [.kwargE "v" (.lit (.int 7))]) "v") }
+    -- `o = Box(); o.cb = twice; o.cb(21)`: a callable held in an INSTANCE FIELD is called
+    -- through the attribute with no receiver, as CPython does (click's
+    -- `FuncParamType.convert`, docs/languages.md §10.9).
+    , { name := "fieldCall", params := []
+      , body :=
+          .seq (.assign "o" (.alloc "Box" []))
+          (.seq (.setField (.name "o") "cb" (.fnref "twice"))
+                (.ret (.mcall (.name "o") "cb" [.lit (.int 21)]))) } ] }
+
+-- mk(10)(2)  -- CPython 12
+#guard match runFunc valueCallProg 200 "chained" [] with | .val (.int 12) => true | _ => false
+-- d["k"](3)  -- CPython 6
+#guard match runFunc valueCallProg 200 "fromDict" [] with | .val (.int 6) => true | _ => false
+-- P = Pt; P(4).v  -- CPython 4
+#guard match runFunc valueCallProg 200 "viaClassValue" [] with | .val (.int 4) => true | _ => false
+-- Pt(v=7).v  -- CPython 7
+#guard match runFunc valueCallProg 200 "viaClassValueKw" [] with | .val (.int 7) => true | _ => false
+-- 5(1)       -- CPython TypeError; Core: a named hole, never a value
+#guard match runFunc valueCallProg 200 "notCallable" [] with
+       | .hole "call:value:not-callable" => true | _ => false
+-- o.cb = twice; o.cb(21)  -- CPython 42: the field's function, no receiver passed
+#guard match runFunc valueCallProg 200 "fieldCall" [] with | .val (.int 42) => true | _ => false
+
+/-! ## Corpus exception classes and `except ... as e`
+
+`class MyErr(Exception)` in the program is an exception class -- the library reference
+("Built-in Exceptions") has user code "derive new exceptions from the `Exception` class or
+one of its subclasses" -- so `raise MyErr("x")` raises the represented name `MyErr`, and a
+handler matches it by "the class or a non-virtual base class of the exception object, or
+a tuple that contains such a class" (reference §8.4.1). The exporter lowers `except E as e:`
+to a binding of `e` to the pending value -- the class name -- and each handler's accepted
+set is its types closed over the corpus hierarchy. These `#guard`s build exactly the shape
+the exporter emits (`tryCatch` + `ifte (inOp pending accepted)`), against CPython. -/
+private def excClassProg : Program :=
+  { dialect := .python, excClasses := ["MyErr"]
+  , funcs :=
+    [ -- `raise MyErr("x")`: the argument is evaluated for its effects, the NAME is raised
+      { name := "boom", params := []
+      , body := .seq (.expr (.lit (.str "x"))) (.raise (.lit (.str "MyErr"))) }
+      -- `try: boom()  except MyErr: return 1`
+    , { name := "catchOwn", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "MyErr")]))
+                 (.ret (.lit (.int 1))) (.raise (.name "$exc"))) }
+      -- `except Exception: return 2` -- the accepted set is `Exception`'s descendants,
+      -- which the exporter closes over the corpus, so it contains `MyErr`
+    , { name := "catchBase", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc")
+                    (.tupleE [.lit (.str "Exception"), .lit (.str "KeyError"), .lit (.str "MyErr")]))
+                 (.ret (.lit (.int 2))) (.raise (.name "$exc"))) }
+      -- `except KeyError: return 3` -- no match, `MyErr` propagates
+    , { name := "miss", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "KeyError")]))
+                 (.ret (.lit (.int 3))) (.raise (.name "$exc"))) }
+      -- `except (KeyError, MyErr) as e: return e` -- `e` is bound to the pending value
+    , { name := "bound", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "KeyError"), .lit (.str "MyErr")]))
+                 (.seq (.assign "e" (.name "$exc")) (.ret (.name "e"))) (.raise (.name "$exc"))) }
+      -- `except MyErr as e: raise e`
+    , { name := "reraise", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "MyErr")]))
+                 (.seq (.assign "e" (.name "$exc")) (.raise (.name "e"))) (.raise (.name "$exc"))) }
+      -- `raise Widget` for a name that is NOT an exception class: CPython's
+      -- `TypeError: exceptions must derive from BaseException`
+    , { name := "notExc", params := []
+      , body := .raise (.lit (.str "Widget")) } ] }
+
+#guard match runFunc excClassProg 200 "catchOwn" [] with | .val (.int 1) => true | _ => false
+#guard match runFunc excClassProg 200 "catchBase" [] with | .val (.int 2) => true | _ => false
+#guard match runFunc excClassProg 200 "miss" [] with | .exn (.str "MyErr") => true | _ => false
+#guard match runFunc excClassProg 200 "bound" [] with | .val (.str "MyErr") => true | _ => false
+#guard match runFunc excClassProg 200 "reraise" [] with | .exn (.str "MyErr") => true | _ => false
+#guard match runFunc excClassProg 200 "notExc" [] with | .exn (.str "TypeError") => true | _ => false
+
+/-! ## Slice D: sets as unit-valued dicts, dict-display deduplication, n-ary `and`/`or`,
+`assert` (docs/languages.md §16.D)
+
+Every expectation is CPython's; the reference sections are cited next to each rule. -/
+private def sliceDProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ -- `s = {1, 2, 1}; len(s)`  -- §6.2.7: distinct elements; CPython 2
+      { name := "setLen", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit), (.lit (.int 2), .lit .unit),
+                                             (.lit (.int 1), .lit .unit)]))
+                     (.ret (.call "len" [.name "s"])) }
+      -- `2 in {1, 2}` / `3 in {1, 2}`  -- CPython True / False
+    , { name := "setIn", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit), (.lit (.int 2), .lit .unit)]))
+                     (.ret (.tupleE [.inOp false (.lit (.int 2)) (.name "s"),
+                                     .inOp false (.lit (.int 3)) (.name "s")])) }
+      -- `s = {1}; s.add(2); s.add(1); s.discard(9); len(s)`  -- CPython 2
+    , { name := "setAdd", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit)]))
+               (.seq (.expr (.mcall (.name "s") "add" [.lit (.int 2)]))
+               (.seq (.expr (.mcall (.name "s") "add" [.lit (.int 1)]))
+               (.seq (.expr (.mcall (.name "s") "discard" [.lit (.int 9)]))
+                     (.ret (.call "len" [.name "s"]))))) }
+      -- `{1}.remove(9)`  -- CPython KeyError
+    , { name := "setRemoveMissing", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit)]))
+                     (.expr (.mcall (.name "s") "remove" [.lit (.int 9)])) }
+      -- `d = {1: "a", 2: "b", 1: "c"}; (len(d), d[1])`  -- §6.2.8: CPython (2, "c")
+    , { name := "dictDup", params := []
+      , body := .seq (.assign "d" (.dictE [(.lit (.int 1), .lit (.str "a")), (.lit (.int 2), .lit (.str "b")),
+                                             (.lit (.int 1), .lit (.str "c"))]))
+                     (.ret (.tupleE [.call "len" [.name "d"], .index (.name "d") (.lit (.int 1))])) }
+      -- `1 and 2 and 3`, `1 and 0 and 3`, `0 or "" or "x"`  -- §6.11: the last evaluated
+      -- operand, left-associated as the grammar (`and_test: and_test "and" not_test`) is
+    , { name := "andChain", params := []
+      , body := .ret (.tupleE
+          [ .binop "&&" (.binop "&&" (.lit (.int 1)) (.lit (.int 2))) (.lit (.int 3))
+          , .binop "&&" (.binop "&&" (.lit (.int 1)) (.lit (.int 0))) (.lit (.int 3))
+          , .binop "||" (.binop "||" (.lit (.int 0)) (.lit (.str ""))) (.lit (.str "x")) ]) }
+      -- `assert False, "boom"` as the exporter lowers it (§7.3: `if not e: raise
+      -- AssertionError(msg)`); `assert True` runs on
+    , { name := "assertFails", params := []
+      , body := .ifte (.lit (.bool false)) .skip
+                  (.raise (.unop "py:exception:AssertionError" (.tupleE [.lit (.str "boom")]))) }
+    , { name := "assertPasses", params := []
+      , body := .seq (.ifte (.lit (.bool true)) .skip
+                        (.raise (.unop "py:exception:AssertionError" (.tupleE []))))
+                     (.ret (.lit (.int 7))) } ] }
+
+#guard match runFunc sliceDProg 200 "setLen" [] with | .val (.int 2) => true | _ => false
+#guard match runFunc sliceDProg 200 "setIn" [] with
+       | .val (.tuple [.bool true, .bool false]) => true | _ => false
+#guard match runFunc sliceDProg 200 "setAdd" [] with | .val (.int 2) => true | _ => false
+#guard match runFunc sliceDProg 200 "setRemoveMissing" [] with
+       | .exn (.str "KeyError") => true | _ => false
+#guard match runFunc sliceDProg 200 "dictDup" [] with
+       | .val (.tuple [.int 2, .str "c"]) => true | _ => false
+#guard match runFunc sliceDProg 200 "andChain" [] with
+       | .val (.tuple [.int 3, .int 0, .str "x"]) => true | _ => false
+#guard match runFunc sliceDProg 200 "assertFails" [] with
+       | .exn (.str "AssertionError") => true | _ => false
+#guard match runFunc sliceDProg 200 "assertPasses" [] with | .val (.int 7) => true | _ => false
+
+/-! ## Boxed containers, step 3: `setIndex` on a heap payload
+
+`docs/boxed-containers.md` §2. Nothing constructs a payload yet, so these are the only
+programs that exercise the path — which is why it is landed this way: the semantics can be
+written and checked before the switchover moves any measured number, exactly as step 1 was
+landed inert.
+
+Every expectation below was taken from CPython, not from the design document — whose
+pseudocode also has the evaluation order wrong. It shows the target evaluated first;
+CPython evaluates the RHS first, and `execStmt` follows CPython. -/
+private def setIdxCtx : Ctx := { dialect := .python, table := [] }
+/-- The same probes under a non-Python dialect, where a container literal is a VALUE and
+must stay one: a C aggregate has no identity to share. -/
+private def setIdxCtxC : Ctx := { dialect := .cLike, table := [] }
+private def setIdxEnv : Env :=
+  [("xs", .ref 0), ("d", .ref 1), ("t", .ref 2), ("o", .ref 3)]
+private def setIdxHeap : Heap :=
+  [ { cls := "list",  fields := [], payload := .list [.int 1, .int 2] }
+  , { cls := "dict",  fields := [], payload := .dict [(.str "a", .int 1)] }
+  , { cls := "T",     fields := [], payload := .tuple [.int 7] }
+  , { cls := "Plain", fields := [] } ]
+private def setIdx (tgt idx val : Expr) : Heap × Ctl :=
+  execStmt setIdxCtx 50 setIdxHeap setIdxEnv (.setIndex tgt idx val)
+
+-- `xs[0] = 9` on a list payload.  CPython: [9, 2]
+#guard match (setIdx (.name "xs") (.lit (.int 0)) (.lit (.int 9))).1[0]!.payload with
+       | .list [.int 9, .int 2] => true | _ => false
+
+-- `d["b"] = 2`.  CPython: {'a': 1, 'b': 2} -- insertion order is observable.
+#guard match (setIdx (.name "d") (.lit (.str "b")) (.lit (.int 2))).1[1]!.payload with
+       | .dict [(.str "a", .int 1), (.str "b", .int 2)] => true | _ => false
+
+-- Mutation bumps the version, so an iterator can tell that it happened.
+#guard (setIdx (.name "xs") (.lit (.int 0)) (.lit (.int 9))).1[0]!.version == 1
+
+-- Out of range is `IndexError` -- a value, not a hole.  CPython agrees.
+#guard match (setIdx (.name "xs") (.lit (.int 5)) (.lit (.int 9))).2 with
+       | .exn (.str "IndexError") _ => true | _ => false
+
+-- A `tuple` subclass instance is immutable, and Python says so with a `TypeError`.
+#guard match (setIdx (.name "t") (.lit (.int 0)) (.lit (.int 9))).2 with
+       | .exn (.str "TypeError") _ => true | _ => false
+
+-- An ordinary instance still holes. `__setitem__` dispatch is not part of this step, and
+-- a `TypeError` here would be wrong for every class that defines one.
+#guard match (setIdx (.name "o") (.lit (.int 0)) (.lit (.int 9))).2 with
+       | .hole "setIndex:immutable-containers" => true | _ => false
+
+private def delIdx (tgt idx : Expr) : Heap × Ctl :=
+  execStmt setIdxCtx 50 setIdxHeap setIdxEnv (.delIndex tgt idx)
+
+-- `del xs[0]`.  CPython: [2]
+#guard match (delIdx (.name "xs") (.lit (.int 0))).1[0]!.payload with
+       | .list [.int 2] => true | _ => false
+
+-- `del d["a"]`.  CPython: {}
+#guard match (delIdx (.name "d") (.lit (.str "a"))).1[1]!.payload with
+       | .dict [] => true | _ => false
+
+-- A key that is not there is `KeyError`, not a silent no-op.  CPython agrees.
+#guard match (delIdx (.name "d") (.lit (.str "zz"))).2 with
+       | .exn (.str "KeyError") _ => true | _ => false
+
+-- Out of range on a list is `IndexError`.  CPython agrees.
+#guard match (delIdx (.name "xs") (.lit (.int 5))).2 with
+       | .exn (.str "IndexError") _ => true | _ => false
+
+-- A `tuple` payload is immutable.
+#guard match (delIdx (.name "t") (.lit (.int 0))).2 with
+       | .exn (.str "TypeError") _ => true | _ => false
+
+-- A boxed literal deletes; a C aggregate value still holes.
+#guard match (delIdx (.listE [.lit (.int 1)]) (.lit (.int 0))).2 with
+       | .normal _ => true | _ => false
+#guard match (execStmt setIdxCtxC 50 setIdxHeap setIdxEnv
+                (.delIndex (.listE [.lit (.int 1)]) (.lit (.int 0)))).2 with
+       | .hole "delIndex:immutable-containers" => true | _ => false
+
+private def mcallOn (recv : Expr) (m : String) (args : List Expr) : Heap × EResult :=
+  evalExpr setIdxCtx 60 setIdxHeap setIdxEnv (.mcall recv m args)
+
+-- `xs.append(3)` mutates the payload in place, and aliases see it.  CPython [1,2,3]
+#guard match (mcallOn (.name "xs") "append" [.lit (.int 3)]).1[0]!.payload with
+       | .list [.int 1, .int 2, .int 3] => true | _ => false
+
+-- ... and bumps the version, so an iterator can tell.
+#guard (mcallOn (.name "xs") "append" [.lit (.int 3)]).1[0]!.version == 1
+
+-- `xs.pop()` returns the element AND shortens the receiver.  CPython 2, [1]
+#guard match (mcallOn (.name "xs") "pop" []).2 with
+       | .val (.int 2) => true | _ => false
+#guard match (mcallOn (.name "xs") "pop" []).1[0]!.payload with
+       | .list [.int 1] => true | _ => false
+
+-- A pure builtin leaves the payload alone.
+#guard match (mcallOn (.name "d") "get" [.lit (.str "a")]).2 with
+       | .val (.int 1) => true | _ => false
+#guard (mcallOn (.name "d") "get" [.lit (.str "a")]).1[1]!.version == 0
+
+-- An ordinary Python instance with no such attribute: without class metadata the
+-- hierarchy is unknown, so the miss is a named gap before argument evaluation (with
+-- metadata it is `AttributeError`; see `attrMissMetaProg`).
+#guard match (mcallOn (.name "o") "append" [.lit (.int 3)]).2 with
+       | .hole "field:append:unresolved-inheritance" => true | _ => false
+
+-- §4, live iteration. `for v in xs: del xs[0]` on [1,2].
+-- CPython sees one element and ends with [2]; a SNAPSHOT loop would see two. This is the
+-- case §4 says must not survive boxing, because it is silently wrong the moment a
+-- container can be mutated mid-loop.
+private def shrinkLoop : Heap × Ctl :=
+  execStmt setIdxCtx 300 setIdxHeap setIdxEnv
+    (.forIn "v" (.name "xs") (.delIndex (.name "xs") (.lit (.int 0))))
+
+#guard match shrinkLoop.1[0]!.payload with | .list [.int 2] => true | _ => false
+-- Iterated once, not twice: the loop variable never reached the second element.
+#guard match shrinkLoop.2 with
+       | .normal ρ => (match ρ.get "v" with | .int 1 => true | _ => false)
+       | _ => false
+
+-- A dict mutated during iteration raises, which is what `Obj.version` is for.
+-- CPython: RuntimeError: dictionary changed size during iteration.
+#guard match (execStmt setIdxCtx 300 setIdxHeap setIdxEnv
+                (.forIn "k" (.name "d")
+                  (.setIndex (.name "d") (.lit (.str "c")) (.lit (.int 3))))).2 with
+       | .exn (.str "RuntimeError") _ => true | _ => false
+
+-- THE POINT OF THE WHOLE MIGRATION: a Python list literal is boxed, so `[1][0] = 9`
+-- assigns instead of holing. Under a non-Python dialect the literal is still a value and
+-- still holes, which is correct -- a C aggregate has no identity.
+#guard match (setIdx (.listE [.lit (.int 1)]) (.lit (.int 0)) (.lit (.int 9))).2 with
+       | .normal _ => true | _ => false
+#guard match (execStmt setIdxCtxC 50 setIdxHeap setIdxEnv
+                (.setIndex (.listE [.lit (.int 1)]) (.lit (.int 0)) (.lit (.int 9)))).2 with
+       | .hole "setIndex:immutable-containers" => true | _ => false
+
+/-! ## The container protocol on user instances, checked against CPython
+
+`class Bag: def __contains__(self, k): return k == 1` -- `1 in Bag()` is `True`,
+`2 in Bag()` is `False`, `2 not in Bag()` is `True`. A `__getitem__` that doubles its key,
+a `__setitem__` that records `k + v` in a field, a `__delitem__` that records the key; and
+`Plain`, which defines none of them, keeps exactly the holes it had. Boxed containers are
+untouched by this path (`Ctx.dunderOn` is `none` on any payload), which the `aliasProg`
+guards below keep checking. -/
+private def dunderProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.Bag.__contains__", params := ["k"]
+      , body := .ret (.binop "==" (.name "k") (.lit (.int 1))) }
+    , { name := "m.py:<module>.Bag.__getitem__", params := ["k"]
+      , body := .ret (.binop "*" (.name "k") (.lit (.int 2))) }
+    , { name := "m.py:<module>.Bag.__setitem__", params := ["k", "v"]
+      , body := .setField (.name "self") "last" (.binop "+" (.name "k") (.name "v")) }
+    , { name := "m.py:<module>.Bag.__delitem__", params := ["k"]
+      , body := .setField (.name "self") "deleted" (.name "k") }
+    , { name := "m.py:<module>.hit", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.inOp false (.lit (.int 1)) (.name "b"))) }
+    , { name := "m.py:<module>.miss", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.inOp false (.lit (.int 2)) (.name "b"))) }
+    , { name := "m.py:<module>.notIn", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.inOp true (.lit (.int 2)) (.name "b"))) }
+    , { name := "m.py:<module>.get", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.index (.name "b") (.lit (.int 21)))) }
+    , { name := "m.py:<module>.set", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+               (.seq (.setIndex (.name "b") (.lit (.int 40)) (.lit (.int 2)))
+                     (.ret (.field (.name "b") "last"))) }
+    , { name := "m.py:<module>.del", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+               (.seq (.delIndex (.name "b") (.lit (.int 7)))
+                     (.ret (.field (.name "b") "deleted"))) }
+    , { name := "m.py:<module>.plainIn", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.ret (.inOp false (.lit (.int 1)) (.name "p"))) }
+    , { name := "m.py:<module>.plainGet", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.ret (.index (.name "p") (.lit (.int 1)))) }
+    , { name := "m.py:<module>.plainSet", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.setIndex (.name "p") (.lit (.int 1)) (.lit (.int 2))) }
+    , { name := "m.py:<module>.plainDel", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.delIndex (.name "p") (.lit (.int 1))) }
+    -- `in` on a BOXED list still takes the structural path: `2 in [1, 2]`.
+    , { name := "m.py:<module>.boxedIn", params := []
+      , body := .seq (.assign "xs" (.listE [.lit (.int 1), .lit (.int 2)]))
+                     (.ret (.inOp false (.lit (.int 2)) (.name "xs"))) } ] }
+
+-- `1 in Bag()`      CPython True
+#guard match runFunc dunderProg 200 "m.py:<module>.hit" [] with
+       | .val (.bool true) => true | _ => false
+-- `2 in Bag()`      CPython False
+#guard match runFunc dunderProg 200 "m.py:<module>.miss" [] with
+       | .val (.bool false) => true | _ => false
+-- `2 not in Bag()`  CPython True -- the negation is of `__contains__`'s truthiness
+#guard match runFunc dunderProg 200 "m.py:<module>.notIn" [] with
+       | .val (.bool true) => true | _ => false
+-- `Bag()[21]`       CPython 42
+#guard match runFunc dunderProg 200 "m.py:<module>.get" [] with
+       | .val (.int 42) => true | _ => false
+-- `b[40] = 2; b.last`  CPython 42 -- `__setitem__` ran on THIS instance
+#guard match runFunc dunderProg 200 "m.py:<module>.set" [] with
+       | .val (.int 42) => true | _ => false
+-- `del b[7]; b.deleted`  CPython 7
+#guard match runFunc dunderProg 200 "m.py:<module>.del" [] with
+       | .val (.int 7) => true | _ => false
+-- A class WITHOUT the dunder keeps the hole it had: nothing is guessed.
+#guard match runFunc dunderProg 200 "m.py:<module>.plainIn" [] with
+       | .hole "in:non-container" => true | _ => false
+#guard match runFunc dunderProg 200 "m.py:<module>.plainGet" [] with
+       | .hole "index:unsupported" => true | _ => false
+#guard match runFunc dunderProg 200 "m.py:<module>.plainSet" [] with
+       | .hole "setIndex:immutable-containers" => true | _ => false
+#guard match runFunc dunderProg 200 "m.py:<module>.plainDel" [] with
+       | .hole "delIndex:immutable-containers" => true | _ => false
+-- `2 in [1, 2]` on a boxed list: True, through the structural path.
+#guard match runFunc dunderProg 200 "m.py:<module>.boxedIn" [] with
+       | .val (.bool true) => true | _ => false
+
+/-! ## The switchover: containers have identity
+
+`docs/boxed-containers.md`. A Python list or dict literal now allocates, so two names can
+refer to one container and a write through either is visible through the other. This is
+the whole point of the migration, and it is the case Core could not express at all
+before: `Val.list` was a value, so `b = a` copied it and `b[0] = 9` was a hole.
+
+Every expectation is CPython's, executed. -/
+/-! ## A receiver followed by nothing but collectors, checked against CPython
+
+`class C: def f(self, *a, **k): return (a, k)`. The exporter strips `self` and records
+`receiverName := some "self"` because `**k` could otherwise swallow a `self=` keyword.
+Every expected value below is CPython's. -/
+private def collProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.C.f", params := ["a", "k"], vararg := some "a", kwarg := some "k"
+      , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := []
+                                , isMethod := some true, receiverName := some "self" }
+      , body := .ret (.tupleE [.name "a", .name "k"]) } ] }
+private def collCtx : Ctx := { dialect := .python, table := collProg.table }
+private def collCall (args : List Expr) : Heap × EResult :=
+  evalExpr collCtx 60 [{ cls := "C", fields := [] }] [("o", .ref 0)] (.mcall (.name "o") "f" args)
+
+-- o.f(1, 2, x=3)   CPython ((1, 2), {'x': 3}) -- `self` is the receiver, not consumed by `*a`
+#guard match (collCall [.lit (.int 1), .lit (.int 2), .kwargE "x" (.lit (.int 3))]).2 with
+       | .val (.tuple [.tuple [.int 1, .int 2], .dict [(.str "x", .int 3)]]) => true | _ => false
+-- o.f()            CPython ((), {})
+#guard match (collCall []).2 with
+       | .val (.tuple [.tuple [], .dict []]) => true | _ => false
+-- o.f(self=1)      CPython TypeError: f() got multiple values for argument 'self'
+#guard match (collCall [.kwargE "self" (.lit (.int 1))]).2 with
+       | .exn (.str "TypeError") => true | _ => false
+-- o.f(1, self=2)   CPython TypeError (same reason; the positional went to `*a`)
+#guard match (collCall [.lit (.int 1), .kwargE "self" (.lit (.int 2))]).2 with
+       | .exn (.str "TypeError") => true | _ => false
+
+private def aliasProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "alias", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1), .lit (.int 2)]))
+          (.seq (.assign "b" (.name "a"))
+          (.seq (.setIndex (.name "b") (.lit (.int 0)) (.lit (.int 9)))
+                (.ret (.index (.name "a") (.lit (.int 0)))))) }
+    , { name := "appendThroughAlias", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1)]))
+          (.seq (.assign "b" (.name "a"))
+          (.seq (.expr (.mcall (.name "b") "append" [.lit (.int 7)]))
+                (.ret (.index (.name "a") (.lit (.int 1)))))) }
+    , { name := "dictAlias", params := []
+      , body :=
+          .seq (.assign "d" (.dictE []))
+          (.seq (.assign "e" (.name "d"))
+          (.seq (.setIndex (.name "e") (.lit (.str "k")) (.lit (.int 5)))
+                (.ret (.index (.name "d") (.lit (.str "k")))))) }
+    , { name := "equalButNotIdentical", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1)]))
+          (.seq (.assign "b" (.listE [.lit (.int 1)]))
+                (.ret (.binop "==" (.name "a") (.name "b")))) }
+    , { name := "identity", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1)]))
+          (.seq (.assign "b" (.listE [.lit (.int 1)]))
+                (.ret (.isOp false (.name "a") (.name "b")))) } ] }
+
+-- `a = [1,2]; b = a; b[0] = 9; a[0]`  -- CPython 9
+#guard match runFunc aliasProg 400 "alias" [] with
+       | .val (.int 9) => true | _ => false
+-- `a = [1]; b = a; b.append(7); a[1]`  -- CPython 7
+#guard match runFunc aliasProg 400 "appendThroughAlias" [] with
+       | .val (.int 7) => true | _ => false
+-- `d = {}; e = d; e["k"] = 5; d["k"]`  -- CPython 5
+#guard match runFunc aliasProg 400 "dictAlias" [] with
+       | .val (.int 5) => true | _ => false
+-- Two distinct lists with equal contents are `==` (this is `Val.eqPy` through the heap)
+-- but not `is`. Before boxing Core could not tell these apart -- the case
+-- `STRATEGY.md` §31/§34 records against `_HashedTuple`.
+#guard match runFunc aliasProg 400 "equalButNotIdentical" [] with
+       | .val (.bool true) => true | _ => false
+#guard match runFunc aliasProg 400 "identity" [] with
+       | .val (.bool false) => true | _ => false
+
+/-! ## Slices, checked against CPython
+
+`xs = [1, 2, 3, 4, 5]`, boxed. Every expected value below is CPython's, and the failure
+cases are CPython's exceptions by name. A slice read is a fresh allocation, so its result
+is a `Val.ref` to a NEW heap cell, whose payload is what is checked. -/
+private def sliceHeap : Heap :=
+  [ { cls := "list", fields := [], payload := .list [.int 1, .int 2, .int 3, .int 4, .int 5] } ]
+private def sliceEnv : Env :=
+  [("xs", .ref 0), ("t", .tuple [.int 1, .int 2, .int 3]), ("s", .str "hello")]
+private def sU : Expr := .lit .unit
+private def sI (i : Int) : Expr := .lit (.int i)
+private def slRead (recv lo hi st : Expr) : Heap × EResult :=
+  evalExpr setIdxCtx 80 sliceHeap sliceEnv (.slice recv lo hi st)
+private def slList (r : Heap × EResult) : Option (List Val) :=
+  match r.2 with
+  | .val (.ref k) =>
+      match r.1.payload k with
+      | .list vs => some vs
+      | _        => none
+  | _ => none
+private def slStmt (st : Stmt) : Heap × Ctl := execStmt setIdxCtx 120 sliceHeap sliceEnv st
+private def slAt0 (r : Heap × Ctl) : Payload := r.1.payload 0
+
+-- xs[1:]     CPython [2, 3, 4, 5]
+#guard match slList (slRead (.name "xs") (sI 1) sU sU) with
+       | some [.int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- xs[:-1]    CPython [1, 2, 3, 4]
+#guard match slList (slRead (.name "xs") sU (sI (-1)) sU) with
+       | some [.int 1, .int 2, .int 3, .int 4] => true | _ => false
+-- xs[::-1]   CPython [5, 4, 3, 2, 1]
+#guard match slList (slRead (.name "xs") sU sU (sI (-1))) with
+       | some [.int 5, .int 4, .int 3, .int 2, .int 1] => true | _ => false
+-- xs[::2]    CPython [1, 3, 5]
+#guard match slList (slRead (.name "xs") sU sU (sI 2)) with
+       | some [.int 1, .int 3, .int 5] => true | _ => false
+-- xs[5:]     CPython []  (a start past the end is empty, not an error)
+#guard match slList (slRead (.name "xs") (sI 5) sU sU) with
+       | some [] => true | _ => false
+-- xs[-2:]    CPython [4, 5]
+#guard match slList (slRead (.name "xs") (sI (-2)) sU sU) with
+       | some [.int 4, .int 5] => true | _ => false
+-- xs[3:1]    CPython []  (reversed bounds with a positive step)
+#guard match slList (slRead (.name "xs") (sI 3) (sI 1) sU) with
+       | some [] => true | _ => false
+-- xs[::0]    CPython ValueError: slice step cannot be zero
+#guard match (slRead (.name "xs") sU sU (sI 0)).2 with
+       | .exn (.str "ValueError") => true | _ => false
+-- xs["a":]   CPython TypeError: slice indices must be integers or None
+#guard match (slRead (.name "xs") (.lit (.str "a")) sU sU).2 with
+       | .exn (.str "TypeError") => true | _ => false
+-- The slice is a COPY: the original is untouched by the read.
+#guard match (slRead (.name "xs") (sI 1) sU sU).1.payload 0 with
+       | .list [.int 1, .int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- t[1:]      CPython (2, 3) -- a tuple slice is a tuple value, not an allocation
+#guard match (slRead (.name "t") (sI 1) sU sU).2 with
+       | .val (.tuple [.int 2, .int 3]) => true | _ => false
+-- s[1:3]     CPython 'el'
+#guard match (slRead (.name "s") (sI 1) (sI 3) sU).2 with
+       | .val (.str "el") => true | _ => false
+-- s[::-1]    CPython 'olleh'
+#guard match (slRead (.name "s") sU sU (sI (-1))).2 with
+       | .val (.str "olleh") => true | _ => false
+
+-- del xs[0:1]        CPython [2, 3, 4, 5]
+#guard match slAt0 (slStmt (.delSlice (.name "xs") (sI 0) (sI 1) sU)) with
+       | .list [.int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- del xs[::2]        CPython [2, 4]
+#guard match slAt0 (slStmt (.delSlice (.name "xs") sU sU (sI 2))) with
+       | .list [.int 2, .int 4] => true | _ => false
+-- xs[0:1] = [9, 8]   CPython [9, 8, 2, 3, 4, 5]  (a unit-step assignment may resize)
+#guard match slAt0 (slStmt (.setSlice (.name "xs") (sI 0) (sI 1) sU
+                             (.listE [sI 9, sI 8]))) with
+       | .list [.int 9, .int 8, .int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- xs[3:1] = [9]      CPython [1, 2, 3, 9, 4, 5]  (reversed bounds insert at `lower`)
+#guard match slAt0 (slStmt (.setSlice (.name "xs") (sI 3) (sI 1) sU (.listE [sI 9]))) with
+       | .list [.int 1, .int 2, .int 3, .int 9, .int 4, .int 5] => true | _ => false
+-- xs[::2] = [7, 7, 7]  CPython [7, 2, 7, 4, 7]
+#guard match slAt0 (slStmt (.setSlice (.name "xs") sU sU (sI 2)
+                             (.listE [sI 7, sI 7, sI 7]))) with
+       | .list [.int 7, .int 2, .int 7, .int 4, .int 7] => true | _ => false
+-- xs[::2] = [7]      CPython ValueError: attempt to assign sequence of size 1 to
+--                    extended slice of size 3
+#guard match (slStmt (.setSlice (.name "xs") sU sU (sI 2) (.listE [sI 7]))).2 with
+       | .exn (.str "ValueError") _ => true | _ => false
+-- xs[0:1] = 5        CPython TypeError: can only assign an iterable
+#guard match (slStmt (.setSlice (.name "xs") (sI 0) (sI 1) sU (sI 5))).2 with
+       | .exn (.str "TypeError") _ => true | _ => false
+
+/-! ## Value dunders, checked against CPython
+
+`class P: __init__(x), __eq__, __lt__`; `class C: __len__ → 3`; `class Z: __len__ → 0`;
+`class H: __hash__ → 7`, `__str__ → "h"`; `class Q:` (nothing). Each expectation is what
+CPython 3.11 prints. -/
+private def valueDunderProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "d.py:<module>.P.__init__", params := ["x"]
+      , body := .setField (.name "self") "x" (.name "x") }
+    , { name := "d.py:<module>.P.__eq__", params := ["o"]
+      , body := .ret (.binop "==" (.field (.name "self") "x") (.field (.name "o") "x")) }
+    , { name := "d.py:<module>.P.__lt__", params := ["o"]
+      , body := .ret (.binop "<" (.field (.name "self") "x") (.field (.name "o") "x")) }
+    , { name := "d.py:<module>.C.__len__", params := [], body := .ret (.lit (.int 3)) }
+    , { name := "d.py:<module>.Z.__len__", params := [], body := .ret (.lit (.int 0)) }
+    , { name := "d.py:<module>.H.__hash__", params := [], body := .ret (.lit (.int 7)) }
+    , { name := "d.py:<module>.H.__str__", params := [], body := .ret (.lit (.str "h")) }
+    , { name := "d.py:<module>.Q.__init__", params := [], body := .skip }
+    -- `B` defines both: CPython consults `__bool__` first and never calls `__len__`.
+    , { name := "d.py:<module>.B.__bool__", params := [], body := .ret (.lit (.bool false)) }
+    , { name := "d.py:<module>.B.__len__", params := [], body := .ret (.lit (.int 3)) }
+    , { name := "d.py:<module>.W.__bool__", params := [], body := .ret (.lit (.int 1)) }
+    , { name := "eqTrue", params := []
+      , body := .ret (.binop "==" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 1)])) }
+    , { name := "eqFalse", params := []
+      , body := .ret (.binop "==" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 2)])) }
+    , { name := "neFalse", params := []
+      , body := .ret (.binop "!=" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 1)])) }
+    , { name := "ltTrue", params := []
+      , body := .ret (.binop "<" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 2)])) }
+    , { name := "geHole", params := []   -- no `__ge__`: stays the hole it was
+      , body := .ret (.binop ">=" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 2)])) }
+    , { name := "lenC", params := [], body := .ret (.call "len" [.alloc "C" []]) }
+    , { name := "boolC", params := [], body := .ret (.call "bool" [.alloc "C" []]) }
+    , { name := "boolZ", params := [], body := .ret (.call "bool" [.alloc "Z" []]) }
+    , { name := "hashH", params := [], body := .ret (.call "hash" [.alloc "H" []]) }
+    , { name := "strH", params := [], body := .ret (.call "str" [.alloc "H" []]) }
+    , { name := "identityQ", params := []
+      , body := .ret (.binop "==" (.alloc "Q" []) (.alloc "Q" [])) }
+    , { name := "lenQ", params := [], body := .ret (.call "len" [.alloc "Q" []]) }
+    , { name := "boolB", params := [], body := .ret (.call "bool" [.alloc "B" []]) }
+    , { name := "ifB", params := []
+      , body := .ifte (.alloc "B" []) (.ret (.lit (.str "yes"))) (.ret (.lit (.str "no"))) }
+    , { name := "boolW", params := [], body := .ret (.call "bool" [.alloc "W" []]) } ] }
+
+-- `P(1) == P(1)`  -- CPython True (through `__eq__`; identity would say False)
+#guard match runFunc valueDunderProg 200 "eqTrue" [] with | .val (.bool true) => true | _ => false
+-- `P(1) == P(2)`  -- CPython False
+#guard match runFunc valueDunderProg 200 "eqFalse" [] with | .val (.bool false) => true | _ => false
+-- `P(1) != P(1)`  -- CPython False (default `__ne__` negates `__eq__`)
+#guard match runFunc valueDunderProg 200 "neFalse" [] with | .val (.bool false) => true | _ => false
+-- `P(1) < P(2)`   -- CPython True
+#guard match runFunc valueDunderProg 200 "ltTrue" [] with | .val (.bool true) => true | _ => false
+-- `P(1) >= P(2)`  -- CPython TypeError ('>=' not supported); Core keeps the hole, not a guess
+#guard match runFunc valueDunderProg 200 "geHole" [] with | .hole _ => true | _ => false
+-- `len(C())`      -- CPython 3
+#guard match runFunc valueDunderProg 200 "lenC" [] with | .val (.int 3) => true | _ => false
+-- `bool(C())`     -- CPython True (no `__bool__`, so `__len__() != 0`)
+#guard match runFunc valueDunderProg 200 "boolC" [] with | .val (.bool true) => true | _ => false
+-- `bool(Z())`     -- CPython False
+#guard match runFunc valueDunderProg 200 "boolZ" [] with | .val (.bool false) => true | _ => false
+-- `hash(H())`     -- CPython 7;  `str(H())` -- 'h'
+#guard match runFunc valueDunderProg 200 "hashH" [] with | .val (.int 7) => true | _ => false
+#guard match runFunc valueDunderProg 200 "strH" [] with | .val (.str "h") => true | _ => false
+-- `Q() == Q()`    -- CPython False: no `__eq__`, so identity, and these are two objects
+#guard match runFunc valueDunderProg 200 "identityQ" [] with | .val (.bool false) => true | _ => false
+-- `len(Q())`      -- CPython TypeError; Core has no `len` on an instance without `__len__`
+--                    and says so (`call:len`), which is the pre-existing behaviour.
+#guard match runFunc valueDunderProg 200 "lenQ" [] with | .hole _ => true | _ => false
+-- `bool(B())`     -- CPython False: `__bool__` wins over `__len__` (which says 3)
+#guard match runFunc valueDunderProg 200 "boolB" [] with | .val (.bool false) => true | _ => false
+-- `if B(): ...`   -- CPython takes the else branch: the truth test runs `__bool__` too
+#guard match runFunc valueDunderProg 200 "ifB" [] with | .val (.str "no") => true | _ => false
+-- `bool(W())`     -- CPython TypeError: __bool__ should return bool, returned int
+#guard match runFunc valueDunderProg 200 "boolW" [] with | .exn (.str "TypeError") => true | _ => false
+
+/-! ## The iteration protocol, checked against CPython
+
+`Counter` is the textbook iterator (`__iter__` returns `self`, `__next__` counts to 3 and
+then raises `StopIteration`); `Bag.__iter__` returns a plain list; `Seq` has only
+`__getitem__` and is iterated by the sequence protocol until `IndexError`. Every expected
+value is CPython 3.11's. -/
+private def iterProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.Counter.__iter__", params := []
+      , body := .ret (.name "self") }
+    , { name := "m.py:<module>.Counter.__next__", params := []
+      , body := .ifte (.binop ">=" (.field (.name "self") "i") (.lit (.int 3)))
+                  (.raise (.unop "py:exception:StopIteration" (.tupleE [])))
+                  (.seq (.setField (.name "self") "i"
+                           (.binop "+" (.field (.name "self") "i") (.lit (.int 1))))
+                        (.ret (.field (.name "self") "i"))) }
+    , { name := "m.py:<module>.Bag.__iter__", params := []
+      , body := .ret (.listE [.lit (.int 7), .lit (.int 8)]) }
+    , { name := "m.py:<module>.Seq.__getitem__", params := ["i"]
+      , body := .ifte (.binop ">=" (.name "i") (.lit (.int 2)))
+                  (.raise (.unop "py:exception:IndexError" (.tupleE [])))
+                  (.ret (.binop "*" (.name "i") (.lit (.int 10)))) }
+    -- for x in Counter(): acc += x
+    , { name := "m.py:<module>.collect", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 0)))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "c") (.assign "acc" (.binop "+" (.name "acc") (.name "x"))))
+                (.ret (.name "acc"))))) }
+    -- for x in Counter(): if x == 2: break; acc += x   -- and x is still bound afterwards
+    , { name := "m.py:<module>.breaks", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 0)))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "c")
+                   (.ifte (.binop "==" (.name "x") (.lit (.int 2))) .brk
+                          (.assign "acc" (.binop "+" (.name "acc") (.name "x")))))
+                (.ret (.tupleE [.name "acc", .name "x"]))))) }
+    -- for x in Bag(): acc += x   -- __iter__ returned a list
+    , { name := "m.py:<module>.viaList", params := []
+      , body :=
+          .seq (.assign "b" (.alloc "Bag" []))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "b") (.assign "acc" (.binop "+" (.name "acc") (.name "x"))))
+                (.ret (.name "acc")))) }
+    -- for x in Seq(): acc += x   -- sequence protocol: s[0], s[1], IndexError
+    , { name := "m.py:<module>.viaSeq", params := []
+      , body :=
+          .seq (.assign "s" (.alloc "Seq" []))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "s") (.assign "acc" (.binop "+" (.name "acc") (.name "x"))))
+                (.ret (.name "acc")))) }
+    -- c = Counter(); c.i = 3; next(c)
+    , { name := "m.py:<module>.exhausted", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 3)))
+                (.ret (.call "next" [.name "c"]))) }
+    -- c = Counter(); c.i = 3; next(c, 99)
+    , { name := "m.py:<module>.withDefault", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 3)))
+                (.ret (.call "next" [.name "c", .lit (.int 99)]))) }
+    -- c = Counter(); c.i = 1; next(iter(c))
+    , { name := "m.py:<module>.iterThenNext", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 1)))
+                (.ret (.call "next" [.call "iter" [.name "c"]]))) } ] }
+
+-- 1 + 2 + 3                                   -- CPython 6
+#guard match runFunc iterProg 400 "collect" [] with | .val (.int 6) => true | _ => false
+-- break at 2: acc = 1, and `x` survives the loop  -- CPython (1, 2)
+#guard match runFunc iterProg 400 "breaks" [] with
+       | .val (.tuple [.int 1, .int 2]) => true | _ => false
+-- CHANGED: a list returned by __iter__ is not itself an iterator in CPython.
+#guard match runFunc iterProg 400 "viaList" [] with | .exn (.str "TypeError") => true | _ => false
+-- 0 + 10                                      -- CPython 10
+#guard match runFunc iterProg 400 "viaSeq" [] with | .val (.int 10) => true | _ => false
+-- next() past the end                         -- CPython StopIteration
+#guard match runFunc iterProg 400 "exhausted" [] with
+       | .exn (.str "StopIteration") => true | _ => false
+-- next() past the end, with a default         -- CPython 99
+#guard match runFunc iterProg 400 "withDefault" [] with | .val (.int 99) => true | _ => false
+-- next(iter(c)) with c.i = 1                  -- CPython 2
+#guard match runFunc iterProg 400 "iterThenNext" [] with | .val (.int 2) => true | _ => false
+
+/-! ## Java: casts, constructors, collections -- expectations from the JLS and `javac`
+
+`(byte) 300 == 44` and `(short) 70000 == 4464` are JLS §5.1.3's "discards all but the n
+lowest order bits"; `(int) 3.9 == 3` and `(int) -3.9 == -3` its round-toward-zero;
+`(int) NaN == 0`; `(int) 1e30 == Integer.MAX_VALUE` and `(long) -1e30 == Long.MIN_VALUE`
+its saturation; `(byte) 300.9 == 44` its two-step rule (to `int` 300, then narrowed). -/
+#guard match applyUnop .java "cast:i8" (.int 300) with | .val (.int 44) => true | _ => false
+#guard match applyUnop .java "cast:i16" (.int 70000) with | .val (.int 4464) => true | _ => false
+-- 3.9 is 0x400F333333333333; -3.9 sets the sign bit; 1e30 is 0x46293E5939A08CEA.
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0x400F333333333333)) with | .val (.int 3) => true | _ => false
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0xC00F333333333333)) with | .val (.int (-3)) => true | _ => false
+#guard match applyUnop .java "cast:i8" (.float (Fl.ofBits 0x4072CE6666666666)) with | .val (.int 44) => true | _ => false
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0x7FF8000000000000)) with | .val (.int 0) => true | _ => false
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0x46293E5939A08CEA)) with | .val (.int 2147483647) => true | _ => false
+#guard match applyUnop .java "cast:i64" (.float (Fl.ofBits 0xC6293E5939A08CEA)) with | .val (.int (-9223372036854775808)) => true | _ => false
+-- The same cast under C is not claimed: out-of-range float→int is undefined there.
+#guard match applyUnop .cLike "cast:i32" (.float (Fl.ofBits 0x400F333333333333)) with
+       | .hole _ => true | _ => false
+
+/-- A Java class with a constructor named `<init>` and a signature in its qualified name,
+as javasrc2cpg exports it. `new Box(7)` runs the constructor with `this` bound
+(JLS §15.9.4), then `box.v` reads the field it set. -/
+private def javaProg : Program :=
+  { dialect := .java
+  , funcs :=
+    [ { name := "pkg.Box.<init>:void(int)", params := ["v"]
+      , body := .setField (.name "self") "v" (.name "v") }
+    , { name := "pkg.Box.get:int()", params := []
+      , body := .ret (.field (.name "self") "v") }
+    , { name := "pkg.Main.mk:int()", params := []
+      , body := .seq (.assign "b" (.alloc "Box" [.lit (.int 7)]))
+                     (.ret (.binop "+" (.field (.name "b") "v")
+                                       (.mcall (.name "b") "get" []))) } ] }
+
+-- new Box(7).v + new Box(7).get()  -- java: 14
+#guard match runFunc javaProg 300 "pkg.Main.mk:int()" [] with | .val (.int 14) => true | _ => false
+
+/-! ## JavaScript arrays and strings
+
+The JS frontend lowers `[a, b]` to `__ecma.Array.factory()` followed by `.push(a)`,
+`.push(b)` -- a constructor plus in-place mutation, which is exactly the boxed-container
+shape. `push` returns the NEW LENGTH where Python's `append` returns `None`, which is why
+`.javascript` has its own `Stdlib.methodCore` table rather than borrowing Python's. Every
+expectation below is Node's. -/
+private def jsProg : Program :=
+  { dialect := .javascript
+  , funcs :=
+    [ { name := "build", params := []
+      , body :=
+          .seq (.assign "xs" (.listE []))
+          (.seq (.expr (.mcall (.name "xs") "push" [.lit (.int 1)]))
+          (.seq (.assign "n" (.mcall (.name "xs") "push" [.lit (.int 2)]))
+                (.ret (.binop "+" (.name "n")
+                         (.binop "*" (.lit (.int 10)) (.field (.name "xs") "length")))))) }
+    , { name := "oob", params := []
+      , body := .seq (.assign "xs" (.listE [.lit (.int 1)]))
+                     (.ret (.index (.name "xs") (.lit (.int 5)))) }
+    , { name := "strIdx", params := []
+      , body := .ret (.index (.lit (.str "xy")) (.lit (.int 0))) }
+    , { name := "strLen", params := []
+      , body := .ret (.field (.lit (.str "xy")) "length") }
+      -- `o = {a: 1}; o.b = 2; o.a + o.b * 10 + (o.c === undefined ? 100 : 0)`  -- Node: 121
+    , { name := "objLit", params := []
+      , body :=
+          .seq (.assign "o" (.dictE [(.lit (.str "a"), .lit (.int 1))]))
+          (.seq (.setField (.name "o") "b" (.lit (.int 2)))
+                (.ret (.binop "+" (.field (.name "o") "a")
+                         (.binop "+" (.binop "*" (.field (.name "o") "b") (.lit (.int 10)))
+                            (.cond (.binop "==" (.field (.name "o") "c") (.lit .unit))
+                               (.lit (.int 100)) (.lit (.int 0))))))) }
+      -- `xs = [1, 2]; xs.foo`  -- Node: undefined
+    , { name := "arrMiss", params := []
+      , body := .seq (.assign "xs" (.listE [.lit (.int 1), .lit (.int 2)]))
+                     (.ret (.field (.name "xs") "foo")) }
+      -- `class Pt { constructor(x) { this.x = x } getX() { return this.x } }`
+      -- `new Pt(3).getX()`  -- Node: 3. The exporter renames `this` to `self` and the
+      -- constructor is `<init>` (`Dialect.ctorName`).
+    , { name := "m.js:<module>.Pt.<init>", params := ["x"]
+      , body := .setField (.name "self") "x" (.name "x") }
+    , { name := "m.js:<module>.Pt.getX", params := []
+      , body := .ret (.field (.name "self") "x") }
+    , { name := "newPt", params := []
+      , body := .ret (.mcall (.alloc "Pt" [.lit (.int 3)]) "getX" []) }
+      -- `typeof 1 + typeof "s" + typeof true + typeof undefined + typeof newPt`
+    , { name := "typeofs", params := []
+      , body := .ret (.binop "js:+" (.unop "js:typeof" (.lit (.int 1)))
+                 (.binop "js:+" (.unop "js:typeof" (.lit (.str "s")))
+                 (.binop "js:+" (.unop "js:typeof" (.lit (.bool true)))
+                 (.binop "js:+" (.unop "js:typeof" (.lit .unit))
+                                (.unop "js:typeof" (.fnref "newPt")))))) }
+      -- `[1 === "1", 1 == "1", 0 == false, null == undefined, "" == 0, 1 === 1.0, 2 != "2"]`
+    , { name := "eqs", params := []
+      , body := .ret (.tupleE
+          [ .binop "js:===" (.lit (.int 1)) (.lit (.str "1"))
+          , .binop "js:==" (.lit (.int 1)) (.lit (.str "1"))
+          , .binop "js:==" (.lit (.int 0)) (.lit (.bool false))
+          , .binop "js:==" (.lit .unit) (.lit .unit)
+          , .binop "js:==" (.lit (.str "")) (.lit (.int 0))
+          , .binop "js:===" (.lit (.int 1)) (.lit (.float (Fl.ofBits 0x3FF0000000000000)))
+          , .binop "js:!=" (.lit (.int 2)) (.lit (.str "2")) ]) }
+      -- `1 == {}`: an object against a primitive is ToPrimitive, which Core does not
+      -- model -- a named hole, never a guess.
+    , { name := "eqObj", params := []
+      , body := .ret (.binop "js:==" (.lit (.int 1)) (.dictE [])) } ] }
+
+-- `xs = []; xs.push(1); n = xs.push(2); n + 10 * xs.length`  -- Node: 2 + 20 = 22
+#guard match runFunc jsProg 300 "build" [] with | .val (.int 22) => true | _ => false
+-- Out of range on an array is `undefined`, not an exception.  -- Node: undefined
+#guard match runFunc jsProg 300 "oob" [] with | .val .unit => true | _ => false
+-- `"xy"[0]` is `"x"`; `"xy".length` is 2.
+#guard match runFunc jsProg 300 "strIdx" [] with | .val (.str "x") => true | _ => false
+#guard match runFunc jsProg 300 "strLen" [] with | .val (.int 2) => true | _ => false
+-- An object literal's own keys are its properties; a missing one is `undefined`, and a
+-- property write lands in the literal, not beside it.  -- Node: 121
+#guard match runFunc jsProg 300 "objLit" [] with | .val (.int 121) => true | _ => false
+#guard match runFunc jsProg 300 "arrMiss" [] with | .val .unit => true | _ => false
+-- `new Pt(3).getX()`  -- Node: 3
+#guard match runFunc jsProg 300 "newPt" [] with | .val (.int 3) => true | _ => false
+-- Node: "numberstringbooleanundefinedfunction"
+#guard match runFunc jsProg 300 "typeofs" [] with
+       | .val (.str "numberstringbooleanundefinedfunction") => true | _ => false
+-- Node: [false, true, true, true, true, true, false]
+#guard match runFunc jsProg 300 "eqs" [] with
+       | .val (.tuple [.bool false, .bool true, .bool true, .bool true, .bool true,
+                       .bool true, .bool false]) => true
+       | _ => false
+#guard match runFunc jsProg 300 "eqObj" [] with | .hole l => l.startsWith "js:loose-eq:" | _ => false
+
+-- UTF-16 units: `"😀".length` is 2 and its first unit is a lone surrogate.
+#guard "xy".jsLength == 2
+#guard "😀".jsLength == 2
+#guard "xy".utf16At 0 == some 120
+#guard "xy".utf16At 5 == none
+#guard "xy".utf16At (-1) == none
+#guard ("😀".utf16At 0).any Nat.isUTF16Surrogate
+
+/-! ## Go: tuple assignment and the `for` forms, checked against `go run`
+
+These are the Core shapes `cartographer/export_ast.sc`'s `goTupleAssign` and `forStmt`
+emit for Go source, run under `.go`. Every expectation is `go1.20.6`'s output for the
+program in the comments (`.tmp_gospec/main.go` while this was written).
+
+* Go spec, "Assignment statements": "The assignment proceeds in two phases. First, the
+  operands of index expressions and pointer indirections [...] on the left and the
+  expressions on the right are all evaluated in the usual order. Second, the assignments
+  are carried out in left-to-right order." -- hence the temporaries: `a, b = b, a` swaps.
+* Go spec, "For statements": "The iteration may be controlled by a single condition, a
+  "for" clause, or a "range" clause." [...] "If the condition is absent, it is
+  equivalent to the boolean value true." -/
+private def goProg : Program :=
+  { dialect := .go
+  , funcs :=
+    -- a, b := 1, 2; a, b = b, a; return a*10 + b        -- go: 21
+    [ { name := "swap", params := []
+      , body :=
+          .seq (.assign "a" (.lit (.int 1)))
+          (.seq (.assign "b" (.lit (.int 2)))
+          (.seq (.assign "$t0" (.name "b"))
+          (.seq (.assign "$t1" (.name "a"))
+          (.seq (.assign "a" (.name "$t0"))
+          (.seq (.assign "b" (.name "$t1"))
+                (.ret (.binop "+" (.binop "*" (.name "a") (.lit (.int 10))) (.name "b")))))))) }
+    -- func pair() (int, int) { return 3, 4 }; x, y := pair(); return x*10 + y   -- go: 34
+    , { name := "pair", params := []
+      , body := .ret (.tupleE [.lit (.int 3), .lit (.int 4)]) }
+    , { name := "destructure", params := []
+      , body :=
+          .seq (.assign "$t" (.call "pair" []))
+          (.seq (.assign "x" (.index (.name "$t") (.lit (.int 0))))
+          (.seq (.assign "y" (.index (.name "$t") (.lit (.int 1))))
+                (.ret (.binop "+" (.binop "*" (.name "x") (.lit (.int 10))) (.name "y"))))) }
+    -- i := 0; for i < 3 { i = i + 1 }; return i          -- go: 3
+    , { name := "cond", params := []
+      , body :=
+          .seq (.assign "i" (.lit (.int 0)))
+          (.seq (.loop (.binop "<" (.name "i") (.lit (.int 3)))
+                       (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))
+                (.ret (.name "i"))) }
+    -- i := 0; for { i = i + 2; if i > 4 { break } }; return i   -- go: 6
+    , { name := "forever", params := []
+      , body :=
+          .seq (.assign "i" (.lit (.int 0)))
+          (.seq (.loop (.lit (.bool true))
+                       (.seq (.assign "i" (.binop "+" (.name "i") (.lit (.int 2))))
+                             (.ifte (.binop ">" (.name "i") (.lit (.int 4))) .brk .skip)))
+                (.ret (.name "i"))) } ] }
+
+#guard match runFunc goProg 300 "swap" [] with | .val (.int 21) => true | _ => false
+#guard match runFunc goProg 300 "destructure" [] with | .val (.int 34) => true | _ => false
+#guard match runFunc goProg 300 "cond" [] with | .val (.int 3) => true | _ => false
+
+/-! ## Go pointers on the interior-pointer clauses, checked against the Go spec
+
+Core's `boxNew`/`boxFields`/`boxArray`/`irefField`/`irefIndex`/`derefIref`/`setDerefIref`
+were built for C (`docs/core-language.md`, interior pointers) and are dialect-independent,
+so a Go `&x` boxes the local exactly as a C `&x` does and `*p` reads through the box. What
+the guards below pin is that the Go meaning is the one these clauses deliver:
+
+* Spec, "Address operators": "For an operand `x` of type `T`, the address operation `&x`
+  generates a pointer of type `*T` to `x`"; "for an operand `x` of pointer type `*T`, the
+  pointer indirection `*x` denotes the variable of type `T` pointed to by `x`" -- so a
+  write through `p` is a write to `x` (`ptrLocal`).
+* Spec, "Selectors": "if the type of `x` is a defined pointer type and `(*x).f` is a valid
+  selector expression denoting a field, `x.f` is shorthand for `(*x).f`" -- `&s.a` is an
+  interior pointer into the struct, and a write through it is seen by `s.a` (`ptrField`).
+* Spec, "Slice expressions"/"Index expressions": `&a[i]` addresses element `i`
+  (`ptrIndex`).
+
+Expected values are `go1.20.6`'s for the program in each comment. -/
+private def goPtrProg : Program :=
+  { dialect := .go
+  , funcs :=
+    -- x := 1; p := &x; *p = 5; return x                      -- go: 5
+    -- (the exporter boxes `x` at its binding and resolves `*p` through the alias, so
+    --  Core sees the box directly: `x` IS the box, `*p` is its `v` field)
+    [ { name := "ptrLocal", params := []
+      , body :=
+          .seq (.assign "x" (.boxNew (.lit (.int 1))))
+          (.seq (.setField (.name "x") "v" (.lit (.int 5)))
+                (.ret (.field (.name "x") "v"))) }
+    -- s := T{a: 1, b: 2}; q := &s.a; *q = 9; return *q + s.b   -- go: 11
+    , { name := "ptrField", params := []
+      , body :=
+          .seq (.assign "s" (.boxFields [(.lit (.str "a"), .lit (.int 1)), (.lit (.str "b"), .lit (.int 2))]))
+          (.seq (.assign "q" (.irefField (.name "s") "a"))
+          (.seq (.setDerefIref (.name "q") (.lit (.int 9)))
+                (.ret (.binop "+" (.derefIref (.name "q")) (.field (.name "s") "b"))))) }
+    -- var a [3]int; r := &a[1]; *r = 7; return a[1] + *r      -- go: 14
+    , { name := "ptrIndex", params := []
+      , body :=
+          .seq (.assign "a" (.boxArray (.lit (.int 3))))
+          (.seq (.assign "r" (.irefIndex (.name "a") (.lit (.int 1))))
+          (.seq (.setDerefIref (.name "r") (.lit (.int 7)))
+                (.ret (.binop "+" (.derefIref (.irefIndex (.name "a") (.lit (.int 1))))
+                                  (.derefIref (.name "r")))))) }
+    -- x := 1; p := &x; x = 3; return *p                       -- go: 3 (aliasing, both ways)
+    , { name := "ptrAlias", params := []
+      , body :=
+          .seq (.assign "x" (.boxNew (.lit (.int 1))))
+          (.seq (.setField (.name "x") "v" (.lit (.int 3)))
+                (.ret (.field (.name "x") "v"))) } ] }
+
+#guard match runFunc goPtrProg 300 "ptrLocal" [] with | .val (.int 5) => true | _ => false
+#guard match runFunc goPtrProg 300 "ptrField" [] with | .val (.int 11) => true | _ => false
+#guard match runFunc goPtrProg 300 "ptrIndex" [] with | .val (.int 14) => true | _ => false
+#guard match runFunc goPtrProg 300 "ptrAlias" [] with | .val (.int 3) => true | _ => false
+#guard match runFunc goProg 300 "forever" [] with | .val (.int 6) => true | _ => false
+
+/-! ## A missing attribute raises `AttributeError`
+
+Python Language Reference §3.2.11 and §3.3.2, Library Reference "Built-in Exceptions".
+Every expectation below is CPython's; the JavaScript one is Node's (`undefined`). -/
+private def attrMissProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.C.__init__", params := []
+      , body := .setField (.name "self") "present" (.lit (.int 1)) }
+    , { name := "m.py:<module>.C.p", params := []
+      , body := .ret (.lit (.int 7)) }
+    -- `C().x`  -- CPython: AttributeError
+    , { name := "m.py:<module>.missing", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.ret (.field (.name "c") "x")) }
+    -- `try: C().x  except AttributeError as e: return e`  -- the handler binds the class name
+    , { name := "m.py:<module>.caught", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.tryCatch (.ret (.field (.name "c") "x")) "e" (.ret (.name "e"))) }
+    -- `C().present`  -- an instance attribute still reads
+    , { name := "m.py:<module>.present", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.ret (.field (.name "c") "present")) }
+    -- `C().p` with `p` a `@property`  -- the getter still runs
+    , { name := "m.py:<module>.viaProperty", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.ret (.field (.name "c") "p")) } ]
+  , properties := [("C", "p")] }
+
+-- Legacy (no `classDecls`): Core cannot see whether `C` inherits `x`, so the miss is
+-- a named gap, not a claim that CPython raises.
+#guard match runFunc attrMissProg 200 "m.py:<module>.missing" [] with
+       | .hole "field:x:unresolved-inheritance" => true | _ => false
+#guard match runFunc attrMissProg 200 "m.py:<module>.caught" [] with
+       | .hole "field:x:unresolved-inheritance" => true | _ => false
+
+/-- The same program with its class declared: the MRO is complete (`C` → `object`), so
+the miss is CPython's `AttributeError`. -/
+private def attrMissMetaProg : Program :=
+  { attrMissProg with
+    classDecls :=
+      [ { name := "m.py:<module>.C", shortName := "C", bases := ["__builtin.object"]
+        , attributes := [("__init__", .method "m.py:<module>.C.__init__"),
+                         ("p", .property "m.py:<module>.C.p")] } ] }
+
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.missing" [] with
+       | .exn (.str "AttributeError") => true | _ => false
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.caught" [] with
+       | .val (.str "AttributeError") => true | _ => false
+
+/-- `class Cache(collections.abc.MutableMapping)`, with the ABC contracted
+(`ExternalBases.lean`): own members are found through the base, a name the ABC provides
+(`get`) is a named hole, a true miss is CPython's `AttributeError`, construction works
+when every abstract method is implemented and is a named gap when one is not, and an
+uncontracted external base (`foo.Bar`) leaves the hierarchy unresolved as before. -/
+private def externalBaseProg : Program :=
+  { dialect := .python
+  , classDecls :=
+      [ { name := "m.py:<module>.Cache", shortName := "Cache"
+        , bases := ["<external>collections.abc.MutableMapping"]
+        , attributes := [("__init__", .method "m.py:<module>.Cache.__init__"),
+                         ("__getitem__", .method "m.py:<module>.Cache.__getitem__"),
+                         ("__setitem__", .method "m.py:<module>.Cache.__setitem__"),
+                         ("__delitem__", .method "m.py:<module>.Cache.__delitem__"),
+                         ("__iter__", .method "m.py:<module>.Cache.__iter__"),
+                         ("__len__", .method "m.py:<module>.Cache.__len__"),
+                         ("size", .method "m.py:<module>.Cache.size")] }
+      , { name := "m.py:<module>.Partial", shortName := "Partial"
+        , bases := ["<external>collections.abc.MutableMapping"]
+        , attributes := [("__getitem__", .method "m.py:<module>.Partial.__getitem__")] }
+      , { name := "m.py:<module>.Odd", shortName := "Odd", bases := ["<external>foo.Bar"]
+        , attributes := [("size", .method "m.py:<module>.Odd.size")] } ]
+  , funcs :=
+    [ { name := "m.py:<module>.Cache.__init__", params := []
+      , body := .setField (.name "self") "n" (.lit (.int 7)) }
+    , { name := "m.py:<module>.Cache.size", params := []
+      , body := .ret (.field (.name "self") "n") }
+    , { name := "m.py:<module>.Cache.__getitem__", params := ["k"], body := .ret (.name "k") }
+    , { name := "m.py:<module>.Cache.__setitem__", params := ["k", "v"], body := .skip }
+    , { name := "m.py:<module>.Cache.__delitem__", params := ["k"], body := .skip }
+    , { name := "m.py:<module>.Cache.__iter__", params := [], body := .skip }
+    , { name := "m.py:<module>.Cache.__len__", params := [], body := .ret (.lit (.int 0)) }
+    , { name := "m.py:<module>.Partial.__getitem__", params := ["k"], body := .ret (.name "k") }
+    , { name := "m.py:<module>.Odd.size", params := [], body := .ret (.lit (.int 1)) }
+    -- `Cache().size()`  -- an own method through a contracted base
+    , { name := "m.py:<module>.own", params := []
+      , body := .seq (.assign "c" (.alloc "Cache" []))
+                     (.ret (.mcall (.name "c") "size" [])) }
+    -- `Cache().get(1)`  -- a mixin the ABC provides: its code is not translated
+    , { name := "m.py:<module>.mixin", params := []
+      , body := .seq (.assign "c" (.alloc "Cache" []))
+                     (.ret (.mcall (.name "c") "get" [.lit (.int 1)])) }
+    -- `Cache().nothing`  -- CPython: AttributeError
+    , { name := "m.py:<module>.missing", params := []
+      , body := .seq (.assign "c" (.alloc "Cache" []))
+                     (.ret (.field (.name "c") "nothing")) }
+    -- `Partial()`  -- CPython: TypeError, abstract methods unimplemented
+    , { name := "m.py:<module>.partial", params := []
+      , body := .ret (.alloc "Partial" []) }
+    -- `Odd().size()`  -- `foo.Bar` is not contracted
+    , { name := "m.py:<module>.odd", params := []
+      , body := .seq (.assign "c" (.alloc "Odd" []))
+                     (.ret (.mcall (.name "c") "size" [])) } ] }
+
+#guard match runFunc externalBaseProg 200 "m.py:<module>.own" [] with
+       | .val (.int 7) => true | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.mixin" [] with
+       | .hole "class-attribute:external-base:<external>collections.abc.MutableMapping:get" => true
+       | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.missing" [] with
+       | .exn (.str "AttributeError") => true | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.partial" [] with
+       | .hole "class-construction:abstract-method:__delitem__" => true | _ => false
+#guard match runFunc externalBaseProg 200 "m.py:<module>.odd" [] with
+       | .hole "class-hierarchy:unresolved-base:<external>foo.Bar" => true | _ => false
+
+/-- `__getattr__` runs only on a MISS (§3.3.2): a present instance attribute reads and
+writes as usual, and the miss is a named gap rather than `AttributeError`. -/
+private def getattrHookProg : Program :=
+  { dialect := .python
+  , classDecls :=
+      [ { name := "m.py:<module>.D", shortName := "D", bases := ["__builtin.object"]
+        , attributes := [("__init__", .method "m.py:<module>.D.__init__"),
+                         ("__getattr__", .method "m.py:<module>.D.__getattr__")] } ]
+  , funcs :=
+    [ { name := "m.py:<module>.D.__init__", params := []
+      , body := .setField (.name "self") "n" (.lit (.int 3)) }
+    , { name := "m.py:<module>.D.__getattr__", params := ["name"], body := .ret (.name "name") }
+    , { name := "m.py:<module>.present", params := []
+      , body := .seq (.assign "d" (.alloc "D" []))
+                (.seq (.setField (.name "d") "n" (.lit (.int 4)))
+                      (.ret (.field (.name "d") "n"))) }
+    , { name := "m.py:<module>.missing", params := []
+      , body := .seq (.assign "d" (.alloc "D" []))
+                     (.ret (.field (.name "d") "zzz")) } ] }
+
+#guard match runFunc getattrHookProg 100 "m.py:<module>.present" [] with
+       | .val (.int 4) => true | _ => false
+#guard match runFunc getattrHookProg 100 "m.py:<module>.missing" [] with
+       | .hole "field:zzz:__getattr__-hook" => true | _ => false
+
+/-- A bare call never resolves to a method (`Ctx.resolveCall`). `set()` beside a class
+whose only `….set` is a method: CPython builds an empty set, which Core does not model,
+so the honest answer is the builtin's hole -- not the method's arity `TypeError`. -/
+private def bareCallProg : Program :=
+  { dialect := .python
+  , classDecls := [{ name := "m.py:<module>.K", shortName := "K", bases := ["__builtin.object"] }]
+  , funcs :=
+      [ { name := "m.py:<module>.K.set", params := ["self"], body := .ret (.lit (.int 1)) }
+      , { name := "m.py:<module>.bare", params := [], body := .ret (.call "set" []) }
+      , { name := "m.py:<module>.helper", params := [], body := .ret (.lit (.int 2)) }
+      , { name := "m.py:<module>.viaSuffix", params := [], body := .ret (.call "helper" []) }
+      , { name := "m.py:<module>.dotted", params := [],
+          body := .ret (.call "K.set" [.lit (.int 0)]) } ] }
+
+#guard match runFunc bareCallProg 50 "m.py:<module>.bare" [] with
+       | .hole "call:set" => true | _ => false
+-- A module-level function is still found by its bare name, and a dotted name still
+-- reaches the method.
+#guard match runFunc bareCallProg 50 "m.py:<module>.viaSuffix" [] with
+       | .val (.int 2) => true | _ => false
+#guard match runFunc bareCallProg 50 "m.py:<module>.dotted" [] with
+       | .val (.int 1) => true | _ => false
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.present" [] with
+       | .val (.int 1) => true | _ => false
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.viaProperty" [] with
+       | .val (.int 7) => true | _ => false
+#guard match runFunc attrMissProg 200 "m.py:<module>.present" [] with
+       | .val (.int 1) => true | _ => false
+#guard match runFunc attrMissProg 200 "m.py:<module>.viaProperty" [] with
+       | .val (.int 7) => true | _ => false
+
+-- JavaScript: `({}).x` is `undefined`, not an exception (ECMA-262 OrdinaryGet).
+private def jsMissProg : Program :=
+  { dialect := .javascript
+  , funcs :=
+    [ { name := "K.constructor", params := [], body := .skip }
+    , { name := "missing", params := []
+      , body := .seq (.assign "o" (.alloc "K" []))
+                     (.ret (.field (.name "o") "x")) } ] }
+#guard match runFunc jsMissProg 200 "missing" [] with | .val .unit => true | _ => false
+
+/-! ## Decorated methods: a function stored as a class attribute binds
+
+`class Box: @add1 def bump(self, n): return self.v + n` binds the class attribute `bump`
+to `add1(<function bump>)` when the class body runs (Language Reference §8.7). A function
+is a non-data descriptor, so `Box().bump` is a bound method and `Box.bump` the plain
+function (§3.3.2.4, §3.2.8.4). A stored instance of a class with `__get__` is a
+descriptor Core does not run: reading or writing it through an instance is a named gap. -/
+private def plainSig : Option PythonSignature := some { isMethod := some false }
+private def decoratedMethodProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.add1", params := ["f"], pythonSignature := plainSig
+      , body := .seq (.assign "wrapper" (.closure "m.py:<module>.add1.wrapper"))
+                     (.ret (.name "wrapper")) }
+    , { name := "m.py:<module>.add1.wrapper", params := ["self", "n"], pythonSignature := plainSig
+      , body := .ret (.binop "+" (.callValue (.name "f") [.name "self", .name "n"])
+                                 (.lit (.int 1))) }
+    , { name := "m.py:<module>.Box.bump<undecorated>", params := ["self", "n"]
+      , pythonSignature := plainSig
+      , body := .ret (.binop "+" (.field (.name "self") "v") (.name "n")) }
+    , { name := "m.py:<module>.D.__get__", params := ["obj", "owner"]
+      , body := .ret (.lit (.int 0)) }
+    , { name := "m.py:<module>.viaInstance", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                      (.ret (.mcall (.name "c") "bump" [.lit (.int 5)]))) }
+    , { name := "m.py:<module>.boundValue", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                (.seq (.assign "b" (.field (.name "c") "bump"))
+                      (.ret (.callValue (.name "b") [.lit (.int 1)])))) }
+    , { name := "m.py:<module>.viaClass", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                      (.ret (.callValue (.field (.fnref "m.py:<module>.Box<meta>") "bump")
+                              [.name "c", .lit (.int 2)]))) }
+    , { name := "m.py:<module>.unchanged", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                      (.ret (.mcall (.name "c") "same" [.lit (.int 3)]))) }
+    , { name := "m.py:<module>.readDescriptor", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                     (.ret (.field (.name "c") "desc")) }
+    , { name := "m.py:<module>.writeDescriptor", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "desc" (.lit (.int 1)))
+                      (.ret (.lit (.int 1)))) }
+    , { name := "m.py:<module>", params := []
+      , body := .seq (.setGlobal "<classattr>m.py:<module>.Box.bump"
+                        (.call "m.py:<module>.add1" [.fnref "m.py:<module>.Box.bump<undecorated>"]))
+                (.seq (.setGlobal "<classattr>m.py:<module>.Box.same"
+                        (.fnref "m.py:<module>.Box.bump<undecorated>"))
+                      (.setGlobal "<classattr>m.py:<module>.Box.desc"
+                        (.alloc "m.py:<module>.D" []))) } ]
+  , classDecls :=
+      [ { name := "m.py:<module>.Box", shortName := "Box", bases := ["__builtin.object"]
+        , attributes := [("bump", .stored "<classattr>m.py:<module>.Box.bump"),
+                         ("same", .stored "<classattr>m.py:<module>.Box.same"),
+                         ("desc", .stored "<classattr>m.py:<module>.Box.desc")] }
+      , { name := "m.py:<module>.D", shortName := "D", bases := ["__builtin.object"]
+        , attributes := [("__get__", .method "m.py:<module>.D.__get__")] } ] }
+
+private def decoratedInits : List Func :=
+  decoratedMethodProg.funcs.filter (·.name == "m.py:<module>")
+
+-- `Box().bump(5)`: the receiver goes in front of the arguments, `wrapper(self, 5)` runs.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.viaInstance" [] with
+       | .val (.int 16) => true | _ => false
+-- `b = Box().bump; b(1)`: the bound method carries its receiver.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.boundValue" [] with
+       | .val (.int 12) => true | _ => false
+-- `Box.bump(c, 2)`: through the class the function is unbound.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.viaClass" [] with
+       | .val (.int 13) => true | _ => false
+-- A decorator returning the original function: the raw body binds like any method.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.unchanged" [] with
+       | .val (.int 13) => true | _ => false
+-- An instance of a class defining `__get__` is a descriptor Core does not run.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.readDescriptor" [] with
+       | .hole "class-attribute:desc:descriptor-object" => true | _ => false
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.writeDescriptor" [] with
+       | .hole "class-attribute:desc:descriptor-object" => true | _ => false
+#guard funcObjCls == "<function>"
+#guard (resolveBoundMethod boundFunctionName).map (·.name) == some boundFunctionName
 
 end Autoform.Core

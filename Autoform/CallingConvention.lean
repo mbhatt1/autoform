@@ -216,8 +216,9 @@ set_option maxRecDepth 100000 in
 theorem doubleStar_overflow_lands_in_kwargs :
     runFunc prog 60 "c11" [] = .val (.tuple [.unit, .dict [(.str "z", .int 9)]]) := by
   simp +decide [runFunc, prog, caller, f_f, f_g, f_h, f_k, f_m, Program.table, Heap.get,
-    Ctx.resolve, Ctx.resolve.go, String.endsWith, applyFunc, bindParams, Func.posParams,
-    kwargsRejected, execStmt, evalExpr, evalList, evalPairs, strKeyed, Env.set, Env.get]
+    Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith, applyFunc, bindParams, Func.literalDefaults, Func.posParams,
+    kwargsRejected, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList,
+    evalPairs, strKeyed, Stdlib.dictOfPairs, Stdlib.dictSet, Val.beq, Env.set, Env.get, Heap.alloc]
 
 theorem all_four_forms_together :
     runFunc prog 60 "c13" []

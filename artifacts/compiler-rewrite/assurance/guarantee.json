@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "module": "CompilerRewrite",
+  "status": "verified_scoped",
+  "whole_program_correctness": false,
+  "claims": [
+    {
+      "theorem": "Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__add",
+      "subject": "numbers.py:<module>.add",
+      "recorded_cases": 5,
+      "all_inputs": false,
+      "property": "The Lean model produces the recorded native outcome for each listed input and initial state."
+    },
+    {
+      "theorem": "Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__fraction",
+      "subject": "numbers.py:<module>.fraction",
+      "recorded_cases": 5,
+      "all_inputs": false,
+      "property": "The Lean model produces the recorded native outcome for each listed input and initial state."
+    },
+    {
+      "theorem": "Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__quotient",
+      "subject": "numbers.py:<module>.quotient",
+      "recorded_cases": 5,
+      "all_inputs": false,
+      "property": "The Lean model produces the recorded native outcome for each listed input and initial state."
+    }
+  ],
+  "failed_checks": [],
+  "repository": null,
+  "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+  "native_observations": 15,
+  "assumptions": [
+    "The recorded build context, source revision and initial states define the scope.",
+    "The Lean kernel and stated interpreter semantics are trusted.",
+    "Native comparisons test translation fidelity on recorded cases; they do not prove it for all inputs."
+  ],
+  "exclusions": [
+    "All-input correctness of the original program",
+    "Absence of all bugs or security vulnerabilities",
+    "Untranslated, unexecuted or unproved behavior",
+    "Deployment behavior outside the recorded environment"
+  ],
+  "evidence_sha256": {
+    "conformance.json": "79bfbfb16a2fbbf6fcda76688509cfae6ce2dfad86c5ac641d09a27b33132806",
+    "specs.json": "d720dbfd2df2999a8e4cbc9cc5c0716197674dd8053449bd0cc6dfa4cf28452c",
+    "audit.json": "c49312a91f880b0c2bde1fef645575996fdcdae8077d3731daed17c08d30594c",
+    "mutation.json": "62abf3574a6e1278a1970bc89a3075701bfc906e3d28a2c97cfa58a431c2a4fd",
+    "context.json": "fa0a55c5d9d9ded6406238493b96a9c00baf9db8e651a07ebfacd6b4d9138cf4",
+    "../../../Autoform/Generated/CompilerRewrite.lean": "2b59af2db7d369c7735ce91666c5f90edf3149b11362ce0bce49d2d1ace6215a",
+    "../../../Autoform/SpecsGen/CompilerRewrite.lean": "62da50e8ed4ba2f68a8b00fa3e525db3d9d5f9e1b7a1fd0e94105e4a33d23fc2",
+    "inventory.json": "5708edb03bf83d750262d0e4582c08c2882dd7e1ce88bb560dd8361edba74e0d",
+    "inventory-after.json": "5708edb03bf83d750262d0e4582c08c2882dd7e1ce88bb560dd8361edba74e0d",
+    "source-coverage.json": "3c208cf353c901e71dc08b319dcc93be9468d40a847820669c666f2ce48a2f6d",
+    "selection.json": "0914a50467743afc08226183bc2768badbfd5aa6ea2481c997ad8cb332a6845e"
+  },
+  "replay_command": "lake env leanchecker --fresh Autoform.SpecsGen.CompilerRewrite",
+  "source_coverage": {
+    "schema_version": 1,
+    "language": "python",
+    "inventory_fingerprint": "1a2026657949c3d11ce5d8d9a959e6610b66c435843a583614e6fdcf20e2c3f2",
+    "files": [
+      {
+        "path": "numbers.py",
+        "language": "python",
+        "status": "represented"
+      }
+    ],
+    "counts": {
+      "represented": 1,
+      "unrepresented": 0,
+      "unsupported": 0,
+      "unclassified": 0,
+      "auxiliary": 0,
+      "outside_partition": 0
+    },
+    "source_changes": [],
+    "source_stable": true,
+    "scan_complete": true,
+    "source_census_complete": false,
+    "truncated_by_method_limit": false,
+    "frontend_census_complete": false,
+    "unexpected_ast_files": [],
+    "note": "Represented means at least one exported AST entry names the file. It does not establish complete parsing, translation or proof coverage."
+  }
+}

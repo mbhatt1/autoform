@@ -1,0 +1,214 @@
+{
+  "status": "PROMOTED_TO_MAIN_SOURCE",
+  "goal_status": "active_incomplete",
+  "candidate_revision": "38ed72a60e362f8c87feff31580f9ae7121ab473",
+  "workspace": "/Users/mbhatt/autoform/.autoform-work/interpreter-integration",
+  "main_revision": "d8aec57",
+  "scope": "Qualified inheritance and slots, faithful native trace returns and source identities, lexical callable dispatch, safe constructor gap emission, and exact class-valued conformance proofs.",
+  "source_sha256": {
+    "Autoform/Contracts.lean": "de87e1bb19cb70763c9b0f81494ec4b31a45e24a22a4d6aaef1375472f96bf82",
+    "Autoform/FuelMono.lean": "0d918ccc389d8e63603f470ca708fbe5f1a3091a89a031d76c458dcbe06b4f8e",
+    "Autoform/Lang/Core/ClassHierarchy.lean": "d847e5393e0b6d6a8cfdbe6bbfdc0ca72ca56575ff88d8df3a3d7acbedbde7ac",
+    "Autoform/Lang/Core/ExcSafe.lean": "d4d1b791856b577897d2ddbb96c0988cbc10ce40a7db07a3009a08049e4a805a",
+    "Autoform/Lang/Core/Semantics.lean": "9d449417ec9c01d6923eb015a9311273a9aea46733c44d2af3fb8523498f1c9e",
+    "Autoform/Lang/Core/Syntax.lean": "0d3fd9b0b8abee244a15d1c67e23b72df21e6473c012864d33a4796465512c28",
+    "Autoform/Refine.lean": "203a5a0a810043bf4304893a73312595030283767e7974dbf24b96e5aa5bd6af",
+    "Autoform/Specs/CachetoolsSpec.lean": "e92b77b259960ddb3f675d7488179f0104d1bbb2da605f301c509f7be330f013",
+    "Autoform/SpecsGen/Basis.lean": "9ea49568876e05c8126e863a12ca45fca1011710628902ac87616ac66b532eda",
+    "cartographer/export_ast.sc": "b451f65cdede1131b380d9edf1a82d8e58b2ab8b0eef78f1826cc1db54730eb6",
+    "cartographer/render_lean.py": "c5a824d3ac42a59fc5b545d106d974cbb9d8eb60c651b95917c8003e11746560",
+    "examples/python_control/inheritance.py": "49bf46552359e499f2288ff56f9b7af490437eb28e0b699aabeb0a6e010552f7",
+    "examples/python_control/local_callables.py": "9e073361b3cca760b09705a83cf1cecec009c25d184c961a50e674da21631bb7",
+    "examples/python_control/slots.py": "6c2a92b5669429879e2aafc42b0c625ae2928f2f925a8bc9a6171e37dfa9d8f8",
+    "scripts/core_oracle.py": "445b9d8c890a783110218759531c78656d4219be6eae75a4a57ab502fd819b9c",
+    "scripts/differential.py": "1c6279aae0c60115edd39d202e5625cdec431cd365a7c3d4d29048f40fd9be5c",
+    "scripts/provenance.py": "57d9c3fd755708d072044515070db24b71ddf31b0fb6da85a926514041454067",
+    "scripts/synth_specs.py": "32b9415c2677bf2965b0d485761874d95e462fa23d627c989f4b5562319a41df",
+    "tests/test_class_value_observations.py": "6098f31967c8f619b37a0220d3768767ba6256b8f8a872cd5dfcfc2c09c3fa4e",
+    "tests/test_native_deadlines.py": "bf42c8837a9ff2ac2008fb71002e6899acacc5760560c91a689238be2df3a85b",
+    "tests/test_native_trace_returns.py": "1c67a8e6c6609ea1ab0550ed99b1aca34550a5f003fbd5585b4740227b42c223",
+    "tests/test_python_binding.py": "121b8f3b25381e1beae1086b7ee8c94fb5cb54e8e8a1b1cc4212f9623cc80971",
+    "tests/test_python_callable_shapes.py": "e5b4bf69173f686a804f0678d611c8660357259961dbca6d9f77e8fd23475302",
+    "tests/test_python_class_identities.py": "43e7df37a4fdfeaac712e238a570a13e953675dbb59eb81b31f38a896ebdf1f7",
+    "tests/test_python_receivers.py": "3d6c4a605cf3b68f1201f9348c2c6475c37d558224f3c3f34983a65683b86093",
+    "tests/test_python_signatures.py": "51299c1a2176085a9a6bb12174100e7f11b9507a9e5aad875c93350b0c201dac",
+    "tests/test_python_slot_metadata.py": "61b22622289862b2ed15a36d9e05771fc9d5ce603c0cf33a923c3d608ea8993b",
+    "tests/test_python_slots.py": "8ac47f52aefba18c7bda2cd79604e43814331a3069a043728d1e341ce0209ba4",
+    "tests/test_source_constructor_boundaries.py": "172398a0289711a3601492b15ebf5405031c906c51149e5e2018a83160ad8a9c",
+    "tests/test_source_generator_expressions.py": "c1eee7a8f08a9193b5d8a214ec390e7f72e52fa2796fb856263b2a9109b6b8e6",
+    "tests/test_source_inheritance.py": "784ea232f2e905ac5f704a693d356113567c2511a5a8b18d1be09618470aefa0",
+    "tests/test_source_local_callables.py": "c32670855113a7b0503118f74cc6ef6a8c46bc0c5f0407954f183f5037305fca",
+    "tests/test_source_numeric.py": "b5cefabb76bee471ba3f9d1211986d7d0252524df1cfd8db0a33adab2e8fb803",
+    "tests/test_source_revision.py": "3b44909d24422e6c88344227e173dfdd98a5cc199e5275451b69cb158a4c50cd",
+    "tests/test_source_slots.py": "f119f0d9d898ade79ceebc33063c8ad8c47877597b19299de373531506a576e8"
+  },
+  "checks": {
+    "lean_consistency": {
+      "status": "PASS",
+      "summary": "No Lean source differences from the frozen slots candidate 6274a62."
+    },
+    "pipeline_before_lexical_fix": {
+      "status": "FAILED_DIVERGENCES",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/interpreter-integration-validation",
+      "log": "integration-pipeline1.log",
+      "report": "artifacts/pipeline/InterpreterRecovery/run.json",
+      "session_id": 50013,
+      "source": "/Users/mbhatt/autoform/.autoform-work/integration-source",
+      "source_revision": "10f0779",
+      "summary": "28 observations: 16 agreements, 12 divergences, 0 inconclusive. All divergences come from a local classmethod binding incorrectly compiled as a static Base.owner call.",
+      "measurement_basis": "python-class-slots-v6+trace-returns-v1"
+    },
+    "python_before_lexical_fix": {
+      "status": "PASS",
+      "log": "integration-python1.log",
+      "session_id": 90393,
+      "summary": "837 passed, 60 skipped, 1 xfailed in 325.04s; before lexical callable fix."
+    },
+    "source_regressions": {
+      "status": "10_PASS_1_HARNESS_FAILURE",
+      "log": "local-callables-source-regressions1.log",
+      "session_id": 67209,
+      "scope": "Final lexical call fix with thirteen callback probes plus prior inheritance, slots, bound calls, class attributes, and callable shapes.",
+      "summary": "10 passed, 1 failed in 464.01s. Thirteen new callable comparisons and kernel observations passed. The remaining harness omitted class metadata; fixed in b7bb470."
+    },
+    "pipeline_lexical_fix": {
+      "status": "COMPLETED_WITH_GAPS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/interpreter-integration-validation2",
+      "log": "integration-pipeline2.log",
+      "report": "artifacts/pipeline/InterpreterRecovery/run.json",
+      "session_id": 61041,
+      "source": "/Users/mbhatt/autoform/.autoform-work/integration-source",
+      "source_revision": "10f0779204ef656228259a848a69d55698030b72",
+      "comparisons": {
+        "cases": 28,
+        "agree": 28,
+        "divergences": 0,
+        "inconclusive": 0
+      },
+      "measurement_basis": "python-class-slots-v6+trace-returns-v1",
+      "proofs": 7,
+      "open_obligations": 0,
+      "holes": 0,
+      "mutation": {
+        "tested": 14,
+        "killed": 11,
+        "survived": 3,
+        "invalid": 0,
+        "inconclusive": 0
+      },
+      "fresh_proof_audit": "PASS; STABLE; VERIFIED",
+      "proof_observation_gap": "One class-valued outcome was skipped by the old callable filter."
+    },
+    "source_contexts": {
+      "status": "PASS_WITH_TARGETED_RECHECKS",
+      "initial_log": "callable-context-source1.log",
+      "initial": "58 passed; 2 stale expectation/proof failures.",
+      "rechecks": [
+        {
+          "log": "callable-context-source2.log",
+          "result": "Receiver matrix and kernel proofs pass; signature module-init precondition repaired afterward."
+        },
+        {
+          "log": "signature-source3.log",
+          "result": "Signature/default source and kernel checks pass: 1 passed in 22.07s."
+        }
+      ]
+    },
+    "python_previous": {
+      "status": "PASS",
+      "log": "integration-python2.log",
+      "session_id": 26332,
+      "summary": "838 passed, 61 skipped, 1 xfailed in 362.97s; final lexical callable candidate 733aa0d."
+    },
+    "python": {
+      "status": "PASS",
+      "log": "integration-python3.log",
+      "session_id": 32563,
+      "summary": "843 passed, 62 skipped, 1 xfailed in 320.04s."
+    },
+    "class_value_focus": {
+      "status": "PASS",
+      "log": "class-values-focused1.log",
+      "summary": "41 passed, 1 skipped in 86.80s."
+    },
+    "pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/interpreter-integration-validation3",
+      "candidate_revision": "38ed72a60e362f8c87feff31580f9ae7121ab473",
+      "log": "integration-pipeline3.log",
+      "report": "artifacts/pipeline/InterpreterRecovery/run.json",
+      "session_id": 54600,
+      "proofs": 8,
+      "open_obligations": 0,
+      "holes": 0,
+      "verification_complete": false,
+      "stage_exit_codes": {
+        "source": 0,
+        "core-oracle": 0,
+        "mutation": 1,
+        "restore-build": 0,
+        "audit": 0,
+        "contracts": 0,
+        "assurance": 1
+      },
+      "mutation": {
+        "tested": 16,
+        "killed": 12,
+        "survived": 4,
+        "invalid": 0,
+        "inconclusive": 0
+      },
+      "fresh_proof_audit": {
+        "verdict": {
+          "failures": [],
+          "pass": true
+        },
+        "artifact_binding": "STABLE",
+        "kernel_recheck": "VERIFIED"
+      }
+    },
+    "docs": {
+      "status": "PASS",
+      "log": "integration-docs2.log",
+      "summary": "Eight documented figures match unchanged baseline artifacts. Initial clone lacked ignored ledger-Cachetools.json; copied its unchanged main input before checking."
+    },
+    "full_lean_builds": {
+      "inheritance": "PASS: 479 jobs",
+      "slots": "PASS: 479 jobs",
+      "fresh_full_audits": {
+        "inheritance": "PASS; STABLE; VERIFIED; 7365 declarations",
+        "slots": "PASS; STABLE; VERIFIED; 7385 declarations"
+      }
+    },
+    "main_promotion": {
+      "status": "PASS_SOURCE_COPY",
+      "main_head": "d8aec57",
+      "candidate_revision": "337b639",
+      "backup": "/Users/mbhatt/autoform/.autoform-work/integration-promotion-backup",
+      "note": "Main Git index writes are denied. Validated source changes are present as an uncommitted main worktree diff; isolated commits and patch preserve reviewability. Existing newer main native-oracle reports were retained."
+    },
+    "main_build": {
+      "status": "PASS",
+      "log": "/Users/mbhatt/autoform/.autoform-work/main-integration-build1.log",
+      "summary": "479 jobs; verified after source promotion and copying the terminal audited slots build cache."
+    }
+  },
+  "prior_evidence": {
+    "inheritance": "../inheritance-development/artifacts/interpreter-recovery/inheritance-validation.json",
+    "slots": "../slots-development/artifacts/interpreter-recovery/slots-validation.json",
+    "native_oracle": "/Users/mbhatt/autoform/artifacts/interpreter-recovery/native-trace-validation.json"
+  },
+  "remaining": [
+    "Native heap-effect observations are needed for constructors and other mutating methods.",
+    "Imported-base contracts, class namespace execution, global/closure snapshots and fresh corpus re-lands remain incomplete; the arbitrary-codebase bar is not met.",
+    "Strict unbound-local errors and general dynamic class invocation remain gaps in the existing name/value interpreter paths.",
+    "Fresh Cachetools diagnostic at 26fefc9: 35 agreements, 95 inconclusive cases, 7 proofs, unresolved mutation/assurance gates. See cachetools-integration-diagnostic.json.",
+    "A separate heap-preservation fix is implemented at ../heap-observation-development (dcb1f2b); it is not included in this candidate."
+  ],
+  "research": [
+    {
+      "url": "https://docs.python.org/3.11/reference/executionmodel.html#resolution-of-names",
+      "finding": "Local and free callable names are resolved in their lexical environment at runtime. Class namespaces do not enclose method bodies."
+    }
+  ]
+}

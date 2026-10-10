@@ -84,6 +84,27 @@ class TestResolveSrcRoot:
         assert R(missing, ["pkg/a.py"]) == missing
 
 
+class TestTestScope:
+    def test_selected_component_does_not_execute_ancestor_tests(self, differential, tmp_path):
+        root = tree(str(tmp_path), 'tests/test_host.py', 'examples/component/policy.py')
+        assert differential.find_tests(os.path.join(root, 'examples/component')) == []
+
+    def test_repository_tests_are_found_before_import_root_correction(self, differential, tmp_path):
+        root = tree(str(tmp_path), 'src/pkg/policy.py', 'tests/test_policy.py')
+        assert differential.find_tests(root) == [os.path.join(root, 'tests')]
+        assert differential.resolve_src_root(root, ['pkg/policy.py']) == os.path.join(root, 'src')
+
+    def test_component_local_tests_remain_discoverable(self, differential, tmp_path):
+        root = tree(str(tmp_path), 'component/policy.py', 'component/tests/test_policy.py')
+        component = os.path.join(root, 'component')
+        assert differential.find_tests(component) == [os.path.join(component, 'tests')]
+
+    def test_automatic_test_directory_cannot_symlink_outside_scope(self, differential, tmp_path):
+        root = tree(str(tmp_path), 'host/tests/test_host.py', 'component/policy.py')
+        os.symlink(os.path.join(root, 'host/tests'), os.path.join(root, 'component/tests'))
+        assert differential.find_tests(os.path.join(root, 'component')) == []
+
+
 class TestImportSideEffects:
     """Importing `differential.py` re-execs the *whole process* unless guarded.
 

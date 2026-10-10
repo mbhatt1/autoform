@@ -1,0 +1,55 @@
+{
+  "baseline_revision": "5a1305b",
+  "baseline_exporter_sha256": "bf6771e25a0945b64dc975abc5e4d1726837b0843b8e6090c94f38f1da5ff193",
+  "module_probe": {
+    "status": "passed",
+    "stdout": "MODULE_PROBE:0"
+  },
+  "cases": [
+    {
+      "language": "python",
+      "source": "examples/source/python",
+      "cpg_sha256": "a64f960d6636cd659e6e24a2cfaf1b2e783b1f472d439295176c2a228955aaae",
+      "functions": 5,
+      "ast_bytes": 3958,
+      "ast_sha256": "4b7227dd4eea775bec2f9b9f0035ec4751d37ace4876b384a6e5f8514096a829",
+      "ast_byte_identical": true,
+      "census_byte_identical": true,
+      "census_sha256": "0c98b5482cc928cd3b7878298ffc928385144d19beb86489385400ac13b628ff"
+    },
+    {
+      "language": "c",
+      "source": "examples/source/c",
+      "cpg_sha256": "b1a10f9b6beb10aebfcd00cdada39c7a38dd2f72bf7da79c17ed034fc6a43ffd",
+      "functions": 13,
+      "ast_bytes": 7584,
+      "ast_sha256": "f143ad4fb10b8755ef793bf48ec81cf9c1acda930b8912518a6e2767ec7787bb",
+      "ast_byte_identical": true,
+      "census_byte_identical": true,
+      "census_sha256": "d288e2ea4088586283db070fd1d06589900a4396107d78721f354838549ee7c6"
+    }
+  ],
+  "compiler_files": {
+    "cartographer/export_ast.sc": {
+      "lines": 30,
+      "sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+    },
+    "cartographer/compiler/Json.scala": {
+      "lines": 117,
+      "sha256": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17"
+    },
+    "cartographer/compiler/Numeric.scala": {
+      "lines": 173,
+      "sha256": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c"
+    },
+    "cartographer/compiler/SourceCompiler.scala": {
+      "lines": 12524,
+      "sha256": "56a0244588348041ed97e8aeeddffc974a09110d2b09a653a66e1d29e7acf4f0"
+    }
+  },
+  "limits": {
+    "jvm_heap": "-J-Xmx6g",
+    "LEAN_NUM_THREADS": "1",
+    "rss_measurement": "unavailable: sandbox denied ps"
+  }
+}

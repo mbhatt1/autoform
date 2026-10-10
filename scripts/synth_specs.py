@@ -61,6 +61,10 @@ import random
 import re
 import subprocess
 import sys
+import signal
+import tempfile
+import time
+import deep_json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -68,6 +72,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(REPO, "cartographer"))
 
 import differential as D                                  # noqa: E402  (trace + encoder)
+import runtime_backends
 import mutate as M                                        # noqa: E402  (decl parser)
 from render_lean import ident as lean_ident               # noqa: E402  (name mangling)
 
@@ -78,7 +83,7 @@ INIT_FUEL = 5000       # fuel for `initGlobals`, matching scripts/differential.p
 MAX_DOMAIN = 8         # cases per mined law: the kernel has to evaluate every one
 MIN_LAW_DOMAIN = 3     # below this a "law" is an anecdote, not a law
 OUTDIR = os.path.join(REPO, "Autoform", "SpecsGen")
-SCRATCH = os.environ.get("AUTOFORM_SCRATCH", "/tmp")
+SCRATCH = tempfile.mkdtemp(prefix="autoform-synth-", dir=os.environ.get("AUTOFORM_SCRATCH", "/tmp"))
 GLOBALS = ("[]", "0")   # filled in by `globals_literal` once the module is known
 ENV = dict(os.environ, PATH=os.path.expanduser("~/.elan/bin") + ":" + os.environ["PATH"])
 
@@ -190,8 +195,7 @@ def mine_artifacts(funcs, src_root):
             art["docstrings"] += 1
             if DOCTEST.search(doc):
                 art["doctests"] += 1
-        blob = json.dumps(f["body"])
-        art["raises"] += blob.count('"k": "raise"') + blob.count('"k":"raise"')
+        art["raises"] += sum(n.get('k') == 'raise' for n in deep_json.dict_nodes(f['body']))
     for root, _dirs, files in os.walk(src_root):
         if ".git" in root:
             continue
@@ -223,9 +227,9 @@ def observe(ast_path, src_root, tests_override, per_fn):
     Reused wholesale rather than rebuilt: the encoder there already refuses every value
     it cannot represent faithfully, which is precisely the property a specification
     generator needs from its input."""
-    funcs = json.load(open(ast_path))
-    holefree = [f for f in funcs if not D.has_hole(f["body"])]
-    wanted = set(f["name"] for f in holefree if D.classify(f))
+    funcs = deep_json.load(ast_path)
+    candidates = D.python_sampling_candidates(funcs)
+    wanted = set(f["name"] for f in candidates if D.classify(f))
     # The exporter emits one synthetic `<module-objects>:<module>` entry with an empty
     # `file`, which is not a source path. Passed through, `root + ""` is the source root
     # itself and `build_lineno_index` dies with IsADirectoryError -- a crash, at least,
@@ -357,7 +361,7 @@ def fuzz_cases(rec, rng, n):
         heap = [list(o) for o in rec["heap"]]
         for o in heap:
             o[1] = [(k, perturb(x, rng) if rng.random() < 0.4 else x) for k, x in o[1]]
-        out.append({"heap": [(c, fs) for c, fs in heap], "self": rec["self"],
+        out.append({"heap": heap, "self": rec["self"],
                     "args": args})
     return out
 
@@ -522,16 +526,7 @@ def val_lit(v):
 
 
 def heap_lit(heap):
-    """Heap literal, written with named fields.
-
-    `differential.py`'s `lean_heap` uses the anonymous constructor, which no longer
-    accepts `Obj` now that it carries a third (defaulted) `captured` field — named fields
-    are the form that survives a structure gaining one."""
-    return "[%s]" % ", ".join(
-        "{ cls := %s, fields := [%s] }"
-        % (lean_str(cls), ", ".join("(%s, %s)" % (lean_str(k), val_lit(v))
-                                    for k, v in fields))
-        for cls, fields in heap)
+    return D.lean_heap(heap, val_lit, lean_str)
 
 
 def case_lit(c):
@@ -553,7 +548,49 @@ def eresult_lit(outcome):
 
 
 def obs_lit(rec):
-    return "{ case := %s, expected := %s }" % (case_lit(rec), eresult_lit(rec["outcome"]))
+    return "{ case := %s, expected := %s, post := %s }" % (
+        case_lit(rec), eresult_lit(rec["outcome"]), D.graph_lit(rec, val_lit, lean_str))
+
+
+def value_has_callable(v, class_values=frozenset()):
+    """Does an encoded runtime value contain a function (`["fn", qualname]`) anywhere?
+
+    `scripts/differential.py` counts a returned callable as AGREEING when the two sides'
+    names match by dotted suffix with `<locals>`/`<module>` dropped -- CPython reports a
+    `__qualname__`, Joern a fully-qualified name, and Core answers a closure. That is a
+    name rule, not the `Val` equality `lawConform` states, so such an observation cannot
+    be a conformance theorem as written and is left to the oracle rather than emitted as
+    a candidate that refutation would (correctly) reject. Recovered class values
+    admitted by conformance_class_values use exact identity instead and can be
+    checked by the existing Val equality law."""
+    if not isinstance(v, (list, tuple)) or not v:
+        return False
+    t = v[0]
+    if t == "fn":
+        return len(v) != 2 or v[1] not in class_values
+    if t in ("list", "tuple") and len(v) > 1 and isinstance(v[1], list):
+        return any(value_has_callable(x, class_values) for x in v[1])
+    if t == "dict" and len(v) > 1 and isinstance(v[1], list):
+        return any(value_has_callable(a, class_values) or value_has_callable(b, class_values)
+                   for a, b in v[1])
+    return False
+
+
+def outcome_has_callable(outcome, class_values=frozenset()):
+    return bool(outcome) and outcome[0] == "val" and value_has_callable(outcome[1], class_values)
+
+
+def conformance_class_values(funcs, src_root, native_report):
+    """Class identities whose native evidence used the exact comparison rule.
+
+    Older callable-name evidence cannot establish this stronger observation.
+    Duplicate and unresolved declarations retain the oracle's refusal.
+    """
+    if (native_report.get('runtime') != 'cpython' or
+            'class-values-v1' not in native_report.get('measurement_basis', '').split('+')):
+        return frozenset()
+    identities = D.class_identity_index(funcs, src_root)
+    return frozenset(name + '<meta>' for name in (identities or {}).values() if name is not None)
 
 
 # ---------------------------------------------------------------------------
@@ -580,7 +617,8 @@ class Cand:
 
     def as_json(self):
         return {"id": self.id, "family": self.family, "source": self.source,
-                "subject": self.subject, "kind": self.kind, "domain": len(self.dom),
+                "subject": self.subject, "definition": self.fdef,
+                "kind": self.kind, "domain": len(self.dom),
                 "status": self.status, "reason": self.reason, "proved": self.proved,
                 "checked": self.checked, "note": self.note}
 
@@ -590,40 +628,49 @@ GUARD = {"conform": "gRunObs", "charact": "gRunObs", "runs": "gRun", "returns": 
          "identity": "gRun", "nonneg": "gRun", "raises": "gRun",
          "idempotent": "gIdem", "involutive": "gInvol", "commutes": "gComm"}
 
-MONO = {"conform": "lawConform_fuel_mono", "charact": "lawConform_fuel_mono",
-        "runs": "lawRuns_fuel_mono",
-        "returns": "lawReturns_fuel_mono", "heappure": "lawHeapPreserved_fuel_mono",
-        "const": "lawConst_fuel_mono", "projects": "lawProjects_fuel_mono",
-        "identity": "lawIdentity_fuel_mono", "nonneg": "lawNonneg_fuel_mono",
-        "raises": "lawRaises_fuel_mono", "idempotent": "lawIdempotent_fuel_mono",
-        "involutive": "lawInvolutive_fuel_mono", "commutes": "lawCommutes_fuel_mono"}
+MONO = {"conform": "lawConform_fuel_mono_all", "charact": "lawConform_fuel_mono_all",
+        "runs": "lawRuns_fuel_mono_all",
+        "returns": "lawReturns_fuel_mono_all", "heappure": "lawHeapPreserved_fuel_mono_all",
+        "const": "lawConst_fuel_mono_all", "projects": "lawProjects_fuel_mono_all",
+        "identity": "lawIdentity_fuel_mono_all", "nonneg": "lawNonneg_fuel_mono_all",
+        "raises": "lawRaises_fuel_mono_all", "idempotent": "lawIdempotent_fuel_mono_all",
+        "involutive": "lawInvolutive_fuel_mono_all", "commutes": "lawCommutes_fuel_mono_all"}
 
 
 def has_try_finally(body):
-    """`Stmt.tryFinally` is the one construct fuel monotonicity excludes, and the
-    exclusion is real: `FuelMono.tryFinally_breaks_fuel_mono` exhibits a program that
-    answers 1 at fuel 4 and 2 at fuel 5. A law about such a subject stays an open
-    obligation."""
-    return '"tryFinally"' in json.dumps(body)
+    """Record finalizer presence for reporting; all constructors support fuel transport."""
+    return any(n.get('k') == 'tryFinally' for n in deep_json.dict_nodes(body))
 
 
 def writes_heap(body):
-    blob = json.dumps(body)
-    return any(k in blob for k in ('"setField"', '"setIndex"', '"alloc"'))
+    return any(n.get('k') in ('setField', 'setIndex', 'alloc') for n in deep_json.dict_nodes(body))
 
 
 def can_hole_or_loop(body):
     """Does this function have any construct that could hole at runtime or fail to
     terminate? Mirrors `Ledger.lean`'s `Analysis.eRisk`: `field`, `index`, `mcall`,
     `call`, `inOp`, arithmetic, and every looping form."""
-    blob = json.dumps(body)
-    return any('"%s"' % k in blob for k in
-               ("field", "index", "mcall", "call", "alloc", "inOp", "binop",
-                "loop", "forIn", "setIndex"))
+    return any(n.get('k') in ("field", "index", "mcall", "call", "alloc", "inOp", "binop",
+                             "loop", "forIn", "setIndex") for n in deep_json.dict_nodes(body))
 
 
-def gen_candidates(core, byname, recs, rng, synthetic=False):
-    """Mine candidates for every call-closed function the suite actually exercised.
+def conformance_subjects(byname, recs):
+    """Recorded executions can be proved even when another path contains a hole.
+
+    Call closure remains the population for mined behavioral templates. Concrete
+    native conformance has a different premise: every stated execution must reduce
+    to its recorded outcome. Refutation and kernel checking enforce that premise;
+    static holes on other paths do not justify dropping an observed subject.
+    """
+    subjects = sorted({record['name'] for record in recs})
+    missing = [name for name in subjects if name not in byname]
+    if missing:
+        raise ValueError('native observations name absent subjects: ' + ', '.join(missing))
+    return subjects
+
+
+def gen_candidates(core, byname, recs, rng, synthetic=False, conformance_only=False):
+    """Mine candidates for the selected functions the suite actually exercised.
 
     With `synthetic=True` there is no suite and no recorded call: the domain is fuzzed
     from the signature instead, and the three families that are mined *from observations*
@@ -655,10 +702,14 @@ def gen_candidates(core, byname, recs, rng, synthetic=False):
             cf = Cand("conform_" + sid, "conform", "cross-runtime (§4.4)", name,
                       fdef, "lawConform C FUEL %s" % fdef,
                       [obs_lit(r) for r in uniq[:MAX_DOMAIN]], dom_kind="obs",
-                      note="expected outcomes recorded from CPython by "
+                      note="expected outcomes recorded from the source runtime by "
                            "scripts/differential.py")
             cf.extra["try_finally"] = has_try_finally(f["body"])
+            cf.extra["heap_graph"] = any('post_heap' in r for r in uniq[:MAX_DOMAIN])
             cands.append(cf)
+
+        if conformance_only:
+            continue
 
         # ---- the fuzz domain every behavioural law is refuted against
         base = []
@@ -705,8 +756,8 @@ def gen_candidates(core, byname, recs, rng, synthetic=False):
         # domain a function that ignores its arguments satisfies `commutes` and
         # `idempotent` for a reason that has nothing to do with the law.
         pnames = f.get("params", []) or []
-        blob = json.dumps(core_body)
-        reads = [('"v": %s' % json.dumps(p)) in blob for p in pnames]
+        read_names = {n.get('v') for n in deep_json.dict_nodes(core_body) if n.get('k') == 'name'}
+        reads = [p in read_names for p in pnames]
         if any(len(c["args"]) >= 1 for c in dom):
             ins1 = synthetic and not (reads[:1] or [False])[0]
             add("identity", "algebraic (§4.3)", "lawIdentity C FUEL %s" % fdef,
@@ -801,8 +852,10 @@ open Autoform.Core Autoform.Refine Autoform.SpecsGen
 
 -- The proofs below are by computation on concrete inputs: the kernel walks the
 -- interpreter, and deeply nested calls need more than the default budgets.
-set_option maxRecDepth 20000
-set_option maxHeartbeats 1000000
+set_option maxRecDepth 100000
+set_option maxHeartbeats 10000000
+set_option cbv.warning false
+set_option exponentiation.threshold 4096
 
 abbrev P : Program := Autoform.Generated.%s.program
 
@@ -814,20 +867,12 @@ def h0 : Heap := %s
 /-- Address of the globals frame. -/
 def gref : Ref := %s
 def base : Nat := h0.length
-def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
+def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref,
+                 builtinBases := P.builtinBases, properties := P.properties,
+                 excClasses := P.excClasses, classDecls := P.classDecls }
 def FUEL : Nat := %d
 open Autoform.Generated.%s
 
-/-- Every function body reachable in this program is `tryFinally`-free, so
-`Autoform/FuelMono.lean`'s monotonicity theorems apply to this context. Checked by
-computation over the whole function table, not assumed. `Stmt.tryFinally` is the single
-construct that breaks fuel monotonicity (`FuelMono.tryFinally_breaks_fuel_mono` exhibits a
-program answering 1 at fuel 4 and 2 at fuel 5), so this is the hypothesis that decides
-whether a law checked at one budget holds at every larger one. -/
-theorem C_tfFree : TFFreeCtx C := by
-  refine tfFree_of_table ?_
-  have h : (C.table.all fun p => tfFreeS p.2.body) = true := by rfl
-  exact fun p hp => (List.all_eq_true.mp h) p hp
 """
 
 
@@ -852,11 +897,13 @@ def refute(cands, module, chunk=120):
             src.append(domain_defs(c))
             src.append('#eval IO.println ("@@%s@@" ++ toString '
                        '((dom_%s).all (%s)) ++ " " ++ toString (dom_%s).length ++ " " '
-                       '++ toString ((dom_%s).countP (fun x => %s)))\n'
+                       '++ toString ((dom_%s).countP (fun x => %s)) ++ " " '
+                       '++ toString ((dom_%s).countP (fun x => !(%s C FUEL %s x))))\n'
                        % (c.id, c.id, c.law, c.id, c.id,
                           "isHole (runCase C FUEL %s x.case).2" % c.fdef
                           if c.dom_kind == "obs" else
-                          "isHole (runCase C FUEL %s x).2" % c.fdef))
+                          "isHole (runCase C FUEL %s x).2" % c.fdef,
+                          c.id, GUARD[c.family], c.fdef))
         src.append("end Autoform.SpecsGen.%s\n" % module)
         # A concurrently rebuilt `.olean` makes `lake env lean` fail for reasons that
         # have nothing to do with the candidates; retry once before recording a chunk as
@@ -865,12 +912,13 @@ def refute(cands, module, chunk=120):
         for attempt in range(2):
             rc, out, err, path = lean_run("\n".join(src), "refute%d" % i)
             for line in out.splitlines():
-                m = re.match(r'@@([A-Za-z0-9_]+)@@(true|false) (\d+) (\d+)', line)
+                m = re.fullmatch(r'@@([A-Za-z0-9_]+)@@(true|false) (\d+) (\d+) (\d+)', line)
                 if m:
                     got[m.group(1)] = (m.group(2) == "true", int(m.group(3)),
-                                       int(m.group(4)))
-            if got:
+                                       int(m.group(4)), int(m.group(5)))
+            if rc == 0 and got:
                 break
+            got = {}
             subprocess.run(["lake", "build", "Autoform.Generated.%s" % module,
                             "Autoform.SpecsGen.Basis"], capture_output=True, env=ENV,
                            cwd=REPO)
@@ -879,12 +927,19 @@ def refute(cands, module, chunk=120):
                 c.status, c.reason = "not_checked", "lean could not evaluate the domain"
                 c.checked = {"error": (err or out)[-300:]}
                 continue
-            holds, n, holes = got[c.id]
-            c.checked = {"holds": holds, "domain": n, "holes": holes}
-            if holes:
-                c.status = "refuted"
+            holds, n, holes, guard_failures = got[c.id]
+            c.checked = {"holds": holds, "domain": n, "holes": holes,
+                         "guard_failures": guard_failures, "fuel": FUEL}
+            if n != len(c.dom) or n == 0:
+                c.status, c.reason = 'not_checked', 'evaluation did not cover the candidate domain'
+            elif holes:
+                c.status = "not_checked"
                 c.reason = ("interpreter reached an untranslated construct on %d/%d "
                             "cases — the law is inconclusive, not true" % (holes, n))
+            elif guard_failures:
+                c.status = 'not_checked'
+                c.reason = ('execution preconditions unavailable on %d/%d cases at fuel %d; '
+                            'this is not a counterexample' % (guard_failures, n, FUEL))
             elif not holds:
                 c.status, c.reason = "refuted", "counterexample in the fuzzed domain"
         if rc != 0 and not got:
@@ -903,12 +958,6 @@ def guard_pass(cands, module, chunk=120):
     `outOfFuel`, so the answer to "did the guard ever matter?" is a measurement.
     """
     live = [c for c in cands if c.kind == "law" and c.status == "candidate"]
-    for c in live:
-        if c.extra.get("try_finally"):
-            c.extra["fuel_mono"] = False
-            c.extra["fuel_mono_reason"] = (
-                "subject reaches Stmt.tryFinally, which FuelMono excludes by "
-                "counterexample (1 at fuel 4, 2 at fuel 5)")
     todo = [c for c in live if "fuel_mono" not in c.extra]
     for i in range(0, len(todo), chunk):
         part = todo[i:i + chunk]
@@ -1094,48 +1143,138 @@ PROOF_CONST = """theorem %(id)s :
 PROOF_PROJ = """theorem %(id)s :
     MRefines P %(name)s 4
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
+        (∀ o, h.get r = some o → o.payload = .none) ∧
+        (∀ o, h.get r = some o → (ctxOf P).usesClassMetadata o.cls = true →
+          (ctxOf P).classLookupGap o.cls %(field)s = none ∧
+          (ctxOf P).isProperty o.cls %(field)s = false ∧
+          (ctxOf P).readSlot o %(field)s = none ∧
+          (o.fields.find? (·.1 == %(field)s)).isSome = true) ∧
+        ∀ o, h.get r = some o →
+          (o.fields.find? (·.1 == %(field)s)).isSome = true ∨
+          (o.captured.find? (·.1 == %(field)s)).isSome = true)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hmeta, hfld⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r [] rfl
-      hmod
+      hmod (fun _ => hbox) (hsig := by rfl) (hfld := fun _ => hfld) (hmeta := hmeta)
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
     MRefines P %(name)s 5
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
+        (∀ o, h.get r = some o → o.payload = .none) ∧
+        (∀ o, h.get r = some o → (ctxOf P).usesClassMetadata o.cls = true →
+          (ctxOf P).classLookupGap o.cls %(field)s = none ∧
+          (ctxOf P).isProperty o.cls %(field)s = false ∧
+          (ctxOf P).readSlot o %(field)s = none ∧
+          (o.fields.find? (·.1 == %(field)s)).isSome = true) ∧
+        ∀ o, h.get r = some o →
+          (o.fields.find? (·.1 == %(field)s)).isSome = true ∨
+          (o.captured.find? (·.1 == %(field)s)).isSome = true)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hmeta, hfld⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
-      [] rfl hmod
+      [] rfl hmod (fun _ => hbox) (hsig := by rfl) (hfld := fun _ => hfld) (hmeta := hmeta)
 """
+
+def select_proof_fuel(cands, module):
+    """Find a small sufficient computation budget without weakening the theorem.
+
+    The VM only proposes a budget. Both the outcome and the no-out-of-fuel guard
+    are subsequently proved in the kernel, then transported to every fuel ≥ FUEL.
+    Reducing a large mutual recursor at fuel 400 can otherwise retain enormous
+    unused reductions even for a function that terminates after four steps.
+    """
+    live = [c for c in cands if c.kind == "law" and c.status == "candidate"
+            and c.extra.get("fuel_mono")]
+    if not live:
+        return
+    budgets, n = [], 1
+    while n < FUEL:
+        budgets.append(n)
+        n *= 2
+    budgets.append(FUEL)
+    src = [HEADER % (module, module, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL, module)]
+    for c in live:
+        src.append(domain_defs(c))
+        law = c.law.replace("C FUEL", "C k")
+        src.append('#eval IO.println ("@@%s@@" ++ toString ((%s : List Nat).find? '
+                   '(fun k => (dom_%s).all (%s C k %s) && (dom_%s).all (%s))))'
+                   % (c.id, budgets, c.id, GUARD[c.family], c.fdef, c.id, law))
+    src.append("end Autoform.SpecsGen.%s" % module)
+    rc, out, err, _ = lean_run("\n".join(src), "proof_fuel")
+    if rc:
+        raise RuntimeError("could not select proof fuel: " + (err or out)[-2000:])
+    found = dict(re.findall(r"@@(\w+)@@\(some (\d+)\)", out))
+    for c in live:
+        if c.id not in found:
+            raise RuntimeError("no sufficient proof budget for " + c.id)
+        c.extra["proof_fuel"] = int(found[c.id])
+
+
+def execution_hints(cands, module):
+    """Propose intermediate results, then prove both execution and native comparison.
+
+    These VM results are proof hints only. They never replace the observations:
+    the emitted theorem checks the interpreter result in the kernel and separately
+    compares it with the unchanged result recorded from the source runtime.
+    """
+    live = [c for c in cands if c.family == "conform" and c.status == "candidate"]
+    if not live:
+        return
+    src = [HEADER % (module, module, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL, module)]
+    for c in live:
+        src.append(domain_defs(c))
+        projection = '' if c.extra.get('heap_graph') else '.2'
+        src.append('#eval IO.println ("@@%s@@" ++ String.intercalate "@|@" '
+                   '((dom_%s).map (fun o => ((repr ((runCase C %d %s o.case)%s)).pretty '
+                   '(width := 100000000)))))'
+                   % (c.id, c.id, c.extra.get("proof_fuel", FUEL), c.fdef, projection))
+    src.append("end Autoform.SpecsGen.%s" % module)
+    rc, out, err, _ = lean_run("\n".join(src), "execution_hints")
+    if rc:
+        raise RuntimeError("could not propose execution results: " + (err or out)[-2000:])
+    results = dict(re.findall(r"^@@(\w+)@@(.*)$", out, re.M))
+    for c in live:
+        values = results.get(c.id, "").split("@|@")
+        if len(values) != len(c.dom) or not all(values):
+            raise RuntimeError("incomplete execution results for " + c.id)
+        c.extra["execution_results"] = values
+
+
+# Lean's detailed `decide +kernel` failure message invokes elaborator reduction
+# again. On very wide shifts that diagnostic can time out after the kernel has
+# already rejected the claim. Discard the lazy diagnostic, preserving failure.
+KERNEL_COMPUTE = 'first | decide +kernel | fail "kernel computation did not establish the claim"'
+
 
 FUEL_THM = """/-- Holds at **every** fuel budget at or above `FUEL`.
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+Checked at fuel %(budget)s by computation, then transported by `applyFunc_fuel_mono_all`.
 The `%(guard)s` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
 domain rather than assumed: without it a law could hold at `FUEL` for the reason that
 nothing ran. -/
 theorem %(id)s : ∀ fuel, FUEL ≤ fuel → ((dom_%(id)s).all (%(lawfuel)s)) = true := by
   intro fuel hf
-  exact all_transfer _ (%(guard)s C FUEL %(fdef)s) (%(law)s) (%(lawfuel)s)
+  have hk : %(budget)s ≤ fuel := Nat.le_trans (by decide : %(budget)s ≤ FUEL) hf
+%(prepare)s\
+  exact all_transfer _ (%(guard)s C %(budget)s %(fdef)s) (%(law)s) (%(lawfuel)s)
     (fun c hgc hlc =>
-      %(mono)s (hctx := C_tfFree) (hfn := (by rfl : tfFreeS %(fdef)s.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+      %(mono)s (hk := hk) (hg := hgc) (h := hlc))
+    (by %(compute)s) (%(checked)s)
 """
 
 DOC = '''
@@ -1152,8 +1291,8 @@ for any theorem that does not mention the implementation it claims to constrain.
 What each family claims, in the order of `STRATEGY.md` §4:
 
 * `conform_*` (§4.4, cross-implementation) — the interpreter reproduces, case by case,
-  the outcome **CPython** produced when the repository's own test suite called this
-  function. The right-hand sides were recorded by `scripts/differential.py`'s trace hook;
+  the outcome the **source runtime** produced for the recorded calls to this
+  function. The right-hand sides were recorded by `scripts/differential.py`;
   they are not this system's own output, which is what keeps the family from being an
   elaborate `rfl`.
 * `runs_*` / `returns_*` (§4.2, structural) — on this domain the interpreter neither
@@ -1174,7 +1313,7 @@ whose subject a mutation gate can attack.
 stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
 computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
 transport needs two side conditions, both discharged rather than assumed — the context is
-`tryFinally`-free (`C_tfFree`, by computation over the function table) and the run did not
+covered by the unrestricted fuel theorem (including finalizers) and the run did not
 end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
 either fails, the theorem stays at `FUEL` and its generalization is recorded in
 `obligations` below as a `Prop`-valued `def` — a statement, not an admission.
@@ -1184,6 +1323,35 @@ There is no `sorry` in this file.
 Counts for this run are in `Autoform/SpecsGen/report.json`.
 -/
 '''
+
+
+def staged_conformance(c, budget, execution_tactic):
+    """Fallback: prove an intermediate result, then its native comparison."""
+    tactic = ("  apply List.all_eq_true.mpr\n"
+              "  intro o ho\n"
+              "  simp only [dom_%s, List.mem_cons, List.not_mem_nil, or_false] at ho\n"
+              "  rcases ho with %s\n"
+              % (c.id, " | ".join("rfl" for _ in c.dom)))
+    for index, observation in enumerate(c.dom):
+        results = c.extra.get("execution_results")
+        result = results[index] if results else "((%s : Obs).expected)" % observation
+        projection = '' if c.extra.get('heap_graph') else '.2'
+        if not results and not projection:
+            tactic += '  · ' + KERNEL_COMPUTE + '\n'
+            continue
+        tactic += ("  · have hrun : (runCase C %d %s ((%s : Obs).case))%s = %s := by\n"
+                   "      %s\n"
+                   "    unfold lawConform\n"
+                   "    dsimp only\n"
+                   "    rw [hrun]\n"
+                   "    rfl\n" % (budget, c.fdef, observation, projection, result, execution_tactic))
+    return tactic
+
+
+# Set by `main` from `--exclude-subjects`; `emit` names them in the module it writes.
+EXCLUDED_SUBJECTS = []
+# (theorem, subject, reason) for candidates `budget_probe` found over the proof budget.
+BUDGET_EXCLUDED = []
 
 
 def emit(cands, module, obligations_extra, ns=None):
@@ -1200,14 +1368,38 @@ def emit(cands, module, obligations_extra, ns=None):
         if c.kind == "law":
             out.append(domain_defs(c))
             lawfuel = c.law.replace("C FUEL", "C fuel")
+            budget = c.extra.get("proof_fuel", FUEL)
+            checked = "by rfl"
+            prepare = ""
+            tactic = "  rfl\n"
+            if c.family == "conform":
+                execution_tactic = c.extra.get("execution_tactic", "decide +kernel")
+                checked = "hchecked"
+                if execution_tactic == "decide +kernel":
+                    # The kernel reduces the Boolean law directly. Elaborator
+                    # reduction of an EResult equality can spend minutes on
+                    # nested calls/loops that the kernel checks in seconds.
+                    # This checks the unchanged native observation; VM execution
+                    # hints are irrelevant to this proof path.
+                    tactic = "  " + KERNEL_COMPUTE + "\n"
+                else:
+                    tactic = staged_conformance(c, budget, execution_tactic)
+                # Keep the check inside the public theorem, so a mutation failure
+                # is attributed to the theorem whose claim it refutes.
+                prepare = ("  have hchecked : (dom_%s).all (%s) = true := by\n" %
+                           (c.id, c.law.replace("C FUEL", "C %d" % budget)))
+                prepare += "".join("  " + line for line in tactic.splitlines(keepends=True))
             if c.extra.get("fuel_mono"):
                 # the general statement, proved: FuelMono transports it off FUEL
-                out.append(FUEL_THM % {"id": c.id, "law": c.law, "lawfuel": lawfuel,
+                budget = c.extra.get("proof_fuel", FUEL)
+                out.append(FUEL_THM % {"id": c.id, "law": c.law.replace("C FUEL", "C %d" % budget),
+                                       "budget": budget, "lawfuel": lawfuel,
                                        "guard": GUARD[c.family], "fdef": c.fdef,
-                                       "mono": MONO[c.family]})
+                                       "mono": MONO[c.family], "checked": checked,
+                                       "prepare": prepare, "compute": KERNEL_COMPUTE})
             else:
-                out.append("theorem %s : ((dom_%s).all (%s)) = true := by rfl\n"
-                           % (c.id, c.id, c.law))
+                out.append("theorem %s : ((dom_%s).all (%s)) = true := by\n%s"
+                           % (c.id, c.id, c.law, tactic))
                 # the honest generalization: stated, and not proved
                 out.append("/-- Open: the same statement at **every** fuel budget ≥ "
                            "`FUEL`. Proved only at `FUEL`; %s -/\ndef ob_%s : Prop :=\n"
@@ -1239,6 +1431,25 @@ def emit(cands, module, obligations_extra, ns=None):
                                   json.dumps(r)) for n, s, sub, r in obs))
     out.append("#eval IO.println (renderObligations %s obligations)\n"
                % json.dumps(ns))
+    if EXCLUDED_SUBJECTS:
+        # Left out by `--exclude-subjects`: their by-computation proofs do not finish in
+        # the emission budget. Named here, in the tracked module, not only in the
+        # untracked JSON report -- an exclusion nobody can see is a silent one.
+        out.append("/-- Subjects left out of this module by `--exclude-subjects` (no "
+                   "statement about them is made here, true or open). -/\n"
+                   "def excludedSubjects : List String :=\n  [%s]\n"
+                   % ",\n   ".join(json.dumps(n) for n in EXCLUDED_SUBJECTS))
+        out.append('#eval IO.println s!"excluded subjects ─ %s ({excludedSubjects.length})"\n'
+                   % ns)
+    if BUDGET_EXCLUDED:
+        out.append("/-- Candidates left out because, compiled alone, their proof exceeded the "
+                   "emission budget (`--theorem-timeout`, `--theorem-memory-gb`): "
+                   "`(theorem, subject, reason)`. Not stated here, true or open. -/\n"
+                   "def budgetExcluded : List (String × String × String) :=\n  [%s]\n"
+                   % ",\n   ".join("(%s, %s, %s)" % (json.dumps(t), json.dumps(sj), json.dumps(r))
+                                   for t, sj, r in BUDGET_EXCLUDED))
+        out.append('#eval IO.println s!"over the proof budget ─ %s ({budgetExcluded.length})"\n'
+                   % ns)
     out.append("/-! ## Anti-vacuity gate\n\n`#audit_depends` fails the build if a "
                "theorem's proof term never mentions the generated definition it claims "
                "to be about — the necessary half of the gate. The sufficient half is "
@@ -1252,6 +1463,70 @@ def emit(cands, module, obligations_extra, ns=None):
         out.append("#audit_axioms %s" % tid)
     out.append("\nend Autoform.SpecsGen.%s\n" % ns)
     return "\n".join(out), thms, obs
+
+
+def _group_rss_kb(pgids):
+    """Resident set size, in KiB, of every process in each of the given sessions."""
+    out = subprocess.run(["ps", "-A", "-o", "pgid=,rss="], capture_output=True, text=True).stdout
+    total = {g: 0 for g in pgids}
+    for row in out.splitlines():
+        fields = row.split()
+        if len(fields) == 2 and fields[0].isdigit() and int(fields[0]) in total:
+            total[int(fields[0])] += int(fields[1]) if fields[1].isdigit() else 0
+    return total
+
+
+def budget_probe(cands, module, workdir, seconds, gigabytes, jobs, ns=None):
+    """Compile each candidate alone and exclude, by name, those over budget.
+
+    One by-computation theorem whose kernel evaluation explodes takes the whole module
+    with it: on click a 59-theorem module held 63 GB and pushed the machine into swap for
+    90 minutes, while 47 of the 59 proved alone in seconds. Probing each candidate in its
+    own process, under a wall-clock and resident-memory budget, turns that into a named
+    exclusion with a reason. A probe that merely FAILS to prove is left alone: the
+    repair rounds demote it to an open obligation, which is a different statement."""
+    live = [c for c in cands if c.status == "candidate"]
+    if not live or seconds <= 0:
+        return []
+    os.makedirs(workdir, exist_ok=True)
+    pending, running, over = list(enumerate(live)), {}, []
+    limit_kb = int(gigabytes * 1024 * 1024)
+    while pending or running:
+        while pending and len(running) < max(1, jobs):
+            i, c = pending.pop(0)
+            src, _thms, _obs = emit([c], module, [], ns=ns)
+            path = os.path.join(workdir, "probe%04d.lean" % i)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(src)
+            proc = subprocess.Popen(["lake", "env", "lean", path], cwd=REPO, env=ENV,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    start_new_session=True)
+            running[proc.pid] = (proc, c, time.time(), 0)
+        time.sleep(1)
+        rss = _group_rss_kb(list(running))
+        for pid in list(running):
+            proc, c, start, peak = running[pid]
+            peak = max(peak, rss.get(pid, 0))
+            running[pid] = (proc, c, start, peak)
+            reason = None
+            if proc.poll() is not None:
+                del running[pid]
+                continue
+            if peak > limit_kb:
+                reason = "kernel evaluation exceeded %g GB resident" % gigabytes
+            elif time.time() - start > seconds:
+                reason = "kernel evaluation exceeded %d s" % seconds
+            if reason:
+                try:
+                    os.killpg(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):  # exited; macOS says EPERM
+                    pass
+                proc.wait()
+                del running[pid]
+                c.status, c.reason = "excluded", "over the proof budget: " + reason
+                over.append(c)
+                print("   budget: excluded %s (%s): %s" % (c.id, c.subject, reason), flush=True)
+    return over
 
 
 def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
@@ -1280,6 +1555,9 @@ def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
                 if c.status == "candidate":
                     c.status, c.proved = "proved", True
             return True, demoted, r.stdout
+        diagnostic = "Lean exited with status %d\n%s%s" % (r.returncode, r.stdout, r.stderr)
+        with open(path + ".compile.log", "w", encoding="utf-8") as f:
+            f.write(diagnostic)
         lines = src.splitlines(keepends=True)
         decls = M.parse_decls(lines)
         bad = set()
@@ -1291,16 +1569,36 @@ def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
                     bad.add(d.name)
         if not bad:
             print("  build failed with no attributable theorem:\n%s"
-                  % (r.stdout + r.stderr)[:600])
-            return False, demoted, r.stdout + r.stderr
+                  % diagnostic[:1200])
+            return False, demoted, diagnostic
+        infrastructure = bad - {c.id for c in cands}
+        if infrastructure:
+            print("  proof infrastructure failed: %s" % ", ".join(sorted(infrastructure)))
+            return False, demoted, diagnostic
+        retried = {}
         for c in cands:
             if c.id in bad and c.status == "candidate":
+                # Recursion-limit errors are not reliably recoverable inside Lean's
+                # `first` tactic. Retry the whole declaration with staged execution
+                # before recording an open obligation. Every rung is kernel checked.
+                if c.family == "conform":
+                    current = c.extra.get("execution_tactic", "decide +kernel")
+                    fallback = {"decide +kernel": "rfl", "rfl": "cbv"}.get(current)
+                    if fallback:
+                        c.extra["execution_tactic"] = fallback
+                        retried[c.id] = fallback
+                        continue
                 c.status = "unproved"
                 c.reason = "no proof found by the generated portfolio"
                 demoted.append(("stmt_" + c.id, c.source, c.subject,
                                 "statement survived refutation; the generated proof "
                                 "portfolio could not close it"))
-        print("  demoted to open obligations: %s" % ", ".join(sorted(bad)))
+        if retried:
+            print("  retrying execution proofs: %s" % ", ".join(
+                "%s (%s)" % (name, tactic) for name, tactic in sorted(retried.items())))
+        demoted_now = bad - set(retried)
+        if demoted_now:
+            print("  demoted to open obligations: %s" % ", ".join(sorted(demoted_now)))
     return False, demoted, "gave up after %d repair rounds" % rounds
 
 
@@ -1314,6 +1612,9 @@ def main():
     ap.add_argument("src_root")
     ap.add_argument("module")
     ap.add_argument("--tests", default=None)
+    ap.add_argument("--conformance", help="consume compared native observations from differential.py")
+    ap.add_argument("--conformance-only", action="store_true",
+                    help="prove the supplied runtime observations without mining additional laws")
     ap.add_argument("--cases", type=int, default=10,
                     help="traced calls to keep per function")
     ap.add_argument("--allow-dirty-subject", action="store_true",
@@ -1343,6 +1644,22 @@ def main():
                          "Autoform/SpecsGen/<Module>.lean. A targeted run "
                          "(--only-subjects) must use it, or it would silently replace "
                          "the full corpus module with a two-function one")
+    ap.add_argument("--theorem-timeout", type=int,
+                    default=int(os.environ.get("AUTOFORM_THEOREM_TIMEOUT", "300")),
+                    help="seconds one candidate may take to prove when compiled alone; over "
+                         "it, the candidate is excluded by name (0 disables the probe)")
+    ap.add_argument("--theorem-memory-gb", type=float,
+                    default=float(os.environ.get("AUTOFORM_THEOREM_MEMORY_GB", "16")),
+                    help="resident memory one candidate's proof may use when compiled alone")
+    ap.add_argument("--probe-jobs", type=int,
+                    default=int(os.environ.get("AUTOFORM_PROBE_JOBS", "2")),
+                    help="budget probes run concurrently; memory use is up to jobs x the limit")
+    ap.add_argument("--exclude-subjects", default=None,
+                    help="`;`-separated function names to leave OUT of the mined set. For a "
+                         "subject whose by-computation proof does not terminate in the "
+                         "emission budget (a constructor that dispatches through the class "
+                         "name, say). Recorded in the report: the census is smaller by "
+                         "exactly these, and it says so")
     ap.add_argument("--only-subjects", default=None,
                     help="`;`-separated function names (a C++ signature contains commas: mine candidates for exactly "
                          "these call-closed functions and no others. Used to build a "
@@ -1365,6 +1682,8 @@ def main():
     ap.add_argument("--json", dest="json_path",
                     default=os.path.join(OUTDIR, "report.json"))
     args = ap.parse_args()
+    if args.conformance_only:
+        args.characterize = False
 
     globals()["MAX_DOMAIN"] = args.domain
     os.makedirs(OUTDIR, exist_ok=True)
@@ -1378,20 +1697,24 @@ def main():
         # worse than no proof, and the mutation gate's own backup file is the reliable
         # in-flight marker.
         blockers = []
-        if os.path.exists(gen_path + ".mutate-backup"):
-            blockers.append("a mutation run is in flight (%s.mutate-backup exists)"
-                            % os.path.basename(gen_path))
-        try:
-            if "__mutated" in open(gen_path, encoding="utf-8").read():
-                blockers.append("the module contains mutation markers (`__mutated`)")
-        except OSError as e:
-            blockers.append("could not read the subject: %r" % e)
+        # A sharded model's definitions are in its parts; a live mutant can be in any.
+        model_files = [str(p) for p in runtime_backends.generated_module.model_files(gen_path)]
+        for path in model_files:
+            if os.path.exists(path + ".mutate-backup"):
+                blockers.append("a mutation run is in flight (%s.mutate-backup exists)"
+                                % os.path.basename(path))
+            try:
+                if "__mutated" in open(path, encoding="utf-8").read():
+                    blockers.append("%s contains mutation markers (`__mutated`)"
+                                    % os.path.basename(path))
+            except OSError as e:
+                blockers.append("could not read the subject: %r" % e)
         # The marker check is necessary but not sufficient: `scripts/mutate.py` also
         # mutates *values* (`.int 0` -> `.int 1`), which leave no marker, and it removes
         # its `.mutate-backup` between mutants. For a tracked module the reliable test is
         # that it matches the commit — observed in practice: a gate was mid-cycle with no
         # backup file present and a live one-line numeric mutation in the tree.
-        r = subprocess.run(["git", "diff", "--quiet", "--", gen_path],
+        r = subprocess.run(["git", "diff", "--quiet", "--", *model_files],
                            capture_output=True, cwd=REPO)
         if r.returncode == 1:
             blockers.append("the subject differs from its committed version (a mutation "
@@ -1417,12 +1740,17 @@ def main():
               "an artefact of the broken build:\n%s"
               % (b.stderr or b.stdout)[-600:])
         return 2
-    global GLOBALS
-    GLOBALS = globals_literal(args.module)
+    global GLOBALS, FUEL, INIT_FUEL
+    FUEL, INIT_FUEL = 400, D.FUEL
     core = core_names(args.module)
     if core is None:
         return 2
-    funcs = json.load(open(args.ast))
+    artifact_hashes = {'ast': runtime_backends.sha256(args.ast),
+                       # every part of a sharded model, not just its root
+                       'model': runtime_backends.generated_module.model_digest(gen_path)}
+    if args.conformance:
+        artifact_hashes['conformance'] = runtime_backends.sha256(args.conformance)
+    funcs = deep_json.load(args.ast)
     byname = {f["name"]: f for f in funcs}
     print("   %d functions translated, %d call-closed" % (len(funcs), len(core)))
 
@@ -1434,7 +1762,36 @@ def main():
              art["pbt_files"], art["pbt_properties"]))
 
     print("== 2. observations from the repository's own test suite")
-    if args.synthetic:
+    if args.conformance:
+        if args.synthetic or args.obs_cache:
+            ap.error("--conformance cannot be combined with --synthetic or --obs-cache")
+        try:
+            recs, native_report = runtime_backends.load_observations(
+                args.conformance, args.ast, args.src_root, args.module, gen_path)
+            FUEL = native_report.get('interpreter_fuel', D.FUEL)
+            INIT_FUEL = native_report.get('initializer_fuel', D.FUEL)
+            if any(type(n) is not int or n < 1 for n in (FUEL, INIT_FUEL)):
+                raise ValueError('native evidence contains an invalid interpreter budget')
+        except (ValueError, OSError) as exc:
+            print("REFUSING TO RUN:", exc)
+            return 4
+        stats = {"skip_varargs": 0, "skip_unencodable_args": 0, "skip_unencodable_ret": 0,
+                 "runtime": native_report["runtime"], "evidence": os.path.abspath(args.conformance)}
+        tests = native_report.get("test_runs", [])
+        print("   loaded %d compared observations from %s" % (len(recs), native_report["runtime"]))
+        class_values = conformance_class_values(funcs, args.src_root, native_report)
+        callable_recs = [r for r in recs if 'post_heap' not in r
+                         and outcome_has_callable(r["outcome"], class_values)]
+        if callable_recs:
+            recs = [r for r in recs if 'post_heap' in r
+                    or not outcome_has_callable(r["outcome"], class_values)]
+            stats["skip_callable_outcome"] = len(callable_recs)
+            print("   %d observation(s) return a callable and stay with the oracle: its "
+                  "agreement rule for callables is a name match (see value_has_callable), "
+                  "not the Val equality lawConform states -- over %d function(s): %s"
+                  % (len(callable_recs), len({r["name"] for r in callable_recs}),
+                     ", ".join(sorted({r["name"].split(":<module>.")[-1] for r in callable_recs}))))
+    elif args.synthetic:
         # LOUD, not silent: this run has no cross-runtime evidence at all, and the
         # report has to say so where a reader will trip over it rather than in a
         # footnote. A quiet zero here would look exactly like a suite that ran and
@@ -1447,8 +1804,8 @@ def main():
         recs, stats, tests = [], {"skip_varargs": 0, "skip_unencodable_args": 0,
                                   "skip_unencodable_ret": 0}, []
     elif args.obs_cache and os.path.exists(args.obs_cache):
-        blob = json.load(open(args.obs_cache))
-        funcs, recs, stats, tests = (json.load(open(args.ast)), blob["recs"],
+        blob = deep_json.load(args.obs_cache)
+        funcs, recs, stats, tests = (deep_json.load(args.ast), blob["recs"],
                                      blob["stats"], blob["tests"])
         print("   (replayed from %s)" % args.obs_cache)
     else:
@@ -1457,6 +1814,7 @@ def main():
         if args.obs_cache:
             json.dump({"recs": recs, "stats": stats, "tests": tests},
                       open(args.obs_cache, "w"))
+    GLOBALS = globals_literal(args.module)
     incore = [r for r in recs if r["name"] in set(core)]
     if not args.synthetic and not recs:
         print("REFUSING TO RUN: the trace step recorded zero calls, so every mined law "
@@ -1468,36 +1826,49 @@ def main():
           % (len(recs), len(set(r["name"] for r in recs)), len(incore)))
 
     print("== 3. candidate generation")
-    subjects = core
+    try:
+        eligible = conformance_subjects(byname, recs) if args.conformance_only else core
+    except ValueError as exc:
+        print("REFUSING TO RUN:", exc)
+        return 4
+    population = "observed" if args.conformance_only else "call-closed"
+    subjects = eligible
     if args.only_subjects:
         want = [n.strip() for n in args.only_subjects.split(";") if n.strip()]
-        subjects = [n for n in core if n in want]
+        subjects = [n for n in eligible if n in want]
         missing = [n for n in want if n not in subjects]
         if missing:
-            # Asking for a function that is not in the call-closed core and getting a
-            # quietly smaller run is exactly the silence this repository keeps paying
-            # for. Name them.
-            print("   !! not in the call-closed core, so NOT mined: %s"
-                  % ", ".join(missing))
+            print("   !! not in the %s population, so NOT mined: %s"
+                  % (population, ", ".join(missing)))
         if not subjects:
-            print("REFUSING TO RUN: --only-subjects matched nothing in the call-closed "
-                  "core.")
+            print("REFUSING TO RUN: --only-subjects matched nothing in the %s "
+                  "population." % population)
             return 5
-        print("   targeted run: %d of %d call-closed functions named on the command line"
-              % (len(subjects), len(core)))
-    elif args.max_subjects and len(core) > args.max_subjects:
+        print("   targeted run: %d of %d %s functions named on the command line"
+              % (len(subjects), len(eligible), population))
+    elif args.max_subjects and len(eligible) > args.max_subjects:
         # Deterministic and stated, so the report is not silently a sample presented as
         # a census: sorted by name, first N.
-        subjects = sorted(core)[:args.max_subjects]
-        print("   capped at %d of %d call-closed functions (--max-subjects); the "
-              "report records the cap" % (len(subjects), len(core)))
-    cands = gen_candidates(subjects, byname, incore, rng, synthetic=args.synthetic)
+        subjects = sorted(eligible)[:args.max_subjects]
+        print("   capped at %d of %d %s functions (--max-subjects); the "
+              "report records the cap" % (len(subjects), len(eligible), population))
+    excluded = []
+    if args.exclude_subjects:
+        drop = [n.strip() for n in args.exclude_subjects.split(";") if n.strip()]
+        excluded = [n for n in subjects if n in drop]
+        EXCLUDED_SUBJECTS[:] = excluded
+        subjects = [n for n in subjects if n not in drop]
+        print("   excluded %d subject(s) by --exclude-subjects: %s"
+              % (len(excluded), ", ".join(excluded) or "(none matched)"))
+    observations = recs if args.conformance_only else incore
+    cands = gen_candidates(subjects, byname, observations, rng, synthetic=args.synthetic,
+                           conformance_only=args.conformance_only)
     print("   %d candidates" % len(cands))
 
     print("== 4. refutation (fuzz every candidate before emitting anything)")
     cache = {}
     if args.refute_cache and os.path.exists(args.refute_cache):
-        cache = json.load(open(args.refute_cache))
+        cache = deep_json.load(args.refute_cache)
     hit = [c for c in cands if c.id in cache]
     for c in hit:
         v = cache[c.id]
@@ -1557,7 +1928,7 @@ def main():
     liftable = [c for c in live if c.extra.get("fuel_mono")]
     tf = [c for c in live if c.extra.get("try_finally")]
     oof = [c for c in live if c.extra.get("outOfFuel_cases")]
-    print("   %d of %d laws transportable to all fuel ≥ FUEL; %d blocked by "
+    print("   %d of %d laws transportable to all fuel ≥ FUEL; %d contain "
           "tryFinally; %d have a case that reaches outOfFuel at FUEL"
           % (len(liftable), len(live), len(tf), len(oof)))
     for c in oof:
@@ -1566,6 +1937,8 @@ def main():
                  c.extra.get("outOfFuel_second_run", 0)))
 
     print("== 6. emission + proof")
+    select_proof_fuel(cands, args.module)
+    execution_hints(cands, args.module)
     path = args.out or os.path.join(OUTDIR, "%s.lean" % args.module)
     if args.only_subjects and not args.out:
         print("REFUSING TO RUN: a targeted --only-subjects run would overwrite the "
@@ -1574,6 +1947,12 @@ def main():
         return 6
     ns_override = (os.path.splitext(os.path.basename(path))[0]
                    if args.out else args.module)
+    over = budget_probe(cands, args.module, os.path.join(SCRATCH, "budget-probe"),
+                        args.theorem_timeout, args.theorem_memory_gb, args.probe_jobs,
+                        ns=ns_override)
+    BUDGET_EXCLUDED[:] = [(c.id, c.subject, c.reason) for c in over]
+    print("   budget probe: %d candidate(s) over %d s / %g GB, excluded by name"
+          % (len(over), args.theorem_timeout, args.theorem_memory_gb))
     ok, demoted, log = compile_repair(cands, args.module, path, ns=ns_override)
     proved = [c for c in cands if c.proved]
     unproved = [c for c in cands if c.status == "unproved"]
@@ -1622,7 +2001,8 @@ def main():
     report = {
         "module": args.module,
         "corpus": os.path.abspath(args.src_root),
-        "mode": "synthetic" if args.synthetic else "traced",
+        "mode": "native" if args.conformance else ("synthetic" if args.synthetic else "traced"),
+        "interpreter_fuel": FUEL, "initializer_fuel": INIT_FUEL,
         "cross_runtime_evidence": (not args.synthetic),
         "self_recorded_families": ["charact"],
         "self_recorded_note": ("`charact_*` right-hand sides are this interpreter's own "
@@ -1633,8 +2013,12 @@ def main():
         "families_unavailable": (["conform", "const", "raises", "projects"]
                                  if args.synthetic else []),
         "subjects_considered": len(subjects),
+        "subject_population": population,
         "max_subjects": args.max_subjects or None,
         "only_subjects": args.only_subjects,
+        "excluded_subjects": excluded,
+        "budget_excluded": [{"theorem": t, "subject": sj, "reason": r}
+                            for t, sj, r in BUDGET_EXCLUDED],
         "functions": len(funcs),
         "call_closed": len(core),
         "artifacts": art,
@@ -1653,6 +2037,7 @@ def main():
                                                  if c.proved and c.kind == "law"
                                                  and not c.extra.get("fuel_mono")]),
         "build_clean": ok,
+        "artifact_hashes": dict(artifact_hashes, proof=runtime_backends.sha256(path)),
         "mutation_sample": sample_info,
         "fuel_independent": len([c for c in cands
                                  if c.proved and c.extra.get("fuel_mono")]),
@@ -1693,6 +2078,15 @@ def main():
     print("   fuel-independent     : %d proved for ALL fuel ≥ FUEL (%d still FUEL-only)"
           % (report["fuel_independent"], report["fuel_obligations_remaining"]))
     print("   report               : %s" % args.json_path)
+    print("   over proof budget    : %d (excluded by name; see budgetExcluded)"
+          % len(BUDGET_EXCLUDED))
+    # A candidate excluded by the proof budget is named in the module and the report, as
+    # `--exclude-subjects` is, and states nothing; it is not an unproved claim. Every
+    # candidate that WAS emitted must still prove.
+    attempted = [c for c in cands if c.status != "excluded"]
+    if args.conformance_only and (not proved or len(proved) != len(attempted)):
+        print("FAIL: not every generated native conformance obligation was proved")
+        return 1
     return 0 if ok else 1
 
 

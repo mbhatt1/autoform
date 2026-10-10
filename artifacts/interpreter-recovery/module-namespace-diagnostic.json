@@ -1,0 +1,30 @@
+{
+  "status": "CONFIRMED_DIVERGENCE",
+  "native": [
+    1,
+    2,
+    2,
+    2
+  ],
+  "core": [
+    2,
+    2,
+    3,
+    3
+  ],
+  "core_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.tuple [Autoform.Core.Val.int 2, Autoform.Core.Val.int 2, Autoform.Core.Val.int 3, Autoform.Core.Val.int 3])",
+  "kernel": "Concrete Core result proved by rfl.",
+  "scope": "Minimal three-module data binding diagnostic; no production changes.",
+  "explanation": "All modules write the same unqualified globals key; function reads observe another module and a write leaks into it.",
+  "source_sha256": {
+    "source/entry.py": "2d84ae6590806097dfc7c9c5d480bc92e90c8118e9d3892ce8a44e0b38a31ccd",
+    "source/left.py": "aaa8e81c2e58cd92d765e6f235c02a202dab87b6f4dfab34a827b316b545b790",
+    "source/right.py": "97e98d9309dc8e9af5796f8d5877ee0b09b4f4c9c90f4ec929db80aaae4e4742"
+  },
+  "exporter_sha256": "b451f65cdede1131b380d9edf1a82d8e58b2ab8b0eef78f1826cc1db54730eb6",
+  "renderer_sha256": "c5a824d3ac42a59fc5b545d106d974cbb9d8eb60c651b95917c8003e11746560",
+  "workspace": "/Users/mbhatt/autoform/.autoform-work/module-namespace-probe",
+  "command": "LEAN_NUM_THREADS=1 .venv/bin/python .autoform-work/module-namespace-probe/probe.py",
+  "proof_sha256": "f1c03b536d3256e70d76d6ab1bbbfcfbf4b80ce772741ac55fa0947263e02e91",
+  "fix_status": "Separate namespace development candidate; not included in the graph observation change."
+}

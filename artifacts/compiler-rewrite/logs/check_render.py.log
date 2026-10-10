@@ -1,0 +1,42 @@
+UNVERIFIABLE Ansible: AST not found: neither ast-Ansible.json nor /tmp/final-Ansible.json exists. AST /tmp/final-Ansible.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG. Re-export it or drop the module from artifact-manifest.json; this check cannot speak for it.
+MISMATCH Cachetools: the AST is unchanged but its render is not.
+      recorded render 38112e88aa8262a066f83ce3aa54248e4133f2b9b081d5a6b739db2749e829f5
+      fresh render    85f6a8f851ff598fb1fe38dd289c4931e2890bee8b96093d145f95ad0d548885
+      render_lean.py is supposed to be a deterministic function of the AST alone; something in the renderer changed the artifact every downstream number describes.
+MISMATCH Click: the AST is unchanged but its render is not.
+      recorded render b16611a1183ba783bc29f7b91f7ca12b9adafac0ef6d5ed37c0aeda07e2d7032
+      fresh render    31d057413873128df80db50e085fde1e73b121d668dba11f1b896948f41e04f8
+      render_lean.py is supposed to be a deterministic function of the AST alone; something in the renderer changed the artifact every downstream number describes.
+MISMATCH Jinja2: the AST is unchanged but its render is not.
+      recorded render 034a8c46920835ca960be5e3f90f186f96f54d1a5f6319fff89c2e94ef93b28a
+      fresh render    f1b961305c126a14575fae10488e8a01cbab4cd0201ce8f3fefbfbeadd4672f5
+      render_lean.py is supposed to be a deterministic function of the AST alone; something in the renderer changed the artifact every downstream number describes.
+UNVERIFIABLE LinuxCrypto: AST not found: neither ast-LinuxCrypto.json nor /tmp/final-LinuxCrypto.json exists. AST /tmp/final-LinuxCrypto.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG. Re-export it or drop the module from artifact-manifest.json; this check cannot speak for it.
+UNVERIFIABLE LinuxLib: AST not found: neither ast-LinuxLib.json nor /tmp/final-LinuxLib.json exists. AST /tmp/final-LinuxLib.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG. Re-export it or drop the module from artifact-manifest.json; this check cannot speak for it.
+UNVERIFIABLE PipelineC: artifact-manifest.json has no entry for PipelineC, so there is no recorded hash to check it against. If ast-PipelineC.json is real and reviewed, run: scripts/check_render.py --record PipelineC
+UNVERIFIABLE PipelineCPP: artifact-manifest.json has no entry for PipelineCPP, so there is no recorded hash to check it against. If ast-PipelineCPP.json is real and reviewed, run: scripts/check_render.py --record PipelineCPP
+UNVERIFIABLE PipelineGo: artifact-manifest.json has no entry for PipelineGo, so there is no recorded hash to check it against. If ast-PipelineGo.json is real and reviewed, run: scripts/check_render.py --record PipelineGo
+UNVERIFIABLE PipelineJS: artifact-manifest.json has no entry for PipelineJS, so there is no recorded hash to check it against. If ast-PipelineJS.json is real and reviewed, run: scripts/check_render.py --record PipelineJS
+UNVERIFIABLE PipelineJava: artifact-manifest.json has no entry for PipelineJava, so there is no recorded hash to check it against. If ast-PipelineJava.json is real and reviewed, run: scripts/check_render.py --record PipelineJava
+UNVERIFIABLE PipelineKotlin: artifact-manifest.json has no entry for PipelineKotlin, so there is no recorded hash to check it against. If ast-PipelineKotlin.json is real and reviewed, run: scripts/check_render.py --record PipelineKotlin
+UNVERIFIABLE PipelinePython: artifact-manifest.json has no entry for PipelinePython, so there is no recorded hash to check it against. If ast-PipelinePython.json is real and reviewed, run: scripts/check_render.py --record PipelinePython
+UNVERIFIABLE PipelineTS: artifact-manifest.json has no entry for PipelineTS, so there is no recorded hash to check it against. If ast-PipelineTS.json is real and reviewed, run: scripts/check_render.py --record PipelineTS
+MISMATCH Requests: the AST is unchanged but its render is not.
+      recorded render 4d39de0d612b6909fbed52d2600497a8758b46688f8015c27927e527eae81639
+      fresh render    47caa07d99e40cfa8bb60154e0f75a73b2ffbc8e3c8487746155c1b79c686b0b
+      render_lean.py is supposed to be a deterministic function of the AST alone; something in the renderer changed the artifact every downstream number describes.
+
+check_render: 13 verified, 4 mismatched, 11 unverifiable (of 28)
+OK CMath: d3a662ae60f3 (working-tree module matches)
+OK LangC: 2135c3a723e8 (working-tree module matches)
+OK LangGo: 7c7941c3cc02 (working-tree module matches)
+OK LangJS: cffd21dde521 (working-tree module matches)
+OK LangJava: 590f4f8ea7c6 (working-tree module matches)
+OK LangKt: 6709e9bf29ee (working-tree module matches)
+OK LangTS: 90861a61a828 (working-tree module matches)
+OK LinuxLibSample: b41fc8183c2e (working-tree module matches)
+OK Sample: fafaff9de5ca (working-tree module matches)
+OK Stress: 7a37d691a932 (working-tree module matches)
+OK V8Base: c93fb9363dcc (working-tree module matches)
+OK V8BaseSample: 6cd7c869b089 (working-tree module matches)
+OK V8Numbers: 8a8343b8bd9a (working-tree module matches)

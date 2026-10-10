@@ -1,0 +1,40 @@
+{
+  "status": "IN_PROGRESS_NOT_PROMOTED",
+  "base_revision": "38ed72a60e362f8c87feff31580f9ae7121ab473",
+  "scope": "Strengthen lawHeapPreserved to compare every stored object component and exact value state. This does not yet add native heap-effect observations to lawConform.",
+  "source_sha256": {
+    "Autoform/SpecsGen/Basis.lean": "e5ed0b09af4b7e5ff60e43b92a12b874b00076a4f97ba29cf07a0f728075b43c",
+    "tests/test_heap_preservation.py": "46603a9c6ce4a3e4b1fbad839ae1ac5b85e45d5376ba14cec7a343375ac42260"
+  },
+  "changes": [
+    "Compare payload kind, values and insertion order, captured bindings and mutation version.",
+    "Use structural value comparison for closure captures, boxed-class identities, numeric tags and floating-point bits, rather than language-level equality."
+  ],
+  "checks": {
+    "kernel": {
+      "status": "PASS",
+      "log": "heap-preservation-focused1.log",
+      "summary": "1 passed in 6.04s; eighteen kernel checks, including real list append, read-only length and append/pop with restored contents."
+    },
+    "existing_proofs": {
+      "status": "PASS",
+      "log": "heap-preservation-proof-regressions3.log",
+      "summary": "Six V8 heap-preservation subjects pass under unchanged stronger claims after rfl was replaced with decide +kernel. Basis, Cachetools and CachetoolsSpec passed in the prior run.",
+      "prior_failure": "heap-preservation-proof-regressions2.log: rfl did not reduce the strengthened predicate; all six VM searches found no counterexample and an independent kernel pilot passed."
+    },
+    "python": {
+      "status": "PASS",
+      "log": "heap-preservation-python1.log",
+      "summary": "844 passed, 62 skipped, 1 xfailed in 632.61s"
+    },
+    "full_build": {
+      "status": "PASS",
+      "log": "heap-preservation-full-build1.log",
+      "summary": "Build completed successfully: 479 jobs. Session83684 exited0."
+    }
+  },
+  "remaining": [
+    "Fresh strict audit is pending on the combined graph candidate, which includes this exact-state equality and all six proof tactic corrections.",
+    "The combined graph candidate is not yet promoted to main."
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "language": "python",
+  "inventory_fingerprint": "1a2026657949c3d11ce5d8d9a959e6610b66c435843a583614e6fdcf20e2c3f2",
+  "files": [
+    {
+      "path": "numbers.py",
+      "language": "python",
+      "status": "represented"
+    }
+  ],
+  "counts": {
+    "represented": 1,
+    "unrepresented": 0,
+    "unsupported": 0,
+    "unclassified": 0,
+    "auxiliary": 0,
+    "outside_partition": 0
+  },
+  "source_changes": [],
+  "source_stable": true,
+  "scan_complete": true,
+  "source_census_complete": false,
+  "truncated_by_method_limit": false,
+  "frontend_census_complete": false,
+  "unexpected_ast_files": [],
+  "note": "Represented means at least one exported AST entry names the file. It does not establish complete parsing, translation or proof coverage."
+}

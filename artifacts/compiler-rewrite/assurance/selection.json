@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "language": "python",
+  "frontend": "PYTHONSRC",
+  "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+  "input_sha256": "4b7227dd4eea775bec2f9b9f0035ec4751d37ace4876b384a6e5f8514096a829",
+  "output_sha256": "4b7227dd4eea775bec2f9b9f0035ec4751d37ace4876b384a6e5f8514096a829",
+  "kept_functions": 5,
+  "kept_files": [
+    "numbers.py"
+  ],
+  "excluded_functions": [],
+  "source_census_complete": false
+}

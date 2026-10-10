@@ -1,0 +1,30 @@
+==========================================================================
+autoform trust audit
+==========================================================================
+
+[1] AXIOM SWEEP  (CLEAN)
+    3330 declarations in the built Autoform library
+    axiom histogram: {'propext': 1348, 'Quot.sound': 714, 'Classical.choice': 681}
+    no `axiom` declarations of our own
+    no sorryAx / ofReduceBool / ofReduceNat anywhere in the library
+
+[2] SOURCE SWEEP  (189 .lean files, comments stripped)
+    sorry: 1
+      Demo.lean:37: sorry  [demonstration]
+    sorryAx: 1
+      Autoform/Harness/Audit.lean:29: [``sorryAx, ``Lean.ofReduceBool, ``Lean.ofReduceNat]
+    partial: 3
+      Autoform/Harness/Audit.lean:32: partial def transitiveDeps (env : Environment) (root : Name) : NameSet := Id.run do
+      Autoform/Tactics/Portfolio.lean:481: partial def searchGoal (cfg : SearchCfg) (st : IO.Ref SearchState) (goal : MVarId)
+      Autoform/Tactics/Portfolio.lean:717: partial def toSMT (e : Expr) : MetaM (Option String) := do
+
+    Trusted semantics (Autoform/Lang/Core, Autoform/Lang/PCode) claim: free of sorry/partial/unsafe/native_decide/implemented_by/axiom
+    VERIFIED: no findings under trusted semantics.
+
+[3] KERNEL RECHECK / leanchecker  (VERIFIED)
+    lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform.SpecsGen.CompilerRewrite  -> returncode 0
+    the kernel replayed every constant reachable from `Autoform.SpecsGen.CompilerRewrite` into a fresh environment and accepted them all
+
+--------------------------------------------------------------------------
+VERDICT: PASS (no trusted-code leak)
+wrote /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/audit.json

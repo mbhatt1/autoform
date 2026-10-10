@@ -117,6 +117,38 @@ quietly adapts. -/
 unfold `program` itself (a 233-entry list literal). -/
 theorem P_dialect : P.dialect = Dialect.python := rfl
 
+-- RELAND (2026-10-09): `stored_class_declarations` (`program.classDecls = []`) and
+-- `stored_field_write` described the pre-re-land translation, which carried no class
+-- metadata. The re-landed program declares its classes, so both are false and deleted;
+-- the theorems below are proved against the declared hierarchy.
+
+attribute [local simp] Ctx.classLookupGap Ctx.usesClassMetadata Ctx.isProperty
+  Ctx.classStorageKey Ctx.fieldWriteCheck Ctx.fieldWriteKey Ctx.readSlot Ctx.isSharedClassValue
+
+/-- Attribute reads must discharge the descriptor check before unfolding getter
+applications. These facts use the imported property table and preserve all receiver
+domains and postconditions below. -/
+@[simp] private theorem stored__Cache__maxsize_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Cache__maxsize") = false := by
+  simp [program]
+
+@[simp] private theorem stored__Cache__currsize_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Cache__currsize") = false := by
+  simp [program]
+
+@[simp] private theorem stored__Cache__data_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Cache__data") = false := by
+  simp [program]
+
+@[simp] private theorem stored_expires_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "expires") = false := by
+  simp [program]
+
+@[simp] private theorem stored__Timer__nesting_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Timer__nesting") = false := by
+  simp [program]
+
+
 /-- Field lookup as a *shallow* function: own fields first, then the bindings captured by
 the class the object came from, then `unit`.
 
@@ -147,12 +179,91 @@ def HasField (h : Heap) (r : Ref) (f : String) (v : Val) : Prop :=
 theorem readField_of_has {h r f v} (hv : HasField h r f v) : readField h r f = v := by
   obtain ⟨o, hg, hf⟩ := hv; simp [readField, hg, hf]
 
+/-- `h` stores at `r` an instance of `cls` whose **own** field `f` holds `v`.
+
+RELAND (2026-10-09): the re-landed program carries class metadata, so what an attribute
+access does depends on the receiver's class -- a slot, a property, an inherited name or a
+miss are all different answers. The accessor theorems therefore name the receiver's
+class. A receiver of another class is outside their domain, which is the truth and not
+a weakening: `Cache.maxsize` applied to something that is not a `Cache` is not a
+statement cachetools makes either. -/
+def HasClassField (h : Heap) (r : Ref) (cls f : String) (v : Val) : Prop :=
+  ∃ o, h.get r = some o ∧ o.cls = cls ∧ o.fields.find? (·.1 == f) = some (f, v)
+
+/-- `h` stores at `r` an instance of `cls`. -/
+def HasClass (h : Heap) (r : Ref) (cls : String) : Prop :=
+  ∃ o, h.get r = some o ∧ o.cls = cls
+
+deriving instance DecidableEq for ClassAttribute
+deriving instance DecidableEq for ClassLookup
+
+/-! The class-dependent lookups the theorems below pass through, decided by the kernel on
+the recovered hierarchy (`program.classDecls`). Each is stated for any context carrying
+this program's declarations, which is the shape `simp` meets after unfolding `ctxOf`.
+`Cache` reaches `MutableMapping` through its contract (`ExternalBases.lean`), so a name
+neither defines is `.absent`; `_Link` is a `__slots__` class, so `key` and `expires` are
+slot descriptors with their own storage keys; `_Timer` defines `__getattr__`, which only
+matters on a miss. -/
+theorem lookup_Cache_maxsize (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>.Cache" "_Cache__maxsize" = .absent := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Cache_currsize (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>.Cache" "_Cache__currsize" = .absent := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Cache_data (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>.Cache" "_Cache__data" = .absent := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Timer_nesting (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>._TimedCache._Timer" "_Timer__nesting" = .absent := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Timer_timer (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>._TimedCache._Timer" "_Timer__timer" = .absent := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Timer_setattr (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>._TimedCache._Timer" "__setattr__" = .found "__builtin.object" (.opaque "class-attribute:object:__setattr__") := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Link_setattr (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>.TTLCache._Link" "__setattr__" = .found "__builtin.object" (.opaque "class-attribute:object:__setattr__") := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Link_key (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>.TTLCache._Link" "key" = .found "cachetools/__init__.py:<module>.TTLCache._Link" (.slot "<slot>cachetools/__init__.py:<module>.TTLCache._Link.key") := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+theorem lookup_Link_expires (ctx : Ctx) (hc : ctx.classDecls = P.classDecls) :
+    ctx.classLookup "cachetools/__init__.py:<module>.TTLCache._Link" "expires" = .found "cachetools/__init__.py:<module>.TTLCache._Link" (.slot "<slot>cachetools/__init__.py:<module>.TTLCache._Link.expires") := by
+  unfold Ctx.classLookup; rw [hc]; decide +kernel
+
+theorem allowsDict_Timer : ClassHierarchy.allowsDict P.classDecls "cachetools/__init__.py:<module>._TimedCache._Timer" = true := by
+  decide +kernel
+
 /-! ### `Cache.getsizeof` — the size model is the constant 1
 
 `cachetools.Cache.getsizeof` is the default cost function: every entry costs 1. This is
 the assumption the whole `currsize`/`maxsize` accounting rests on, so it is worth
 pinning rather than assuming. -/
 
+/-! **Re-land assessment (cachetools v7.1.7 under the current exporter).**
+
+Every subject below was looked up in a fresh export of the identified revision, and each
+theorem is annotated with what happens to it when `ast-Cachetools.json` is replaced:
+
+* `RELAND: survives` -- the function is hole-free and its body is byte-identical to the
+  committed one; only the added `signatureRejected`/`Func.keywordParams` simp arguments
+  are needed, because the fresh render carries a real `pythonSignature` and
+  `signatureRejected_legacy` no longer discharges the check.
+* `RELAND: BREAKS -- getter is a hole` -- was the prediction for `Cache.maxsize` and
+  `Cache.currsize`, `@property` getters the exporter used to hole as
+  `call:python-receiver-signature`. Property definitions translate now
+  (`Program.properties`, docs/languages.md §12/§14), so on the re-land these theorems
+  SURVIVED unchanged; the annotation is kept as the record of what was expected.
+* `RELAND: replaced` -- the two `cache_clear` theorems asserted that the function REACHES
+  `scope:nonlocal-write`. It no longer does: `nonlocal` writes are boxed
+  (docs/languages.md §11), the function is hole-free, and the negative result was false
+  in the good direction. §3 now states what the function does instead.
+* `RELAND: verified` -- hole-free but the body differed from the committed one; checked
+  on the first build against the re-landed AST (`ast-Cachetools.json`, cachetools v7.1.7,
+  Joern 4.0.606 -- see `provenance/ast-Cachetools.json.prov.json`).
+-/
+-- RELAND: survives (staticmethod fix restored `return 1`; body byte-identical).
 theorem Cache_getsizeof_refines :
     Refines₁ (α := Int) (β := Int) P
       "cachetools/__init__.py:<module>.Cache.getsizeof" 8 (fun _ => True) (fun _ => 1) := by
@@ -160,7 +271,7 @@ theorem Cache_getsizeof_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module__Cache_getsizeof rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, Marshal.toVal]
 
 /-! ### `_DefaultSize.__getitem__` / `.pop` — the degenerate size table
@@ -168,6 +279,7 @@ theorem Cache_getsizeof_refines :
 `_DefaultSize` is the object `Cache` uses when no `getsizeof` was supplied: a mapping
 that answers `1` to every lookup and forgets every write. Both halves are specified. -/
 
+-- RELAND: survives.
 theorem DefaultSize_getitem_refines :
     Refines₁ (α := Int) (β := Int) P
       "cachetools/__init__.py:<module>._DefaultSize.__getitem__" 8
@@ -176,9 +288,10 @@ theorem DefaultSize_getitem_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize___getitem__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, Marshal.toVal]
 
+-- RELAND: survives.
 theorem DefaultSize_pop_refines :
     Refines₁ (α := Int) (β := Int) P
       "cachetools/__init__.py:<module>._DefaultSize.pop" 8
@@ -187,11 +300,12 @@ theorem DefaultSize_pop_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize_pop rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, Marshal.toVal]
 
 /-- `_DefaultSize.__setitem__` is a no-op **on the heap as well as on the result**: this
 is the theorem that would catch the store being silently implemented. -/
+-- RELAND: survives.
 theorem DefaultSize_setitem_mrefines :
     MRefines "cachetools/__init__.py:<module>._DefaultSize.__setitem__" 8
       (fun _ _ args => ∃ k v, args = [k, v])
@@ -200,7 +314,7 @@ theorem DefaultSize_setitem_mrefines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___DefaultSize___setitem__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize___setitem__, ctxOf, P]
 
 /-! ### `Cache.maxsize` / `Cache.currsize` — the two accessors must read *different* fields
@@ -218,23 +332,25 @@ not as a positional parameter — so *any* positional argument is a surplus, and
 covers every argument list; before the calling convention was modelled the surplus was
 silently truncated and this theorem's `.ret` branch was claimed for calls CPython
 rejects. -/
+-- RELAND: survived -- predicted to break (`@property` getter holed); property definitions translate now.
+-- RELAND (2026-10-09): restated -- the receiver is a `Cache` (`HasClassField`).
 theorem Cache_maxsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.maxsize" 10
-      (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__maxsize" v)
+      (fun h self _ => ∃ r v, self = .ref r ∧ HasClassField h r "cachetools/__init__.py:<module>.Cache" "_Cache__maxsize" v)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (readField h r "_Cache__maxsize")
                                    | _      => .ret .unit
                            | _  => .raise (.str "TypeError"))) := by
-  rintro h _ args ⟨r, v, rfl, o, hg, hfld⟩
+  rintro h _ args ⟨r, v, rfl, o, hg, hcls, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl]
   cases args with
   | nil =>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, readField, hg, hfld]
+    simp +decide [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, P_dialect, readField, hg, hcls, hfld, lookup_Cache_maxsize]
   | cons a as =>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
 
 /-- **The surplus-argument branch is part of the specification, not excluded from it.**
 The rendered accessor has `params := []` — the receiver arrives as the base environment,
@@ -244,27 +360,29 @@ not as a positional parameter — so *any* positional argument is a surplus, and
 covers every argument list; before the calling convention was modelled the surplus was
 silently truncated and this theorem's `.ret` branch was claimed for calls CPython
 rejects. -/
+-- RELAND: survived -- predicted to break (`@property` getter holed); property definitions translate now.
+-- RELAND (2026-10-09): restated -- the receiver is a `Cache` (`HasClassField`).
 theorem Cache_currsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.currsize" 10
-      (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__currsize" v)
+      (fun h self _ => ∃ r v, self = .ref r ∧ HasClassField h r "cachetools/__init__.py:<module>.Cache" "_Cache__currsize" v)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (readField h r "_Cache__currsize")
                                    | _      => .ret .unit
                            | _  => .raise (.str "TypeError"))) := by
-  rintro h _ args ⟨r, v, rfl, o, hg, hfld⟩
+  rintro h _ args ⟨r, v, rfl, o, hg, hcls, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
   cases args with
   | nil =>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_currsize, ctxOf, P, readField, hg, hfld]
+    simp +decide [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_currsize, ctxOf, P, P_dialect, readField, hg, hcls, hfld, lookup_Cache_currsize]
   | cons a as =>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
 
 /-- A concrete cache object whose capacity and occupancy differ. -/
 def sampleCache : Heap :=
-  [{ cls := "Cache"
+  [{ cls := "cachetools/__init__.py:<module>.Cache"
    , fields := [("_Cache__maxsize", .int 128), ("_Cache__currsize", .int 3)] }]
 
 /-- The two accessors read the two fields, and are therefore observably different
@@ -276,6 +394,7 @@ functions on a cache whose capacity and occupancy differ.
 so an inequality between two functions is not evidence about either of them. Pinning both
 values is what gives it teeth. The lesson generalises: a witness that asserts a relation
 between two computations tests neither unless the relation is pinned on both sides. -/
+-- RELAND: survived -- predicted to break (both getters holed); property definitions translate now.
 theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
     (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
         = .val (.int 128)
@@ -283,13 +402,17 @@ theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
         = .val (.int 3)
   ∧ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
       ≠ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2 := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl,
-      runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
-  refine ⟨?_, ?_, ?_⟩ <;>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
-          f_cachetools___init___py__module__Cache_maxsize,
-          f_cachetools___init___py__module__Cache_currsize]
+  have hmax := Cache_maxsize_mrefines sampleCache (.ref 0) []
+    ⟨0, .int 128, rfl, by exact ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
+  have hcur := Cache_currsize_mrefines sampleCache (.ref 0) []
+    ⟨0, .int 3, rfl, by exact ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
+  have hm : (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
+      = .val (.int 128) := by
+    simpa [readField, sampleCache, Heap.get, Outcome.toEResult] using congrArg Prod.snd hmax
+  have hc : (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2
+      = .val (.int 3) := by
+    simpa [readField, sampleCache, Heap.get, Outcome.toEResult] using congrArg Prod.snd hcur
+  exact ⟨hm, hc, by rw [hm, hc]; intro he; cases he⟩
 
 /-! ### `Cache.__contains__` — membership, and the *polarity* of `in`
 
@@ -297,73 +420,56 @@ theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
 flag is a silent inversion of every containment test in the library, which this theorem
 refutes on any dict receiver. -/
 
+-- RELAND: survives. RELAND (2026-10-09): restated -- the receiver is a `Cache`.
 theorem Cache_contains_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.__contains__" 12
       (fun h self args => ∃ r k kvs, self = .ref r ∧ args = [k]
-                            ∧ HasField h r "_Cache__data" (.dict kvs))
+                            ∧ HasClassField h r "cachetools/__init__.py:<module>.Cache" "_Cache__data" (.dict kvs))
       (fun h self args => (h, match self, args with
                               | .ref r, [k] =>
                                   match readField h r "_Cache__data" with
                                   | .dict kvs => .ret (.bool (kvs.any (fun kv => Val.beq k kv.1)))
                                   | _         => .ret .unit
                               | _, _ => .ret .unit)) := by
-  rintro h _ _ ⟨r, k, kvs, rfl, rfl, o, hg, hfld⟩
+  rintro h _ _ ⟨r, k, kvs, rfl, rfl, o, hg, hcls, hfld⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__Cache___contains__, ctxOf, P, valIn, readField,
-        hg, hfld]
+  simp +decide [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
+        f_cachetools___init___py__module__Cache___contains__, ctxOf, P, P_dialect, valIn, readField,
+        Ctx.dunderOn, Val.unbox, hg, hcls, hfld, lookup_Cache_data]
 
 /-- Membership is not constant: it answers `true` for a present key and `false` for an
 absent one. This is the anti-vacuity witness for `Cache_contains_mrefines` — a
 specification satisfied by `fun _ => true` would pass the equation above only if that
 equation were itself wrong, and this makes the discrimination concrete. -/
+-- RELAND: survives.
 theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
-    (runMethod fuel [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+    (runMethod fuel [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 1]).2 = .val (.bool true)
-  ∧ (runMethod fuel [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+  ∧ (runMethod fuel [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 2]).2 = .val (.bool false) := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  refine ⟨?_, ?_⟩ <;>
-    rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl] <;>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
-          f_cachetools___init___py__module__Cache___contains__]
+  have present := Cache_contains_mrefines
+    [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+    (.ref 0) [.int 1] ⟨0, .int 1, [(.int 1, .int 9)], rfl, rfl, ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
+  have absent := Cache_contains_mrefines
+    [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+    (.ref 0) [.int 2] ⟨0, .int 2, [(.int 1, .int 9)], rfl, rfl, ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
+  constructor
+  · simpa [readField, Heap.get, Val.beq, Outcome.toEResult] using congrArg Prod.snd present
+  · simpa [readField, Heap.get, Val.beq, Outcome.toEResult] using congrArg Prod.snd absent
 
-/-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
+/-! ### `TLRUCache._Item.__lt__` — retired
 
-The TLRU cache keeps its items in a heap ordered by `__lt__`. Relaxing `<` to `<=` is the
-classic off-by-one that turns a strict weak order into a non-order; the equation below is
-false under that mutation at any pair of equal expiry times. -/
-
-theorem TLRUItem_lt_mrefines :
-    MRefines "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__" 12
-      (fun h self args => ∃ r s a b, self = .ref r ∧ args = [.ref s]
-                            ∧ HasField h r "expires" (.int a)
-                            ∧ HasField h s "expires" (.int b))
-      (fun h self args => (h, match self, args with
-                              | .ref r, [.ref s] =>
-                                  match readField h r "expires", readField h s "expires" with
-                                  | .int a, .int b => .ret (.bool (decide (a < b)))
-                                  | _, _ => .ret .unit
-                              | _, _ => .ret .unit)) := by
-  rintro h _ _ ⟨r, s, a, b, rfl, rfl, ⟨o, hg, hfld⟩, ⟨o', hg', hfld'⟩⟩
-  refine forall_ge_of_forall_add (N := 12) ?_
-  intro n
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__TLRUCache__Item___lt__, ctxOf, P,
-        applyBinop_int_lt, readField, hg, hfld, hg', hfld']
-
-/-- Irreflexivity: an item does not precede itself. False the moment `<` becomes `<=`. -/
-theorem TLRUItem_lt_irrefl (fuel : Nat) (hf : 12 ≤ fuel) :
-    (runMethod fuel [{ cls := "_Item", fields := [("expires", .int 7)] }]
-        "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__" (.ref 0) [.ref 0]).2
-      = .val (.bool false) := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, applyBinop_int_lt, Heap.get,
-        f_cachetools___init___py__module__TLRUCache__Item___lt__]
+RELAND (2026-10-09): `TLRUItem_lt_mrefines` and `TLRUItem_lt_irrefl` are deleted. `_Item`
+is decorated with `functools.total_ordering`, a decorator the exporter cannot apply, so
+the re-landed program records the class as `class-definition:decorator-or-metaclass`: no
+attribute of an `_Item` instance is readable through its namespace, and a theorem about
+`__lt__` reading `self.expires` would be a theorem about that hole. The strict-order claim
+is still the right specification; what it needs is a contract for `total_ordering` (it
+adds the three missing comparison methods and touches nothing else), the same mechanism
+as the external base-class contracts, and that is future work rather than a restated
+weaker theorem. -/
 
 /-! ### `_TimedCache._Timer.__exit__` — a heap effect, specified exactly
 
@@ -371,33 +477,37 @@ The timer's re-entrancy counter is decremented on exit. This is the only place i
 specifications where the *heap* is the observable, and it is stated as an exact equation
 on `Heap.setField`, so `-` → `+` and `1` → `2` are both refuted. -/
 
+-- RELAND: survives. RELAND (2026-10-09): restated -- the receiver is a `_Timer`. `_Timer`
+-- defines `__getattr__`; the exporter used to make that a barrier on the whole namespace,
+-- now it is a miss-only hook (docs/languages.md §16.A), and `_Timer__nesting` is present.
 theorem Timer_exit_mrefines :
     MRefines "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" 12
       (fun h self args => ∃ r n e, self = .ref r ∧ args = [e]
-                            ∧ HasField h r "_Timer__nesting" (.int n))
+                            ∧ HasClassField h r "cachetools/__init__.py:<module>._TimedCache._Timer" "_Timer__nesting" (.int n))
       (fun h self _ => match self with
                        | .ref r =>
                            match readField h r "_Timer__nesting" with
                            | .int n => (h.setField r "_Timer__nesting" (.int (n - 1)), .ret .unit)
                            | _      => (h, .ret .unit)
                        | _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨r, n, e, rfl, rfl, o, hg, hfld⟩
+  rintro h _ _ ⟨r, n, e, rfl, rfl, o, hg, hcls, hfld⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
+  simp +decide [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___TimedCache__Timer___exit__, ctxOf, P,
-        P_dialect, readField, hg, hfld]
+        P_dialect, readField, hg, hcls, hfld, lookup_Timer_nesting, lookup_Timer_setattr, allowsDict_Timer]
 
 /-- The decrement is a decrement: on a concrete timer at nesting 1, exit leaves 0. -/
+-- RELAND: survives.
 theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
-    readField ((runMethod fuel [{ cls := "_Timer", fields := [("_Timer__nesting", .int 1)] }]
+    readField ((runMethod fuel [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [("_Timer__nesting", .int 1)] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" (.ref 0) [.unit]).1) 0
         "_Timer__nesting" = .int 0 := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
-        f_cachetools___init___py__module___TimedCache__Timer___exit__]
+  have hr := Timer_exit_mrefines [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [("_Timer__nesting", .int 1)] }]
+    (.ref 0) [.unit] ⟨0, 1, .unit, rfl, rfl, ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
+  rw [hr]
+  rfl
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
 
@@ -405,66 +515,76 @@ A constructor is specified by the *whole* post-state. Deleting either branch of 
 `Stmt.seq` changes the resulting heap, so the mutation gate's `seq`-deletion operator has
 something to break here. -/
 
+-- RELAND: survives. RELAND (2026-10-09): restated -- the receiver is a `_Timer` (`HasClass`).
 theorem Timer_init_mrefines :
     MRefines "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" 12
-      (fun _ self args => ∃ r t, self = .ref r ∧ args = [t])
+      (fun h self args => ∃ r t, self = .ref r ∧ args = [t] ∧ HasClass h r "cachetools/__init__.py:<module>._TimedCache._Timer")
       (fun h self args => match self, args with
                           | .ref r, [t] =>
                               (((h.setField r "_Timer__timer" t).setField r "_Timer__nesting" (.int 0)),
                                .ret .unit)
                           | _, _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨r, t, rfl, rfl⟩
+  rintro h _ _ ⟨r, t, rfl, rfl, o, hg, hcls⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P]
+  simp +decide [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
+        f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P, P_dialect,
+        Heap.get_setField, hg, hcls, lookup_Timer_timer, lookup_Timer_nesting, lookup_Timer_setattr, allowsDict_Timer]
 
 /-- Both fields are actually written, with the right values in the right places. -/
+-- RELAND: survives.
 theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
-    readField (runMethod fuel [{ cls := "_Timer", fields := [] }]
+    readField (runMethod fuel [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
       0 "_Timer__timer" = .int 99
-  ∧ readField (runMethod fuel [{ cls := "_Timer", fields := [] }]
+  ∧ readField (runMethod fuel [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
       0 "_Timer__nesting" = .int 0 := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  refine ⟨?_, ?_⟩ <;>
-    rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl] <;>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
-          f_cachetools___init___py__module___TimedCache__Timer___init__]
+  have hr := Timer_init_mrefines [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
+    (.ref 0) [.int 99] ⟨0, .int 99, rfl, rfl, ⟨_, rfl, rfl⟩⟩ fuel hf
+  rw [hr]
+  exact ⟨rfl, rfl⟩
 
-/-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
+/-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields
 
+`_Link` declares `__slots__ = ("expires", "key", "next", "prev")`, so RELAND (2026-10-09)
+its two writes land in the slots' storage keys (`<slot><class>.<name>`, the key the oracle
+also snapshots), not in a dictionary entry named `key`. The specification says so. -/
+
+-- RELAND: survives. RELAND (2026-10-09): restated -- slot storage keys, receiver a `_Link`.
 theorem TTLLink_init_mrefines :
     MRefines "cachetools/__init__.py:<module>.TTLCache._Link.__init__" 12
-      (fun _ self args => ∃ r k e, self = .ref r ∧ args = [k, e])
+      (fun h self args => ∃ r k e, self = .ref r ∧ args = [k, e] ∧ HasClass h r "cachetools/__init__.py:<module>.TTLCache._Link")
       (fun h self args => match self, args with
                           | .ref r, [k, e] =>
-                              (((h.setField r "key" k).setField r "expires" e), .ret .unit)
+                              (((h.setField r "<slot>cachetools/__init__.py:<module>.TTLCache._Link.key" k).setField r "<slot>cachetools/__init__.py:<module>.TTLCache._Link.expires" e), .ret .unit)
                           | _, _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨r, k, e, rfl, rfl⟩
+  rintro h _ _ ⟨r, k, e, rfl, rfl, o, hg, hcls⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache__Link___init__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P]
+  simp +decide [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
+        f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P, P_dialect,
+        Heap.get_setField, hg, hcls, lookup_Link_setattr, lookup_Link_key, lookup_Link_expires]
 
 /-! ### `TTLCache.__setstate__.<lambda>0` — a projection out of an *argument*, not `self` -/
 
+-- RELAND: survives. RELAND (2026-10-09): restated -- the argument is a `_Link`, whose
+-- `expires` is a slot read from its storage key.
 theorem TTLSetstate_lambda_mrefines :
     MRefines "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0" 10
-      (fun h _ args => ∃ r v, args = [.ref r] ∧ HasField h r "expires" v)
+      (fun h _ args => ∃ r v, args = [.ref r] ∧ HasClassField h r "cachetools/__init__.py:<module>.TTLCache._Link" "<slot>cachetools/__init__.py:<module>.TTLCache._Link.expires" v)
       (fun h _ args => (h, match args with
-                           | [.ref r] => .ret (readField h r "expires")
+                           | [.ref r] => .ret (readField h r "<slot>cachetools/__init__.py:<module>.TTLCache._Link.expires")
                            | _        => .ret .unit)) := by
-  rintro h self _ ⟨r, v, rfl, o, hg, hfld⟩
+  rintro h self _ ⟨r, v, rfl, o, hg, hcls, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache___setstate____lambda_0 rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__TTLCache___setstate____lambda_0, ctxOf, P,
-        readField, hg, hfld]
+  simp +decide [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
+        f_cachetools___init___py__module__TTLCache___setstate____lambda_0, ctxOf, P, P_dialect,
+        readField, hg, hcls, hfld, lookup_Link_expires]
 
 /-! ### `_TimedCache.expire` — an *exception* is a specification
 
@@ -472,38 +592,38 @@ theorem TTLSetstate_lambda_mrefines :
 legitimate refinement target (see `Refine.lean` §1), so "this method always raises" is a
 complete specification rather than a gap, and `.raise` → `.ret` is refuted by it.
 
-**Recorded caveat, not smoothed over:** the payload is `Val.unit`, not a
-`NotImplementedError` object. `Expr.name "NotImplementedError"` is a builtin the
-transpiler does not model, and the semantics evaluates an unbound name to `unit`. The
-statement therefore says "raises", not "raises `NotImplementedError`" — see obligation (3)
-in §4. -/
+The re-landed export spells `raise NotImplementedError` as the
+`py:exception:NotImplementedError` constructor, whose value IS the class name, and
+`Stmt.raise` under `.python` classifies what it raises (`pythonRaise`): a represented
+class name passes through unchanged. So the statement names the class — the caveat that
+stood here ("raises, but the payload is `unit`") is closed, and obligation (3) in §4
+records what is still not modelled: the exception's *arguments*. -/
 
-/-- Evaluating a bare name never holes and never consumes the heap: every branch of the
-`Expr.name` case — local, global, function value, unbound — returns a value. Needed
-because `NotImplementedError` is an unbound builtin, and `Ctx.resolve` on a 233-entry
-table does not reduce in the kernel. -/
-theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : String) :
-    ∃ v, evalExpr ctx (n + 1) h ρ (.name x) = (h, .val v) := by
-  simp only [evalExpr]
-  repeat' split
-  all_goals exact ⟨_, rfl⟩
-
+-- RELAND: verified on the re-landed body (`raise` of the `py:exception:` constructor).
 theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
-    ∃ v, runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t] = .exn v := by
+    runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t]
+      = .exn (.str "NotImplementedError") := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
-  obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError"
-  refine ⟨v, ?_⟩
   have hne : ((none : Option String) != some "time") = true := rfl
-  simp +decide only [hne, applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+  simp +decide only [hne, applyFunc, seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv,
+        bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams,
+        Option.map, Option.getD, List.length, Bool.and_false, Bool.true_and, Bool.or_false, Bool.false_or,
         Val.unbuiltin, execStmt, f_cachetools___init___py__module___TimedCache_expire,
         Env.set, List.filter, List.any, Option.isNone, bne_iff_ne, ne_eq,
         reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self]
-  rw [hv]
-  simp +decide
+  -- The constructor's name is a `String.drop` the kernel computes; `startsWith` is a
+  -- simproc. Establish the name first so the rewrite has a literal to work with.
+  have hname : ("py:exception:NotImplementedError".drop "py:exception:".length).toString
+      = "NotImplementedError" := by decide
+  have hname' : ("py:exception:NotImplementedError".drop "py:exception:".length).copy
+      = "NotImplementedError" := by decide
+  simp +decide [evalExpr, evalList, applyUnop, hname, hname', Stdlib.makeException,
+                Stdlib.excNames, pythonRaise, ctxOf, P]
 
 /-! ### `_cachedmethod._none` — the sentinel is constant -/
 
+-- RELAND: survives.
 theorem cachedmethod_none_refines :
     Refines P "cachetools/_cachedmethod.py:<module>._none" 8
       (fun args => ∃ x, args = [x]) (fun _ => .ret .unit) := by
@@ -511,36 +631,36 @@ theorem cachedmethod_none_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro m
   rw [runFunc_of_resolve _ _ _ _ f_cachetools__cachedmethod_py__module___none rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools__cachedmethod_py__module___none, ctxOf, P]
 
-/-! ## 3. A negative result on the translated module
+/-! ## 3. The former negative result, now a positive one
 
-`Refine.lean` proves `sample_id_not_refinable` on a copied term. The same argument is
-worth having on the *real* module, because holes in `cachetools` are the reason the SACM
-top claim is UNDEVELOPED. `_uncached_info.cache_clear` is one of the 102: it writes a
-closed-over variable, and `nonlocal` *writes* are an honest hole
-(`Stmt.hole "scope:nonlocal-write"`, README "Not yet built").
+`Refine.lean` proves `sample_id_not_refinable` on a copied term, and this section used to
+prove the same thing about the REAL module: `_uncached_info.cache_clear` writes a
+closed-over variable, `nonlocal` writes were an honest hole (`scope:nonlocal-write`), and
+no shallow specification could refine a hole. That negative result is now false in the
+good direction. `nonlocal` is boxed: `_uncached_info` allocates `misses` as a heap cell
+(`Expr.boxNew`) and the closure captures the reference, so `cache_clear` translates to
+`misses.v = 0` on that cell. The theorem that replaces the negative one says exactly what
+the function does when called with its captured box: it returns `None` and the box's `v`
+is `0` afterwards — stated with `Heap.setField` on the left so nothing about the rest of
+the heap is assumed or lost. -/
 
-The theorem says: no shallow specification, at any fuel bound, on any inhabited domain,
-refines it. Holes are not an inconvenience to be routed around — they are provably
-unspecifiable, and this is now stated about generated code rather than a copy. -/
-
-theorem cache_clear_reaches_hole (k : Nat) (h : Heap) (self : Val) :
-    (runMethod (k + 4) h "cachetools/_cached.py:<module>._uncached_info.cache_clear"
-      self []).2 = .hole "scope:nonlocal-write" := by
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools__cached_py__module___uncached_info_cache_clear rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, Env.set,
-        f_cachetools__cached_py__module___uncached_info_cache_clear]
-
-theorem cache_clear_not_refinable (N : Nat)
-    (dom : Heap → Val → List Val → Prop) (spec : Heap → Val → List Val → Heap × Outcome)
-    (h : Heap) (self : Val) (hd : dom h self []) :
-    ¬ MRefines "cachetools/_cached.py:<module>._uncached_info.cache_clear" N dom spec := by
-  intro hm
-  have h1 := congrArg Prod.snd (hm h self [] hd (N + 4) (Nat.le_add_right _ _))
-  rw [cache_clear_reaches_hole N h self] at h1
-  exact Outcome.toEResult_ne_hole _ _ h1.symm
+-- RELAND: replaced -- `nonlocal` is boxed, the function translates, and the negative result
+-- it stood for (`cache_clear_reaches_hole`, `cache_clear_not_refinable`) is now false.
+-- RELAND (2026-10-09): the box at `r` is named as what it is (`Expr.boxNew` allocates
+-- class `<local>`): with class metadata a write consults the receiver's class, and a box
+-- has none.
+theorem cache_clear_zeroes_the_box (k : Nat) (h : Heap) (r : Ref) (hb : HasClass h r "<local>") :
+    applyClosure (ctxOf P) (k + 5) h
+        f_cachetools__cached_py__module___uncached_info_cache_clear [("misses", .ref r)] [] []
+      = (h.setField r "v" (.int 0), .val .unit) := by
+  obtain ⟨o, hg, hcls⟩ := hb
+  simp +decide [applyClosure, seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults,
+        bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
+        signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
+        f_cachetools__cached_py__module___uncached_info_cache_clear, hg, hcls]
 
 /-! ## 4. What the mutation gate actually said
 
@@ -608,12 +728,11 @@ Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
    `_Link.unlink` and the eviction loops, which are the functions whose specifications
    would actually be interesting to a `cachetools` user.
 
-3. **Exception payloads are unmodelled.** `TimedCache_expire_raises` pins the *fact* of a
-   raise but not its class, because `NotImplementedError` is an unbound builtin name that
-   the semantics evaluates to `unit`. Modelling builtin exception classes is a transpiler
-   and semantics change, not something this file can repair, and until it happens no
-   statement in this file can distinguish `raise NotImplementedError` from `raise
-   KeyError`.
+3. **Exception arguments are unmodelled.** `TimedCache_expire_raises` names the class —
+   the `py:exception:<Name>` constructor evaluates to the represented class name, and
+   `ExcSafe.lean` proves every Python exception Core raises is one — but an exception is
+   only its class here: `KeyError(key)` and `KeyError()` are the same value, so no
+   statement in this file can speak about what an exception *carries*.
 
 4. **`Cache.get` is not specified.** Its body is `if key in self: return self[key]`, and
    `Expr.inOp`/`Expr.index` applied to a `ref` receiver hole out (`in:non-container`)

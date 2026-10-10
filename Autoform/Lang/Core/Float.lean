@@ -543,6 +543,60 @@ def pyMod (c : FConfig) (x y : Fl) : FResult :=
       else .ok m
   | r => r
 
+/-! ### Which exceptions arithmetic can raise
+
+The try/except invariant (`Autoform/Lang/Core/ExcSafe.lean`) needs to know that every
+`FResult.exn` an arithmetic operation produces names a Python exception class. `guard2` is
+private to this file, so the lemmas that look inside it live here. Only `div`, `fmod`
+(and `pyMod`, through `fmod`) and `ofInt` raise at all; `add`, `sub` and `mul` never do
+-- IEEE arithmetic on finite operands rounds, it does not fault. -/
+
+theorem add_ne_exn (c : FConfig) (x y : Fl) (s : String) : c.add x y ≠ .exn s := by
+  intro h
+  unfold add guard2 at h
+  dsimp only at h
+  repeat' split at h
+  all_goals cases h
+
+theorem sub_ne_exn (c : FConfig) (x y : Fl) (s : String) : c.sub x y ≠ .exn s :=
+  add_ne_exn c x y.neg s
+
+theorem mul_ne_exn (c : FConfig) (x y : Fl) (s : String) : c.mul x y ≠ .exn s := by
+  intro h
+  unfold mul guard2 at h
+  dsimp only at h
+  repeat' split at h
+  all_goals cases h
+
+theorem div_exn (c : FConfig) (x y : Fl) (s : String) :
+    c.div x y = .exn s → s = "ZeroDivisionError" := by
+  intro h
+  unfold div guard2 at h
+  dsimp only at h
+  repeat' split at h
+  all_goals first | (cases h; rfl) | cases h
+
+theorem fmod_exn (c : FConfig) (x y : Fl) (s : String) :
+    c.fmod x y = .exn s → s = "ZeroDivisionError" := by
+  intro h
+  unfold fmod guard2 at h
+  dsimp only at h
+  repeat' split at h
+  all_goals first | (cases h; rfl) | cases h
+
+theorem pyMod_exn (c : FConfig) (x y : Fl) (s : String) :
+    c.pyMod x y = .exn s → s = "ZeroDivisionError" := by
+  intro h
+  unfold pyMod at h
+  cases hf : c.fmod x y with
+  | ok m =>
+      simp only [hf] at h
+      repeat' split at h
+      all_goals first | cases h | exact absurd h (add_ne_exn c _ _ _)
+  | exn r => simp only [hf] at h; cases h; exact fmod_exn c x y _ hf
+  | ub r => simp only [hf] at h; cases h
+  | unmodelled r => simp only [hf] at h; cases h
+
 /-! ### Comparison
 
 Python's float comparison is IEEE's: NaN is unordered (so `x != x` when `x` is NaN, and
@@ -581,6 +635,16 @@ both directions are exact here. -/
 def ofInt (c : FConfig) (n : Int) : FResult :=
   let r := c.fmt.round (n < 0) n.natAbs 1
   if r.isInf then .exn "OverflowError" else .ok r
+
+theorem ofInt_exn (c : FConfig) (n : Int) (s : String) :
+    c.ofInt n = .exn s → s = "OverflowError" := by
+  intro h
+  unfold ofInt at h
+  -- `ofInt` binds `r` with a `let`; zeta-reduce before the `if` is splittable.
+  dsimp only at h
+  split at h
+  · cases h; rfl
+  · cases h
 
 /-- `int(x)`: truncation toward zero. `int(inf)` is `OverflowError`, `int(nan)` is
 `ValueError` — both are Python-specific and neither is a hole. -/

@@ -1,0 +1,95 @@
+name: Source runtime proofs
+
+on:
+  push:
+    branches: [main]
+    paths: ['Autoform/**', 'Autoform.lean', 'scripts/**', 'cartographer/**', 'examples/**', 'tests/**', '*.sh', 'src/**', 'pyproject.toml', 'build_support.py', 'setup.py', 'MANIFEST.in', 'requirements*.txt', 'lean-toolchain', 'lakefile.toml', 'lake-manifest.json', 'joern-version', '.github/workflows/source.yml', '.github/workflows/package.yml']
+  pull_request:
+    paths: ['Autoform/**', 'Autoform.lean', 'scripts/**', 'cartographer/**', 'examples/**', 'tests/**', '*.sh', 'src/**', 'pyproject.toml', 'build_support.py', 'setup.py', 'MANIFEST.in', 'requirements*.txt', 'lean-toolchain', 'lakefile.toml', 'lake-manifest.json', 'joern-version', '.github/workflows/source.yml', '.github/workflows/package.yml']
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      distribution_artifact:
+        description: Wheel artifact from the calling package workflow
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    # The two installed acceptance commands each have a 30-minute bound, in
+    # addition to toolchain setup and the source regression suite.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: Install package and test tools
+        if: inputs.distribution_artifact == ''
+        run: python -m pip install '.[test]'
+      - uses: actions/download-artifact@v4
+        if: inputs.distribution_artifact != ''
+        with:
+          name: ${{ inputs.distribution_artifact }}
+          path: dist
+      - name: Install the exact candidate wheel and test tools
+        if: inputs.distribution_artifact != ''
+        run: |
+          python -m pip install pytest packaging
+          python scripts/check_distribution.py dist
+          wheel=$(find "$PWD/dist" -name '*.whl' -print -quit)
+          python -m pip install "$wheel"
+      - name: Install Lean
+        run: |
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        id: joern
+        with:
+          path: ~/joern
+          key: joern-${{ runner.os }}-${{ hashFiles('joern-version') }}
+      - name: Install pinned Joern
+        if: steps.joern.outputs.cache-hit != 'true'
+        run: |
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/joern-cli.zip" -o /tmp/joern.zip
+          mkdir -p "$HOME/joern"
+          unzip -q /tmp/joern.zip -d "$HOME/joern"
+      - name: All source languages, real runtimes and generated kernel proofs
+        env:
+          AUTOFORM_TEST_JOERN: '1'
+          AUTOFORM_REQUIRE_LEAN: '1'
+        run: python -m pytest tests/test_source_pipeline.py tests/test_source_numeric.py tests/test_control_flow.py tests/test_python_handlers.py tests/test_python_raises.py tests/test_python_signatures.py tests/test_python_binding.py tests/test_python_receivers.py tests/test_python_callable_shapes.py tests/test_production_gaps.py tests/test_spec_synthesis.py tests/test_linux_pipeline.py -q
+      - name: Installed source CLI outside checkout
+        run: |
+          cd "$RUNNER_TEMP"
+          autoform init
+          autoform source .autoform-work/examples/source/go InstalledGo
+          cd .autoform-work
+          lake env leanchecker --fresh Autoform.SpecsGen.InstalledGo
+      - name: Installed Git URL command accepts a proved property and rejects a false one
+        env:
+          AUTOFORM_TEST_INSTALLED_E2E: '1'
+        run: python -m pytest tests/test_installed_assurance.py -q --basetemp="$RUNNER_TEMP/autoform-installed-assurance"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-runtime-evidence
+          path: |
+            artifacts/pipeline/
+            ${{ runner.temp }}/.autoform-work/artifacts/pipeline/
+            ${{ runner.temp }}/autoform-installed-assurance/**/artifacts/pipeline/

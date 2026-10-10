@@ -1,0 +1,136 @@
+{
+ "module": "PipelinePython",
+ "corpus": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/examples/source/python",
+ "mode": "native",
+ "interpreter_fuel": 5000,
+ "initializer_fuel": 5000,
+ "cross_runtime_evidence": true,
+ "self_recorded_families": [
+  "charact"
+ ],
+ "self_recorded_note": "`charact_*` right-hand sides are this interpreter's own output. They are characterization/regression theorems and are NOT cross-implementation evidence; only `conform_*` is, and it needs a runtime this repository can drive.",
+ "families_unavailable": [],
+ "subjects_considered": 3,
+ "subject_population": "observed",
+ "max_subjects": null,
+ "only_subjects": null,
+ "excluded_subjects": [],
+ "functions": 5,
+ "call_closed": 5,
+ "artifacts": {
+  "docstrings": 0,
+  "doctests": 0,
+  "asserts": 0,
+  "raises": 0,
+  "pbt_files": 0,
+  "pbt_properties": 0,
+  "test_files": 0
+ },
+ "observations": {
+  "calls": 15,
+  "in_core": 15,
+  "tests": [],
+  "skipped": {
+   "skip_varargs": 0,
+   "skip_unencodable_args": 0,
+   "skip_unencodable_ret": 0,
+   "runtime": "cpython",
+   "evidence": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/artifacts/pipeline/PipelinePython/conformance.json"
+  }
+ },
+ "candidates": 3,
+ "refuted": 0,
+ "not_checked": 0,
+ "vacuous": 0,
+ "vacuity_checks": {},
+ "vacuity_rate_pct": 0.0,
+ "emitted": 3,
+ "proved": 3,
+ "open_obligations": 0,
+ "build_clean": true,
+ "artifact_hashes": {
+  "ast": "4b7227dd4eea775bec2f9b9f0035ec4751d37ace4876b384a6e5f8514096a829",
+  "model": "2b7aae24bb3dc0d11d9f9f498016c0c948b3505f196194efd0ba95142d8907b4",
+  "conformance": "8073112ac0e9e79727756dd59f235b74ed91ab113964a44a679ff3bfec78a441",
+  "proof": "85d7a8716d4a37906203347b0e42aee4429c4f984aaba462f282d91fc4a222c4"
+ },
+ "mutation_sample": null,
+ "fuel_independent": 3,
+ "fuel_obligations_remaining": 0,
+ "fuel_blocked_reasons": {},
+ "outOfFuel_cases": {},
+ "by_family": {
+  "conform": {
+   "candidates": 3,
+   "refuted": 0,
+   "vacuous": 0,
+   "proved": 3
+  }
+ },
+ "specs": [
+  {
+   "id": "conform_numbers_py__module__add",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.py:<module>.add",
+   "definition": "f_numbers_py__module__add",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_py__module__fraction",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.py:<module>.fraction",
+   "definition": "f_numbers_py__module__fraction",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_numbers_py__module__quotient",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "numbers.py:<module>.quotient",
+   "definition": "f_numbers_py__module__quotient",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  }
+ ],
+ "not_checked_gates": [
+  "scripts/mutate.py \u2014 run separately; a surviving mutant means the spec is vacuous in the sufficient sense",
+  "scripts/audit_all.py \u2014 axiom basis of the emitted theorems"
+ ]
+}
