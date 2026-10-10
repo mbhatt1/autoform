@@ -133,6 +133,24 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
                  % doc_functions)
     with open(os.path.join(d, "README.md"), "w") as fh:
         fh.write("| 0 holes, all named |\n")
+        # The per-corpus spec figures are COUNTED rows bound to the tracked spec modules
+        # (2026-10-10): each needs its README line and a module with as many
+        # `#audit_axioms` lines as it quotes, and a `budgetExcluded` list of the quoted
+        # length (or none, for zero).
+        fh.write("requests 2.32.5 — 226/260 hole-free, core 134, 147 agree / 0 diverge, "
+                 "2 specs, 0 over the proof budget;\n"
+                 "click 8.2.1 — 475/549, core 265, 135 / 0, 3 specs, 1 over the proof "
+                 "budget;\njinja2 3.1.6 — 662/817, core 438, 133 / 0, 1 specs, 0 over the "
+                 "proof budget.\n")
+    os.makedirs(os.path.join(d, "Autoform", "SpecsGen"), exist_ok=True)
+    for mod, n, excluded in (("Requests", 2, []), ("Click", 3, ["conform_x"]),
+                             ("Jinja2", 1, [])):
+        with open(os.path.join(d, "Autoform", "SpecsGen", mod + ".lean"), "w") as fh:
+            if excluded:
+                fh.write("def budgetExcluded : List (String × String × String) :=\n  [%s]\n\n"
+                         % ", ".join('("%s", "s", "r")' % t for t in excluded))
+            for i in range(n):
+                fh.write("#audit_axioms conform_%d\n" % i)
     # The Java corpus rows (commons-lang3, 2026-10-10) are bound too. They are internally
     # consistent here (ledger and oracle population equal the AST's), so this fixture
     # still isolates the cachetools staleness it is about.

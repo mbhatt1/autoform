@@ -103,12 +103,57 @@ CROSS = [
 COUNTED = [
     ("README.md", r"\|\s*(\d+) holes, all named\s*\|",
      "ast-Cachetools.json", "ast_hole_count", "hole count"),
+    # The per-corpus spec figures are bound to the TRACKED spec modules, not to the
+    # `.autoform-work/reland/<M>/specs.json` reports (gitignored: a clone cannot see them).
+    # A theorem is counted by its `#audit_axioms` line, which the generator emits exactly
+    # once per theorem it proved; the over-budget figure is the `budgetExcluded` list, and
+    # a module with no such list has zero.
+    ("README.md", r"requests 2\.32\.5 — [^;]*?, (\d+) specs",
+     "Autoform/SpecsGen/Requests.lean", "specsgen_theorem_count", "requests spec count"),
+    ("README.md", r"requests 2\.32\.5 — [^;]*?, \d+ specs, (\d+) over the proof budget",
+     "Autoform/SpecsGen/Requests.lean", "specsgen_budget_excluded_count",
+     "requests over-budget count"),
+    ("README.md", r"click 8\.2\.1 — [^;]*?, (\d+) specs",
+     "Autoform/SpecsGen/Click.lean", "specsgen_theorem_count", "click spec count"),
+    ("README.md", r"click 8\.2\.1 — [^;]*?, \d+ specs, (\d+) over the proof budget",
+     "Autoform/SpecsGen/Click.lean", "specsgen_budget_excluded_count",
+     "click over-budget count"),
+    ("README.md", r"jinja2 3\.1\.6 — [^;.]*?, (\d+) specs",
+     "Autoform/SpecsGen/Jinja2.lean", "specsgen_theorem_count", "jinja2 spec count"),
+    ("README.md", r"jinja2 3\.1\.6 — [^;.]*?, \d+ specs, (\d+) over the proof budget",
+     "Autoform/SpecsGen/Jinja2.lean", "specsgen_budget_excluded_count",
+     "jinja2 over-budget count"),
 ]
 
 
 def ast_hole_count(path):
     """Holes in a neutral AST, counted from the label field the exporter emits."""
     return len(re.findall(r'"(?:label|hole)"\s*:\s*"[^"]+"', open(path).read()))
+
+
+def specsgen_sources(path):
+    """A spec module's text: the file itself, plus its `<Module>/` directory of parts when
+    the generator split it (split-modules: `Base` and `PartN`)."""
+    out = [open(path, encoding="utf-8").read()]
+    part_dir = os.path.splitext(path)[0]
+    if os.path.isdir(part_dir):
+        for name in sorted(os.listdir(part_dir)):
+            if name.endswith(".lean"):
+                out.append(open(os.path.join(part_dir, name), encoding="utf-8").read())
+    return "\n".join(out)
+
+
+def specsgen_theorem_count(path):
+    """Theorems a generated spec module proves: one `#audit_axioms` line each."""
+    return len(re.findall(r'^#audit_axioms ', specsgen_sources(path), re.M))
+
+
+def specsgen_budget_excluded_count(path):
+    """Entries of the module's `budgetExcluded` list; 0 when the generator emitted none."""
+    src = specsgen_sources(path)
+    m = re.search(r'^def budgetExcluded : List \(String × String × String\) :=\n(.*?)\n\n',
+                  src, re.S | re.M)
+    return len(re.findall(r'\("', m.group(1))) if m else 0
 
 
 def ast_function_count(path):

@@ -876,27 +876,169 @@ def Program.table (p : Program) : FuncTable :=
 /-! ### Name matching the kernel can compute
 
 Name matching runs during kernel-checked execution as well as native execution.
-These helpers use character lists and structural recursion to keep concrete lookups
-cheap to reduce. The agreement lemmas connect them to the library's string operations.
-This is a reduction-cost choice, not a restriction on what the Lean kernel can prove. -/
+These helpers compare **UTF-8 byte lists** with structural recursion, so that a concrete
+lookup is cheap for both the kernel and the elaborator. The agreement lemmas connect them
+to the library's string operations and to the character-list view. This is a
+reduction-cost choice, not a restriction on what the Lean kernel can prove.
+
+Why bytes and not characters. `String` is a byte array in this toolchain, and
+`String.toList` *decodes* it through the well-founded `ByteArray.utf8Decode?.go`, which
+the kernel unfolds through `Acc.rec`. Measured on the Click table (2026-10-10,
+`lake env lean -M`, one `decide +kernel`): decoding one function name costs the kernel
+about 40 MB and 150 ms, encoding one costs about 5 MB and 20 ms, and comparing two
+literals is free. `Ctx.resolve`'s suffix scan decodes every key of the table on a miss,
+which is every bare builtin name (`repr`, `len`, `isinstance`, …): over Click's ~600
+entries that was 24 GB and the reason 30 conformance theorems across Requests, Click and
+Jinja2 were over the 16 GB proof budget. Byte lists never decode: a literal reduces to
+its bytes by encoding, which is what the kernel does for every string literal anyway. The
+library's own `String.endsWith` is just as cheap in the kernel but does not reduce in the
+elaborator (`rfl`/`decide` get stuck on its slice machinery), and the `rfl` proofs in
+`Refine.lean` need the elaborator to compute these. -/
+
+/-- The UTF-8 bytes of a string, as a list. A literal reduces to this without decoding. -/
+def strBytes (s : String) : List UInt8 := s.toByteArray.data.toList
+
+theorem strBytes_eq_flatMap (s : String) :
+    strBytes s = s.toList.flatMap String.utf8EncodeChar := by
+  unfold strBytes
+  rw [← String.utf8Encode_toList]
+  simp [List.utf8Encode, List.data_toByteArray]
+
+/-- UTF-8 encoding is injective (it decodes back). -/
+theorem flatMap_utf8EncodeChar_inj {l m : List Char}
+    (h : l.flatMap String.utf8EncodeChar = m.flatMap String.utf8EncodeChar) : l = m := by
+  have h' : l.utf8Encode = m.utf8Encode := by unfold List.utf8Encode; rw [h]
+  have h2 := congrArg ByteArray.utf8Decode? h'
+  rw [List.utf8Decode?_utf8Encode, List.utf8Decode?_utf8Encode] at h2
+  exact List.toArray_inj (Option.some.inj h2)
+
+theorem flatMap_utf8EncodeChar_ne_nil {l : List Char} (h : l ≠ []) :
+    l.flatMap String.utf8EncodeChar ≠ [] := by
+  cases l with
+  | nil => exact absurd rfl h
+  | cons c l => simp [List.flatMap_cons]
+
+/-- A byte prefix that is itself an encoding is a character prefix (the library proves
+this one; the suffix direction below is ours). -/
+theorem prefix_of_flatMap_utf8EncodeChar_prefix {l m : List Char}
+    (h : l.flatMap String.utf8EncodeChar <+: m.flatMap String.utf8EncodeChar) : l <+: m := by
+  obtain ⟨r, hr⟩ := h
+  apply List.isPrefix_of_utf8Encode_append_eq_utf8Encode r.toByteArray
+  unfold List.utf8Encode
+  rw [← List.toByteArray_append, hr]
+
+/-- The encoding of a non-empty character list starts with a UTF-8 first byte. -/
+theorem first_byte_of_flatMap_utf8EncodeChar {q : List Char} (hq : q ≠ []) :
+    ∃ b rest, q.flatMap String.utf8EncodeChar = b :: rest ∧ b.IsUTF8FirstByte := by
+  obtain ⟨d, q', rfl⟩ := List.exists_cons_of_ne_nil hq
+  rw [List.flatMap_cons]
+  obtain ⟨b, ed', hb⟩ := List.exists_cons_of_ne_nil (@String.utf8EncodeChar_ne_nil d)
+  refine ⟨b, ed' ++ q'.flatMap String.utf8EncodeChar, by rw [hb]; rfl, ?_⟩
+  have := @UInt8.isUTF8FirstByte_getElem_zero_utf8EncodeChar d
+  simpa [hb] using this
+
+/-- Inside one character's encoding, no byte after the first is a first byte: UTF-8 is
+self-synchronising. -/
+theorem not_first_byte_of_proper_suffix_utf8EncodeChar {c : Char} {r : List UInt8} {b : UInt8}
+    {t' : List UInt8} (h : r ++ b :: t' = String.utf8EncodeChar c) (hr : r ≠ []) :
+    ¬ b.IsUTF8FirstByte := by
+  have hi : r.length < (String.utf8EncodeChar c).length := by
+    rw [← h]; simp
+  have key := @UInt8.isUTF8FirstByte_getElem_utf8EncodeChar c r.length hi
+  have hget : (String.utf8EncodeChar c)[r.length]'hi = b := by
+    rw [List.getElem_of_eq h.symm]
+    simp
+  rw [hget] at key
+  intro hb
+  exact hr (List.length_eq_zero_iff.1 (key.1 hb))
+
+/-- A byte suffix that is itself an encoding is a character suffix. -/
+theorem suffix_of_flatMap_utf8EncodeChar_suffix {q s : List Char}
+    (h : q.flatMap String.utf8EncodeChar <:+ s.flatMap String.utf8EncodeChar) : q <:+ s := by
+  induction s with
+  | nil =>
+    rw [List.flatMap_nil, List.suffix_nil] at h
+    cases q with
+    | nil => exact List.nil_suffix
+    | cons d q' => exact absurd h (flatMap_utf8EncodeChar_ne_nil (List.cons_ne_nil d q'))
+  | cons c s' ih =>
+    rw [List.flatMap_cons] at h
+    by_cases hlen : (q.flatMap String.utf8EncodeChar).length ≤
+        (s'.flatMap String.utf8EncodeChar).length
+    · have hq : q.flatMap String.utf8EncodeChar <:+ s'.flatMap String.utf8EncodeChar :=
+        List.suffix_of_suffix_length_le h (List.suffix_append _ _) hlen
+      exact List.suffix_cons_iff.2 (Or.inr (ih hq))
+    · have hs : s'.flatMap String.utf8EncodeChar <:+ q.flatMap String.utf8EncodeChar :=
+        List.suffix_of_suffix_length_le (List.suffix_append _ _) h
+          (Nat.le_of_lt (Nat.lt_of_not_le hlen))
+      obtain ⟨t, ht⟩ := List.suffix_iff_exists_eq_append.1 hs
+      obtain ⟨r, hr⟩ := h
+      rw [ht, ← List.append_assoc] at hr
+      have hrt : r ++ t = String.utf8EncodeChar c := List.append_inj_left' hr rfl
+      have htne : t ≠ [] := by
+        intro h0
+        subst h0
+        rw [List.nil_append] at ht
+        exact hlen (by rw [ht]; exact Nat.le_refl _)
+      cases r with
+      | nil =>
+        rw [List.nil_append] at hrt
+        subst hrt
+        have : q.flatMap String.utf8EncodeChar = (c :: s').flatMap String.utf8EncodeChar := by
+          rw [List.flatMap_cons]; exact ht
+        rw [flatMap_utf8EncodeChar_inj this]
+        exact List.suffix_refl _
+      | cons r0 r' =>
+        have hqne : q ≠ [] := by
+          rintro rfl
+          rw [List.flatMap_nil] at ht
+          exact htne (List.append_eq_nil_iff.1 ht.symm).1
+        obtain ⟨b, rest, hb, hfirst⟩ := first_byte_of_flatMap_utf8EncodeChar hqne
+        obtain ⟨b', t', rfl⟩ := List.exists_cons_of_ne_nil htne
+        have hbb : b = b' := by
+          rw [hb] at ht
+          exact (List.cons.inj ht).1
+        subst hbb
+        exact (not_first_byte_of_proper_suffix_utf8EncodeChar hrt (List.cons_ne_nil _ _) hfirst).elim
+
+theorem strBytes_prefix_iff {s t : String} : strBytes t <+: strBytes s ↔ t.toList <+: s.toList := by
+  rw [strBytes_eq_flatMap, strBytes_eq_flatMap]
+  exact ⟨prefix_of_flatMap_utf8EncodeChar_prefix,
+    fun ⟨r, hr⟩ => ⟨r.flatMap String.utf8EncodeChar, by rw [← List.flatMap_append, hr]⟩⟩
+
+theorem strBytes_suffix_iff {s t : String} : strBytes t <:+ strBytes s ↔ t.toList <:+ s.toList := by
+  rw [strBytes_eq_flatMap, strBytes_eq_flatMap]
+  exact ⟨suffix_of_flatMap_utf8EncodeChar_suffix,
+    fun ⟨r, hr⟩ => ⟨r.flatMap String.utf8EncodeChar, by rw [← List.flatMap_append, hr]⟩⟩
 
 /-- Structural prefix matching for executable proofs of attribute lookup. -/
-def strStartsWith (s pre : String) : Bool := pre.toList.isPrefixOf s.toList
+def strStartsWith (s pre : String) : Bool := (strBytes pre).isPrefixOf (strBytes s)
 
 @[simp] theorem strStartsWith_eq_startsWith (s pre : String) :
     strStartsWith s pre = s.startsWith pre := by
   unfold strStartsWith String.startsWith
-  rw [Bool.eq_iff_iff, List.isPrefixOf_iff_prefix, String.Slice.startsWith_string_iff,
-      String.copy_toSlice]
+  rw [Bool.eq_iff_iff, List.isPrefixOf_iff_prefix, strBytes_prefix_iff,
+      String.Slice.startsWith_string_iff, String.copy_toSlice]
 
-/-- `suffix` is a suffix of `s`, decided on the character lists. -/
-def strEndsWith (s suffix : String) : Bool := suffix.toList.isSuffixOf s.toList
+/-- `suffix` is a suffix of `s`, decided on the byte lists. -/
+def strEndsWith (s suffix : String) : Bool := (strBytes suffix).isSuffixOf (strBytes s)
 
 /-- The structural test agrees with the library's byte-position one. -/
 theorem strEndsWith_eq_endsWith (s suffix : String) : strEndsWith s suffix = s.endsWith suffix := by
   unfold strEndsWith String.endsWith
-  rw [Bool.eq_iff_iff, List.isSuffixOf_iff_suffix, String.Slice.endsWith_string_iff,
-      String.copy_toSlice]
+  rw [Bool.eq_iff_iff, List.isSuffixOf_iff_suffix, strBytes_suffix_iff,
+      String.Slice.endsWith_string_iff, String.copy_toSlice]
+
+/-- The character-list view, for proofs that reason about characters. -/
+theorem strEndsWith_eq_isSuffixOf_toList (s suffix : String) :
+    strEndsWith s suffix = suffix.toList.isSuffixOf s.toList := by
+  unfold strEndsWith
+  rw [Bool.eq_iff_iff, List.isSuffixOf_iff_suffix, List.isSuffixOf_iff_suffix, strBytes_suffix_iff]
+
+theorem strStartsWith_eq_isPrefixOf_toList (s pre : String) :
+    strStartsWith s pre = pre.toList.isPrefixOf s.toList := by
+  unfold strStartsWith
+  rw [Bool.eq_iff_iff, List.isPrefixOf_iff_prefix, List.isPrefixOf_iff_prefix, strBytes_prefix_iff]
 
 /-- The last dotted segment of a character list; the whole list when there is no dot,
 the empty list when the dot is last -- the same answers as `(s.splitOn ".").getLastD s`. -/
@@ -1601,14 +1743,15 @@ def Ctx.readClassAttribute (ctx : Ctx) (heap : Heap) (owner : String)
 (JLS §8.4.9 overloading, §8.8 constructors). Core has no overloads and matches methods by
 dotted suffix, so the signature is dropped before the suffix test: everything from the
 LAST `:` on, but only when the name ends in `)`, which no Python name
-(`a.py:<module>.C.f`) does. Structural over `List Char`, so the kernel reduces it. -/
+(`a.py:<module>.C.f`) does. The `)` test is `strEndsWith` on bytes, so the common case --
+every key of a Python table, tested once per `resolveMethod` scan -- never decodes the
+name; only a key that does end in `)` pays for the character-level split. -/
 def stripSig (k : String) : String :=
-  match k.toList.reverse with
-  | ')' :: _ =>
-      match k.toList.reverse.dropWhile (· != ':') with
-      | _ :: before => String.mk before.reverse
-      | []          => k
-  | _ => k
+  if strEndsWith k ")" then
+    match k.toList.reverse.dropWhile (· != ':') with
+    | _ :: before => String.ofList before.reverse
+    | []          => k
+  else k
 
 #guard stripSig "com.google.gson.Foo.<init>:void(java.util.Map,boolean)" == "com.google.gson.Foo.<init>"
 #guard stripSig "a.py:<module>.C.f" == "a.py:<module>.C.f"

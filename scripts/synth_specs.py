@@ -1307,18 +1307,45 @@ KERNEL_COMPUTE = 'first | decide +kernel | fail "kernel computation did not esta
 FUEL_THM = """/-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel %(budget)s by computation, then transported by `applyFunc_fuel_mono_all`.
-The `%(guard)s` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+%(guard_doc)s -/
 theorem %(id)s : ∀ fuel, FUEL ≤ fuel → ((dom_%(id)s).all (%(lawfuel)s)) = true := by
   intro fuel hf
   have hk : %(budget)s ≤ fuel := Nat.le_trans (by decide : %(budget)s ≤ FUEL) hf
 %(prepare)s\
-  exact all_transfer _ (%(guard)s C %(budget)s %(fdef)s) (%(law)s) (%(lawfuel)s)
+  exact all_transfer _ %(guard_expr)s (%(law)s) (%(lawfuel)s)
     (fun c hgc hlc =>
-      %(mono)s (hk := hk) (hg := hgc) (h := hlc))
+      %(step)s)
     (by %(compute)s) (%(checked)s)
 """
+
+# The `≠ outOfFuel` side condition of the transport, per family. For the families whose
+# law is `lawConform` the recorded outcome came from the source runtime (or, for
+# `charact`, was recorded as a defined result), so the law itself implies the run
+# completed (`Basis.lawConform_defined`): the guard is a check on the recorded literal and
+# the kernel evaluates each case once. Every other family re-runs the case through its
+# `g…` guard, because nothing outside the interpreter says what the result was.
+GUARD_DERIVED_FAMILIES = ("conform", "charact")
+
+GUARD_DOC_EVALUATED = (
+    "The `%(guard)s` conjunct is the `≠ outOfFuel` side condition, evaluated over the same\n"
+    "domain rather than assumed: without it a law could hold at `FUEL` for the reason that\n"
+    "nothing ran.")
+GUARD_DOC_DERIVED = (
+    "The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of\n"
+    "every case is `defined` (checked on the literal), and `lawConform_defined` turns the law\n"
+    "into the guard, so the kernel runs each case once (`FuelMono.lean`, \"Reachability form\n"
+    "of the side condition\").")
+
+
+def fuel_transport(c, budget):
+    """The guard expression, step lemma and docstring the fuel-transport proof of `c` uses."""
+    if c.family in GUARD_DERIVED_FAMILIES:
+        return {"guard_expr": "(fun o => defined o.expected)",
+                "step": "lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc)",
+                "guard_doc": GUARD_DOC_DERIVED}
+    return {"guard_expr": "(%s C %d %s)" % (GUARD[c.family], budget, c.fdef),
+            "step": "%s (hk := hk) (hg := hgc) (h := hlc)" % MONO[c.family],
+            "guard_doc": GUARD_DOC_EVALUATED % {"guard": GUARD[c.family]}}
 
 DOC = '''
 /-!
@@ -1354,12 +1381,15 @@ whose subject a mutation gate can attack.
 
 **Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
 stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
-computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
-transport needs two side conditions, both discharged rather than assumed — the context is
-covered by the unrestricted fuel theorem (including finalizers) and the run did not
-end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
-either fails, the theorem stays at `FUEL` and its generalization is recorded in
-`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono_all`. The
+transport assumes nothing about the context or about any body, reached or not (the
+unrestricted fuel theorem covers finalizers); its one side condition is that the run did
+not end in `outOfFuel`. For `conform_*` that condition is a consequence of the law — the
+recorded outcome is a value or an exception, and the law says the interpreter reproduced
+it (`lawConform_defined`) — so it is checked on the recorded literal and each case is
+evaluated once. For every other family it is the `g…` guard, evaluated over the same
+domain as the law. Where it fails, the theorem stays at `FUEL` and its generalization is
+recorded in `obligations` below as a `Prop`-valued `def` — a statement, not an admission.
 
 There is no `sorry` in this file.
 
@@ -1472,11 +1502,11 @@ def _theorem_text(c):
         if c.extra.get("fuel_mono"):
             # the general statement, proved: FuelMono transports it off FUEL
             budget = c.extra.get("proof_fuel", FUEL)
-            out.append(FUEL_THM % {"id": c.id, "law": c.law.replace("C FUEL", "C %d" % budget),
-                                   "budget": budget, "lawfuel": lawfuel,
-                                   "guard": GUARD[c.family], "fdef": c.fdef,
-                                   "mono": MONO[c.family], "checked": checked,
-                                   "prepare": prepare, "compute": KERNEL_COMPUTE})
+            out.append(FUEL_THM % dict(fuel_transport(c, budget),
+                                       id=c.id, law=c.law.replace("C FUEL", "C %d" % budget),
+                                       budget=budget, lawfuel=lawfuel, fdef=c.fdef,
+                                       checked=checked, prepare=prepare,
+                                       compute=KERNEL_COMPUTE))
         else:
             out.append("theorem %s : ((dom_%s).all (%s)) = true := by\n%s"
                        % (c.id, c.id, c.law, tactic))
