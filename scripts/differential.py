@@ -3232,9 +3232,13 @@ def main():
               % (len(funcs), len(holefree), result["functions_covered"],
                  len(compared_fns), 100 * result["coverage"]["compared_fraction"],
                  100 * result["coverage"]["compared_fraction_of_hole_free"]))
+    dropped = case_cap.get("dropped", 0)
     print("conformance: %d/%d agree (%s) vs %s, %d divergences, %d INCONCLUSIVE "
-          "(hole / outOfFuel / unrepresentable)%s"
+          "(hole / outOfFuel / unrepresentable)%s%s"
           % (agree, total, rate, runtime, diverge, incon,
+             "" if not dropped else
+             " [%d cases dropped by the case cap, not compared: see conformance.json case_cap]"
+             % dropped,
              "" if not cached_entries else
              " [%d cases compared now, %d replayed from cache]"
              % (sum(1 for i in fresh if verdict_kind(i) != "incon"),

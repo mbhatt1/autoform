@@ -2469,6 +2469,10 @@ def main():
             unsplit(ns_override)
     elif args.split_gb > 0:
         print("   split: --out names a single file, so the module is emitted whole")
+    elif not args.out:
+        # Splitting disabled: remove any parts a previous split left beside the umbrella,
+        # or the umbrella and the stale parts would both be read as the module's text.
+        unsplit(ns_override)
     ok, demoted, log = compile_repair(cands, args.module, path, ns=ns_override, plan=plan)
     proved = [c for c in cands if c.proved]
     unproved = [c for c in cands if c.status == "unproved"]
