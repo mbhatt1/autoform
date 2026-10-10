@@ -2444,9 +2444,26 @@ def main():
         stats["skip_no_instance"] = sum(1 for f, _, _ in methods
                                         if f["name"] not in reached)
 
+    case_cap = {"limit": MAX_TOTAL_CASES, "recorded": len(cases), "dropped": 0}
     if len(cases) > MAX_TOTAL_CASES:
+        # The cap used to be a silent random sample over everything recorded: on the
+        # cachetools 7.1.6 defect hunt (docs/evidence-cachetools.md) 523 suite-traced
+        # cases competed with 3,900 synthesized ones for 600 seats, and the regression
+        # test's calls lost the draw while the summary said "600 cases to compare now".
+        # Suite-traced cases are the evidence this oracle exists for (source 1 above),
+        # so they are kept first; the draw is still random within an origin, and what
+        # was dropped is recorded and printed rather than implied.
         random.shuffle(cases)
+        cases.sort(key=lambda c: c.get("origin") != "test-suite")
+        before = collections.Counter(c.get("origin") for c in cases)
         cases = cases[:MAX_TOTAL_CASES]
+        after = collections.Counter(c.get("origin") for c in cases)
+        case_cap.update(dropped=case_cap["recorded"] - MAX_TOTAL_CASES,
+                        dropped_by_origin={k: before[k] - after.get(k, 0) for k in before
+                                           if before[k] - after.get(k, 0)})
+        print("case cap: %d recorded, %d kept (suite-traced first), dropped %s"
+              % (case_cap["recorded"], MAX_TOTAL_CASES,
+                 ", ".join("%d %s" % (n, k) for k, n in sorted(case_cap["dropped_by_origin"].items()))))
 
     if lang == 'python':
         BASIS += '+trace-returns-v1'
@@ -2498,7 +2515,8 @@ def main():
               "corpus_commit": _corpus_commit(src_root),
               "functions_total": len(funcs), "functions_hole_free": len(holefree),
               "functions_covered": len(set(c["name"] for c in cases)),
-              "cases": len(cases), "agree": 0, "total": 0, "divergences": 0,
+              "cases": len(cases), "case_cap": case_cap,
+              "agree": 0, "total": 0, "divergences": 0,
               "inconclusive": 0, "rate": "n/a", "by_origin": {},
               "skipped": {k: v for k, v in stats.items() if k.startswith("skip")},
               "native_deadline_detail": stats.get("native_deadline_detail", []),
