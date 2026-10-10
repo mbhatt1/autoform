@@ -1805,7 +1805,15 @@ def plan_parts(cands, base_kb, limit_kb):
               % (len(unknown), ", ".join(unknown[:3]), ", ..." if len(unknown) > 3 else ""),
               flush=True)
         return None
-    cost = {c.id: max(c.extra["probe_peak_kb"] - base_kb, 0) for c in live}
+    # Costs are rounded UP to a quarter of a GB before packing. The probe's peak RSS
+    # moves by a few percent from run to run (sampling at 1 s, allocator noise), and a
+    # plan that re-packed every time a part sat within that noise of the threshold
+    # would churn the tracked part files on every regeneration. Rounding up keeps the
+    # prediction conservative and the plan stable under that noise.
+    quantum = 256 * 1024
+    cost = {c.id: ((max(c.extra["probe_peak_kb"] - base_kb, 0) + quantum - 1) // quantum) * quantum
+            for c in live}
+    base_kb = ((base_kb + quantum - 1) // quantum) * quantum
     total = base_kb + sum(cost.values())
     if total <= limit_kb:
         print("   split: predicted single-process peak %.2f GB <= %.2f GB; one file"
