@@ -4,8 +4,8 @@
 They did not, and nothing noticed for weeks.
 
 `Autoform/SpecsGen/*.lean` holds every theorem this repository claims about a translated
-corpus — the 79 `Cachetools` theorems that were the headline number, plus the V8Base and
-LinuxLib theorems added later. None of these modules was in the build. `lake build` was
+corpus — at the time, the 79 `Cachetools` theorems that were the headline number, plus
+the V8Base and LinuxLib theorems added later. None of these modules was in the build. `lake build` was
 green because the `Autoform` library's root is `Autoform.lean`, and `Autoform.lean` did
 not import them; `audit_all.py` printed PASS because `leanchecker` replays the import
 closure of `Autoform`, which did not include them either; and CI's proof-inventory step
@@ -16,11 +16,12 @@ So the inventory floor was met by a file that had not type-checked since
 none of them looking at the thing they were supposed to be about. That is the exact shape
 this repository keeps re-learning: silence read as success.
 
-`Autoform/SpecsGen/Basis.lean` is now imported from `Autoform.lean`, so it is kernel-
-checked on every build. The corpus modules are too large to put in the gating build (a
-single `lake env lean` on `SpecsGen/V8Base.lean` runs for well over ten minutes), so this
-script is the check for them: it elaborates each one and reports, per module, whether it
-proved, how many theorems it states, and what failed.
+Every `Autoform/SpecsGen/*.lean` module is now imported from `Autoform.lean` (V8Base as
+an umbrella over 73 part files sharing one `Base`), so all of them are kernel-checked on
+every `lake build` and replayed by `leanchecker` in the trust audit. This script is the
+hand tool for the same question after a re-export, or for a module not yet wired into
+the root: it elaborates each one and reports, per module, whether it proved, how many
+theorems it states, and what failed.
 
 Failure is per-module and attributed. A module that cannot be found, or a module whose
 `Autoform/Generated/<M>.lean` dependency is not built, is a FAILURE with that reason --

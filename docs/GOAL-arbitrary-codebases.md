@@ -104,8 +104,10 @@ Django's ledger runs under 60 s; the `--exclude-subjects` list for cachetools is
 ## Milestone 6 — deeper specifications
 
 Discharge `Refine.lean` obligations (3), the loop-invariant rule, and (4), the
-heap-representation predicate. Restate `FuelMono`'s transport so `tryFinally` bodies
-transport under a reachability side condition (retire `C_not_tfFree`).
+heap-representation predicate. The `FuelMono` transport was restated with the
+2026-10-09 re-land: `SpecsGen/Cachetools.lean` discharges a finalizer-covering side
+condition per law instead of a module-wide `tryFinally`-free premise, so `C_not_tfFree`
+is already retired; what remains here is the reachability form of that side condition.
 
 *Exit:* one eviction loop in cachetools (`_Link.unlink` or `LRUCache.popitem`) has a
 proved functional specification against a `HeapRep`; the mutation gate on the spec

@@ -339,63 +339,74 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          check() {  # name file floor
-            n=$(grep -c '^ *theorem ' "$2")
-            echo "$1: $n theorems (floor $3)"
-            if [ "$n" -lt "$3" ]; then
-              echo "REGRESSION: $2 lost proofs ($n < $3)"; fail=1
+          check() {  # name floor file...
+            name=$1; floor=$2; shift 2
+            # `grep -c` exits 1 on a zero count; under `set -e` that used to abort the
+            # step before its own REGRESSION line was printed.
+            n=$(cat "$@" | grep -c '^ *theorem ' || true)
+            echo "$name: $n theorems (floor $floor)"
+            if [ "$n" -lt "$floor" ]; then
+              echo "REGRESSION: $name lost proofs ($n < $floor)"; fail=1
             fi
           }
-          # A floor here is a floor on TEXT. SpecsGen/V8Base still does not elaborate --
-          # see STRATEGY.md 40 -- so its count is recorded to stop the text being deleted
-          # while it waits for regeneration, NOT as a claim that it proves anything. The
-          # elaboration verdict is the step below; read them together. SpecsGen/Cachetools
-          # DOES elaborate again and is imported from Autoform.lean, so `lake build` proves it; 72 of its laws
-          # are now Prop-valued open obligations (the fuel transport is refuted, not
-          # assumed) with their FUEL-instantiated content kept as *_at_FUEL theorems, so
-          # its text count is higher than the old floor and the floor stays where it was.
-          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
-          check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229   # DOES NOT PROVE
-          check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
-          check SpecsGen-LinuxLib   Autoform/SpecsGen/LinuxLib.lean   12
-          check Refine              Autoform/Refine.lean             113
+          # A floor here is a floor on TEXT: it stops a module's theorems being deleted
+          # without a deliberate edit to this file. Whether the text PROVES anything is
+          # decided by `lake build` above -- every module below is imported from
+          # Autoform.lean and replayed by `leanchecker --fresh` in the trust audit -- never
+          # by this count. A count on its own is how this repository once carried
+          # 79 cachetools "theorems" that had not type-checked for weeks
+          # (scripts/check_specs.py). Read the two together.
+          #
+          # Each floor is the count at the commit that last regenerated the module. A floor
+          # goes DOWN only together with the regeneration that explains it:
+          #   * SpecsGen/Cachetools: the 2026-10-09 re-land (d5bc3f2) replaced the 79-theorem
+          #     module, whose fuel transport had been refuted (`C_not_tfFree`) and whose laws
+          #     were largely open obligations, by 20 kernel-proved conformance theorems with
+          #     an empty `obligations` list. The refutation guard that lived below is retired
+          #     with the premise it guarded; the anti-vacuity guard below replaces it.
+          #   * SpecsGen/V8Base: the module is an umbrella over Autoform/SpecsGen/V8Base/
+          #     Part*.lean since e36b8f1 (one shared Base, 73 parts), so the theorems are
+          #     counted there; Base.lean holds the single context theorem.
+          check SpecsGen-Cachetools 20  Autoform/SpecsGen/Cachetools.lean
+          check SpecsGen-V8Base     284 Autoform/SpecsGen/V8Base/Part*.lean
+          check SpecsGen-Basis      35  Autoform/SpecsGen/Basis.lean
+          check SpecsGen-LinuxLib   12  Autoform/SpecsGen/LinuxLib.lean
+          check Refine              119 Autoform/Refine.lean
           exit $fail
 
-      # ...and the count is only meaningful for a module that proves. This is the
-      # check the count was standing in for.
+      # ...and the count is only meaningful for a module that proves. Every SpecsGen
+      # module is now imported from Autoform.lean (Cachetools, V8Base and its 73 parts,
+      # LinuxLib, the samples, Basis), so `lake build` above is the elaboration verdict
+      # for all of them. This step keeps scripts/check_specs.py itself exercised on the
+      # smallest module: it is the tool a re-export is checked with by hand.
       - name: SpecsGen modules elaborate
         run: python3 scripts/check_specs.py Basis
 
-      # The "Standalone modules elaborate" step that used to live here is GONE, and the
-      # reason it is gone is that its five modules -- Autoform.BuiltinBase,
-      # Autoform.Contracts, Autoform.Specs.CachetoolsSpec, Autoform.SpecsGen.Cachetools
-      # and Autoform.Specs.V8Spec -- are now imported from Autoform.lean, so `lake build`
-      # above elaborates every one of them and `leanchecker --fresh` in the trust audit
-      # replays them. They were outside the graph only because every generated corpus
-      # declared `Autoform.Generated.program`; each corpus now owns
-      # `Autoform.Generated.<Module>`, so cachetools and V8 coexist in one build.
-      #
-      # Do NOT re-add a step like that for a module you merely hope is checked: check that
-      # Autoform.lean imports it. `Autoform.SpecsGen.V8Base` is the one module still
-      # outside, for elaboration cost rather than namespaces (see Autoform.lean), and it
-      # is gated by scripts/check_specs.py, not by grep.
+      # Do NOT add a "standalone modules elaborate" step for a module you merely hope is
+      # checked: check that Autoform.lean imports it. Modules used to sit outside the graph
+      # because every generated corpus declared `Autoform.Generated.program`; each corpus
+      # now owns `Autoform.Generated.<Module>`, so they all coexist in one build.
 
-      # SpecsGen/Cachetools.lean used to be pinned here as KNOWN BROKEN. It elaborates
-      # again as of this change, and is built by the step above. Its `C_tfFree` premise
-      # -- every body in the function table is `tryFinally`-free -- is now FALSE (the
-      # exporter learned to translate try/finally; 8 rendered bodies carry it), so the
-      # module states `C_not_tfFree`, a refutation, and the 72 laws that rested on the
-      # transport are `Prop`-valued open obligations whose FUEL-instantiated content is
-      # kept as `*_at_FUEL` theorems. This step guards that framing: if the refutation
-      # ever stops holding, the module stops elaborating above and this comment is the
-      # place to start.
-      - name: SpecsGen/Cachetools records the refutation, not the premise
+      # SpecsGen/Cachetools.lean claims that `#audit_depends` fails the build for any
+      # theorem whose proof never mentions the implementation it constrains. That gate
+      # only covers the theorems it is asked about, so a theorem added without a matching
+      # `#audit_depends` line would be ungated and the build would stay green. This step
+      # checks that the two lists are the same set, and that the module still declares
+      # its open obligations by name (an empty list is a claim; a missing one is silence).
+      - name: SpecsGen/Cachetools — every theorem is under the anti-vacuity gate
         run: |
           set -euo pipefail
-          grep -q 'theorem C_not_tfFree : ¬ TFFreeCtx C' Autoform/SpecsGen/Cachetools.lean || {
-            echo "SpecsGen/Cachetools.lean no longer refutes TFFreeCtx C."
-            echo "If the corpus lost its tryFinally bodies, restore C_tfFree and the"
-            echo "transported theorems -- do not just drop this check."; exit 1; }
+          f=Autoform/SpecsGen/Cachetools.lean
+          theorems=$(grep -o '^ *theorem [A-Za-z0-9_]*' "$f" | awk '{print $2}' | sort)
+          gated=$(grep -o '^#audit_depends [A-Za-z0-9_]*' "$f" | awk '{print $2}' | sort)
+          if [ "$theorems" != "$gated" ]; then
+            echo "theorems and #audit_depends lines differ (< theorem only, > gate only):"
+            diff <(echo "$theorems") <(echo "$gated") || true
+            exit 1
+          fi
+          grep -q '^def obligations : List OpenObligation :=' "$f" || {
+            echo "SpecsGen/Cachetools.lean no longer declares its open obligations."; exit 1; }
+          echo "$(echo "$theorems" | grep -c .) theorems, each with an #audit_depends line; obligations declared"
 
       # The artifact policy makes the AST the tracked source of truth and the
       # render a build product. check_render verifies both halves against
