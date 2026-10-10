@@ -272,8 +272,10 @@ jobs:
       - name: Conformance oracle is alive (compared > 0)
         run: |
           set -euo pipefail
+          # `--no-cache`: this step exists to see the interpreter answer; a verdict
+          # replayed from .autoform-work/oracle would not count as COMPARED anyway.
           PYTHONHASHSEED=0 AUTOFORM_NO_REEXEC=1 python3 scripts/differential.py \
-            ast-Cachetools.json /tmp/cachetools Cachetools 5 | tee /tmp/conf-ci.log
+            ast-Cachetools.json /tmp/cachetools Cachetools 5 --no-cache | tee /tmp/conf-ci.log
           compared=$(sed -n 's/.*, \([0-9]*\) COMPARED .*/\1/p' /tmp/conf-ci.log | head -1)
           echo "compared=${compared:-0}"
           if [ "${compared:-0}" -eq 0 ]; then
