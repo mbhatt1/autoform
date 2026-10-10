@@ -61,14 +61,16 @@ Counts for this run are in `Autoform/SpecsGen/report.json`.
 
 One Lean process retains every by-computation proof term it elaborates (commit e36b8f1,
 `Autoform/SpecsGen/V8Base`), so the single-file form of this module was predicted to peak
-at 28.88 GB -- base 0.78 GB (imports, `h0`, the domains) plus the
+at 32.75 GB -- base 0.75 GB (imports, `h0`, the domains) plus the
 probe-measured cost of every theorem -- against a `--split-gb 4` threshold.
 `scripts/synth_specs.py` therefore emitted it as `Cachetools/Base.lean` (context and domains,
-elaborated once) and `Cachetools/Part1.lean` .. `Part9.lean` (theorems only, each
-predicted under the threshold), all in this namespace, and this umbrella imports them.
+elaborated once) and `Cachetools/Part1.lean` .. `Part9.lean` (theorems only, packed
+next-fit under the threshold), all in this namespace, and this umbrella imports them.
 No statement was weakened: the parts are a partition of the same theorems.
 
-Per-part prediction (GB): Part1 3.34 (2 theorems), Part2 2.43 (1 theorem), Part3 11.89 (1 theorem), Part4 3.47 (4 theorems), Part5 3.39 (2 theorems), Part6 2.11 (1 theorem), Part7 2.90 (1 theorem), Part8 3.29 (2 theorems), Part9 2.29 (6 theorems).
+Per-part prediction (GB): Part1 3.75 (2 theorems), Part2 2.50 (1 theorem), Part3 12.00 (1 theorem), Part4 4.00 (3 theorems), Part5 4.00 (3 theorems), Part6 2.25 (1 theorem), Part7 3.00 (1 theorem), Part8 3.50 (2 theorems), Part9 3.75 (6 theorems).
+
+NOT bounded by the split: `conform_cachetools___init___py__module__Cache___len` -- each of these theorems alone is predicted over the threshold and sits in a part of its own. The split cannot bring a single kernel evaluation under the limit; only a cheaper proof or an exclusion (`--theorem-memory-gb`, which names it in `budgetExcluded`) can.
 
 The `#audit_depends` / `#audit_axioms` gates are at the end of each part, for the theorems
 that part states; `obligations`, `excludedSubjects` and `budgetExcluded` are declared

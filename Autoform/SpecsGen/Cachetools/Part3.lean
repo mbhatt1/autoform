@@ -8,8 +8,8 @@ import Autoform.SpecsGen.Cachetools.Base
 Part 3 of 9 of `Autoform/SpecsGen/Cachetools.lean`: theorems only. The context, the
 frozen globals heap and every domain are in `Autoform/SpecsGen/Cachetools/Base.lean`; the
 parts share one namespace, so every name is the one the unsplit module would have had.
-Predicted peak of this part alone: 11.89 GB (base 0.78 GB + the
-probe-measured cost of each theorem), under the 4 GB split threshold. -/
+Predicted peak of this part alone: 12.00 GB (base 0.75 GB + the
+probe-measured cost of each theorem), OVER the 4 GB split threshold: this one theorem alone exceeds it, so no split bounds it; a cheaper proof or a tighter `--theorem-memory-gb` would. -/
 namespace Autoform.SpecsGen.Cachetools
 
 open Autoform.Core Autoform.Refine Autoform.SpecsGen

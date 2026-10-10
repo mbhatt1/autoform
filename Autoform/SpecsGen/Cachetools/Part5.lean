@@ -8,7 +8,7 @@ import Autoform.SpecsGen.Cachetools.Base
 Part 5 of 9 of `Autoform/SpecsGen/Cachetools.lean`: theorems only. The context, the
 frozen globals heap and every domain are in `Autoform/SpecsGen/Cachetools/Base.lean`; the
 parts share one namespace, so every name is the one the unsplit module would have had.
-Predicted peak of this part alone: 3.39 GB (base 0.78 GB + the
+Predicted peak of this part alone: 4.00 GB (base 0.75 GB + the
 probe-measured cost of each theorem), under the 4 GB split threshold. -/
 namespace Autoform.SpecsGen.Cachetools
 
@@ -21,6 +21,22 @@ set_option exponentiation.threshold 4096
 
 open Autoform.Generated.Cachetools
 
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true := by
+  intro fuel hf
+  have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
+  have hchecked : (dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C 4 f_cachetools___init___py__module__Cache_getsizeof) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 4 f_cachetools___init___py__module__Cache_getsizeof) (lawConform C 4 f_cachetools___init___py__module__Cache_getsizeof) (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
@@ -58,6 +74,7 @@ theorem conform_cachetools___init___py__module__Cache_pop : ∀ fuel, FUEL ≤ f
 
 `#audit_depends` fails the build if a theorem's proof term never mentions the generated definition it claims to be about — the necessary half of the gate. The sufficient half is `scripts/mutate.py`, run against this file. -/
 
+#audit_depends conform_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
 #audit_depends conform_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
 #audit_depends conform_cachetools___init___py__module__Cache_pop on f_cachetools___init___py__module__Cache_pop
 
@@ -65,6 +82,7 @@ theorem conform_cachetools___init___py__module__Cache_pop : ∀ fuel, FUEL ≤ f
 
 `#audit_axioms` fails the build on `sorryAx`, `ofReduceBool` or `ofReduceNat`, so "no admitted step, no `native_decide`" is checked here rather than asserted in prose. -/
 
+#audit_axioms conform_cachetools___init___py__module__Cache_getsizeof
 #audit_axioms conform_cachetools___init___py__module__Cache_maxsize
 #audit_axioms conform_cachetools___init___py__module__Cache_pop
 
