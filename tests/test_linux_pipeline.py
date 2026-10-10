@@ -314,6 +314,10 @@ def test_kernel_unit_links_against_a_sibling_with_no_entry_point(tmp_path, diffe
     f = dict(scalar('lcm', 'lcm.c', ['a', 'b']), paramIntegerTypes=['u64', 'u64'],
              returnIntegerType='u64')
     result = differential.c_runtime(str(source), [f])
-    assert result.info['files_compiled'] == 1, result.info
+    # On Linux CI this unit did not compile (0 of 1) and the full info is truncated in the
+    # log: print only what says why (status, per-unit records, skipped functions).
+    assert result.info['files_compiled'] == 1, json.dumps(
+        {k: result.info.get(k) for k in ('status', 'units', 'skipped', 'files_attempted')},
+        default=str, indent=1)[:6000]
     assert any(u.get('link_partners') == ['gcd.c'] for u in result.info['units'])
     assert result(f)(4, 6) == 12 and result(f)(0, 6) == 6
