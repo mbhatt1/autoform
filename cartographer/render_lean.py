@@ -701,9 +701,18 @@ def _run_main():
     if parts:
         os.makedirs(part_dir, exist_ok=True)
         part_modules = []
+        # Each part also carries its slice of the function list: the root then assembles
+        # `program.funcs` by appending them, so the 10,000-element literal that took the
+        # root module 500 s to elaborate on Django becomes twelve 1,000-element literals
+        # elaborated in parallel and a dozen `++`s. Same list, by `rfl`.
+        part_lists = []
+        rendered_names = names[:len(rendered)]
         for k, chunk in enumerate(parts, 1):
             part = f"Part{k:04d}"
             part_modules.append(f"Autoform.Generated.{module}.{part}")
+            lo = (k - 1) * shard
+            chunk_names = [n for n in rendered_names[lo:lo + len(chunk)]]
+            part_lists.append((part, [n for n, f in zip(chunk_names, funcs[lo:lo + len(chunk)])]))
             body = [
                 "import Autoform.Lang.Core.Semantics",
                 "",
@@ -727,6 +736,10 @@ def _run_main():
             ]
             for lines in chunk:
                 body.extend(lines)
+            own = [n for n in chunk_names if n in set(names[:len(funcs)])]
+            body.append(f"/-- This part's slice of `program.funcs`, in program order. -/")
+            body.append(f"def {part}.partFuncs : List Func := [" + ", ".join(own) + "]")
+            body.append("")
             body.append(f"end Autoform.Generated.{module}")
             with open(os.path.join(part_dir, part + ".lean"), "w") as fh:
                 fh.write("\n".join(body))
@@ -800,9 +813,13 @@ def _run_main():
         out.append(notes[-1] + " -/")
     else:
         out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
-    out.append("def program : Program := { dialect := " + dialect + extra + ", funcs := [")
-    out.append(",\n".join("  " + n for n in names[:len(funcs)]))
-    out.append("] }")
+    if parts:
+        out.append("def program : Program := { dialect := " + dialect + extra + ", funcs :=")
+        out.append("  " + " ++ ".join(f"{part}.partFuncs" for part, _ in part_lists) + " }")
+    else:
+        out.append("def program : Program := { dialect := " + dialect + extra + ", funcs := [")
+        out.append(",\n".join("  " + n for n in names[:len(funcs)]))
+        out.append("] }")
     out.append("")
     out.append(f"end Autoform.Generated.{module}")
     with open(dst, "w") as fh:
