@@ -349,6 +349,19 @@ reported like any other. "No divergence found" means none among the inputs tried
 never equivalence. SLEIGH descriptions are trusted, and arguments are limited to
 integer registers (no stack-passed arguments, floats or aggregates).
 
+### `autoform pr <repo> [Module] --base REF [--head REF]` — evidence for a change
+
+Runs the chain for the functions a change touched, and only those, and reports each
+one's evidence level: `none`, `hole`, `translated`, `oracle-agreed`, `proved` or
+`refuted`, each bound to the artifact that establishes it. `docs/evidence-levels.md`
+is the one-page reference for what each level does and does not claim. `--head`
+defaults to the working tree; `--sarif` and `--markdown` write the SARIF 2.1.0 file
+code scanning ingests and the review comment; `--ast FILE` uses an exporter AST
+instead of running Joern; `--mutants N` adds the mutation gate over the proved
+theorems. From a checkout, `scripts/pr_mode.py` is the same command without the
+workspace. `.github/workflows/pr.yml` runs it on the fixture history that
+`scripts/pr_fixture.py` builds and uploads the SARIF.
+
 ## 3. Reading the ledger
 
 The human form is printed at the end of `autoform.sh`:
@@ -615,6 +628,7 @@ authority when they disagree, and a disagreement is a bug to file.
 | `autoform assure` / `./assure.sh` / a Git URL | every required check completed | the workflow finished with unresolved verification gaps — `completed_with_gaps` in `run.json`; a scoped certificate in `guarantee.json` can coexist with this | invocation, setup or orchestration failure; source acquisition failed; property input invalid; refused tree as above | `128+N` |
 | `autoform regress --machine` | no divergence found among the inputs tried | at least one kernel-checked diverging input (`machine/regression.json`) | usage error, a build, link or lift failure, or a source that is not a Git repository | `128+N` |
 | `autoform regress` | both runs translated and nothing that held at `--base` is lost at `--head`, and no recorded case changed outcome | a regression or a proven behavior change (`regression.json` says which), or a run that never produced an AST | usage error, the source is not a Git repository, a ref could not be fetched, busy workspace, or a refused tree as above | `128+N` from either run; `--timeout` expiry is `143` |
+| `autoform pr` / `scripts/pr_mode.py` | every changed function reported at the level its artifacts reach and none refuted | at least one changed function refuted (`pr.json` names the witness) | usage error, the source is not a Git repository, an unknown ref, or the SARIF failed validation | `128+N`; `--timeout` expiry is `143` |
 | `autoform machine` | as `scripts/formalize_machine.py` | as `formalize_machine.py` | CLI-level failure (workspace, lock, extraction) | — |
 
 Two things worth stating plainly. A `1` from `assure` is **not** a crash: it is the

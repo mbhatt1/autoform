@@ -1,0 +1,156 @@
+name: PR evidence
+
+# `autoform pr` on this repository's own fixture history: the two commits that
+# `scripts/pr_fixture.py` builds from examples/source/python/numbers.py (base) and
+# tests/fixtures/pr/head/numbers.py (head). The job runs the chain for the changed
+# functions only, writes one SARIF result per function with its evidence level, and
+# uploads it to code scanning. The whole job must finish inside 10 minutes
+# (roadmap 5.1); `timeout-minutes` is that bound, not a safety margin.
+#
+# The 10 minutes assume the `.lake` cache saved by the CI workflow (same key). A cold
+# cache would build the Lean dependencies from source and blow the budget, so the job
+# fails fast and says so rather than running the chain without Lean and reporting
+# every function as untranslated.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-evidence:
+    name: evidence levels for the fixture change
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install elan / Lean (pinned)
+        run: |
+          set -euo pipefail
+          curl -sSfL --retry 5 --retry-all-errors https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          for attempt in 1 2 3 4 5; do
+            "$HOME/.elan/bin/elan" run "$(cat lean-toolchain)" lean --version && break
+            [ "$attempt" = 5 ] && exit 1
+            sleep $((attempt * 30))
+          done
+
+      # Restore only: the CI workflow owns this cache and saves it after a full build.
+      # Saving a partial build from here under the same key would starve CI of its own.
+      - name: Restore .lake from the CI workflow's cache
+        id: lake
+        uses: actions/cache/restore@v4
+        with:
+          path: .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+            lake-${{ runner.os }}-
+
+      - name: A built Lean project is a precondition, not something this job can afford
+        run: |
+          set -euo pipefail
+          if [ -z "${{ steps.lake.outputs.cache-matched-key }}" ]; then
+            echo "::error::no .lake cache from the CI workflow; building Lean and its dependencies from" \
+                 "source does not fit the 10-minute budget. Run the CI workflow on this branch first." >&2
+            exit 1
+          fi
+          echo "restored .lake from ${{ steps.lake.outputs.cache-matched-key }}"
+
+      - uses: actions/cache@v4
+        id: joern
+        with:
+          path: ~/joern
+          key: joern-${{ runner.os }}-${{ hashFiles('joern-version') }}
+
+      - name: Install pinned Joern
+        if: steps.joern.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          ASSET="joern-cli-linux-x86_64.zip"
+          mkdir -p /tmp/joern-dl/target "$HOME/joern"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}" -o "/tmp/joern-dl/target/${ASSET}"
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}.sha512" -o "/tmp/joern-dl/${ASSET}.sha512"
+          (cd /tmp/joern-dl && sha512sum -c "${ASSET}.sha512")
+          unzip -q "/tmp/joern-dl/target/${ASSET}" -d "$HOME/joern"
+
+      - name: Installed Joern matches the pin
+        run: python3 scripts/provenance.py joern-version --check
+
+      - name: Install the Python tooling
+        run: python3 -m pip install --quiet -r requirements.txt
+
+      - name: Build the fixture history (base, head)
+        id: fixture
+        run: |
+          set -euo pipefail
+          python3 scripts/pr_fixture.py "$RUNNER_TEMP/pr-fixture" | tee "$RUNNER_TEMP/pr-fixture.json"
+          echo "repo=$RUNNER_TEMP/pr-fixture" >> "$GITHUB_OUTPUT"
+
+      # Lean elaborates the theorems; one probe at a time keeps the runner's memory honest.
+      - name: autoform pr on the fixture (changed functions only)
+        env:
+          AUTOFORM_PROBE_JOBS: '1'
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          python3 scripts/pr_mode.py "${{ steps.fixture.outputs.repo }}" --base base --head head \
+            --module PullRequestFixture --mutants 4 \
+            --out "$RUNNER_TEMP/pr-out" \
+            --sarif "$RUNNER_TEMP/pr-out/pr.sarif" --markdown "$RUNNER_TEMP/pr-out/pr.md" \
+            | tee "$RUNNER_TEMP/pr-out.log"
+          echo "pr mode took $(( $(date +%s) - start )) s" | tee -a "$RUNNER_TEMP/pr-out.log"
+          cat "$RUNNER_TEMP/pr-out/pr.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # The fixture is what it is: three functions prove, one is a hole, one the oracle
+      # cannot adjudicate. A run that reports anything else has changed the chain, not
+      # the fixture, and must say so here rather than upload a green SARIF.
+      - name: The fixture's levels are the ones its artifacts reach
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/pr-out/pr.json" <<'PY'
+          import json, sys
+          report = json.load(open(sys.argv[1]))
+          levels = {f["name"].rsplit(".", 1)[-1]: f["level"] for f in report["functions"]}
+          expected = {"quotient": "proved", "clamp": "proved", "label": "proved",
+                      "first": "translated", "raw": "hole"}
+          stages = {name: stage["status"] for name, stage in report["stages"].items()}
+          print(json.dumps({"levels": levels, "stages": stages}, indent=1))
+          if levels != expected:
+              sys.exit("levels differ from the fixture's expected %s" % expected)
+          if any(status != "passed" for status in stages.values()):
+              sys.exit("a stage did not pass: %s" % stages)
+          PY
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ runner.temp }}/pr-out/pr.sarif
+          category: autoform-pr-fixture
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr-evidence
+          path: |
+            ${{ runner.temp }}/pr-out/pr.json
+            ${{ runner.temp }}/pr-out/pr.sarif
+            ${{ runner.temp }}/pr-out/pr.md
+            ${{ runner.temp }}/pr-out/*.log
+            ${{ runner.temp }}/pr-out.log

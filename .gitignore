@@ -140,3 +140,8 @@ Autoform/NL/*.lean
 !Autoform/NL/Basis.lean
 # Parts of a sharded render (`render_lean.py --shard-functions`), as generated as the root.
 Autoform/Generated/*/Part*.lean
+
+# pr mode (scripts/pr_mode.py, `autoform pr`): the proof module it synthesizes for the
+# changed functions and its report directory are products of a run, never tracked.
+Autoform/SpecsGen/PullRequest*.lean
+artifacts/pr/

@@ -114,6 +114,7 @@ with `--help`.
 | `proof_artifacts` | `digest`, `snapshot`, `replay_current`: binding evidence to compiled modules and configuration. |
 | `provenance` | `source_revision(path)` (a Git commit or a tree digest), `record`: how an AST is attributed to the exporter and source that produced it. |
 | `guarantee`, `security_specs`, `sacm`, `audit_all` | the gates, each `main(argv)`. |
+| `pr_mode` | `autoform pr` without the workspace: `changed_functions(repo, base, head, subdir)`, `select_functions(ast, names)`, `evidence(...)`, `sarif_document(report)`, `validate_sarif(document)`, `markdown_comment(report)`; `main(argv)` runs the chain. |
 
 The Lean side is a library too: `import Autoform.Lang.Core.Semantics` gives the
 interpreter (`runFunc`, `applyFunc`, `initGlobals`, `runMain`), `Autoform.Refine` the

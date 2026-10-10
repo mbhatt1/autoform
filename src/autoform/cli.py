@@ -564,6 +564,40 @@ def _regress(args, workspace, report, env):
     return result.returncode
 
 
+def _pr(args, workspace, env):
+    """Per-function evidence for the functions a change touched (`scripts/pr_mode.py`).
+
+    The repository must be a Git checkout: pr mode diffs `--base` against `--head` (the
+    working tree by default) to find the changed functions, then runs the chain on
+    those functions only. A Git URL is cloned at `--head` first; the script fetches the
+    base commit when the clone does not hold it.
+    """
+    source, repository = args.source, None
+    out = workspace / 'artifacts/pr' / args.module
+    try:
+        if is_git_url(source):
+            source, repository = resolve_source(source, workspace, args.module, ref=args.head)
+            # `resolve_source` returns the analysed directory (`--subdir` applied); the
+            # script wants the checkout and applies the subdirectory itself.
+            source = repository.get('checkout') or source
+        elif not (Path(source) / '.git').exists():
+            raise ValueError('pr mode compares two commits, so the source must be a Git URL '
+                             'or a local checkout with a .git directory')
+        command = [sys.executable, str(workspace / 'scripts/pr_mode.py'), str(source),
+                   '--base', args.base, '--module', args.module, '--out', str(out),
+                   '--cases', str(args.cases), '--mutants', str(args.mutants),
+                   '--stage-timeout', str(args.stage_timeout)]
+        for flag in ('head', 'subdir'):
+            if getattr(args, flag):
+                command += ['--' + flag, getattr(args, flag)]
+        for flag in ('ast', 'tests', 'sarif', 'markdown'):
+            if getattr(args, flag):
+                command += ['--' + flag, str(Path(getattr(args, flag)).resolve())]
+        return _run_command(command, env=env, timeout=args.timeout)
+    finally:
+        discard_checkout(repository, keep=args.keep_checkout)
+
+
 def _regress_machine(args, workspace, source, out, env):
     """Check out both commits, then let `scripts/machine_regress.py` compare them."""
     trees, records = {}, {}
@@ -598,12 +632,14 @@ def main(argv=None):
         epilog=("A Git URL alone runs the full workflow: "
                 "autoform https://host/owner/repo.git [Module] [--ref REF] [--subdir PATH]\n"
                 "Two commits of one repository are compared by what can be proven about each: "
-                "autoform regress <repo> [Module] --base REF [--head REF]\n\n"
+                "autoform regress <repo> [Module] --base REF [--head REF]\n"
+                "The functions a change touched get a per-function evidence level, as SARIF and Markdown: "
+                "autoform pr <repo> --base REF [--head REF] --sarif out.sarif --markdown out.md\n\n"
                 "exit codes (docs/running.md §7):\n"
                 "  0      completed; for `assure`, every required check passed; for `regress`,\n"
-                "         nothing that held at --base is lost at --head\n"
-                "  1      a stage failed, `assure` finished with unresolved verification gaps, or\n"
-                "         `regress` found a regression or a proven behavior change\n"
+                "         nothing that held at --base is lost at --head; for `pr`, no function refuted\n"
+                "  1      a stage failed, `assure` finished with unresolved verification gaps,\n"
+                "         `regress` found a regression or a proven behavior change, or `pr` refuted a function\n"
                 "  2      invocation, setup or orchestration failure: bad module name, missing\n"
                 "         Joern, busy workspace, unreadable package, or a refused dirty tree\n"
                 "  128+N  interrupted by signal N; `--timeout` expiry is 143 (SIGTERM)\n"
@@ -667,6 +703,29 @@ def main(argv=None):
                          help="with --machine: functions to compare (default: those whose code changed)")
     regress.add_argument("--target", choices=("aarch64", "x86_64", "i386"), default="aarch64",
                          help="with --machine: the Linux target to compile for (default: aarch64)")
+    pr = sub.add_parser("pr",
+                        help="evidence level of every function changed since --base (hole / "
+                             "translated / oracle-agreed / proved / refuted), as SARIF and Markdown")
+    pr.add_argument("source", help="Git URL, or a local checkout with a .git directory")
+    pr.add_argument("module", nargs="?", default="PullRequest",
+                    help="Lean module the changed functions are rendered under (default: PullRequest)")
+    pr.add_argument("--base", required=True, help="the commit the change is measured against")
+    pr.add_argument("--head", help="the changed commit (default: the working tree, untracked files included)")
+    pr.add_argument("--subdir", help="directory inside the checkout to analyze")
+    pr.add_argument("--ast", type=Path,
+                    help="a neutral AST the exporter produced for the head tree, used instead of "
+                         "running Joern (recorded in the report as supplied)")
+    pr.add_argument("--tests", type=Path, help="a test suite outside the source tree for the oracle")
+    pr.add_argument("--cases", type=int, default=5, help="random oracle cases per function (default: 5)")
+    pr.add_argument("--mutants", type=int, default=0,
+                    help="mutants for the mutation gate over the proved theorems (default: 0 = skip)")
+    pr.add_argument("--sarif", type=Path, help="write SARIF 2.1.0 here, one result per changed function")
+    pr.add_argument("--markdown", type=Path, help="write the review comment here")
+    pr.add_argument("--stage-timeout", type=float, default=1800,
+                    help="maximum seconds for each stage (default: 1800)")
+    pr.add_argument("--timeout", type=float, help="wall-clock limit in seconds for the whole run")
+    pr.add_argument("--keep-checkout", action="store_true",
+                    help="keep a cloned tree under <workspace>/sources after the run")
     sub.add_parser("autoformalize", add_help=False,
                    help="code -> validated Lean model -> English -> Lean statements -> checks -> kernel proofs "
                         "[--deep | --deep-too] (autoformalize --help)")
@@ -704,9 +763,11 @@ def main(argv=None):
         parser.error('--machine needs --files: the source files to compile at both commits')
     if args.command == 'regress' and not args.machine and (args.files or args.functions):
         parser.error('--files and --functions apply only with --machine')
-    if args.command == 'assure' and (not math.isfinite(args.stage_timeout) or args.stage_timeout <= 0):
+    if args.command in ('assure', 'pr') and (not math.isfinite(args.stage_timeout) or args.stage_timeout <= 0):
         parser.error('--stage-timeout must be a finite positive number')
-    if args.command in ('source', 'regress') and args.timeout is not None and (
+    if args.command == 'pr' and (args.cases < 1 or args.mutants < 0):
+        parser.error('--cases must be >= 1 and --mutants >= 0')
+    if args.command in ('source', 'regress', 'pr') and args.timeout is not None and (
             not math.isfinite(args.timeout) or args.timeout <= 0):
         parser.error('--timeout must be a finite positive number')
     if getattr(args, 'shard_functions', 0) < 0:
@@ -751,6 +812,8 @@ def main(argv=None):
                 raise ValueError('a run for this workspace and module is already in progress') from exc
             if args.command == 'regress':
                 return _regress(args, workspace, report, env)
+            if args.command == 'pr':
+                return _pr(args, workspace, env)
             property_input, property_error, property_path = None, None, None
             if args.command == 'assure' and args.properties is not None:
                 try:
