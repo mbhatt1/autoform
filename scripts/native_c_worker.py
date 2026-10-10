@@ -29,7 +29,20 @@ def execute(request):
 def main():
     fd = int(sys.argv[1])
     os.set_inheritable(fd, False)
-    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    # No core dumps: a crash must reach the parent as the fatal signal, promptly.
+    # A limit of 0 is not enough on Linux when kernel.core_pattern is a pipe
+    # (Ubuntu's apport, GitHub runners): the kernel ignores the limit for piped
+    # dumps and streams the whole image to the helper first, which held a
+    # SIGSEGV past the parent's deadline in CI (2026-10-10, reported as
+    # 'timeout'). The kernel aborts a piped dump only for the special limit 1
+    # (fs/coredump.c), which also disables file dumps, so that is the limit
+    # wherever the hard limit allows it.
+    for limit in (1, 0):
+        try:
+            resource.setrlimit(resource.RLIMIT_CORE, (limit, limit))
+            break
+        except (ValueError, OSError):
+            continue
     try:
         response = execute(json.load(sys.stdin))
     except Exception as exc:
