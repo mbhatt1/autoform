@@ -86,9 +86,12 @@ jobs:
           # lean-toolchain and the manifest between them pin every input that
           # affects the build products; the source hash keeps the cache honest.
           key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          # Only a same-toolchain cache is worth restoring: a different toolchain's
+          # .olean files are rebuilt anyway, and a prefix match across lines once
+          # restored an `Autoform.olean` importing a module this tree never had
+          # (2026-10-10; the demo step loaded it because nothing rebuilt the root).
           restore-keys: |
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
-            lake-${{ runner.os }}-
 
       # `lake build` has no job-count/parallelism flag in this Lake version (confirmed
       # via `lake --help` / `lake build --help` -- neither exposes one). Left to its own
@@ -489,9 +492,12 @@ jobs:
         with:
           path: .lake
           key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          # Only a same-toolchain cache is worth restoring: a different toolchain's
+          # .olean files are rebuilt anyway, and a prefix match across lines once
+          # restored an `Autoform.olean` importing a module this tree never had
+          # (2026-10-10; the demo step loaded it because nothing rebuilt the root).
           restore-keys: |
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
-            lake-${{ runner.os }}-
 
       - uses: actions/cache@v4
         id: joern
