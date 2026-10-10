@@ -737,10 +737,17 @@ def _af_global(frame, event, arg):
             cur.add((fid, prev[0], 0))
         return _af_local
     return _af_local
+_af_prev = [0]
 def _af_top(frame, event, arg):
-    if event == 'line' and frame.f_lineno == _af_mark:
-        _af_cur[0] = set()
-        _af_points.append(_af_cur[0])
+    # One point per ARRIVAL at the mark line. The marked statement is a list
+    # comprehension, which Python >= 3.12 inlines into this frame (PEP 709), so the line
+    # fires once per element on top of once per statement; consecutive repeats are the
+    # same arrival.
+    if event == 'line':
+        if frame.f_lineno == _af_mark and _af_prev[0] != _af_mark:
+            _af_cur[0] = set()
+            _af_points.append(_af_cur[0])
+        _af_prev[0] = frame.f_lineno
     return _af_top
 _afs.settrace(_af_global)
 _afs._getframe().f_trace = _af_top

@@ -602,6 +602,76 @@ def dotted_name(node):
     return '.'.join(reversed(parts))
 
 
+# A comprehension target on Python >= 3.12: local to the comprehension, assigned.
+class _CompSymbol:
+    def __init__(self, name):
+        self.name = name
+    def get_name(self):
+        return self.name
+    def is_local(self):
+        return True
+    def is_assigned(self):
+        return True
+    def is_referenced(self):
+        return True
+    def is_parameter(self):
+        return False
+    def is_imported(self):
+        return False
+    def is_global(self):
+        return False
+    def is_declared_global(self):
+        return False
+    def is_nonlocal(self):
+        return False
+    def is_free(self):
+        return False
+    def is_namespace(self):
+        return False
+    def is_annotated(self):
+        return False
+
+
+# The scope of a list, set or dict comprehension on Python >= 3.12.
+#
+# PEP 709 inlines these into the enclosing function, so `symtable` no longer has a
+# child table for them -- `inner_scope` found none and refused the file as ambiguous.
+# The language did not change: the targets are still bound only inside the
+# comprehension and everything else resolves in the enclosing scope. This table says
+# exactly that, and delegates the rest (including `get_children`, where a lambda or
+# generator expression inside the comprehension now lives) to the enclosing table.
+# Generator expressions keep their own table and never come here.
+class _InlinedComprehension:
+    def __init__(self, kind, node, parent):
+        self.kind, self.node, self.parent = kind, node, parent
+        self.symbols = {n.id: _CompSymbol(n.id) for g in node.generators
+                        for n in ast.walk(g.target) if isinstance(n, ast.Name)}
+    def get_type(self):
+        return 'function'
+    def get_name(self):
+        return self.kind
+    def get_lineno(self):
+        return self.node.lineno
+    def is_nested(self):
+        return True
+    def get_children(self):
+        return self.parent.get_children()
+    def get_identifiers(self):
+        return list(self.symbols)
+    def get_symbols(self):
+        return list(self.symbols.values())
+    def lookup(self, name):
+        return self.symbols.get(name) or self.parent.lookup(name)
+
+
+def comprehension_scope(node, kind, scopes):
+    if sys.version_info >= (3, 12) and not isinstance(node, ast.GeneratorExp):
+        scope = _InlinedComprehension(kind, node, scopes[-1])
+        scope_nodes[id(scope)] = node
+        return scopes + [scope]
+    return inner_scope(node, kind, scopes)
+
+
 def inner_scope(node, name, scopes):
     children = [s for s in scopes[-1].get_children()
                 if s.get_name() == name and s.get_lineno() == scope_lines.get(id(node), node.lineno)]
@@ -1056,7 +1126,7 @@ def visit(node, scopes):
         visit(node.generators[0].iter, scopes)
         kind = {ast.ListComp: 'listcomp', ast.SetComp: 'setcomp',
                 ast.DictComp: 'dictcomp', ast.GeneratorExp: 'genexpr'}[type(node)]
-        nested = inner_scope(node, kind, scopes)
+        nested = comprehension_scope(node, kind, scopes)
         if isinstance(node, ast.GeneratorExp):
             local_symbols = nested[-1].get_symbols()
             metadata = {
@@ -1186,13 +1256,26 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   val pythonHandlerCache = collection.mutable.Map.empty[String, Option[ujson.Value]]
   def pythonHandlers(file: String): Option[ujson.Value] =
     pythonHandlerCache.getOrElseUpdate(file, fileText(file).flatMap { source =>
+      val python = sys.env.getOrElse("AUTOFORM_PYTHON", "python3")
       try {
-        val python = sys.env.getOrElse("AUTOFORM_PYTHON", "python3")
         val output = os.proc(python, "-I", "-S", "-c", pythonHandlerDecoder)
           .call(stdin = source, timeout = 30000, stderr = os.Pipe).out.text()
         Some(ujson.read(output))
       } catch {
-        case scala.util.control.NonFatal(_) => None
+        // Without this metadata every builtin reference, class attribute and global in
+        // the file is translated by the exporter's own guesswork, and the AST differs
+        // from one host to the next (Python 3.12's PEP 709 did exactly that, silently,
+        // until the decoder learned inlined comprehensions). Degrade, but say so: the
+        // line lands in export.log, which the pipeline keeps.
+        case scala.util.control.NonFatal(e) =>
+          val why = e match {
+            case f: os.SubprocessException =>
+              f.result.err.text().linesIterator.filter(_.nonEmpty).toSeq.lastOption.getOrElse(f.getMessage)
+            case other => other.toString
+          }
+          System.err.println(s"export_ast: WARNING python handler sidecar failed for $file " +
+            s"under $python: $why -- builtin/class/global metadata for this file is ABSENT")
+          None
       }
     })
 
