@@ -24,6 +24,7 @@ may not share one workspace at the same time (a lock refuses the second). Start 
 | `assure SRC [Module]` | `source`, then coverage oracle, mutation gate, audit, contracts, assurance case, guarantee | every required check passed |
 | `regress SRC --base REF [--head REF]` | the pipeline at two commits, compared by what each could prove | nothing that held at `--base` is lost |
 | `regress ... --machine --files F...` | the same comparison on compiled code, kernel-checked on lifted p-code | no diverging input found |
+| `pr SRC [Module] --base REF [--head REF]` | evidence level of every function the change touched, as SARIF and Markdown | no function refuted |
 | `autoformalize SRC [Module]` | code → validated Lean model → English → statements → kernel proofs | see `docs/autoformalize.md` |
 | `formalize Module` | candidate claims, SemIf judge, kernel verification, CEGIS repair | see `docs/harness.md` |
 | `machine INPUT [Module]` | binary/assembly → SLEIGH p-code → Lean model, concrete assertions | see `docs/machine-code.md` |
@@ -102,13 +103,44 @@ both commits for a Linux target, linked, lifted through SLEIGH, searched for div
 inputs (type-width boundaries and seeded random values, run natively when the host can)
 and each divergence is kernel-checked. Exit `1` on a regression or a divergence.
 
+### `pr`
+
+```
+autoform pr SRC [Module] --base REF [--head REF] [--subdir PATH] [--ast FILE] [--tests DIR]
+            [--cases N] [--mutants N] [--sarif FILE] [--markdown FILE]
+            [--stage-timeout SECONDS] [--timeout SECONDS] [--keep-checkout]
+```
+
+Runs the chain for the functions a change touched and reports each one's **evidence
+level** -- `none`, `hole`, `translated`, `oracle-agreed`, `proved` or `refuted` -- with
+the artifact it traces to (`docs/evidence-levels.md`). `SRC` is a Git URL or a local
+checkout; `--head` defaults to the working tree, untracked files included. Python
+functions are found by comparing the standard-library `ast` of each changed file at
+both commits, which is also where the SARIF line numbers come from; for other
+languages every function the exporter exported from a changed file is reported. The
+head tree is exported with Joern, or `--ast FILE` supplies an AST the exporter produced
+earlier (recorded as such). The changed functions, their scopes and their resolvable
+callees are rendered as `Autoform.Generated.<Module>` (default `PullRequest`), then
+`scripts/differential.py`, the ledger, `scripts/synth_specs.py --conformance-only` and,
+with `--mutants N`, `scripts/mutate.py` run on that module alone. Reports land in
+`artifacts/pr/<Module>/` (`pr.json`, `conformance.json`, `specs.json`, `mutation.json`,
+the stage logs); `--sarif` writes SARIF 2.1.0 with one result per function, validated
+for GitHub code scanning before it is written, and `--markdown` the review comment.
+Exit `1` only when a function is refuted; a stage that cannot run leaves its functions
+at the level below and is named in the report.
+
 ### `autoformalize`, `formalize`, `machine`
 
 Each owns its flags; `autoform <cmd> --help` is the reference.
 `autoformalize` writes a language model's Lean model of each function and validates it
 against real executions and a second translation (`--deep` uses the Joern translation
-instead; `--deep-too` proves the two equal). It needs a model provider
-(`AUTOFORM_CLAUDE_AUTH=login|api-key`) and caps spend with `--budget-usd`.
+instead; `--deep-too` proves the two equal). It needs a model backend
+(`AUTOFORM_CLAUDE_AUTH=login|api-key|api`, see `docs/autoformalize.md`) and caps the
+run's spend with `--budget-usd`: every model stage stops at the function that would cross
+the cap and names the rest in `budget.json` and the report. Its last stage writes the
+properties that survived checking as pytest tests into the analysed tree's
+`tests/autoform_generated/` and runs them (`--emit-dir DIR` relocates them, `--no-emit`
+skips the stage; `docs/autoformalize.md`, "The emit stage").
 `formalize` needs a translated module in the workspace and, for the default judge, a
 SemIf (OpenJev) installation. `machine` needs the `[machine]` extra; `--assemble`
 also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and
@@ -123,7 +155,7 @@ also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and
 | `inventory.json`, `selection.json` | repository scan | every file, its hash and language, exclusions, scan errors |
 | `ast-<Module>.json`, `frontend.json`, `export.log` | exporter | the neutral AST; CPG population and excluded declarations |
 | `Autoform/Generated/<Module>.lean` (+ `<Module>/PartNNNN.lean`) | renderer | the model; part modules when sharded |
-| `conformance.json` | `scripts/differential.py` | every compared case: agree / diverge / inconclusive, the measurement basis, provenance hashes |
+| `conformance.json` | `scripts/differential.py` | every compared case: agree / diverge / inconclusive, the measurement basis, provenance hashes; a `cache` block and `cached_from` on every verdict replayed from `.autoform-work/oracle/<Module>/` rather than compared now (`differential.py --no-cache` re-compares everything, `--cache-dir DIR` relocates the store; docs/running.md §4) |
 | `ledger-<Module>.json` | `scripts/ledger.lean.tmpl` | holes by label, hole-free count, verifiable core, call closure |
 | `specs.json`, `Autoform/SpecsGen/<Module>.lean` | `scripts/synth_specs.py` | the proved observation theorems; open obligations; subjects excluded by name and why |
 | `core-oracle.json` | `scripts/core_oracle.py` | execution coverage of the recorded observations |
@@ -135,6 +167,11 @@ also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and
 `guarantee.json` has `status: verified_scoped` only when every required check passed
 and every listed claim's artifacts hash as recorded; otherwise `unverified` with the
 failed checks named. It never claims whole-program correctness.
+
+`<workspace>/artifacts/pr/<Module>/` (`autoform pr`): `pr.json` (per function: level,
+reason, artifacts, holes, oracle counts, theorems, mutation verdicts; per stage: status,
+seconds, log), the selected `ast-<Module>.json`, and the same `conformance.json`,
+`ledger-<Module>.json`, `specs.json` and `mutation.json` as above for that module.
 
 ## Environment variables
 
@@ -151,7 +188,8 @@ failed checks named. It never claims whole-program correctness.
 | `AUTOFORM_MUTANTS` | `assure` | mutants per gate run (default `max(8, 2 × proved)`) |
 | `AUTOFORM_CFLAGS`, `CPP_DEFINES`, `AUTOFORM_COMPILE_COMMANDS` | C/C++ parsing and native runs | compiler flags, defines, a compilation database |
 | `AUTOFORM_FRONTEND`, `AUTOFORM_DATA_MODEL` | parse/export | force a Joern frontend; `lp64`/`ilp32` integer model |
-| `AUTOFORM_CLAUDE_AUTH` | `autoformalize`, `formalize --prover` | `login` (default) or `api-key` |
+| `AUTOFORM_CLAUDE_AUTH` | `autoformalize`, `formalize --prover` | `login` (default) or `api-key` (the `claude` CLI), or `api` (the Messages API through the `anthropic` SDK; text stages only) |
+| `AUTOFORM_LLM_MODEL` | `autoformalize` | model for the text stages (`api`: default `claude-opus-5-5`, must have a row in `llm.PRICES`) |
 | `AUTOFORM_ALLOW_DIRTY` | checkout entry points | run over modified tracked artifacts (never over a live mutant) |
 | `AUTOFORM_SCRATCH`, `AUTOFORM_PYTHON` | scripts | scratch directory; the Python the stages run under |
 | `AUTOFORM_DIFF_KEEP`, `AUTOFORM_NO_REEXEC` | oracle debugging | keep the Lean file a case failed in; skip the `PYTHONHASHSEED=0` re-exec |
@@ -159,7 +197,7 @@ failed checks named. It never claims whole-program correctness.
 ## Exit codes
 
 `0` success for the command's own claim; `1` a stage failed, gaps remain, a regression
-or divergence was found; `2` invocation, setup or orchestration failure (bad module
+or divergence was found, or `pr` refuted a function; `2` invocation, setup or orchestration failure (bad module
 name, missing Joern, busy workspace, unreadable package, refused dirty tree); `128+N`
 interrupted by signal N (`--timeout` expiry is `143`). The per-command table is in
 `docs/running.md` §7.

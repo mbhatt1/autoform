@@ -53,7 +53,9 @@ The design choices that make this non-vacuous are all in that sentence:
    Hoare-style **loop rule** with a termination measure (`execStmt_loop_rule`,
    `execFor_rule`) and a **heap representation predicate** (`Represents`) with its frame
    and update rules — the two pieces straight-line pure code does not need and real code
-   cannot do without.
+   cannot do without — and, on top of the latter, a representation predicate for a
+   **doubly-linked ring** (`DRing`) with the unlink theorem (`DRing.unlink`) that
+   `cachetools`' `_Link.unlink` instantiates.
 5. End-to-end refinement theorems for real translated functions from
    `Generated/CMath.lean` (C) and `Generated/Stress.lean`, `Generated/Sample.lean`
    (Python), including the dialect-sensitive division/modulo pair, the two loops
@@ -155,6 +157,47 @@ theorem refines_unique {p name N₁ N₂ dom s₁ s₂}
     (args : List Val) (hd : dom args) : (s₁ args).toEResult = (s₂ args).toEResult := by
   have e₁ := h₁ args hd (N₁ + N₂) (Nat.le_add_right _ _)
   have e₂ := h₂ args hd (N₁ + N₂) (Nat.le_add_left _ _)
+  rw [← e₁, ← e₂]
+
+/-! ### An argument-dependent fuel bound
+
+`Refines` carries a *constant* bound `N`, which is the right shape for straight-line code
+and the wrong shape for a loop: the fuel `gcdish a b` needs grows with `b`, so a
+`Refines` instance for it has to cut the domain down to `b ≤ 1000000` to justify a
+constant. That restriction is an artefact of the statement, not of the program.
+`RefinesWith` lets the bound be a function of the arguments, so a loop can be refined on
+its whole domain with its true cost in the statement (`gcdish_refinesWith`,
+`sumto_refinesWith`, `total_refinesWith` below). It is not weaker: every non-vacuity
+theorem of `Refines` holds for it verbatim, and a `RefinesWith` whose bound is bounded on
+the domain is a `Refines` (`RefinesWith.toRefines`). -/
+def RefinesWith (p : Program) (name : String) (N : List Val → Nat)
+    (dom : List Val → Prop) (spec : List Val → Outcome) : Prop :=
+  ∀ args, dom args → ∀ fuel, N args ≤ fuel →
+    runFunc p fuel name args = (spec args).toEResult
+
+theorem Refines.toWith {p name N dom spec} (h : Refines p name N dom spec) :
+    RefinesWith p name (fun _ => N) dom spec := h
+
+/-- A bound that is bounded on the domain is a constant bound. -/
+theorem RefinesWith.toRefines {p name N dom spec} (h : RefinesWith p name N dom spec)
+    (K : Nat) (hK : ∀ args, dom args → N args ≤ K) : Refines p name K dom spec :=
+  fun args hd fuel hf => h args hd fuel (Nat.le_trans (hK args hd) hf)
+
+theorem refinesWith_not_hole {p name N dom spec} (h : RefinesWith p name N dom spec)
+    (args : List Val) (hd : dom args) (fuel : Nat) (hf : N args ≤ fuel) (l : String) :
+    runFunc p fuel name args ≠ .hole l := by
+  rw [h args hd fuel hf]; exact Outcome.toEResult_ne_hole _ l
+
+theorem refinesWith_terminates {p name N dom spec} (h : RefinesWith p name N dom spec)
+    (args : List Val) (hd : dom args) (fuel : Nat) (hf : N args ≤ fuel) :
+    runFunc p fuel name args ≠ .outOfFuel := by
+  rw [h args hd fuel hf]; exact Outcome.toEResult_ne_outOfFuel _
+
+theorem refinesWith_unique {p name N₁ N₂ dom s₁ s₂}
+    (h₁ : RefinesWith p name N₁ dom s₁) (h₂ : RefinesWith p name N₂ dom s₂)
+    (args : List Val) (hd : dom args) : (s₁ args).toEResult = (s₂ args).toEResult := by
+  have e₁ := h₁ args hd (N₁ args + N₂ args) (Nat.le_add_right _ _)
+  have e₂ := h₂ args hd (N₁ args + N₂ args) (Nat.le_add_left _ _)
   rw [← e₁, ← e₂]
 
 /-! ### From `∀ k, P (k + N)` to `∀ fuel ≥ N, P fuel`
@@ -469,6 +512,26 @@ theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val)
        | (h₁, _)          => (h₁, .hole "call:stray-control-flow")) := rfl
 
 end EvalLemmas
+
+/-- A zero-argument method call whose body finishes normally returns `None`: the prologue
+of `applyFunc_succ` collapsed for the common case. The four side conditions are facts
+about the `Func` literal that a concrete program discharges by `rfl`.
+
+Stated for an abstract `fn` on purpose. Rewriting the prologue by `simp` *at* a concrete
+generated `Func` costs the kernel ~12 GB (measured on `TTLCache._Link.unlink`, 2026-10-10:
+49 s of type checking for one theorem); applying this lemma to the same function with the
+four `rfl` facts costs nothing measurable. -/
+theorem applyFunc_method_normal (ctx : Ctx) (k : Nat) (h : Heap) (fn : Func) (self : Val)
+    (hkw : fn.kwarg = none) (hsig : signatureRejected fn [] [] = false)
+    (hcad : fn.classAttrDefaults = [])
+    (hbind : bindParams fn [("self", self)] [] [] = [("self", self)])
+    {h' : Heap} {ρ' : Env}
+    (hbody : execStmt ctx k h [("self", self)] fn.body = (h', .normal ρ')) :
+    applyFunc ctx (k+1) h fn (some self) [] [] = (h', .val .unit) := by
+  rw [applyFunc_succ]
+  simp only [kwargsRejected_nil, posRejected_nil, hsig, Bool.or_self, Bool.false_eq_true,
+    if_false, seedClassAttrDefaults, hcad, seedClassAttrs, selfEnv, hbind,
+    boxKwargs_of_no_kwarg hkw, hbody]
 
 /-! ### Operator equations for comparison and unary operators
 
@@ -813,6 +876,319 @@ theorem Represents.update {α : Type} {R : HeapRep α} {h : Heap} {r : Ref} {a a
   refine ⟨{ o with fields := (f, v) :: o.fields }, ?_, hc, ha⟩
   simp [Heap.get_setField, ho]
 
+/-- The two pointwise forms of `Heap.get_setField`, for proofs that case on the address. -/
+theorem Heap.get_setField_of_ne {h : Heap} {r s : Ref} {f : String} {v : Val} (hs : s ≠ r) :
+    (h.setField r f v).get s = h.get s := by
+  simp only [Heap.get_setField]
+  cases h.get s <;> simp [hs]
+
+theorem Heap.get_setField_self {h : Heap} {r : Ref} {f : String} {v : Val} :
+    (h.setField r f v).get r
+      = (h.get r).map (fun o => { o with fields := (f, v) :: o.fields }) := by
+  simp [Heap.get_setField]
+
+/-- A field write never changes an object's class — at any address. -/
+theorem Heap.cls_setField {h : Heap} {r s : Ref} {f : String} {v : Val} :
+    ((h.setField r f v).get s).map Obj.cls = (h.get s).map Obj.cls := by
+  simp only [Heap.get_setField]
+  cases h.get s with
+  | none => rfl
+  | some o => by_cases hs : s = r <;> simp [hs]
+
+/-! ### A linked structure: doubly-linked rings
+
+`counterRep` (§4) abstracts one object to one integer. The representation predicate a
+container class needs relates a *region* of the heap — many objects reachable from one
+another through pointer fields — to one abstract value, and that is what this section
+builds, for the structure `cachetools` evicts from: a doubly-linked ring with a sentinel
+(`TTLCache.__root` / `LFUCache.__root`, nodes of class `_Link`).
+
+Three layers, each a plain predicate over `Represents`:
+
+* `dlinkRep cls kprev knext : HeapRep DLink` — one node, abstracted to its two neighbour
+  addresses. The field keys are parameters because a `__slots__` class stores its slots
+  under the declaring class's storage key, not under the attribute name.
+* `DChain R h p L n` — the addresses in `L` form a segment: the first node's `prev` is `p`,
+  the last node's `next` is `n`, and every internal pair points at each other.
+* `DRing R h root L` — a segment closed through `root` in both directions.
+
+`DRing.unlink` is the abstract content of `_Link.unlink`: in any heap holding a ring
+`L₁ ++ x :: L₂` with pairwise-distinct addresses, writing `x.prev.next := x.next` and then
+`x.next.prev := x.prev` leaves a ring `L₁ ++ L₂`. The proof is only `Represents.frame`
+and `Represents.update`, folded along the segment — no interpreter — which is what the
+representation predicate was supposed to buy. The two writes are the only heap effect, so
+the lemma also says what did *not* change: every address other than `x.prev` and `x.next`
+is untouched, `x` itself included (`Heap.get_setField_of_ne`). -/
+
+/-- The abstract view of one node: where its `prev` and `next` pointers go. -/
+structure DLink where
+  prev : Ref
+  next : Ref
+  deriving Repr, DecidableEq, Inhabited
+
+/-- A node of class `cls` whose `prev`/`next` live under the field keys `kprev`/`knext`.
+Partial, as every `HeapRep` is: a node whose pointers are missing or are not references
+represents nothing. -/
+def dlinkRep (cls kprev knext : String) : HeapRep DLink :=
+  { cls := cls
+  , abs := fun o =>
+      match o.fields.find? (·.1 == kprev), o.fields.find? (·.1 == knext) with
+      | some (_, .ref p), some (_, .ref n) => some ⟨p, n⟩
+      | _, _ => none }
+
+/-- What `Represents (dlinkRep …)` says about the object, field by field. -/
+theorem dlink_fields {cls kp kn : String} {h : Heap} {r : Ref} {a : DLink}
+    (hR : Represents (dlinkRep cls kp kn) h r a) :
+    ∃ o, h.get r = some o ∧ o.cls = cls ∧
+      o.fields.find? (·.1 == kp) = some (kp, .ref a.prev) ∧
+      o.fields.find? (·.1 == kn) = some (kn, .ref a.next) := by
+  obtain ⟨ap, an⟩ := a
+  obtain ⟨o, ho, hc, ha⟩ := hR
+  refine ⟨o, ho, hc, ?_⟩
+  simp only [dlinkRep] at ha
+  rcases hp : o.fields.find? (·.1 == kp) with _ | ⟨kp', vp⟩ <;>
+    rcases hn : o.fields.find? (·.1 == kn) with _ | ⟨kn', vn⟩ <;>
+    rw [hp, hn] at ha
+  · simp at ha
+  · simp at ha
+  · cases vp <;> simp at ha
+  have hkp : kp' = kp := by simpa using List.find?_some hp
+  have hkn : kn' = kn := by simpa using List.find?_some hn
+  subst hkp hkn
+  cases vp <;> (try (simp at ha; done))
+  cases vn <;> (try (simp at ha; done))
+  simp at ha
+  obtain ⟨rfl, rfl⟩ := ha
+  exact ⟨hp, hn⟩
+
+/-- Writing a node's `next` re-establishes it at the new neighbour (`Represents.update`). -/
+theorem dlink_set_next {cls kp kn : String} (hne : kp ≠ kn) {h : Heap} {r : Ref} {a : DLink}
+    {n' : Ref} (hR : Represents (dlinkRep cls kp kn) h r a) :
+    Represents (dlinkRep cls kp kn) (h.setField r kn (.ref n')) r ⟨a.prev, n'⟩ := by
+  obtain ⟨o, ho, hc, hp, hn⟩ := dlink_fields hR
+  refine Represents.update hR ho ?_
+  have h1 : ((kn, Val.ref n') :: o.fields).find? (·.1 == kp) = some (kp, .ref a.prev) := by
+    rw [List.find?_cons_of_neg (by simp [Ne.symm hne])]; exact hp
+  have h2 : ((kn, Val.ref n') :: o.fields).find? (·.1 == kn) = some (kn, .ref n') :=
+    List.find?_cons_of_pos (by simp)
+  simp [dlinkRep, h1, h2]
+
+theorem dlink_set_prev {cls kp kn : String} (hne : kp ≠ kn) {h : Heap} {r : Ref} {a : DLink}
+    {p' : Ref} (hR : Represents (dlinkRep cls kp kn) h r a) :
+    Represents (dlinkRep cls kp kn) (h.setField r kp (.ref p')) r ⟨p', a.next⟩ := by
+  obtain ⟨o, ho, hc, hp, hn⟩ := dlink_fields hR
+  refine Represents.update hR ho ?_
+  have h1 : ((kp, Val.ref p') :: o.fields).find? (·.1 == kp) = some (kp, .ref p') :=
+    List.find?_cons_of_pos (by simp)
+  have h2 : ((kp, Val.ref p') :: o.fields).find? (·.1 == kn) = some (kn, .ref a.next) := by
+    rw [List.find?_cons_of_neg (by simp [hne])]; exact hn
+  simp [dlinkRep, h1, h2]
+
+/-- Frame and update in one statement: a write to *any* address `s`, seen from the node
+at `r`, is the update if `s = r` and the frame rule otherwise. This is the form a proof
+wants when the addresses are not known to be distinct (a two-element ring has
+`x.prev = x.next`). -/
+theorem dlink_write_next {cls kp kn : String} (hne : kp ≠ kn) {h : Heap} {r s : Ref}
+    {a : DLink} {n' : Ref} (hR : Represents (dlinkRep cls kp kn) h r a) :
+    Represents (dlinkRep cls kp kn) (h.setField s kn (.ref n')) r
+      (if s = r then ⟨a.prev, n'⟩ else a) := by
+  by_cases hs : s = r
+  · subst hs; simp only [if_true]; exact dlink_set_next hne hR
+  · simp only [hs, if_false]; exact Represents.frame hs hR
+
+theorem dlink_write_prev {cls kp kn : String} (hne : kp ≠ kn) {h : Heap} {r s : Ref}
+    {a : DLink} {p' : Ref} (hR : Represents (dlinkRep cls kp kn) h r a) :
+    Represents (dlinkRep cls kp kn) (h.setField s kp (.ref p')) r
+      (if s = r then ⟨p', a.next⟩ else a) := by
+  by_cases hs : s = r
+  · subst hs; simp only [if_true]; exact dlink_set_prev hne hR
+  · simp only [hs, if_false]; exact Represents.frame hs hR
+
+/-- A doubly-linked segment: `DChain R h p L n` says the nodes at the addresses in `L`
+are linked in order, the first one's `prev` is `p` and the last one's `next` is `n`. -/
+def DChain (R : HeapRep DLink) (h : Heap) : Ref → List Ref → Ref → Prop
+  | _, [], _ => True
+  | p, x :: L, n => Represents R h x ⟨p, L.headD n⟩ ∧ DChain R h x L n
+
+/-- A doubly-linked ring with sentinel `root`: the segment `L` runs from `root` back to
+`root`, and `root` itself points at the two ends (at itself when `L = []`). -/
+def DRing (R : HeapRep DLink) (h : Heap) (root : Ref) (L : List Ref) : Prop :=
+  Represents R h root ⟨L.getLastD root, L.headD root⟩ ∧ DChain R h root L root
+
+/-- The frame rule, lifted to a segment: a write outside `L` preserves it. -/
+theorem DChain.frame {R : HeapRep DLink} {h : Heap} {s : Ref} {f : String} {v : Val} :
+    ∀ {p : Ref} {L : List Ref} {n : Ref}, s ∉ L → DChain R h p L n →
+      DChain R (h.setField s f v) p L n := by
+  intro p L
+  induction L generalizing p with
+  | nil => intro n _ _; trivial
+  | cons x L ih =>
+    intro n hs hc
+    obtain ⟨hx, hL⟩ := hc
+    have hsx : s ≠ x := fun e => hs (e ▸ List.mem_cons_self)
+    exact ⟨Represents.frame hsx hx, ih (fun m => hs (List.mem_cons_of_mem _ m)) hL⟩
+
+theorem headD_append {α} (L₁ L₂ : List α) (d : α) :
+    (L₁ ++ L₂).headD d = L₁.headD (L₂.headD d) := by
+  cases L₁ <;> rfl
+
+theorem getLastD_append_singleton {α} (L : List α) (b d : α) :
+    (L ++ [b]).getLastD d = b := by
+  induction L generalizing d with
+  | nil => rfl
+  | cons x L ih => rw [List.cons_append, List.getLastD_cons, ih]
+
+theorem getLastD_append_cons {α} (L₁ : List α) (x : α) (L₂ : List α) (d : α) :
+    (L₁ ++ x :: L₂).getLastD d = L₂.getLastD x := by
+  induction L₁ generalizing d with
+  | nil => rw [List.nil_append, List.getLastD_cons]
+  | cons y L ih => rw [List.cons_append, List.getLastD_cons, ih]
+
+theorem getLastD_mem_cons {α} (L : List α) (d : α) : L.getLastD d ∈ d :: L := by
+  induction L generalizing d with
+  | nil => simp
+  | cons x L ih =>
+    rw [List.getLastD_cons]
+    rcases List.mem_cons.mp (ih x) with h | h
+    · rw [h]; exact List.mem_cons_of_mem _ List.mem_cons_self
+    · exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _ h)
+
+theorem getLastD_mem_of_ne_nil {α} {L : List α} (hL : L ≠ []) (d : α) : L.getLastD d ∈ L := by
+  cases L with
+  | nil => exact absurd rfl hL
+  | cons x L => rw [List.getLastD_cons]; exact getLastD_mem_cons L x
+
+theorem headD_mem_cons {α} (L : List α) (d : α) : L.headD d ∈ d :: L := by
+  cases L <;> simp
+
+theorem headD_mem_of_ne_nil {α} {L : List α} (hL : L ≠ []) (d : α) : L.headD d ∈ L := by
+  cases L with
+  | nil => exact absurd rfl hL
+  | cons x L => simp
+
+/-- Every address on a segment holds a represented node. -/
+theorem DChain.mem {R : HeapRep DLink} {h : Heap} :
+    ∀ {p : Ref} {L : List Ref} {n y : Ref}, DChain R h p L n → y ∈ L →
+      ∃ a, Represents R h y a := by
+  intro p L
+  induction L generalizing p with
+  | nil => intro n y _ hy; simp at hy
+  | cons x L ih =>
+    intro n y hc hy
+    obtain ⟨hx, hL⟩ := hc
+    rcases List.mem_cons.mp hy with rfl | hy
+    · exact ⟨_, hx⟩
+    · exact ih hL hy
+
+/-- …and so does every address on a ring, the sentinel included. -/
+theorem DRing.mem {R : HeapRep DLink} {h : Heap} {root : Ref} {L : List Ref}
+    (hr : DRing R h root L) {y : Ref} (hy : y ∈ root :: L) : ∃ a, Represents R h y a := by
+  rcases List.mem_cons.mp hy with rfl | hy
+  · exact ⟨_, hr.1⟩
+  · exact DChain.mem hr.2 hy
+
+/-- A segment splits at any point, and the two halves meet in the middle. -/
+theorem DChain.append {R : HeapRep DLink} {h : Heap} :
+    ∀ {p : Ref} {L₁ L₂ : List Ref} {n : Ref},
+      DChain R h p (L₁ ++ L₂) n ↔
+        DChain R h p L₁ (L₂.headD n) ∧ DChain R h (L₁.getLastD p) L₂ n := by
+  intro p L₁
+  induction L₁ generalizing p with
+  | nil => intro L₂ n; simp [DChain]
+  | cons x L ih =>
+    intro L₂ n
+    simp only [List.cons_append, DChain, List.getLastD_cons, headD_append, ih, and_assoc]
+
+/-- Redirecting the last node's `next` re-targets the whole segment. -/
+theorem DChain.setLast {cls kp kn : String} (hne : kp ≠ kn) {h : Heap} {p : Ref}
+    {L : List Ref} {q x n : Ref} (hq : q ∉ L)
+    (hc : DChain (dlinkRep cls kp kn) h p (L ++ [q]) x) :
+    DChain (dlinkRep cls kp kn) (h.setField q kn (.ref n)) p (L ++ [q]) n := by
+  rw [DChain.append] at hc ⊢
+  simp only [DChain, List.headD_cons, List.headD_nil, and_true] at hc ⊢
+  obtain ⟨hL, hq'⟩ := hc
+  exact ⟨DChain.frame hq hL, dlink_set_next hne hq'⟩
+
+/-- Redirecting the first node's `prev` re-sources the whole segment. -/
+theorem DChain.setFirst {cls kp kn : String} (hne : kp ≠ kn) {h : Heap} {x p : Ref}
+    {q : Ref} {L : List Ref} {e : Ref} (hq : q ∉ L)
+    (hc : DChain (dlinkRep cls kp kn) h x (q :: L) e) :
+    DChain (dlinkRep cls kp kn) (h.setField q kp (.ref p)) p (q :: L) e := by
+  obtain ⟨hq', hL⟩ := hc
+  exact ⟨dlink_set_prev hne hq', DChain.frame hq hL⟩
+
+/-- **Unlinking a node from a ring.** In a ring `L₁ ++ x :: L₂` on pairwise-distinct
+addresses, `x`'s neighbours are `p = L₁.getLastD root` and `n = L₂.headD root`, and
+after `p.next := n; n.prev := p` the heap holds the ring `L₁ ++ L₂`. Every ring size is
+covered, including the one-node ring (`p = n = root`, both writes land on the sentinel)
+and the two-node rings (`p = root` or `n = root`). -/
+theorem DRing.unlink {cls kp kn : String} (hne : kp ≠ kn) {h : Heap} {root x : Ref}
+    {L₁ L₂ : List Ref} {p n : Ref}
+    (hp : L₁.getLastD root = p) (hn : L₂.headD root = n)
+    (hring : DRing (dlinkRep cls kp kn) h root (L₁ ++ x :: L₂))
+    (hnd : (root :: (L₁ ++ x :: L₂)).Nodup) :
+    Represents (dlinkRep cls kp kn) h x ⟨p, n⟩ ∧
+    DRing (dlinkRep cls kp kn) ((h.setField p kn (.ref n)).setField n kp (.ref p))
+      root (L₁ ++ L₂) := by
+  subst hp hn
+  obtain ⟨hroot, hch⟩ := hring
+  rw [DChain.append] at hch
+  obtain ⟨hch1, hch2⟩ := hch
+  simp only [List.headD_cons] at hch1
+  obtain ⟨hx, hL₂⟩ := hch2
+  -- distinctness
+  rw [List.nodup_cons, List.nodup_append, List.nodup_cons] at hnd
+  obtain ⟨hroot_nin, hnd₁, ⟨hx_nin₂, hnd₂⟩, hdisj⟩ := hnd
+  have hroot₁ : root ∉ L₁ := fun m => hroot_nin (List.mem_append_left _ m)
+  have hroot₂ : root ∉ L₂ :=
+    fun m => hroot_nin (List.mem_append_right _ (List.mem_cons_of_mem _ m))
+  have hdisj' : ∀ y, y ∈ L₁ → y ∉ L₂ :=
+    fun y m₁ m₂ => hdisj y m₁ y (List.mem_cons_of_mem _ m₂) rfl
+  have hp₂ : L₁.getLastD root ∉ L₂ := by
+    rcases List.mem_cons.mp (getLastD_mem_cons L₁ root) with e | m
+    · rw [e]; exact hroot₂
+    · exact hdisj' _ m
+  have hn₁ : L₂.headD root ∉ L₁ := by
+    rcases List.mem_cons.mp (headD_mem_cons L₂ root) with e | m
+    · rw [e]; exact hroot₁
+    · exact fun m₁ => hdisj' _ m₁ m
+  have hpr : L₁ ≠ [] → L₁.getLastD root ≠ root :=
+    fun hL e => hroot₁ (e ▸ getLastD_mem_of_ne_nil hL root)
+  have hnr : L₂ ≠ [] → L₂.headD root ≠ root :=
+    fun hL e => hroot₂ (e ▸ headD_mem_of_ne_nil hL root)
+  refine ⟨hx, ?_, ?_⟩
+  · -- the sentinel: frame or update, by whether a neighbour of `x` is the sentinel
+    have h1 := dlink_write_next hne (s := L₁.getLastD root) (n' := L₂.headD root) hroot
+    have h2 := dlink_write_prev hne (s := L₂.headD root) (p' := L₁.getLastD root) h1
+    rcases L₁ with _ | ⟨q₁, L₁⟩ <;> rcases L₂ with _ | ⟨q₂, L₂⟩
+    · simpa [-List.getLastD_eq_getLast?, List.getLastD_nil] using h2
+    · have h3 : q₂ ≠ root := by simpa using hnr (by simp)
+      simpa [-List.getLastD_eq_getLast?, h3, List.getLastD_nil, List.getLastD_cons] using h2
+    · have h4 : L₁.getLastD q₁ ≠ root := by
+        simpa [-List.getLastD_eq_getLast?, List.getLastD_cons] using hpr (by simp)
+      simpa [-List.getLastD_eq_getLast?, h4, List.getLastD_cons] using h2
+    · have h3 : q₂ ≠ root := by simpa using hnr (by simp)
+      have h4 : L₁.getLastD q₁ ≠ root := by
+        simpa [-List.getLastD_eq_getLast?, List.getLastD_cons] using hpr (by simp)
+      simpa [-List.getLastD_eq_getLast?, h3, h4, getLastD_append_cons, List.getLastD_cons]
+        using h2
+  · -- the segment: `L₁` keeps its shape with its last `next` re-targeted, `L₂` its first `prev`
+    rw [DChain.append]
+    constructor
+    · rcases List.eq_nil_or_concat L₁ with rfl | ⟨L', q, rfl⟩
+      · trivial
+      · rw [List.concat_eq_append] at *
+        rw [getLastD_append_singleton]
+        have hq' : q ∉ L' := by
+          rw [List.nodup_append] at hnd₁
+          exact fun m => hnd₁.2.2 q m q List.mem_cons_self rfl
+        exact DChain.frame hn₁ (DChain.setLast hne hq' hch1)
+    · rcases L₂ with _ | ⟨q, L⟩
+      · trivial
+      · simp only [List.headD_cons] at hp₂ hL₂ ⊢
+        have hq' : q ∉ L := (List.nodup_cons.mp hnd₂).1
+        exact DChain.setFirst hne hq' (DChain.frame hp₂ hL₂)
+
 /-! ### Evaluation lemmas for the object fragment
 
 The `evalSimp` set of §2 stops at the pure fragment. Field access, field assignment,
@@ -853,6 +1229,31 @@ theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     have hnd := hjs hd
     simp [execStmt, ha, he, hd]
   · simp [execStmt, ha, he, hd, hwrite, hkey]
+
+/-- A field read that resolves to a **slot** (`__slots__` under recovered class metadata):
+the value comes from the declaring class's storage key, which `Ctx.readSlot` computes, and
+the instance dictionary is never consulted. `evalExpr_field_obj` is the dictionary case
+(`readSlot = none`); this is the other. -/
+theorem evalExpr_field_slot (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {a : Expr} {h₁ : Heap} {r : Ref} {o : Obj} {f : String} {v : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
+    (ho : h₁.get r = some o)
+    (hgap : ctx.classLookupGap o.cls f = none)
+    (hslot : ctx.readSlot o f = some (.val v)) :
+    evalExpr ctx (k+1) h ρ (.field a f) = (h₁, .val v) := by
+  simp [evalExpr, ha, ho, hgap, hslot]
+
+/-- `execStmt_setField_val` with the write **key** left free: a slot write lands under
+the slot's storage key (`Ctx.fieldWriteKey`), not under the attribute name. -/
+theorem execStmt_setField_key (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f key : String} {w : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
+    (he : evalExpr ctx k h₁ ρ e = (h₂, .val w))
+    (hjs : ctx.dialect ≠ .javascript)
+    (hwrite : ctx.fieldWriteCheck h₂ r f = .val .unit)
+    (hkey : ctx.fieldWriteKey h₂ r f = key) :
+    execStmt ctx (k+1) h ρ (.setField a f e) = (h₂.setField r key w, .normal ρ) := by
+  simp [execStmt, ha, he, hjs, hwrite, hkey]
 
 /-- CHANGED: built-in container iteration precedes source method resolution. -/
 theorem evalExpr_mcall_container (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
@@ -949,6 +1350,86 @@ theorem execStmt_forIn_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
   cases v <;> first
     | (exfalso; simp [Val.iterable] at hv; done)
     | simp_all [execStmt, he, hv]
+
+/-! ### The body of `_Link.unlink`
+
+`next = self.next; prev = self.prev; prev.next = next; next.prev = prev`, as
+`cartographer/render_lean.py` renders it for `cachetools`' `TTLCache._Link.unlink` and
+`LFUCache._Link.unlink` (the two bodies are identical; `Specs/CachetoolsSpec.lean` checks
+the generated term against this one by `rfl`, so a mutation of the generated body breaks
+the theorems there). The lemma is stated for any context: the class-metadata side
+conditions — slot reads, slot write keys, the `__setattr__` check — are hypotheses that a
+concrete program discharges by computation. `kp`/`kn` are the storage keys the two slot
+writes land under; a non-slot class would instantiate them to `"prev"`/`"next"`. -/
+def dlinkUnlinkBody : Stmt :=
+  .seq (.assign "next" (.field (.name "self") "next"))
+    (.seq (.assign "prev" (.field (.name "self") "prev"))
+      (.seq (.setField (.name "prev") "next" (.name "next"))
+        (.seq .skip (.seq (.setField (.name "next") "prev" (.name "prev")) .skip))))
+
+/-- One run of the unlink body: two slot reads on `self`, then the two pointer writes.
+The resulting heap is exactly `(h.setField p kn n).setField n kp p` — the shape
+`DRing.unlink` consumes. -/
+theorem execStmt_dlink_unlink (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {x p n : Ref} {ox : Obj} {kp kn : String}
+    (hjs : ctx.dialect ≠ .javascript)
+    (hself : ρ.find? (·.1 == "self") = some ("self", .ref x))
+    (hgn : (ρ.get ("<glob>" ++ "next")).truthy = false)
+    (hgp : (ρ.get ("<glob>" ++ "prev")).truthy = false)
+    (hox : h.get x = some ox)
+    (hgap_n : ctx.classLookupGap ox.cls "next" = none)
+    (hgap_p : ctx.classLookupGap ox.cls "prev" = none)
+    (hslot_n : ctx.readSlot ox "next" = some (.val (.ref n)))
+    (hslot_p : ctx.readSlot ox "prev" = some (.val (.ref p)))
+    (hwc_p : ctx.fieldWriteCheck h p "next" = .val .unit)
+    (hwk_p : ctx.fieldWriteKey h p "next" = kn)
+    (hwc_n : ctx.fieldWriteCheck (h.setField p kn (.ref n)) n "prev" = .val .unit)
+    (hwk_n : ctx.fieldWriteKey (h.setField p kn (.ref n)) n "prev" = kp) :
+    execStmt ctx (k+7) h ρ dlinkUnlinkBody
+      = ((h.setField p kn (.ref n)).setField n kp (.ref p),
+         .normal ((ρ.set "next" (.ref n)).set "prev" (.ref p))) := by
+  have hself₁ : (ρ.set "next" (.ref n)).find? (·.1 == "self") = some ("self", .ref x) := by
+    simp [Env.set, hself]
+  have hgp₁ : ((ρ.set "next" (.ref n)).get ("<glob>" ++ "prev")).truthy = false := by
+    simpa [Env.set, Env.get] using hgp
+  have hn₂ : ((ρ.set "next" (.ref n)).set "prev" (.ref p)).find? (·.1 == "next")
+      = some ("next", .ref n) := by simp [Env.set]
+  have hp₂ : ((ρ.set "next" (.ref n)).set "prev" (.ref p)).find? (·.1 == "prev")
+      = some ("prev", .ref p) := by simp [Env.set]
+  have s1 : execStmt ctx (k+6) h ρ (.assign "next" (.field (.name "self") "next"))
+      = (h, .normal (ρ.set "next" (.ref n))) :=
+    execStmt_assign_val ctx (k+5) h ρ
+      (evalExpr_field_slot ctx (k+4) h ρ (evalExpr_name ctx (k+3) h ρ "self" hself)
+        hox hgap_n hslot_n) hgn
+  have s2 : execStmt ctx (k+5) h (ρ.set "next" (.ref n))
+        (.assign "prev" (.field (.name "self") "prev"))
+      = (h, .normal ((ρ.set "next" (.ref n)).set "prev" (.ref p))) :=
+    execStmt_assign_val ctx (k+4) h _
+      (evalExpr_field_slot ctx (k+3) h _ (evalExpr_name ctx (k+2) h _ "self" hself₁)
+        hox hgap_p hslot_p) hgp₁
+  have s3 : execStmt ctx (k+4) h ((ρ.set "next" (.ref n)).set "prev" (.ref p))
+        (.setField (.name "prev") "next" (.name "next"))
+      = (h.setField p kn (.ref n), .normal ((ρ.set "next" (.ref n)).set "prev" (.ref p))) :=
+    execStmt_setField_key ctx (k+3) h _ (evalExpr_name ctx (k+2) h _ "prev" hp₂)
+      (evalExpr_name ctx (k+2) h _ "next" hn₂) hjs hwc_p hwk_p
+  have s4 : execStmt ctx (k+3) (h.setField p kn (.ref n))
+        ((ρ.set "next" (.ref n)).set "prev" (.ref p)) .skip
+      = (h.setField p kn (.ref n), .normal ((ρ.set "next" (.ref n)).set "prev" (.ref p))) :=
+    execStmt_skip ctx (k+2) _ _
+  have s5 : execStmt ctx (k+2) (h.setField p kn (.ref n))
+        ((ρ.set "next" (.ref n)).set "prev" (.ref p))
+        (.setField (.name "next") "prev" (.name "prev"))
+      = ((h.setField p kn (.ref n)).setField n kp (.ref p),
+         .normal ((ρ.set "next" (.ref n)).set "prev" (.ref p))) :=
+    execStmt_setField_key ctx (k+1) _ _ (evalExpr_name ctx k _ _ "next" hn₂)
+      (evalExpr_name ctx k _ _ "prev" hp₂) hjs hwc_n hwk_n
+  simp only [dlinkUnlinkBody]
+  rw [execStmt_seq_normal ctx (k+6) h ρ s1,
+      execStmt_seq_normal ctx (k+5) h _ s2,
+      execStmt_seq_normal ctx (k+4) h _ s3,
+      execStmt_seq_normal ctx (k+3) _ _ s4,
+      execStmt_seq_normal ctx (k+2) _ _ s5]
+  exact execStmt_skip ctx (k+1) _ _
 
 /-! ## 4. End-to-end: real translated functions
 
@@ -1662,6 +2143,19 @@ theorem sumto_refines :
   rintro n ⟨hn, hb, hfit⟩ fuel hf
   exact sumto_run n hn hb hfit fuel (by omega)
 
+/-- The same loop with its **true** cost in the statement: `n + 12` fuel for input `n`.
+The domain is the representability domain only — `n ≤ 65535` is the overflow bound
+(`Fits32 (n*(n+1)/2)` forces it), not a fuel bound. -/
+theorem sumto_refinesWith :
+    RefinesWith CMathProgram "sumto"
+      (fun args => match args with | [.int n] => n.toNat + 12 | _ => 0)
+      (fun args => ∃ n : Int, args = [.int n] ∧ 0 ≤ n ∧ n ≤ 65535 ∧ Fits32 (n * (n + 1) / 2))
+      (fun args => match args with
+        | [.int n] => .ret (.int (n * (n + 1) / 2))
+        | _        => .ret .unit) := by
+  rintro args ⟨n, rfl, hn, hb, hfit⟩ fuel hf
+  exact sumto_run n hn hb hfit fuel hf
+
 
 
 /-! ### Python: `gcdish` from `ops.py` — a loop whose measure is not a counter
@@ -1811,6 +2305,19 @@ theorem gcdish_refines :
       (fun a b => ((Int.gcd a b : Nat) : Int)) := by
   rintro a b ⟨ha, hb, hbb⟩ fuel hf
   exact gcdish_run a b ha hb fuel (by omega)
+
+/-- `gcdish` on its **whole** nonnegative domain: the `b ≤ 1000000` of `gcdish_refines`
+was only there to make a constant fuel bound true, and `RefinesWith` does not need it.
+The bound `b + 8` is the loop's measure plus the straight-line cost. -/
+theorem gcdish_refinesWith :
+    RefinesWith StressProgram "ops.py:<module>.gcdish"
+      (fun args => match args with | [_, .int b] => b.toNat + 8 | _ => 0)
+      (fun args => ∃ a b : Int, args = [.int a, .int b] ∧ 0 ≤ a ∧ 0 ≤ b)
+      (fun args => match args with
+        | [.int a, .int b] => .ret (.int ((Int.gcd a b : Nat) : Int))
+        | _                => .ret .unit) := by
+  rintro args ⟨a, b, rfl, ha, hb⟩ fuel hf
+  exact gcdish_run a b ha hb fuel hf
 
 
 /-! ### A heap-mutating method: `Counter` and `total`
@@ -2195,6 +2702,28 @@ theorem total_refines (ys : List Int) :
   rintro args rfl fuel hf
   exact total_run ys fuel hf
 
+/-- …and over **every** integer list at once, with the cost as a function of the input:
+`|ys| + 13`. `total_refines` fixes one list per instance; this is the single statement. -/
+theorem total_refinesWith :
+    RefinesWith CounterProgram "cnt.py:<module>.total"
+      (fun args => match args with | [.list vs] => vs.length + 13 | _ => 0)
+      (fun args => ∃ ys : List Int, args = [.list (ys.map Val.int)])
+      (fun args => match args with
+        | [.list vs] => .ret (.int (isum (vs.filterMap fun v => match v with
+                                                                 | .int i => some i
+                                                                 | _ => none)))
+        | _          => .ret .unit) := by
+  rintro args ⟨ys, rfl⟩ fuel hf
+  have hfm : ∀ zs : List Int,
+      (zs.map Val.int).filterMap (fun v => match v with | .int i => some i | _ => none) = zs := by
+    intro zs
+    induction zs with
+    | nil => rfl
+    | cons z zs ih => simp [ih]
+  simp only [List.length_map] at hf
+  simp only [hfm]
+  exact total_run ys fuel hf
+
 end Demo
 
 /-! ## 5. Open obligations
@@ -2223,23 +2752,33 @@ so they are visible in the ledger rather than papered over.
    measure. Both are used: `sumto_run`/`sumto_refines` (C, `math.c`) prove
    `sumto n = n*(n+1)/2` on the no-overflow domain, and `gcdish_run`/`gcdish_refines`
    (Python, `ops.py`) prove `gcdish a b = Int.gcd a b` for nonnegative arguments, with
-   `b.natAbs` as the measure. What is *not* closed: the fuel bound of a loop depends on
-   its input, so a `Refines` instance — whose bound is a constant — needs a bounded
-   domain (`n ≤ 65535`, `b ≤ 1000000` above). The parametric `_run` theorems are the sharp
-   statements; making `Refines` carry an argument-dependent bound is the honest fix and is
-   not done here.
+   `b.natAbs` as the measure. The residual that stood here — a `Refines` instance has a
+   *constant* bound, so a loop needed a bounded domain (`b ≤ 1000000`) to state one — is
+   closed by `RefinesWith` (§1): the bound is a function of the arguments, every
+   non-vacuity theorem carries over, and `gcdish_refinesWith` is `gcdish` on its whole
+   nonnegative domain at cost `b + 8`; `sumto_refinesWith` and `total_refinesWith` are
+   the other two loops in the same form. What is still a constant-bound statement is
+   `sumto`'s `n ≤ 65535`, and that is a representability bound (`Fits32 (n*(n+1)/2)`
+   forces it), not a fuel bound.
 
-4. **Heap-mutating methods — closed.** `HeapRep`/`Represents` is the representation
-   predicate, with `Represents.frame` (a write to another address preserves it) and
-   `Represents.update` (a write to this address re-establishes it) proved against the real
-   `Heap.setField`. `bump_step` uses them to prove one dispatch of a method that mutates
-   its receiver, and `total_run`/`total_21` put that inside a `for`-loop over a list:
-   object construction, `__init__`, per-element heap mutation, and a final field read,
-   `total [5,7,9] = 21`. What remains open is generality: `counterRep` abstracts a
-   one-field object to an `Int`. A representation predicate for the *container* classes in
-   `Generated/Cachetools.lean` needs boxed containers first (`Stmt.setIndex` is still
-   `hole "setIndex:immutable-containers"`), so the separation-style frame reasoning here
-   covers field-mutating objects only.
+4. **Heap-mutating methods — closed, including a linked structure.** `HeapRep`/
+   `Represents` is the representation predicate, with `Represents.frame` (a write to
+   another address preserves it) and `Represents.update` (a write to this address
+   re-establishes it) proved against the real `Heap.setField`. `bump_step` uses them to
+   prove one dispatch of a method that mutates its receiver, and `total_run`/`total_21`
+   put that inside a `for`-loop over a list. The residual that stood here — `counterRep`
+   abstracts one object to one `Int`, and nothing related a heap *region* to an abstract
+   value — is closed by §3b's doubly-linked ring: `dlinkRep` (one node), `DChain` (a
+   segment), `DRing` (a ring with sentinel), and `DRing.unlink`, which proves for every
+   heap holding a ring on distinct addresses that `p.next := n; n.prev := p` leaves the
+   ring without `x`. `execStmt_dlink_unlink` is the interpreter half for the rendered body
+   of `_Link.unlink`; `Specs/CachetoolsSpec.lean` (`TTLLink_unlink_ring`) puts the two
+   together on the generated `cachetools` program, so the specification is universal over
+   heaps and ring sizes, not a finite-domain witness. What is *not* covered: container
+   classes whose state is a boxed payload (`Cache._Cache__data`, `LRUCache.__order`) have
+   no representation predicate here — `DRing` is for objects linked through fields, and
+   the eviction loops (`TTLCache.expire`, `LRUCache.popitem`) go through containers as
+   well as links, so they are still open in `CachetoolsSpec.lean` §5.
 
 5. **Integer width — closed, and it changed the theorems.** `Numeric.lean` is now wired
    into `applyBinop`, so `.cLike` is 32-bit two's complement and `NumResult.ub` maps to

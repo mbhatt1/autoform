@@ -30,6 +30,37 @@ move with every change; where a document and an artifact disagree, the artifact 
 
 ## 1. Prerequisites
 
+### One command: `scripts/bootstrap.sh`
+
+From a fresh clone, this installs everything below and ends in the trust audit's
+`VERDICT: PASS`, or fails at a named step:
+
+```sh
+git clone <this repository> autoform && cd autoform
+scripts/bootstrap.sh
+```
+
+In order: elan and the toolchain in `lean-toolchain`; a `.venv` from the first Python 3.10+
+it finds (`python3.12`, `python3.11`, `python3.13`, `python3`, or `AUTOFORM_PYTHON`) with
+`requirements.txt`; the Joern release pinned in `joern-version` into `JOERN_HOME`
+(default `~/joern`), its zip verified against the release's `.sha512` before unpacking and
+the jars on disk checked against the pin afterwards; the build with the memory sequencing
+CI uses (`Autoform.SpecsGen.Cachetools`, then `Autoform.Specs.CachetoolsSpec`, then
+`Autoform.CI`, under `taskset -c 0` on Linux and one after another on macOS, which has no
+`taskset`); the cachetools corpus at the commit `ast-Cachetools.json` was exported from
+(`AUTOFORM_CACHETOOLS_DIR`, default `/tmp/cachetools`, as CI); the "oracle is alive"
+check (the differential oracle must compare more than zero cases); then
+`scripts/audit_all.py --strict --module Autoform.CI`. It finishes by printing `git status`,
+which is clean on a fresh clone. A second run re-checks each step and rebuilds only what
+changed. The things it will not do are said in its output rather than skipped: it never
+installs a JDK (Joern needs one; CI uses temurin 21), and it refuses to overwrite a Joern
+in `JOERN_HOME` that does not match the pin. `AUTOFORM_BOOTSTRAP_ROOT=Autoform` builds and
+audits the whole project including the V8Base parts, which CI cannot (`Autoform/CI.lean`).
+Written and run on macOS arm64; the Linux branches follow `.github/workflows/ci.yml` and
+have not been run on Ubuntu from this script. Expect the first run to take the better
+part of an hour, most of it in the build. The rest of this section is what the script does
+by hand.
+
 ### Lean, via `elan`
 
 The toolchain is pinned in `lean-toolchain` (Lean 4.30.0-rc1 at the time of writing).
@@ -88,11 +119,15 @@ while having failed**, leaving no `joern-cli` directory and a shell that reports
 Fetch the release asset directly instead:
 
 ```sh
-# pick a release from https://github.com/joernio/joern/releases (4.0.606 is known-good)
-curl -L -o joern-cli.zip \
-  https://github.com/joernio/joern/releases/download/v4.0.606/joern-cli.zip
-mkdir -p ~/joern && unzip -q joern-cli.zip -d ~/joern
-~/joern/joern-cli/joern --version
+# the release ships per-platform zips: joern-cli-{linux,macos}-{x86_64,arm64}.zip
+# (there is no joern-cli.zip); the .sha512 beside each names it as target/<asset>
+v=$(cat joern-version); a=joern-cli-macos-arm64.zip
+mkdir -p target ~/joern
+curl -fL -o target/$a https://github.com/joernio/joern/releases/download/v$v/$a
+curl -fL -o $a.sha512 https://github.com/joernio/joern/releases/download/v$v/$a.sha512
+shasum -a 512 -c $a.sha512                        # sha512sum -c on Linux
+unzip -q target/$a -d ~/joern
+python3 scripts/provenance.py joern-version --check
 ```
 
 The scripts look for `"$JOERN_HOME/joern-cli"` with `JOERN_HOME` defaulting to `~/joern`,
@@ -343,6 +378,19 @@ reported like any other. "No divergence found" means none among the inputs tried
 never equivalence. SLEIGH descriptions are trusted, and arguments are limited to
 integer registers (no stack-passed arguments, floats or aggregates).
 
+### `autoform pr <repo> [Module] --base REF [--head REF]` — evidence for a change
+
+Runs the chain for the functions a change touched, and only those, and reports each
+one's evidence level: `none`, `hole`, `translated`, `oracle-agreed`, `proved` or
+`refuted`, each bound to the artifact that establishes it. `docs/evidence-levels.md`
+is the one-page reference for what each level does and does not claim. `--head`
+defaults to the working tree; `--sarif` and `--markdown` write the SARIF 2.1.0 file
+code scanning ingests and the review comment; `--ast FILE` uses an exporter AST
+instead of running Joern; `--mutants N` adds the mutation gate over the proved
+theorems. From a checkout, `scripts/pr_mode.py` is the same command without the
+workspace. `.github/workflows/pr.yml` runs it on the fixture history that
+`scripts/pr_fixture.py` builds and uploads the SARIF.
+
 ## 3. Reading the ledger
 
 The human form is printed at the end of `autoform.sh`:
@@ -385,7 +433,8 @@ subject, and the assurance case caps it accordingly.
 
 ```sh
 # conformance vs the real runtime (CPython / cc)
-python3.11 scripts/differential.py ast-<M>.json <src-dir> <M> 5 [--tests DIR]
+python3.11 scripts/differential.py ast-<M>.json <src-dir> <M> 5 [--tests DIR] \
+        [--no-cache] [--cache-dir DIR]
 
 # execution oracle over the claimed verifiable core
 python3.11 scripts/core_oracle.py ast-<M>.json <M> <src-dir> [-n 24] [--fuel 5000]
@@ -407,6 +456,21 @@ python3 scripts/sacm.py --module <M> [--markdown sacm-<M>.md]
 # scale measurement, stage by stage (see docs/scale.md)
 python3 scripts/scale_test.py --out results.json --target Name /path/to/repo
 ```
+
+**The conformance oracle is incremental by default.** It stores one verdict file per
+function under `.autoform-work/oracle/<M>/` (`--cache-dir DIR` relocates it) and, on the
+next run, sends back to the Lean interpreter only the functions whose key changed: the
+function's own AST record and its rendered Lean definition, the same for every function
+it can reach (by name, by dispatch through its class hierarchy, or through the classes
+of the objects in its cases), the module bodies and the rest of the rendered module,
+`Autoform/Lang/Core`, the renderer, the harness, the Lean toolchain, the runtime
+version, or the recorded cases themselves. A change to
+`Autoform/Lang/Core` invalidates every entry. The test suite is traced on every run; only
+the evaluation is skipped. Replayed verdicts are reported as such -- the summary reads
+`N COMPARED now, M cached from <timestamp>`, and each replayed observation in
+`conformance.json` carries `cached_from` -- and are never counted as comparisons made
+now. `--no-cache` ignores the store and re-compares everything (the entries are still
+refreshed). The store is scratch state: delete the directory to start cold.
 
 `Demo.lean` (`lake env lean Demo.lean`) is a guided tour of the refutation gate, the axiom
 audit, vacuity detection and the ledger. It **deliberately contains an admitted theorem and
@@ -593,6 +657,7 @@ authority when they disagree, and a disagreement is a bug to file.
 | `autoform assure` / `./assure.sh` / a Git URL | every required check completed | the workflow finished with unresolved verification gaps — `completed_with_gaps` in `run.json`; a scoped certificate in `guarantee.json` can coexist with this | invocation, setup or orchestration failure; source acquisition failed; property input invalid; refused tree as above | `128+N` |
 | `autoform regress --machine` | no divergence found among the inputs tried | at least one kernel-checked diverging input (`machine/regression.json`) | usage error, a build, link or lift failure, or a source that is not a Git repository | `128+N` |
 | `autoform regress` | both runs translated and nothing that held at `--base` is lost at `--head`, and no recorded case changed outcome | a regression or a proven behavior change (`regression.json` says which), or a run that never produced an AST | usage error, the source is not a Git repository, a ref could not be fetched, busy workspace, or a refused tree as above | `128+N` from either run; `--timeout` expiry is `143` |
+| `autoform pr` / `scripts/pr_mode.py` | every changed function reported at the level its artifacts reach and none refuted | at least one changed function refuted (`pr.json` names the witness) | usage error, the source is not a Git repository, an unknown ref, or the SARIF failed validation | `128+N`; `--timeout` expiry is `143` |
 | `autoform machine` | as `scripts/formalize_machine.py` | as `formalize_machine.py` | CLI-level failure (workspace, lock, extraction) | — |
 
 Two things worth stating plainly. A `1` from `assure` is **not** a crash: it is the

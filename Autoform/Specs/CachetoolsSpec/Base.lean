@@ -1,5 +1,6 @@
 import Autoform.Refine
 import Autoform.Generated.Cachetools
+import Autoform.Harness.Audit
 
 /-!
 # Shared context of `Autoform/Specs/CachetoolsSpec.lean`

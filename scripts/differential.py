@@ -25,16 +25,23 @@ Outcomes are three-valued, never two: agreement, divergence, and INCONCLUSIVE
 not actually compared is never reported as passing — that is the cardinal sin here.
 
 Usage: differential.py <ast.json> <source-dir> <lean-module> [n-cases] [--tests DIR]
+                       [--no-cache] [--cache-dir DIR]
+
+Incremental by default (`oracle_cache.py`): a function whose translation, reachable
+callees, module bodies, environment and recorded cases are all unchanged since the last
+run is reported from `.autoform-work/oracle/<Module>/` and SAID to be, with the time the
+verdict was computed; the summary counts it apart from the comparisons made now.
+`--no-cache` ignores the stored verdicts and re-compares everything.
 """
-import os, sys, time
+import os, sys
 import json, subprocess, random, importlib.util, re, glob, io
 import contextlib, inspect, functools, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wasm_backend
 import generated_module
 import runtime_backends
-import work_cache                      # .autoform-work/cache: verdicts keyed by AST digest
 import external_bases
+import oracle_cache
 import deep_json
 import struct
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -1942,6 +1949,13 @@ def main():
     lang_override = None
     if "--language" in argv:
         i = argv.index("--language"); lang_override = argv[i + 1]; del argv[i:i + 2]
+    # `--no-cache` forces every function back through the interpreter; `--cache-dir`
+    # relocates the per-function verdict store (default `<repo>/.autoform-work/oracle`).
+    use_cache = "--no-cache" not in argv
+    if not use_cache: argv.remove("--no-cache")
+    cache_dir = None
+    if "--cache-dir" in argv:
+        i = argv.index("--cache-dir"); cache_dir = argv[i + 1]; del argv[i:i + 2]
     ast_path, src_root, lean_mod = argv[0], argv[1], argv[2]
     ncases = int(argv[3]) if len(argv) > 3 else 5
     # Static coverage and sampling use the same source bodies as the Lean ledger,
@@ -2087,27 +2101,6 @@ def main():
     # cases: dict(name, heap, self, args, outcome, origin)
     cases = []
     C_WASM_REPORT = []      # filled by the C backend below; surfaced in conformance.json
-
-    # `.autoform-work/cache`: the Python observation phase (suite trace, random calls,
-    # constructed instances) is memoized as a whole under the AST's digest -- the suite
-    # runs as one process, so it cannot be replayed one function at a time -- keyed by
-    # every input it reads. Lean's answers are memoized per CASE under each function's
-    # digest further below, so an unchanged function's cases are never re-evaluated.
-    observation_store = observation_memo = None
-    if lang == "python" and not wasm_mode:
-        test_dirs_key = [tests_override] if tests_override else None
-        # Fingerprint the tree the cases are recorded from: the corrected root (see the
-        # python branch below), not the directory named on the command line.
-        key_root = resolve_src_root(src_root, sorted(set(f.get("file", "") for f in funcs)))
-        observation_store = work_cache.Store("observe", work_cache.environment_key(
-            source=runtime_backends.source_fingerprints(key_root, funcs), tests=[work_cache.tree_digest(d) for d in
-                                       ([tests_override] if tests_override else find_tests(src_root))],
-            tests_override=test_dirs_key, ncases=ncases, python=sys.version,
-            harness=work_cache.scripts_digest(["scripts/differential.py", "scripts/runtime_backends.py",
-                                               "scripts/native_heap.py", "scripts/deep_json.py",
-                                               "scripts/work_cache.py"]),
-            max_total_cases=MAX_TOTAL_CASES))
-        observation_memo = observation_store.get(ast_fingerprint, "python-phase")
 
     backend_info, backend_skipped, backend_status = {}, {}, "available"
     if missing:
@@ -2293,26 +2286,7 @@ def main():
                   % (wasm_report["status"], len(plan), json.dumps(wtally),
                      len(ub_findings)))
             C_WASM_REPORT.append(wasm_report)
-    elif lang == "python" and observation_memo is not None and "cases" in observation_memo:
-        # Replayed: the suite trace, the random calls and the constructed cases are a
-        # function of the corpus tree, its tests, the AST and this harness, all of which
-        # `observation_key` digests. The basis strings are restored with the cases so
-        # that conformance.json reads exactly as a fresh run's would.
-        cases = observation_memo["cases"]
-        stats = observation_memo["stats"]
-        BASIS, BASIS_NOTE = observation_memo["basis"], observation_memo["basis_note"]
-        # Only whether class metadata was recovered matters past this point (the basis
-        # strings above already reflect it); the index itself keys on tuples and is
-        # not stored.
-        identities = {} if observation_memo["identities_recovered"] else None
-        print("test suite: %s" % ", ".join(observation_memo["test_dirs"]) if observation_memo["test_dirs"]
-              else "test suite: none")
-        print("cases recorded from the test suite: %d (replayed from %s)"
-              % (sum(1 for c in cases if c.get("origin") == "test-suite"), observation_store.root))
-        print("cases constructed for methods the suite never called: %d (replayed)"
-              % sum(1 for c in cases if c.get("origin") == "constructed"))
     elif lang == "python":
-        phase_t0 = time.time()
         wanted, methods, modlevel = set(), [], []
         candidates = python_sampling_candidates(funcs)
         raw_bodies = undecorated_bodies(funcs)
@@ -2440,7 +2414,6 @@ def main():
         reached = set(c["name"] for c in cases)
         stats["skip_no_instance"] = sum(1 for f, _, _ in methods
                                         if f["name"] not in reached)
-        print("  python observation phase: %.0f s" % (time.time() - phase_t0))
 
     if len(cases) > MAX_TOTAL_CASES:
         random.shuffle(cases)
@@ -2530,12 +2503,6 @@ def main():
                   "compared_hole_free": 0, "compared_with_holes": 0,
                   "by_status": {}, "status_counts": {}}}
 
-    if (observation_store is not None and observation_store.enabled and cases
-            and not (observation_memo and "cases" in observation_memo)):
-        observation_store.put(ast_fingerprint, "python-phase", {
-            "cases": cases, "stats": stats, "basis": BASIS, "basis_note": BASIS_NOTE,
-            "identities_recovered": identities is not None, "test_dirs": test_dirs})
-
     if not cases:
         print("module %s (%s, %s): NO COMPARABLE CASES — %s"
               % (module_tag, lang, runtime, backend_status))
@@ -2545,7 +2512,62 @@ def main():
         json.dump(result, open("conformance.json", "w"), indent=1)
         return 2
 
-    # ---- ask Lean for its answer on exactly those cases
+    # ---- which of those cases need the interpreter NOW, and which already have a
+    # verdict about byte-identical inputs (`oracle_cache.py`)?
+    #
+    # A cached verdict is never folded into "compared": it is reported as cached, with
+    # the time it was computed, in the summary, in `coverage.by_status` and on every
+    # observation it contributes. An oracle that silently re-reported old agreement
+    # would be indistinguishable from one that ran.
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cache_root = (os.path.abspath(cache_dir) if cache_dir
+                  else str(oracle_cache.default_root(repo, lean_mod)))
+    cache_env = oracle_cache.environment_digests(
+        repo, result["runtime_version"], semantics_fingerprint)
+    cases_by_name = {}
+    for i, c in enumerate(cases):
+        cases_by_name.setdefault(c["name"], []).append(c)
+    cache_plan = oracle_cache.plan(funcs, cases_by_name, cache_env,
+                                   rendered=generated_module.model_files(generated))
+    cached_entries, cache_miss_reason = {}, {}
+    for name, planned in sorted(cache_plan.items()):
+        if not use_cache:
+            cache_miss_reason[name] = "--no-cache"
+            continue
+        entry, why = oracle_cache.lookup(cache_root, name, planned)
+        if entry is not None:
+            cached_entries[name] = entry
+        else:
+            cache_miss_reason[name] = why
+    fresh = [i for i, c in enumerate(cases) if c["name"] not in cached_entries]
+    cached_idx = [i for i, c in enumerate(cases) if c["name"] in cached_entries]
+    miss_counts = {}
+    for why in cache_miss_reason.values():
+        miss_counts[why] = miss_counts.get(why, 0) + 1
+    print("oracle cache (%s): %d functions / %d cases reported from cache, %d functions "
+          "/ %d cases to compare now%s"
+          % (cache_root if use_cache else "--no-cache: not consulted",
+             len(cached_entries), len(cached_idx),
+             len(cases_by_name) - len(cached_entries), len(fresh),
+             "" if not miss_counts else " (%s)" % ", ".join(
+                 "%s: %d" % kv for kv in sorted(miss_counts.items(), key=lambda kv: -kv[1]))))
+    result["cache"] = {
+        "root": cache_root, "consulted": use_cache, "schema": oracle_cache.SCHEMA,
+        "functions_compared_now": len(cases_by_name) - len(cached_entries),
+        "functions_from_cache": len(cached_entries),
+        "cases_compared_now": len(fresh), "cases_from_cache": len(cached_idx),
+        "cached_from": sorted({e["computed_at"] for e in cached_entries.values()}),
+        "miss_reasons": miss_counts,
+        "misses": dict(sorted(cache_miss_reason.items())),
+        "environment": cache_env,
+        "note": "Verdicts from cache were computed by an earlier run on byte-identical "
+                "inputs (function and its rendered definition, reachable callees, module "
+                "bodies and the rest of the rendered module, semantics, renderer, harness, "
+                "toolchain, runtime and recorded cases). They are NOT comparisons "
+                "made by this run; `functions_compared_now` and the COMPARED figure in "
+                "the summary count only those."}
+
+    # ---- ask Lean for its answer on exactly the cases that need it
     #
     # Evaluated in chunks with bisection on failure: a single case can bring the whole
     # Lean interpreter down (a stale generated module, an unimplemented constructor),
@@ -2553,13 +2575,15 @@ def main():
     # cannot get an answer for are INCONCLUSIVE, never agreement.
     env = dict(os.environ,
                PATH=os.path.expanduser("~/.elan/bin") + ":" + os.environ["PATH"])
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # A stale `.olean` silently answers with the *previous* semantics — which shows up
     # as fictitious divergences. Rebuild the module before trusting anything it says.
-    b = subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod,
-                            "Autoform.Lang.Core.Observation"],
-                       capture_output=True, text=True, env=env, cwd=repo)
-    if b.returncode != 0:
+    # Nothing to evaluate now means nothing to build: the cached verdicts were produced
+    # against artifacts whose digests are part of their keys.
+    b = (subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod,
+                         "Autoform.Lang.Core.Observation"],
+                        capture_output=True, text=True, env=env, cwd=repo)
+         if fresh else None)
+    if b is not None and b.returncode != 0:
         result["status"] = "FAILED: Lean build"
         result["build_error"] = (b.stdout + b.stderr)[-4000:]
         json.dump(result, open("conformance.json", "w"), indent=1)
@@ -2607,19 +2631,21 @@ def main():
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 shutil.copy(f, dest)
     lean_env = dict(env)
+    isolated = False
     try:
         import shutil
-        shutil.rmtree(snap_dir, ignore_errors=True)
-        os.makedirs(snap_dir, exist_ok=True)
-        blib = os.path.join(repo, ".lake/build/lib/lean")
-        shutil.copytree(os.path.join(blib, "Autoform/Lang"),
-                        os.path.join(snap_dir, "Autoform/Lang"))
-        os.makedirs(os.path.join(snap_dir, "Autoform/Generated"), exist_ok=True)
-        snapshot_generated(blib, snap_dir)
-        base = subprocess.run(["lake", "env", "printenv", "LEAN_PATH"],
-                              capture_output=True, text=True, env=env, cwd=repo)
-        lean_env["LEAN_PATH"] = snap_dir + ":" + base.stdout.strip()
-        isolated = True
+        if fresh:
+            shutil.rmtree(snap_dir, ignore_errors=True)
+            os.makedirs(snap_dir, exist_ok=True)
+            blib = os.path.join(repo, ".lake/build/lib/lean")
+            shutil.copytree(os.path.join(blib, "Autoform/Lang"),
+                            os.path.join(snap_dir, "Autoform/Lang"))
+            os.makedirs(os.path.join(snap_dir, "Autoform/Generated"), exist_ok=True)
+            snapshot_generated(blib, snap_dir)
+            base = subprocess.run(["lake", "env", "printenv", "LEAN_PATH"],
+                                  capture_output=True, text=True, env=env, cwd=repo)
+            lean_env["LEAN_PATH"] = snap_dir + ":" + base.stdout.strip()
+            isolated = True
     except (OSError, shutil.Error) as e:                    # noqa: BLE001
         print("could not isolate the build (%s); evaluating against the live tree" % e)
         isolated = False
@@ -2815,41 +2841,7 @@ def main():
         return h.hexdigest()
 
     CHUNK = 20
-    # Lean's answer to a case is a function of the case literal, the rendered model, the
-    # semantics and this harness's header: memoized per case under the digest of the
-    # function the case calls (`.autoform-work/cache/<function digest>/lean-*.json`).
-    # A case with a memoized answer is not sent to Lean at all; the olean-stability loop
-    # below still guards the ones that are.
-    lean_store = work_cache.Store("lean", work_cache.environment_key(
-        model=generated_module.model_digest(generated), semantics=semantics_fingerprint,
-        header=work_cache.sha256_text("\n".join(header + footer)),
-        harness=work_cache.scripts_digest(["scripts/differential.py", "scripts/work_cache.py"])))
-    fn_by_name = {f["name"]: f for f in funcs}
-    fn_digest_cache = {}
-
-    def fn_digest(name):
-        if name not in fn_digest_cache:
-            f = fn_by_name.get(name)
-            fn_digest_cache[name] = work_cache.function_digest(f) if f is not None else None
-        return fn_digest_cache[name]
-
-    case_keys = [work_cache.sha256_text(case_lit(0, c)) for c in cases]
-    memo_by_fn, replayed = {}, {}
-    if lean_store.enabled:
-        for i, c in enumerate(cases):
-            d = fn_digest(c["name"])
-            if d is None:
-                continue
-            if d not in memo_by_fn:
-                memo_by_fn[d] = lean_store.load(d)
-            hit = memo_by_fn[d].get(case_keys[i])
-            if isinstance(hit, dict) and "result" in hit:
-                replayed[i] = hit
-    order = [i for i in range(len(cases)) if i not in replayed]
-    if replayed:
-        print("lean answers replayed for %d/%d cases from %s; %d to evaluate"
-              % (len(replayed), len(cases), lean_store.root, len(order)))
-    lean_t0 = time.time()
+    order = list(fresh)           # cached functions never reach the interpreter
     got, stable = {}, False
     for attempt in range(3):
         before = olean_fingerprint()
@@ -2861,26 +2853,7 @@ def main():
             stable = True; break
         print("WARNING: the compiled Lean artifacts changed while the cases were being "
               "evaluated (a concurrent build). Discarding and re-running.")
-    print("  lean evaluation: %.0f s for %d case(s)" % (time.time() - lean_t0, len(order)))
-    if stable and not mutating and lean_store.enabled:
-        fresh = {}
-        for i in order:
-            if i in got:
-                d = fn_digest(cases[i]["name"])
-                if d is not None:
-                    fresh.setdefault(d, {})[case_keys[i]] = {
-                        "result": got[i], "heap": graph_answers.get(i)}
-        for d, entries in fresh.items():
-            lean_store.put_many(d, entries)
-    for i, hit in replayed.items():
-        got[i] = hit["result"]
-        if hit.get("heap") is not None:
-            graph_answers[i] = hit["heap"]
     result["build_stable"] = stable and not mutating
-    result["cache"] = {"observation_phase_replayed": bool(observation_memo and "cases" in observation_memo),
-                       "lean_answers_replayed": len(replayed),
-                       "lean_answers_evaluated": len(order),
-                       "root": str(lean_store.root or "")}
     result["provenance"] = {
         "ast_sha256": ast_fingerprint,
         "generated_sha256": generated_module.model_digest(generated),
@@ -2899,38 +2872,27 @@ def main():
         print("WARNING: the %s changed while this run was in progress; the results "
               "below describe a tree that no longer exists (build_stable=false)."
               % " and ".join(moved))
-    if len(got) < len(cases):
+    if len(got) < len(fresh):
         print("lean answered %d/%d cases; the rest are INCONCLUSIVE"
-              % (len(got), len(cases)))
+              % (len(got), len(fresh)))
 
-    agree = diverge = incon = 0
-    compared_fns = set()          # functions the oracle actually adjudicated
-    incon_detail: dict = {}
-    per_origin = {}
-    for i, c in enumerate(cases):
-        origin = c.get("origin", "?")
-        bucket = per_origin.setdefault(origin, {"agree": 0, "diverge": 0, "incon": 0})
-        line = got.get(i)
+    def adjudicate(c, line, answer):
+        """One case's verdict from the interpreter's answer: `agree`, `diverge`, or
+        `incon` with the label that says why. Pure in its inputs, so a verdict can be
+        stored and replayed when every input it was computed from is unchanged."""
         if line is None:
-            incon += 1; bucket["incon"] += 1
-            k = "%s: lean-no-answer (interpreter failed on this case)" % c["name"]
-            incon_detail[k] = incon_detail.get(k, 0) + 1
-            continue
+            return {"kind": "incon",
+                    "label": "lean-no-answer (interpreter failed on this case)"}
         try:
             lr = parse_result(line)
         except Exception:                                  # noqa: BLE001
-            incon += 1; bucket["incon"] += 1
             print("  unparsable %s: %s" % (c["name"], line[:80]))
-            continue
+            return {"kind": "incon", "label": "unparsable-lean-answer"}
         py = c["outcome"]
-        argstr = "(%s)" % ", ".join(show(a) for a in c["args"])
         if lr[0] in ("hole", "outOfFuel"):
             # ignorance is never agreement
-            incon += 1; bucket["incon"] += 1
-            label = lr[1] if lr[0] == "hole" else "outOfFuel"
-            k = "%s: %s" % (c["name"], label)
-            incon_detail[k] = incon_detail.get(k, 0) + 1
-            continue
+            return {"kind": "incon",
+                    "label": lr[1] if lr[0] == "hole" else "outOfFuel"}
         ok = False
         undecidable = None
         if py[0] == "val" and lr[0] == "val":
@@ -2964,7 +2926,6 @@ def main():
             lname = lr[1][1] if lr[1][0] == "str" else show(lr[1])
             desc = "%s=%s, lean raised %s" % (runtime, show(py[1]), lname)
         if 'post_heap' in c:
-            answer = graph_answers.get(i)
             desc += '; heap graph=' + str(answer)
             if undecidable is None:
                 # The graph verdict refines an adjudicable result comparison. A case
@@ -2979,25 +2940,61 @@ def main():
             else:
                 ok = False
         if undecidable is not None:
+            return {"kind": "incon", "label": undecidable, "desc": desc[:200],
+                    "lean_repr": line[:400]}
+        return {"kind": "agree" if ok else "diverge", "desc": desc[:200],
+                "lean_repr": line[:400]}
+
+    agree = diverge = incon = 0
+    compared_fns = set()          # functions the oracle actually adjudicated
+    compared_now, compared_cached = set(), set()
+    incon_detail: dict = {}
+    per_origin = {}
+    verdicts_by_name = {}         # name -> {case digest: verdict}, for the cache
+    uncacheable = set()           # functions with an interpreter failure this run
+    kinds = {}                    # case index -> verdict kind, for the summary
+    verdict_kind = kinds.get
+    for i, c in enumerate(cases):
+        origin = c.get("origin", "?")
+        bucket = per_origin.setdefault(origin, {"agree": 0, "diverge": 0, "incon": 0})
+        entry = cached_entries.get(c["name"])
+        cdigest = oracle_cache.case_digest(c)
+        if entry is not None:
+            verdict = dict(entry["verdicts"][cdigest])
+            verdict["cached_from"] = entry["computed_at"]
+        else:
+            verdict = adjudicate(c, got.get(i), graph_answers.get(i))
+            if got.get(i) is None:
+                uncacheable.add(c["name"])
+            verdicts_by_name.setdefault(c["name"], {})[cdigest] = verdict
+        cached_from = verdict.get("cached_from")
+        kinds[i] = verdict["kind"]
+        if verdict["kind"] == "incon":
             incon += 1; bucket["incon"] += 1
-            k = "%s: %s" % (c["name"], undecidable)
+            k = "%s: %s" % (c["name"], verdict["label"])
             incon_detail[k] = incon_detail.get(k, 0) + 1
             continue
         compared_fns.add(c["name"])
-        if ok:
+        (compared_cached if cached_from else compared_now).add(c["name"])
+        argstr = "(%s)" % ", ".join(show(a) for a in c["args"])
+        if verdict["kind"] == "agree":
             agree += 1; bucket["agree"] += 1
             observation = {k: c[k] for k in ("name", "heap", "self", "args", "outcome")}
             if 'post_heap' in c:
                 observation['post_heap'] = c['post_heap']
             observation.update(origin=origin, runtime=runtime, comparison="agree")
+            if cached_from:
+                observation["cached_from"] = cached_from
             result["runtime_cases"].append(observation)
         else:
             diverge += 1; bucket["diverge"] += 1
-            msg = "  DIVERGENCE %s%s: %s [%s]" % (c["name"], argstr, desc, origin)
+            msg = "  DIVERGENCE %s%s: %s [%s]%s" % (
+                c["name"], argstr, verdict["desc"], origin,
+                " (cached from %s)" % cached_from if cached_from else "")
             print(msg[:300])
             result["divergence_detail"].append(
-                {"function": c["name"], "args": argstr[:200], "detail": desc[:200],
-                 "origin": origin,
+                {"function": c["name"], "args": argstr[:200], "detail": verdict["desc"],
+                 "origin": origin, "cached_from": cached_from,
                  # the exact inputs, so a divergence is a reproducible artifact rather
                  # than a line of prose
                  "case": {"self": c["self"], "args": c["args"],
@@ -3005,7 +3002,28 @@ def main():
                  # The compact legacy case above is a display preview. Preserve
                  # the complete graph and native expectation for exact replay.
                  "observation": json.loads(json.dumps(c)),
-                 "lean_repr": line[:400]})
+                 "lean_repr": verdict.get("lean_repr", "")})
+
+    # Record this run's verdicts for the next one -- only verdicts the interpreter
+    # actually produced, against artifacts that held still. A mutant module, a tree
+    # that moved mid-run, or a case Lean never answered leaves no entry: the next run
+    # re-compares that function rather than inheriting a doubt.
+    stored = 0
+    if stable and not mutating and not moved:
+        for name, verdicts in verdicts_by_name.items():
+            if name in uncacheable or name not in cache_plan:
+                continue
+            try:
+                oracle_cache.store(cache_root, name, cache_plan[name], verdicts,
+                                   module=lean_mod)
+                stored += 1
+            except OSError as e:
+                print("  oracle cache: could not store %s (%s)" % (name, e))
+                break
+    result["cache"].update(functions_stored=stored,
+                           not_stored=sorted(uncacheable),
+                           functions_adjudicated_now=len(compared_now),
+                           functions_adjudicated_from_cache=len(compared_cached))
 
     total = agree + diverge
     rate = "%d%%" % (100 * agree // total) if total else "n/a"
@@ -3019,6 +3037,12 @@ def main():
         status[c["name"]] = "cases built, all inconclusive"
     for n in compared_fns:
         status[n] = "compared"
+    # A verdict replayed from the cache says so in the status itself, with the time it
+    # was computed, so a reader of `by_status` cannot mistake it for a comparison this
+    # run made. The `status_counts` key stays `compared` (split at the first colon).
+    for n, entry in cached_entries.items():
+        if n in status and status[n] in ("compared", "cases built, all inconclusive"):
+            status[n] += ": cached from %s" % entry["computed_at"]
     for n, why in stats.get("no_instance_detail", {}).items():
         for f in funcs:
             if f["name"].endswith("." + n) and status.get(f["name"], "").startswith(
@@ -3054,6 +3078,8 @@ def main():
         counts[k] = counts.get(k, 0) + 1
     cov = result["coverage"]
     cov["compared"] = len(compared_fns)
+    cov["compared_now"] = len(compared_now)
+    cov["compared_from_cache"] = len(compared_cached)
     cov["compared_fraction"] = len(compared_fns) / len(funcs) if funcs else 0.0
     cov.update(compared_hole_coverage(holefree, compared_fns))
     cov["by_status"] = status
@@ -3073,14 +3099,36 @@ def main():
                   rate=rate, by_origin=per_origin)
     print("\nmodule %s (%s, %s)" % (module_tag, os.path.abspath(src_root), runtime))
     print("measurement basis: %s" % BASIS)
-    print("functions: %d total, %d hole-free, %d exercised, %d COMPARED (%.0f%% of "
-          "all, %.0f%% of hole-free)"
-          % (len(funcs), len(holefree), result["functions_covered"],
-             len(compared_fns), 100 * result["coverage"]["compared_fraction"],
-             100 * result["coverage"]["compared_fraction_of_hole_free"]))
+    # The COMPARED figure is what the "Conformance oracle is alive" CI step reads. It
+    # counts functions the interpreter adjudicated IN THIS RUN; functions reported from
+    # the cache are named separately with the time their verdict was computed, so a
+    # warm cache can never make a run that compared nothing look alive.
+    if cached_entries:
+        stamps = result["cache"]["cached_from"]
+        print("functions: %d total, %d hole-free, %d exercised, %d COMPARED now, %d "
+              "cached from %s (%d adjudicated in all: %.0f%% of all, %.0f%% of hole-free)"
+              % (len(funcs), len(holefree), result["functions_covered"],
+                 len(compared_now), len(compared_cached),
+                 stamps[0] if len(stamps) == 1 else "%s .. %s" % (stamps[0], stamps[-1]),
+                 len(compared_fns), 100 * result["coverage"]["compared_fraction"],
+                 100 * result["coverage"]["compared_fraction_of_hole_free"]))
+    else:
+        print("functions: %d total, %d hole-free, %d exercised, %d COMPARED (%.0f%% of "
+              "all, %.0f%% of hole-free)"
+              % (len(funcs), len(holefree), result["functions_covered"],
+                 len(compared_fns), 100 * result["coverage"]["compared_fraction"],
+                 100 * result["coverage"]["compared_fraction_of_hole_free"]))
     print("conformance: %d/%d agree (%s) vs %s, %d divergences, %d INCONCLUSIVE "
-          "(hole / outOfFuel / unrepresentable)" % (agree, total, rate, runtime,
-                                                    diverge, incon))
+          "(hole / outOfFuel / unrepresentable)%s"
+          % (agree, total, rate, runtime, diverge, incon,
+             "" if not cached_entries else
+             " [%d cases compared now, %d replayed from cache]"
+             % (sum(1 for i in fresh if verdict_kind(i) != "incon"),
+                sum(1 for i in cached_idx if verdict_kind(i) != "incon"))))
+    print("oracle cache: %d functions stored under %s%s"
+          % (stored, cache_root,
+             "" if not uncacheable else "; not stored (no interpreter answer): %d"
+             % len(uncacheable)))
     for k, v in sorted(incon_detail.items(), key=lambda kv: -kv[1])[:10]:
         print("  INCONCLUSIVE x%-3d %s" % (v, k))
     for o, b in sorted(per_origin.items()):

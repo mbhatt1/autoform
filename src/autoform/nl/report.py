@@ -247,7 +247,7 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
                         if r['function'] == fn['name'] and not r.get('selected')]
         budget_skips += [dict(sk, english=props.get((fn['name'], sk.get('property')), {}).get('text', ''))
                          for sk in (budget or {}).get('skipped', []) if sk.get('function') == fn['name']]
-        out_fns.append({'budget_skips': budget_skips if judged else [],
+        out_fns.append({'budget_skips': budget_skips if judged or budget else [],
                         'name': fn['name'], 'source_name': fn.get('source_name'), 'file': fn.get('file'),
                         'line': fn.get('line'), 'eligible': not reasons, 'skipped': reasons, 'level': level,
                         'model': model_info, 'l1': l1_info,
@@ -316,7 +316,8 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
             'findings': {'potential_bugs': bugs, 'model_defects': defects,
                          'refuted_implementation_only': mismatches, 'refuted_unvalidated_model': unvalidated,
                          **({'suspected_bugs': suspected, 'refuted_adjudicated': adjudicated} if judged else {})},
-            'budget': budget_summary(run_info, selection, budget, proofs_by) if judged else None,
+            'budget': (budget_summary(run_info, selection, budget, proofs_by)
+                       if judged or budget or (run_info or {}).get('budget_usd') is not None else None),
             'functions': out_fns, 'run': run_info or {}}
 
 
@@ -390,6 +391,18 @@ def markdown(rep: dict) -> str:
             note = (st.get('error') or '').splitlines()[0][:120] if st.get('error') else st.get('note', '')
             md.append(f"| {name} | {st.get('status')} | {st.get('seconds', '')} | {st.get('cost_usd', '')} | {note} |")
         md.append('')
+    em = ((run.get('stages') or {}).get('emit') or {}).get('summary') or {}
+    if em:
+        md += ['## Emitted tests', '',
+               f"- statements emitted: {em.get('emitted', 0)} of {em.get('survivors', 0)} survivors "
+               f"({em.get('failing', 0)} with a failing test); not emitted: {em.get('not_emitted', 0)}",
+               f"- tests: {em.get('tests', 0)} (concrete {em.get('tests_concrete', 0)}, hypothesis "
+               f"{em.get('tests_hypothesis', 0)}); passed {em.get('tests_passed', 0)}, failed {em.get('tests_failed', 0)}, "
+               f"error {em.get('tests_error', 0)}, skipped {em.get('tests_skipped', 0)}, not run {em.get('tests_not_run', 0)}",
+               f"- points deduplicated against the existing suite: {em.get('points_deduplicated', 0)}; outside the "
+               f"precondition: {em.get('points_outside_pre', 0)}; without a faithful outcome: "
+               f"{em.get('points_unencodable', 0)}; hypothesis tests withheld: {em.get('hypothesis_rejected', 0)}",
+               '', 'Per statement: `emit.json` (reasons by name).', '']
     b = rep.get('budget')
     if b:
         spent = b.get('spent_usd')
@@ -399,7 +412,10 @@ def markdown(rep: dict) -> str:
                f"(estimate ${((b.get('estimates') or {}).get('per_property_usd') or 0):.2f} per property)",
                '- by stage: ' + (', '.join(f'{k} ${v}' for k, v in (b.get('by_stage') or {}).items()) or 'n/a')]
         for stage, items in (b.get('skipped') or {}).items():
-            md.append(f"- skipped at {stage}: {len(items)}")
+            names = [(s.get('function') or s.get('statement') or '?') + (f".{s['property']}" if s.get('property') else '')
+                     for s in items]
+            md.append(f"- skipped at {stage}: {len(items)} — " + ', '.join(names[:40])
+                      + (f', … {len(names) - 40} more' if len(names) > 40 else ''))
             for it in items[:12]:
                 md.append(f"  - {it.get('function', '').rsplit('.', 1)[-1]} {it.get('property') or it.get('statement')}: "
                           f"{it.get('reason')}")
@@ -543,7 +559,7 @@ def report(out_dir, *, translation=None, english=None, statements=None, checks=N
                 run_info=run_info, functions=functions, models=get(models, 'models') or [],
                 refine=get(refine, 'refine') or [], deep_translation=get(deep_translation, 'deep_translation') or {},
                 selection=get(selection, 'selection') or {}, adjudication=get(adjudication, 'adjudication') or {},
-                budget=_load(out, 'budget') if selection is None else None)
+                budget=_load(out, 'budget'))
     (out / FILES['report']).write_text(json.dumps(rep, indent=1, ensure_ascii=False, default=str))
     (out / 'report.md').write_text(markdown(rep))
     return rep

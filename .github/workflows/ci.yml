@@ -86,9 +86,12 @@ jobs:
           # lean-toolchain and the manifest between them pin every input that
           # affects the build products; the source hash keeps the cache honest.
           key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          # Only a same-toolchain cache is worth restoring: a different toolchain's
+          # .olean files are rebuilt anyway, and a prefix match across lines once
+          # restored an `Autoform.olean` importing a module this tree never had
+          # (2026-10-10; the demo step loaded it because nothing rebuilt the root).
           restore-keys: |
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
-            lake-${{ runner.os }}-
 
       # `lake build` has no job-count/parallelism flag in this Lake version (confirmed
       # via `lake --help` / `lake build --help` -- neither exposes one). Left to its own
@@ -127,10 +130,11 @@ jobs:
       # umbrella says so. That one part is still built alone, before anything else;
       # every other part is under 2.3 GB and the umbrella picks them up with the rest.
       # `Autoform.Specs.CachetoolsSpec` (hand-written) was split by hand the same way on
-      # 2026-10-10 -- `CachetoolsSpec/Base.lean` + `Part1..6.lean`, theorems moved
+      # 2026-10-10 -- `CachetoolsSpec/Base.lean` + `Part1..7.lean`, theorems moved
       # verbatim, same namespace -- after measuring every theorem alone. Measured peak
       # RSS: Base 1.99 GB, Part1 1.36, Part2 1.73, Part3 1.94, Part4 11.06, Part5 2.11,
-      # Part6 11.11, umbrella 1.17. Two theorems cost ~11 GB each on their own, the two
+      # Part6 11.11, Part7 (the `_Link.unlink` ring specification, hyperscale-shards) 1.91,
+      # umbrella 1.17. Two theorems cost ~11 GB each on their own, the two
       # constructor specifications (`Timer_init_mrefines`, Part4; `TTLLink_init_mrefines`,
       # Part6: `simp +decide` through two heap writes under class metadata), so those two
       # parts are built alone as well. Everything else is under 2.2 GB.
@@ -183,34 +187,15 @@ jobs:
       # check found nothing and must not pass), 3 = everything comparable verified but
       # some module could not be checked at all.
       #
-      # Only 3 is tolerated, and only for the three corpora whose ASTs are too large to
-      # track in git (docs/integrity.md) -- Ansible, LinuxCrypto, LinuxLib. Those are a
-      # standing, documented condition, so treating 3 as a hard failure made this step
-      # permanently red, which is how a genuine mismatch would have gone unnoticed among
-      # the noise. A module becoming unverifiable for any OTHER reason still fails.
-      # The tolerated list below is the ONE in docs/integrity.md ("Input availability"):
-      # Ansible, LinuxCrypto and LinuxLib have tracked manifests but untracked ASTs.
-      # Change both or neither.
+      # Every exit but 0 fails. Until 2026-10-10 exit 3 was tolerated for exactly
+      # Ansible, LinuxCrypto and LinuxLib, whose manifest entries pinned ASTs that no
+      # clone could see (`ast_hint: /tmp/final-<M>.json`); those entries are gone from
+      # artifact-manifest.json (docs/integrity.md, "Input availability"), so a module
+      # the manifest promises and the tree cannot verify is now a failure, whichever
+      # module it is. Do not add an allow-list back: a tolerated UNVERIFIABLE is the
+      # noise a genuine mismatch hides in.
       - name: check_render — committed modules are renders of committed ASTs
-        run: |
-          set -o pipefail
-          status=0
-          python3 scripts/check_render.py 2>&1 | tee /tmp/check_render.log || status=$?
-          if [ "$status" -eq 0 ]; then exit 0; fi
-          if [ "$status" -ne 3 ]; then
-            echo "check_render failed with exit $status (1 = mismatch, 2 = nothing compared)." >&2
-            exit "$status"
-          fi
-          unexpected=$(grep '^UNVERIFIABLE ' /tmp/check_render.log \
-            | sed 's/^UNVERIFIABLE \([A-Za-z0-9_]*\):.*/\1/' \
-            | grep -vxE 'Ansible|LinuxCrypto|LinuxLib' || true)
-          if [ -n "$unexpected" ]; then
-            echo "check_render: unexpected UNVERIFIABLE module(s):" >&2
-            echo "$unexpected" >&2
-            echo "Only Ansible, LinuxCrypto and LinuxLib may be unverifiable (ASTs too large to track)." >&2
-            exit 3
-          fi
-          echo "check_render: verified everything comparable; the 3 large corpora remain unverifiable by policy."
+        run: python3 scripts/check_render.py
 
       # A specification is a statement about a SPECIFIC RENDERING of a corpus. Closing a
       # hole changes what the translated function computes, so improving coverage can turn
@@ -289,8 +274,10 @@ jobs:
       - name: Conformance oracle is alive (compared > 0)
         run: |
           set -euo pipefail
+          # `--no-cache`: this step exists to see the interpreter answer; a verdict
+          # replayed from .autoform-work/oracle would not count as COMPARED anyway.
           PYTHONHASHSEED=0 AUTOFORM_NO_REEXEC=1 python3 scripts/differential.py \
-            ast-Cachetools.json /tmp/cachetools Cachetools 5 | tee /tmp/conf-ci.log
+            ast-Cachetools.json /tmp/cachetools Cachetools 5 --no-cache | tee /tmp/conf-ci.log
           compared=$(sed -n 's/.*, \([0-9]*\) COMPARED .*/\1/p' /tmp/conf-ci.log | head -1)
           echo "compared=${compared:-0}"
           if [ "${compared:-0}" -eq 0 ]; then
@@ -520,9 +507,12 @@ jobs:
         with:
           path: .lake
           key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          # Only a same-toolchain cache is worth restoring: a different toolchain's
+          # .olean files are rebuilt anyway, and a prefix match across lines once
+          # restored an `Autoform.olean` importing a module this tree never had
+          # (2026-10-10; the demo step loaded it because nothing rebuilt the root).
           restore-keys: |
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
-            lake-${{ runner.os }}-
 
       - uses: actions/cache@v4
         id: joern

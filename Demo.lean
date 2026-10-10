@@ -1,4 +1,8 @@
-import Autoform
+-- `Autoform.CI` is the umbrella the CI runner actually proves (`Autoform` minus the
+-- V8Base parts the runner cannot hold). Importing the root here made CI load whatever
+-- `Autoform.olean` its restored cache had, including one from a different line that
+-- imported a module this tree does not have (2026-10-10).
+import Autoform.CI
 
 /-!
 Phase-0 end-to-end demo. Run with:  lake env lean Demo.lean

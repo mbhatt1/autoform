@@ -1633,7 +1633,7 @@ def tracer(frame, event, arg):
     entries = known.get(code, 0)
     if entries == 0:
         entries = known[code] = wanted.get((os.path.realpath(code.co_filename), code.co_firstlineno))
-    if entries is None:
+    if entries is None or code.co_name == '<module>':   # a module body starting on a def's line
         return None
     if code.co_flags & 0x3a0:        # generator / coroutine / async generator
         return None
@@ -1831,7 +1831,7 @@ def _modname(mod: _Module) -> str:
     return mod.dotted or mod.path.stem
 
 
-def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, classes=()) -> tuple:
+def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, classes=(), limit: int = TRACE_LIMIT) -> tuple:
     """Run the repository's tests under a tracer.
 
     Returns ({qualified name: [point]}, stats); stats['states'] maps each class in `classes`
@@ -1842,7 +1842,8 @@ def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, class
     receivers and it is not used as a check-stage sample. A method's point starts with its
     receiver's state; a constructor's point omits the receiver. A trailing argument that
     is the parameter's own (unencodable) default object, e.g. a sentinel or a function
-    alias, is dropped, so the call is replayed with the default."""
+    alias, is dropped, so the call is replayed with the default. `limit`: distinct argument
+    tuples kept per function (TRACE_LIMIT; the emit stage asks for all of them)."""
     if not fns or not test_dirs:
         return {}, {'note': 'no tests to trace', 'states': {}}
     roots = []
@@ -1852,7 +1853,7 @@ def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, class
             roots.append(r)
     sys_path = roots + [str(Path(d).resolve().parent) for d in test_dirs]
     classes = sorted(set(classes) | {f.cls.dotted for f in fns if f.cls is not None and f.kind != 'static'})
-    cfg = {'sys_path': sys_path, 'tests': [str(Path(d).resolve()) for d in test_dirs], 'limit': TRACE_LIMIT,
+    cfg = {'sys_path': sys_path, 'tests': [str(Path(d).resolve()) for d in test_dirs], 'limit': limit,
            'classes': classes,
            'wanted': [[str(f.mod.path), f.first_lines, f.info.name, f.kind,
                        f.cls.dotted if f.cls is not None else '', f.qual, _modname(f.mod)] for f in fns]}
@@ -2956,18 +2957,19 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
     names = {f.info.name: lean_ident(f.info.name, taken) for f in attempt}
     done: dict = {}
     order = []
-    spent = [0.0]
+    spent = [0.0, 0.0]          # total so far, dearest function so far (the estimate for the next)
     over_budget = []
     for level in _levels(attempt):
         def job(f):
-            if budget_usd is not None and spent[0] >= budget_usd:
-                over_budget.append(f.info.name)
+            if llm.over_budget(spent[0], budget_usd, spent[1]):
+                over_budget.append(llm.budget_skip(f.info.name, spent[0], budget_usd, spent[1]))
                 return None
             stem = re.sub(r'[^A-Za-z0-9_]', '_', names[f.info.name])
             r = model_function(f, names[f.info.name], module, lean_root, work / stem,
                                traced.get(f.info.name, []), dict(done), repairs=repairs, second=second, ask=ask,
                                ctx=ctx)
             spent[0] += r.cost
+            spent[1] = max(spent[1], r.cost)
             return r
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
             for r in pool.map(job, level):
@@ -2975,9 +2977,11 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
                     continue
                 done[r.fn.info.name] = r
                 order.append(r)
+    if budget_usd is not None:
+        llm.record_skips(out_dir, 'model', over_budget)
     if over_budget:
         notes.append(f'budget ${budget_usd} reached: {len(over_budget)} functions not attempted: '
-                     + ', '.join(over_budget[:40]))
+                     + ', '.join(s['function'] for s in over_budget[:40]))
     modelled = [r for r in order if r.lean_src]
     build_info = {}
     if modelled:

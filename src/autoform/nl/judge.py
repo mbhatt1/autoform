@@ -38,6 +38,7 @@ from pathlib import Path
 
 from ..harness import bench
 from ..harness.judge import CLAIM_JUDGMENTS, DecisionLog, Judge, make_scorer
+from .llm import record_skips  # noqa: F401  (the budget.json writer every budget-aware stage shares)
 from .schema import FILES
 
 INTENT_THRESHOLD = 0.8          # as in the harness: a confident intent pick
@@ -368,12 +369,6 @@ def selected_english(english: list, selection: dict) -> list:
     return specs
 
 
-def record_skips(out: Path, stage: str, items: list):
-    """Append budget/cap skips to budget.json (the report's "spent vs budget" section)."""
-    f = Path(out) / FILES['budget']
-    data = json.loads(f.read_text()) if f.is_file() else {'skipped': []}
-    data['skipped'] = [s for s in data['skipped'] if s.get('stage') != stage] + [dict(s, stage=stage) for s in items]
-    f.write_text(json.dumps(data, indent=1, ensure_ascii=False))
 
 
 def formalize_within_budget(fn, translation: dict, english: list, out_dir, selection: dict, budget_usd,

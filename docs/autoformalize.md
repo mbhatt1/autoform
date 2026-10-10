@@ -18,6 +18,8 @@ the stage contracts are in `src/autoform/nl/schema.py`.
    check ─────► checks.json      bounded `decide +kernel` over a finite domain + real CPython runs
    prove ─────► proofs.json      prover agent; every proof re-checked by the kernel
    refine ────► refine.json      (--deep-too) L1: model proved equal to the deep translation
+   emit ──────► emit.json        surviving properties as pytest tests in the target's
+                                 tests/autoform_generated/, run with the real interpreter
    report ────► report.json, report.md
 ```
 
@@ -315,6 +317,67 @@ whose repair was then established ⇒ right, refuted again ⇒ wrong; …), plus
 `python -m autoform.harness.bench fit-temperature <run>/jevbench.jsonl --out t.json` fits
 per-task temperatures from these rows, as for the harness.
 
+## The emit stage (`emit.py`)
+
+The flow the autoformalizer feeds into is deterministic: the model's properties become
+ordinary tests of the target project, those tests are traced by `scripts/synth_specs.py`
+like any other test, and the kernel proves what it can from the observations. The model
+never produces a number the reports quote; the emit stage produces tests that either pass
+under CPython or are reported as failing.
+
+A statement is emitted when its check status is BOUNDED_HOLDS, or when it is a repair the
+adjudication stage accepted (`adjudication.json`); refuted, uncheckable and unelaborated
+statements are listed in `emit.json` by name with the reason (a refuted statement names its
+counterexample and, if it was repaired, the repair's id). For each emitted statement:
+
+- **Concrete tests.** The check stage's domain is rebuilt (same `binders`, same
+  `--domain-size`) and the real function is run on it again. For every point with a
+  faithful CPython outcome, Lean evaluates the statement's own `pre_`/`post_` definitions
+  on that outcome (one `#eval` per function, in `<run>/emit/`); the points where `pre` and
+  `post` are both true become tests. A test rebuilds the arguments from their recorded
+  encodings (a receiver from its attributes, without `__init__`), calls the function and
+  asserts the recorded outcome exactly: the value with its type (`1` is not `True`), or the
+  exception class; for a `#post` statement also the receiver's attributes after the call.
+  Points outside the precondition are counted (`points_outside_pre`), never emitted.
+- **Hypothesis test.** When every binder is Int/Nat/Bool/String, `pyprop.py` translates
+  `pre`/`post` into Python (`match` on `EResult`/`Val`/`Option`/lists, `&&`/`||`/`!`,
+  `decide`, comparisons, Int arithmetic with Lean's Euclidean `/` and `%` and
+  `Int.fdiv`/`fmod`/`tdiv`/`tmod`, strings, list methods, `if`/`let`/`fun`, the `vField`
+  family). The translation is accepted only if it agrees with Lean's evaluation on every
+  concrete point with a real outcome and at least one of those points satisfied `pre`;
+  otherwise the property test is withheld and the reason recorded (`hypothesis` per
+  statement, `hypothesis_withheld` in the counts). The test is `@given` over the typed
+  binders with `assume(pre)` and `assert post`, `derandomize=True`, and lives in
+  `test_<module>_properties.py`, which `pytest.importorskip`s hypothesis.
+- **Provenance.** Each docstring carries the English property, the statement id and
+  function, the evidence (`kernel-proved for all inputs` when the prove stage proved it,
+  else the bounded check and its point count), the run id (`run.json`'s `id`), the model
+  name and the formalize prompt hash (`Statement.prompt_hash`, the `llm` cache key of the
+  prompt that produced the statement; for runs that predate the field it is rebuilt from
+  the run's inputs and marked `(rebuilt)`).
+- **Deduplication.** The target's own suite (`<source>/tests`, `<source>/test` and every
+  `--tests DIR`) is traced with the model stage's tracer, without its per-function cap, and
+  a concrete test whose argument tuple the suite already produced is not emitted
+  (`points_deduplicated`). The generated directory is removed before tracing, so a previous
+  emission never deduplicates itself.
+- **Run.** The generated files are run with the real interpreter (`AUTOFORM_PYTHON`, else
+  the one running autoform; `PYTHONPATH` set to the import root) and every test's result
+  is recorded. A statement with a failing or erroring test has status FAILING; it is a
+  finding of this stage, not something to drop. The counts (`emitted`, `tests`,
+  `tests_passed`, `tests_failed`, ...) are in `emit.json`, in `run.json` (`stages.emit.summary`)
+  and in the report.
+
+Files go to `<source>/tests/autoform_generated/` (a package, so `test_<module>.py` cannot
+collide with a module of the same name in the target's suite) or to `--emit-dir DIR`;
+`--no-emit` disables the stage. The stage needs real executions: with `--no-runtime` every
+survivor is recorded as not emitted. Languages other than Python are not emitted. The
+stage can be rerun alone: `python -m autoform.nl.emit <run-dir> [--emit-dir DIR] [--tests DIR]
+[--domain-size N] [--lean-root DIR] [--python PY]`.
+
+To feed the observations back, pass the generated directory to the synthesizer like any
+test suite (`scripts/synth_specs.py <ast> <source> <Module> --tests DIR` takes one
+directory: copy or link the generated package next to the suite's tests).
+
 ## The L1 step (`refine.py`, `--deep-too`)
 
 L1 is attempted for each function that has both a VALIDATED model and a hole-free,
@@ -332,9 +395,10 @@ reaches level L1. Otherwise it stays at L0, and the reason is recorded.
 
 - Lean 4 via elan (`lake` on PATH or in `~/.elan/bin`), and this checkout built with
   `lake build` (the model modules import `Autoform.NL.Basis`).
-- The `claude` CLI. All model calls go through `claude -p`. `AUTOFORM_CLAUDE_AUTH=login`
-  (the default) uses the logged-in account and ignores `ANTHROPIC_API_KEY`.
-  `AUTOFORM_CLAUDE_AUTH=api-key` bills the key instead, for machines with no login such as CI.
+- A model backend (see [Backends and budget](#backends-and-budget)): the `claude` CLI
+  (`AUTOFORM_CLAUDE_AUTH=login`, the default, or `api-key`), or the Anthropic Messages API
+  through the `anthropic` SDK (`AUTOFORM_CLAUDE_AUTH=api`). The proving agents always need
+  the CLI.
 - The Python the analysed code needs (`AUTOFORM_PYTHON`, default `python3`), with the
   code's own dependencies importable. The model stage runs the real functions.
 
@@ -359,19 +423,47 @@ autoform autoformalize ./src MyLib --deep-too       # both, and attempt L1
     [--functions f g] [--no-second] [--repairs N] [--no-prove] [--no-runtime]
     [--budget-usd X] [--domain-size N] [--parallel N] [--out DIR] [--no-resume]
     [--judge auto|semif|heuristic|replay:PATH|none] [--max-properties-per-function N]
-    [--repair-rounds N] [--tests DIR ...] [--skip-preflight]
+    [--repair-rounds N] [--tests DIR ...] [--no-emit] [--emit-dir DIR] [--skip-preflight]
 ```
 
 Exit status: 2 if the preflight failed or no translation was produced, 1 if there are
 potential bugs, else 0.
 
-## Costs
+## Backends and budget
 
-Every language-model call goes through headless Claude Code (`llm.py`). Calls that use no
-tools are cached on disk by prompt, so rerunning one costs nothing.
-The prove and L1 stages call an agent per statement. `--budget-usd` caps the total spend
-of those two stages (with a judge, also of formalize and repairs, allocated by utility).
-Accepted proofs are cached and re-checked by the kernel, not trusted. The per-stage spend is listed in `run.json` and in the report.
+Every text call of every stage goes through `llm.ask` / `llm.ask_json` (`llm.py`), and is
+cached on disk by prompt hash, so rerunning one costs nothing whichever backend answered.
+`AUTOFORM_CLAUDE_AUTH` selects the backend:
+
+| value | calls | billed to | spend measured as |
+|---|---|---|---|
+| `login` (default) | headless Claude Code (`claude -p`) | the logged-in plan; `ANTHROPIC_API_KEY` is removed from the child environment | the CLI's own `total_cost_usd` |
+| `api-key` | headless Claude Code | `ANTHROPIC_API_KEY`, for machines with no login such as CI | the CLI's own `total_cost_usd` |
+| `api` | the Anthropic Messages API through the `anthropic` Python SDK (optional; `pip install "anthropic>=1,<2"` or the `[llm]` extra) | `ANTHROPIC_API_KEY` | the response usage (input, output, cache-write and cache-read tokens) times the price table `llm.PRICES`, kept in one place with its date `llm.PRICES_DATE`; a model without a row is refused before the call |
+
+The `api` backend's model is `AUTOFORM_LLM_MODEL` or `llm.DEFAULT_API_MODEL`
+(`claude-opus-5-5`). It runs no tools: the model, describe and formalize stages are
+plain text calls and work unchanged; the proving agents (`prove`, `refine`, and the
+`autoform formalize --prover` path) run headless Claude Code with Lean access
+(`autoform.harness.prover.ClaudeCodeAgent`) and still need the `claude` CLI, billed under
+the same `ANTHROPIC_API_KEY`. The preflight errors when the SDK or the key is missing and
+warns when the CLI is, in which case those stages are recorded as failed and the report is
+still written. A tool-using call under `api` raises `LLMError` rather than pretending.
+
+`--budget-usd` is the spend cap for the whole run, resumed stages included (`run.json`
+carries the per-stage spend and the total). Each model stage receives what is left and
+stops at a function: no new function (describe: batch of functions; formalize: a
+function's properties; model: a function; prove: a statement) starts once the stage's
+measured spend plus the dearest unit it has paid for so far would cross the cap. What was
+not started is named in `budget.json` with the stage, the function (and property), the
+amount spent at that point and the estimate, and the pipeline continues to the report,
+whose **Spent vs budget** section lists the budget, the spend per stage and every skip
+by name; each function lists its own. A function describe skipped is left out of
+`english.json`, so no later stage spends on it. Raising the budget on a rerun repeats the
+stages whose budget changed; their earlier calls are cache hits, so only the skipped
+functions are paid for. With a judge the budget is also allocated across properties by
+utility, as described under [Budget](#budget---budget-usd---max-properties-per-function).
+Accepted proofs are cached and re-checked by the kernel, not trusted.
 
 ## Limits
 

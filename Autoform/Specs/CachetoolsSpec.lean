@@ -5,6 +5,7 @@ import Autoform.Specs.CachetoolsSpec.Part3
 import Autoform.Specs.CachetoolsSpec.Part4
 import Autoform.Specs.CachetoolsSpec.Part5
 import Autoform.Specs.CachetoolsSpec.Part6
+import Autoform.Specs.CachetoolsSpec.Part7
 
 import Autoform.Refine
 import Autoform.Generated.Cachetools
@@ -44,7 +45,7 @@ records what could not be proved, as stated obligations rather than `sorry`.
 
 This file is the umbrella: it imports `CachetoolsSpec/Base.lean` (the subject, `MRefines`,
 the field model and the class-lookup facts) and `CachetoolsSpec/Part1.lean` ..
-`Part6.lean` (the theorems, moved verbatim and still in `Autoform.Specs.Cachetools`).
+`Part7.lean` (the theorems, moved verbatim and still in `Autoform.Specs.Cachetools`).
 One Lean process retains every proof term it elaborates, so the single-file module held
 13.6 GB; the parts hold what the comment in `.github/workflows/ci.yml` records. Nothing was
 restated. `scripts/mutate.py --spec-file Autoform/Specs/CachetoolsSpec.lean` reads every
@@ -55,6 +56,14 @@ namespace Autoform.Specs.Cachetools
 open Autoform.Core Autoform.Refine Autoform.Generated.Cachetools
 
 /-! ## 4. What the mutation gate actually said
+
+**The figure below predates the `_Link.unlink` theorems** (`TTLLink_unlink_mrefines`,
+`TTLLink_unlink_ring`, 2026-10-10). They are not in the 68/73; the gate has to be re-run
+with `cachetools/__init__.py:<module>.TTLCache._Link.unlink` added to `--decls` and both
+theorems mapped to it in `--subject`, and the README figure replaced with that run's
+output — not edited by hand. What the run should show: every mutant of `unlink`'s body
+fails `TTLLink_unlink_body` (a `rfl` against the generated term) and therefore both
+theorems; a mutant elsewhere in the module is off-subject for them.
 
 Run (2026-10-09, after the re-land on the final exporter and semantics):
 `scripts/mutate.py Autoform/Generated/Cachetools.lean Autoform.Generated.Cachetools
@@ -112,16 +121,23 @@ not be conflated, which is why `mutate.py --subject` reports them separately.
 Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
 `native_decide`.
 
-1. **The specified functions are small.** Ten entry points out of a 45-function
-   call-closed core, and out of 233 translated. The large call-closed functions
-   (`Cache.__setitem__`, `LRUCache.popitem`, the `_Link` splice/unlink pair) mutate
-   containers through `Stmt.setIndex`, which is still an honest hole, or need a
-   representation predicate relating a heap region to a shallow record — obligation (4)
-   of `Refine.lean` §5, still open.
+1. **The specified functions are small, with one exception.** Eleven entry points out of
+   a 45-function call-closed core, and out of 233 translated. `TTLCache._Link.unlink` is
+   now specified against a heap-region representation predicate (`TTLLink_unlink_ring`,
+   `Refine.DRing`): obligation (4) of `Refine.lean` §5 is closed for objects linked
+   through fields. The large call-closed functions that mutate **containers**
+   (`Cache.__setitem__`, `LRUCache.popitem`, `TTLCache.expire`) are still unspecified:
+   their state is a boxed `dict`/`OrderedDict` payload, and there is no representation
+   predicate relating a payload to a shallow record yet. `DRing` does not reach them.
 
-2. **No loop is refined here.** `Refine.lean` obligation (3) (loop-invariant rule) blocks
-   `_Link.unlink` and the eviction loops, which are the functions whose specifications
-   would actually be interesting to a `cachetools` user.
+2. **No eviction *loop* is refined here.** `_Link.unlink` is the primitive the loops call,
+   not a loop. `Refine.lean` obligation (3) (loop-invariant rule, now with the
+   argument-dependent bound `RefinesWith`) is no longer what blocks `TTLCache.expire` and
+   `LRUCache.popitem`; the container representation of item 1 is, together with
+   `next(iter(self.__order))` on a boxed `OrderedDict`, which these bodies go through.
+   `LFUCache._Link.unlink` has the same body as `TTLCache._Link.unlink`
+   (`dlinkUnlinkBody`) and would be the same proof under `LFUCache._Link`'s slot keys; it
+   is not stated here.
 
 3. **Exception arguments are unmodelled.** `TimedCache_expire_raises` names the class —
    the `py:exception:<Name>` constructor evaluates to the represented class name, and
