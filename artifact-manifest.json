@@ -17,11 +17,11 @@
    "render_sha256": "d3a662ae60f3eb5133ea14d12d4d5f99afc5d7bd066eff2b7e3d8297d4a86cb2"
   },
   "Cachetools": {
-   "ast_bytes": 684314,
-   "ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
+   "ast_bytes": 766819,
+   "ast_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
    "ast_tracked": true,
-   "render_bytes": 355919,
-   "render_sha256": "85f6a8f851ff598fb1fe38dd289c4931e2890bee8b96093d145f95ad0d548885"
+   "render_bytes": 496247,
+   "render_sha256": "6beadfba44d21abde8c14f92168088d635bbd7c0eabfc84d805bc23f2140902e"
   },
   "Click": {
    "ast_bytes": 4726613,
@@ -153,7 +153,7 @@
  "specs": {
   "Specs/CachetoolsSpec": {
    "corpus": "Cachetools",
-   "corpus_ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
+   "corpus_ast_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
    "source": "ast-Cachetools.json"
   },
   "Specs/V8Spec": {
@@ -163,7 +163,7 @@
   },
   "SpecsGen/Cachetools": {
    "corpus": "Cachetools",
-   "corpus_ast_sha256": "f6797b1f7ba725cff0410e9ad436f6df2ca6c2406f66cf1e358d52214d9607c6",
+   "corpus_ast_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
    "source": "ast-Cachetools.json"
   },
   "SpecsGen/Click": {

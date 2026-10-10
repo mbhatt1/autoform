@@ -1934,6 +1934,12 @@ outcome §29/§31 warn about (a category that moves rather than closes) did not 
 at `keysProgramHoled` — `methodkey` *as the transpiler used to emit it* — so the
 worked example is explicitly historical.
 
+CHANGED (2026-10-09, re-land): `methodkey_refines` is retired. The current exporter reads
+`hashkey` through the module object at call time, as Python does, so the two-function
+slice run from the empty heap no longer has an answer; the theorem was true only of the
+statically bound translation. The note in `Autoform/Contracts.lean` says why it was deleted
+rather than restated.
+
 ### Nine arguments were being dropped in silence
 
 `**kwargs` and `k = v` arrive from `pysrc2cpg` with `ARGUMENT_INDEX = -1` and an
