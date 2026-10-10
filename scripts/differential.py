@@ -2293,6 +2293,12 @@ def main():
         rel_files = sorted(set(f.get("file", "") for f in funcs))
         test_dirs = [tests_override] if tests_override else find_tests(src_root)
         src_root = resolve_src_root(src_root, rel_files)
+        # The fingerprint must describe the tree the cases are recorded from. Taken
+        # before this correction (as it is at the top of main) it covers nothing when no
+        # AST path resolves under the uncorrected root, and the stability check at the
+        # end then fails a healthy run with exit 2 -- CI read 94/94 agree as "not
+        # evidence" that way on 2026-10-10. Re-take it against the corrected root.
+        fingerprints = runtime_backends.source_fingerprints(src_root, funcs)
         identities = class_identity_index(funcs, src_root)
         from native_heap import function_identities
         callable_ids = function_identities(funcs, src_root)
@@ -2778,13 +2784,20 @@ def main():
         "ast_sha256": ast_fingerprint,
         "generated_sha256": generated_module.model_digest(generated),
         "source_sha256": fingerprints, "semantics_sha256": semantics_fingerprint}
-    result["build_stable"] = result["build_stable"] and (
-        runtime_backends.sha256(ast_path) == ast_fingerprint and
-        runtime_backends.source_fingerprints(src_root, funcs) == fingerprints and
-        runtime_backends.semantics_fingerprints() == semantics_fingerprint)
+    moved = [name for name, same in (
+        ("AST", runtime_backends.sha256(ast_path) == ast_fingerprint),
+        ("source tree", runtime_backends.source_fingerprints(src_root, funcs) == fingerprints),
+        ("Autoform/Lang/Core", runtime_backends.semantics_fingerprints() == semantics_fingerprint),
+    ) if not same]
+    result["build_stable"] = result["build_stable"] and not moved
     if not stable or mutating:
         print("WARNING: results below were produced against a moving or mutated build "
               "and must not be treated as conformance evidence (build_stable=false).")
+    elif moved:
+        # Never fail silently: exit 2 with a healthy-looking summary is unreadable.
+        print("WARNING: the %s changed while this run was in progress; the results "
+              "below describe a tree that no longer exists (build_stable=false)."
+              % " and ".join(moved))
     if len(got) < len(cases):
         print("lean answered %d/%d cases; the rest are INCONCLUSIVE"
               % (len(got), len(cases)))
