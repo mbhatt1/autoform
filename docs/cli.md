@@ -24,6 +24,7 @@ may not share one workspace at the same time (a lock refuses the second). Start 
 | `assure SRC [Module]` | `source`, then coverage oracle, mutation gate, audit, contracts, assurance case, guarantee | every required check passed |
 | `regress SRC --base REF [--head REF]` | the pipeline at two commits, compared by what each could prove | nothing that held at `--base` is lost |
 | `regress ... --machine --files F...` | the same comparison on compiled code, kernel-checked on lifted p-code | no diverging input found |
+| `pr SRC [Module] --base REF [--head REF]` | evidence level of every function the change touched, as SARIF and Markdown | no function refuted |
 | `autoformalize SRC [Module]` | code → validated Lean model → English → statements → kernel proofs | see `docs/autoformalize.md` |
 | `formalize Module` | candidate claims, SemIf judge, kernel verification, CEGIS repair | see `docs/harness.md` |
 | `machine INPUT [Module]` | binary/assembly → SLEIGH p-code → Lean model, concrete assertions | see `docs/machine-code.md` |
@@ -102,6 +103,32 @@ both commits for a Linux target, linked, lifted through SLEIGH, searched for div
 inputs (type-width boundaries and seeded random values, run natively when the host can)
 and each divergence is kernel-checked. Exit `1` on a regression or a divergence.
 
+### `pr`
+
+```
+autoform pr SRC [Module] --base REF [--head REF] [--subdir PATH] [--ast FILE] [--tests DIR]
+            [--cases N] [--mutants N] [--sarif FILE] [--markdown FILE]
+            [--stage-timeout SECONDS] [--timeout SECONDS] [--keep-checkout]
+```
+
+Runs the chain for the functions a change touched and reports each one's **evidence
+level** -- `none`, `hole`, `translated`, `oracle-agreed`, `proved` or `refuted` -- with
+the artifact it traces to (`docs/evidence-levels.md`). `SRC` is a Git URL or a local
+checkout; `--head` defaults to the working tree, untracked files included. Python
+functions are found by comparing the standard-library `ast` of each changed file at
+both commits, which is also where the SARIF line numbers come from; for other
+languages every function the exporter exported from a changed file is reported. The
+head tree is exported with Joern, or `--ast FILE` supplies an AST the exporter produced
+earlier (recorded as such). The changed functions, their scopes and their resolvable
+callees are rendered as `Autoform.Generated.<Module>` (default `PullRequest`), then
+`scripts/differential.py`, the ledger, `scripts/synth_specs.py --conformance-only` and,
+with `--mutants N`, `scripts/mutate.py` run on that module alone. Reports land in
+`artifacts/pr/<Module>/` (`pr.json`, `conformance.json`, `specs.json`, `mutation.json`,
+the stage logs); `--sarif` writes SARIF 2.1.0 with one result per function, validated
+for GitHub code scanning before it is written, and `--markdown` the review comment.
+Exit `1` only when a function is refuted; a stage that cannot run leaves its functions
+at the level below and is named in the report.
+
 ### `autoformalize`, `formalize`, `machine`
 
 Each owns its flags; `autoform <cmd> --help` is the reference.
@@ -136,6 +163,11 @@ also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and
 and every listed claim's artifacts hash as recorded; otherwise `unverified` with the
 failed checks named. It never claims whole-program correctness.
 
+`<workspace>/artifacts/pr/<Module>/` (`autoform pr`): `pr.json` (per function: level,
+reason, artifacts, holes, oracle counts, theorems, mutation verdicts; per stage: status,
+seconds, log), the selected `ast-<Module>.json`, and the same `conformance.json`,
+`ledger-<Module>.json`, `specs.json` and `mutation.json` as above for that module.
+
 ## Environment variables
 
 | variable | read by | effect |
@@ -157,7 +189,7 @@ failed checks named. It never claims whole-program correctness.
 ## Exit codes
 
 `0` success for the command's own claim; `1` a stage failed, gaps remain, a regression
-or divergence was found; `2` invocation, setup or orchestration failure (bad module
+or divergence was found, or `pr` refuted a function; `2` invocation, setup or orchestration failure (bad module
 name, missing Joern, busy workspace, unreadable package, refused dirty tree); `128+N`
 interrupted by signal N (`--timeout` expiry is `143`). The per-command table is in
 `docs/running.md` §7.
