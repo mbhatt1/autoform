@@ -148,3 +148,9 @@ artifacts/pr/
 
 # CI scratch: generated ledger driver (ledger-*.json is the artifact)
 .ci-ledger/
+
+# Defect hunt (docs/evidence-cachetools.md): the cachetools 7.1.6 AST is 3.2 MB, over the
+# 2 MB tracking limit, so it is regenerated from the digest-pinned corpus, not tracked.
+# Its provenance record goes with it: a tracked record without its artifact is an orphan.
+ast-DefectCachetools.json
+provenance/ast-DefectCachetools.json.prov.json
