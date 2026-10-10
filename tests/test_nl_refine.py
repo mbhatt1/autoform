@@ -79,7 +79,7 @@ def test_model_path_is_the_default(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, '_impl', stubs.impl)
     src, out = _src(tmp_path), tmp_path / 'run'
     res = pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT)
-    assert stubs.calls == list(pipeline.MODEL_STAGES) == ['model', 'describe', 'formalize', 'check', 'prove']
+    assert stubs.calls == list(pipeline.MODEL_STAGES) == ['model', 'describe', 'formalize', 'check', 'prove', 'emit']
     assert stubs.kw['model']['source_root'] == str(src.resolve()) and stubs.kw['model']['second'] is True
     run = json.loads((out / 'run.json').read_text())
     assert run['mode'] == 'model' and run['stages']['model']['output'] == 'translation.json, models.json'

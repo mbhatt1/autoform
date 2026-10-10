@@ -391,6 +391,18 @@ def markdown(rep: dict) -> str:
             note = (st.get('error') or '').splitlines()[0][:120] if st.get('error') else st.get('note', '')
             md.append(f"| {name} | {st.get('status')} | {st.get('seconds', '')} | {st.get('cost_usd', '')} | {note} |")
         md.append('')
+    em = ((run.get('stages') or {}).get('emit') or {}).get('summary') or {}
+    if em:
+        md += ['## Emitted tests', '',
+               f"- statements emitted: {em.get('emitted', 0)} of {em.get('survivors', 0)} survivors "
+               f"({em.get('failing', 0)} with a failing test); not emitted: {em.get('not_emitted', 0)}",
+               f"- tests: {em.get('tests', 0)} (concrete {em.get('tests_concrete', 0)}, hypothesis "
+               f"{em.get('tests_hypothesis', 0)}); passed {em.get('tests_passed', 0)}, failed {em.get('tests_failed', 0)}, "
+               f"error {em.get('tests_error', 0)}, skipped {em.get('tests_skipped', 0)}, not run {em.get('tests_not_run', 0)}",
+               f"- points deduplicated against the existing suite: {em.get('points_deduplicated', 0)}; outside the "
+               f"precondition: {em.get('points_outside_pre', 0)}; without a faithful outcome: "
+               f"{em.get('points_unencodable', 0)}; hypothesis tests withheld: {em.get('hypothesis_rejected', 0)}",
+               '', 'Per statement: `emit.json` (reasons by name).', '']
     b = rep.get('budget')
     if b:
         spent = b.get('spent_usd')

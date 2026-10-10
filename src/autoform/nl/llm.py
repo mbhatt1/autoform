@@ -145,11 +145,16 @@ def ask_api(prompt: str, *, model: str | None = None, timeout: int = 1800) -> tu
     # stop_reason 'max_tokens': the text is truncated; ask_json's repair round deals with it
     return text, cost
 
+def prompt_key(prompt: str, tools: str = TOOLS_NONE, max_turns: int = 1, model: str | None = None) -> str:
+    """The cache key of a call: sha256 over the prompt and the call options. Stages record
+    it as the provenance of what the model produced (e.g. Statement.prompt_hash)."""
+    return hashlib.sha256(json.dumps([prompt, tools, max_turns, model]).encode()).hexdigest()
+
 
 def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turns: int = 1,
         timeout: int = 1800, model: str | None = None, cache: bool = True) -> tuple[str, float]:
     """Return (text, cost_usd). Tool-using calls (tools != '') are never cached."""
-    key = hashlib.sha256(json.dumps([prompt, tools, max_turns, model]).encode()).hexdigest()
+    key = prompt_key(prompt, tools, max_turns, model)
     hit = CACHE / (key + '.json')
     if cache and not tools and hit.is_file():
         data = json.loads(hit.read_text())
@@ -207,10 +212,16 @@ def extract(tag: str, text: str) -> str | None:
     return found[-1] if found else None
 
 
+def json_suffix(keys: list) -> str:
+    """What `ask_json` appends to a prompt; `prompt_key(prompt + json_suffix(keys))` is the
+    cache key of that call's first attempt."""
+    return ('\n\nAnswer with a single JSON object between <json> and </json> tags, with keys: '
+            + ', '.join(keys) + '.')
+
+
 def ask_json(prompt: str, keys: list, **kw) -> tuple[dict, float]:
     """Ask for <json>{...}</json>; validate top-level keys; one repair round."""
-    suffix = ('\n\nAnswer with a single JSON object between <json> and </json> tags, with keys: '
-              + ', '.join(keys) + '.')
+    suffix = json_suffix(keys)
     text, cost = ask(prompt + suffix, **kw)
     for attempt in range(2):
         body = extract('json', text) or text

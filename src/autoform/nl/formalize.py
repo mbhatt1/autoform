@@ -516,7 +516,8 @@ def formalize_one(translation: dict, fn: dict, spec: dict, prop: dict, scratch_d
         lean_prop=lean_prop,
         binders=[{'name': b['name'], 'type': b['type'], 'val': b.get('val', '')} for b in cand['binders']],
         pre=cand['pre'], post=cand['post'], elaborates=ok,
-        elaboration_log='\n'.join(log), attempts=attempts, entry=cand.get('entry', ''))
+        elaboration_log='\n'.join(log), attempts=attempts, entry=cand.get('entry', ''),
+        prompt_hash=llm.prompt_key(base + llm.json_suffix(['binders', 'pre', 'post'])))
     return stmt, {'id': sid, 'elaborates': ok, 'attempts': attempts, 'cost_usd': cost,
                   'seconds': round(time.time() - t0, 1)}
 

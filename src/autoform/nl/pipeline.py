@@ -1,9 +1,9 @@
 """The natural-language autoformalizer end to end.
 
     model (default) ──┐
-    translate (--deep)┴─► describe → formalize → check → prove [→ refine (--deep-too)] → report
+    translate (--deep)┴─► describe → formalize → check → prove [→ refine (--deep-too)] → emit → report
     with a judge (--judge, the CLI default):
-                        describe → select → formalize → check → adjudicate → prove …
+                        describe → select → formalize → check → adjudicate → prove … emit → report
 
 `model` (autoform.nl.model) has a language model write a plain Lean def per function and
 validates it against the real code and an independent second translation (level L0).
@@ -28,7 +28,9 @@ allocates `--budget-usd` across functions; `formalize` and `prove` then spend in
 and stop when the budget is gone. `adjudicate` (autoform.nl.repair) classifies each refuted
 statement (deterministic gates first), turns cross-validated REAL_BUG readings into
 findings, and repairs BAD_SPEC / MISSING_PRECONDITION properties through formalize → check
-again. The judge never sets a status.
+again. The judge never sets a status. `emit` (autoform.nl.emit) writes the statements that
+survived as pytest tests into the target's `tests/autoform_generated/` and runs them with
+the real interpreter (`--no-emit` skips it, `--emit-dir` relocates the tests).
     python -m autoform.nl ...
 """
 from __future__ import annotations
@@ -49,18 +51,18 @@ from pathlib import Path
 
 from .schema import FILES, dump
 
-MODEL_STAGES = ('model', 'describe', 'formalize', 'check', 'prove')
-DEEP_STAGES = ('translate', 'describe', 'formalize', 'check', 'prove')
-DEEP_TOO_STAGES = ('model', 'translate', 'describe', 'formalize', 'check', 'prove', 'refine')
+MODEL_STAGES = ('model', 'describe', 'formalize', 'check', 'prove', 'emit')
+DEEP_STAGES = ('translate', 'describe', 'formalize', 'check', 'prove', 'emit')
+DEEP_TOO_STAGES = ('model', 'translate', 'describe', 'formalize', 'check', 'prove', 'refine', 'emit')
 STAGES = MODEL_STAGES
 MODES = {'model': MODEL_STAGES, 'deep': DEEP_STAGES, 'deep_too': DEEP_TOO_STAGES}
 NEEDS = {'describe': ('translation',), 'formalize': ('translation', 'english'),
          'select': ('translation', 'english'), 'adjudicate': ('translation', 'statements', 'checks'),
          'check': ('translation', 'statements'), 'prove': ('translation', 'statements', 'checks'),
-         'refine': ('translation', 'models', 'deep_translation')}
+         'refine': ('translation', 'models', 'deep_translation'), 'emit': ('translation', 'statements', 'checks')}
 OUTPUT = {'model': 'translation', 'translate': 'translation', 'describe': 'english', 'formalize': 'statements',
           'check': 'checks', 'prove': 'proofs', 'refine': 'refine', 'select': 'selection',
-          'adjudicate': 'adjudication'}
+          'adjudicate': 'adjudication', 'emit': 'emit'}
 STAGE_MODULE = {'select': 'judge', 'adjudicate': 'repair'}
 SKIP_DIRS = {'.git', '.hg', '.svn', '__pycache__', '.lake', 'node_modules', '.venv', 'venv', '.tox', 'build', 'dist'}
 
@@ -192,8 +194,9 @@ def _result_cost(result) -> float:
 def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=True, runtime=True,
         budget_usd=None, resume=True, ref=None, subdir=None, domain_size=64, parallel=None,
         deep=False, deep_too=False, second=True, repairs=3, judge=None, max_properties_per_function=None,
-        repair_rounds=2, tests=()) -> dict:
-    """`judge=None` runs without the judge stages (select, adjudicate); the CLI default is 'auto'."""
+        repair_rounds=2, tests=(), emit=True, emit_dir=None) -> dict:
+    """`judge=None` runs without the judge stages (select, adjudicate); the CLI default is 'auto'.
+    `emit=False` disables the emit stage; `emit_dir` relocates the emitted tests."""
     source = str(source)
     if not is_url(source) and Path(source).exists():
         source = str(Path(source).resolve())
@@ -215,10 +218,13 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             previous = json.loads(runf.read_text()).get('stages', {})
         except ValueError:
             previous = {}
+    emit_dir = str(Path(emit_dir).resolve()) if emit_dir else None
+    started_at = time.strftime('%Y-%m-%dT%H:%M:%S')
     info = {'source': source, 'module': module, 'mode': mode, 'lean_root': str(lean_root), 'out': str(out),
             'functions': functions, 'prove': prove, 'runtime': runtime, 'budget_usd': budget_usd,
             'second': second, 'judge': judge, 'max_properties_per_function': max_properties_per_function,
-            'tests': tests, 'started': time.strftime('%Y-%m-%dT%H:%M:%S'), 'stages': {}}
+            'tests': tests, 'emit': emit, 'emit_dir': emit_dir, 'domain_size': domain_size, 'started': started_at,
+            'id': _hash(source, module, started_at)[:12], 'stages': {}}
     spent = 0.0
 
     def save():
@@ -228,7 +234,7 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
     for stage in stages:
         keys = outputs(stage, mode)
         rec = info['stages'][stage] = {'status': 'pending', 'output': ', '.join(FILES[k] for k in keys)}
-        if stage == 'prove' and not prove:
+        if (stage == 'prove' and not prove) or (stage == 'emit' and not emit):
             rec['status'] = 'disabled'
             save()
             continue
@@ -248,6 +254,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                      'formalize': [budget_usd] if budget_usd is not None else [],
                      'check': [runtime, domain_size], 'prove': [budget_usd],
                      'refine': [_file_bytes(out, 'statements'), budget_usd, domain_size],
+                     'emit': [_file_bytes(out, 'proofs'), _file_bytes(out, 'adjudication'), _file_bytes(out, 'english'),
+                              tests, emit_dir, runtime, domain_size],
                      'select': [judge, budget_usd, max_properties_per_function, prove],
                      'adjudicate': [judge, _file_bytes(out, 'english'), _file_bytes(out, 'selection'), runtime,
                                     domain_size, budget_usd, repair_rounds]}.get(stage, [])
@@ -334,9 +342,14 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                         result = fn(translation, _load(out, 'statements'), out, domain_size=domain_size,
                                     runtime=runtime)
                     else:
-                        if parallel:
+                        if parallel and stage != 'emit':
                             kw['parallel'] = parallel
-                        if stage == 'prove':
+                        if stage == 'emit':
+                            result = fn(translation, _load(out, 'statements'), _load(out, 'checks'), out,
+                                        proofs=_load(out, 'proofs'), adjudication=_load(out, 'adjudication') if judge else None,
+                                        english=_load(out, 'english'), run_info=info, tests=tests, target=emit_dir,
+                                        domain_size=domain_size, runtime=runtime)
+                        elif stage == 'prove':
                             statements, checks = _load(out, 'statements'), _load(out, 'checks')
                             adjudication = _load(out, 'adjudication') if judge else None
                             if adjudication:   # repaired statements are proved too
@@ -357,6 +370,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                 dump(result, out / FILES[key])
             rec.update(status='ok', count=len(result) if isinstance(result, list) else None,
                        output_hash=_hash(*[_file_bytes(out, k) for k in keys]))
+            if stage == 'emit' and isinstance(result, dict):
+                rec['summary'] = result.get('counts')
         except Exception as exc:  # graceful degradation: record, keep going
             # A partial output the stage chose to write is kept, and later stages use it.
             cost = box[0]
@@ -480,6 +495,9 @@ def main(argv=None) -> int:
     ap.add_argument('--tests', action='append', default=[], metavar='DIR',
                     help='a test directory outside the source tree (repeatable); its tests are traced '
                          'for model inputs and shown to describe')
+    ap.add_argument('--no-emit', action='store_true', help='do not write the surviving properties as tests')
+    ap.add_argument('--emit-dir', type=Path, metavar='DIR',
+                    help='where the emit stage writes its tests (default <source>/tests/autoform_generated)')
     ap.add_argument('--skip-preflight', action='store_true', help='do not check the environment first')
     a = ap.parse_args(argv)
     if not a.skip_preflight:
@@ -496,7 +514,7 @@ def main(argv=None) -> int:
               ref=a.ref, subdir=a.subdir, domain_size=a.domain_size, parallel=a.parallel, deep=a.deep,
               deep_too=a.deep_too, second=not a.no_second, repairs=a.repairs, judge=a.judge,
               max_properties_per_function=a.max_properties_per_function, repair_rounds=a.repair_rounds,
-              tests=a.tests)
+              tests=a.tests, emit=not a.no_emit, emit_dir=a.emit_dir)
     for name, st in res['run']['stages'].items():
         print(f"{name:10s} {st.get('status'):9s} {st.get('seconds', '')!s:>8}s  ${st.get('cost_usd', 0)}"
               + (f"  {st['error'].splitlines()[0][:140]}" if st.get('error') else ''))
@@ -509,6 +527,13 @@ def main(argv=None) -> int:
         if lv:
             print('by level: ' + '; '.join(f"{k}: {v['functions']} functions, {v['proved']} proved"
                                            for k, v in lv.items()))
+    em = (res['run']['stages'].get('emit') or {}).get('summary') or {}
+    if em:
+        print(f"emitted tests {em.get('tests', 0)} (concrete {em.get('tests_concrete', 0)}, hypothesis "
+              f"{em.get('tests_hypothesis', 0)}): passed {em.get('tests_passed', 0)}, failed {em.get('tests_failed', 0)}, "
+              f"error {em.get('tests_error', 0)}, not run {em.get('tests_not_run', 0)}; statements emitted "
+              f"{em.get('emitted', 0)}/{em.get('survivors', 0)} survivors; points deduplicated "
+              f"{em.get('points_deduplicated', 0)}")
     dec = res['run'].get('decisions') or {}
     if dec.get('decisions') is not None:
         print(f"judge decisions {dec['decisions']} (forced {dec['forced']}); JEVBench rows {dec['jevbench_rows']} "

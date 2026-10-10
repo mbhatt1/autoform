@@ -110,7 +110,10 @@ against real executions and a second translation (`--deep` uses the Joern transl
 instead; `--deep-too` proves the two equal). It needs a model backend
 (`AUTOFORM_CLAUDE_AUTH=login|api-key|api`, see `docs/autoformalize.md`) and caps the
 run's spend with `--budget-usd`: every model stage stops at the function that would cross
-the cap and names the rest in `budget.json` and the report.
+the cap and names the rest in `budget.json` and the report. Its last stage writes the
+properties that survived checking as pytest tests into the analysed tree's
+`tests/autoform_generated/` and runs them (`--emit-dir DIR` relocates them, `--no-emit`
+skips the stage; `docs/autoformalize.md`, "The emit stage").
 `formalize` needs a translated module in the workspace and, for the default judge, a
 SemIf (OpenJev) installation. `machine` needs the `[machine]` extra; `--assemble`
 also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and

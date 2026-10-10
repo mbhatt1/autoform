@@ -1633,7 +1633,7 @@ def tracer(frame, event, arg):
     entries = known.get(code, 0)
     if entries == 0:
         entries = known[code] = wanted.get((os.path.realpath(code.co_filename), code.co_firstlineno))
-    if entries is None:
+    if entries is None or code.co_name == '<module>':   # a module body starting on a def's line
         return None
     if code.co_flags & 0x3a0:        # generator / coroutine / async generator
         return None
@@ -1831,7 +1831,7 @@ def _modname(mod: _Module) -> str:
     return mod.dotted or mod.path.stem
 
 
-def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, classes=()) -> tuple:
+def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, classes=(), limit: int = TRACE_LIMIT) -> tuple:
     """Run the repository's tests under a tracer.
 
     Returns ({qualified name: [point]}, stats); stats['states'] maps each class in `classes`
@@ -1842,7 +1842,8 @@ def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, class
     receivers and it is not used as a check-stage sample. A method's point starts with its
     receiver's state; a constructor's point omits the receiver. A trailing argument that
     is the parameter's own (unencodable) default object, e.g. a sentinel or a function
-    alias, is dropped, so the call is replayed with the default."""
+    alias, is dropped, so the call is replayed with the default. `limit`: distinct argument
+    tuples kept per function (TRACE_LIMIT; the emit stage asks for all of them)."""
     if not fns or not test_dirs:
         return {}, {'note': 'no tests to trace', 'states': {}}
     roots = []
@@ -1852,7 +1853,7 @@ def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, class
             roots.append(r)
     sys_path = roots + [str(Path(d).resolve().parent) for d in test_dirs]
     classes = sorted(set(classes) | {f.cls.dotted for f in fns if f.cls is not None and f.kind != 'static'})
-    cfg = {'sys_path': sys_path, 'tests': [str(Path(d).resolve()) for d in test_dirs], 'limit': TRACE_LIMIT,
+    cfg = {'sys_path': sys_path, 'tests': [str(Path(d).resolve()) for d in test_dirs], 'limit': limit,
            'classes': classes,
            'wanted': [[str(f.mod.path), f.first_lines, f.info.name, f.kind,
                        f.cls.dotted if f.cls is not None else '', f.qual, _modname(f.mod)] for f in fns]}
