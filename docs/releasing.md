@@ -10,6 +10,9 @@ that was skipped because a tool was missing is an unmet gate, not a pass, and
       every language runtime present, `[machine]` extras installed).
 - [ ] Working tree clean; `git status --porcelain` empty; no `*.mutate-backup` anywhere.
 - [ ] `lake build` clean (regenerate `Autoform/Generated/V8Base.lean` from its tracked AST first).
+      This is the **full** build, with `Autoform.SpecsGen.V8Base`; CI builds and audits
+      `Autoform.CI`, which leaves that module out because its parts exceed the runner's
+      memory. A release candidate needs the full build on a machine that can run it.
 - [ ] `python scripts/audit_all.py --strict` → `VERDICT: PASS` (axiom sweep clean, source
       sweep verified, `leanchecker --fresh` VERIFIED). Retain `audit.json`.
 - [ ] `python -m pytest tests -q` all green; the count of `skipped` is explained by

@@ -270,7 +270,10 @@ class TestRenderability:
     def test_every_node_has_a_shape(self, corpora, render_lean):
         checked = 0
         for name, funcs in corpora.items():
-            for f in funcs:
+            # `render_lean.py` lowers generator functions (`yieldS`/`yieldFromS`) into
+            # suspended-frame programs before printing anything, so the shape table is
+            # asked about the lowered tree, exactly as the renderer asks it.
+            for f in render_lean.lower_generators(funcs):
                 self._walk_stmt(render_lean, f["body"], name, f["name"])
                 checked += 1
         assert checked > 0
