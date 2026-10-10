@@ -131,7 +131,7 @@ which fails the build when a document and an artifact disagree.
 |---|---|---|
 | semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **94 agree, 0 divergences, 133 INCONCLUSIVE** on 227 cases of `cachetools` v7.1.7 re-landed 2026-10-09 (the September artifact compared 245: it carried no class metadata and so could not refuse the test suite's own `TTLCache` subclasses; see `docs/integrity.md`). Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools --tests <tests>` |
 | the model translates the corpus | ledger | **204 of 209** functions hole-free, **150** in the verifiable core (`ledger-Cachetools.json`; `scripts/ledger.lean.tmpl`) |
-| specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on-subject on `Autoform/Generated/Cachetools.lean` (2026-09-21; 10 survivors all analysed in `Autoform/Specs/CachetoolsSpec.lean` §4); **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution (`mutation-Imp.json`) |
+| specifications constrain behaviour | source-level mutation gate | **68/73 (93.2%)** on-subject on `Autoform/Generated/Cachetools.lean` (2026-10-09, 51 mutants, 0 invalid; the 5 survivors and 2 untested theorems are all analysed in `Autoform/Specs/CachetoolsSpec.lean` §4); **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution (`mutation-Imp.json`) |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean — `propext`, `Quot.sound`, `Classical.choice` only (`scripts/audit_all.py --strict`) |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
 | untranslated code is declared | hole counting + SACM assumptions | 5 holes, all named |
