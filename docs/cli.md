@@ -193,6 +193,7 @@ seconds, log), the selected `ast-<Module>.json`, and the same `conformance.json`
 | `AUTOFORM_ALLOW_DIRTY` | checkout entry points | run over modified tracked artifacts (never over a live mutant) |
 | `AUTOFORM_SCRATCH`, `AUTOFORM_PYTHON` | scripts | scratch directory; the Python the stages run under |
 | `AUTOFORM_DIFF_KEEP`, `AUTOFORM_NO_REEXEC` | oracle debugging | keep the Lean file a case failed in; skip the `PYTHONHASHSEED=0` re-exec |
+| `AUTOFORM_SANDBOX` | oracle, native worker, nl runners | `on` (default: refuse without a mechanism), `off` (run the subject unconfined; recorded in every artifact), or `seatbelt`/`bwrap`/`unshare` to force one (`scripts/sandbox.py`) |
 
 ## Exit codes
 

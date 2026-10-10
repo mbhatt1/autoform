@@ -56,6 +56,7 @@ def test_installed_distribution(tmp_path):
         assert "scripts/proof_artifacts.py" in names
         assert "scripts/deep_json.py" in names
         assert "scripts/security_specs.py" in names
+        assert "scripts/sandbox.py" in names   # the one confinement layer, shipped with the oracle and workers
         assert "examples/security/autoform.properties.json" in names
         for name in ('LICENSE', 'NOTICE', 'THIRD_PARTY.md', 'SUPPORT.md', 'SECURITY.md',
                      'licenses/cachetools-MIT.txt', 'docs/packaging.md'):

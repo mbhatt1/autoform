@@ -1201,6 +1201,7 @@ def record(work: Path, function: str, lean_name: str, rounds: list):
     """Write the function's rounds to <work>/fuzz.json and merge them into <out>/fuzz.json."""
     last = rounds[-1]
     entry = {'function': function, 'lean_name': lean_name, 'seed': last['seed'],
+             'sandbox': _model().sandbox_record(),
              'cases_run': sum(r['cases_run'] for r in rounds),
              'disagreements_found': sum(r['disagreements_found'] for r in rounds),
              'shrunk': sum(len(r['shrunk']) for r in rounds),

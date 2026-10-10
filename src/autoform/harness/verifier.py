@@ -20,8 +20,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -447,14 +449,26 @@ def native_replay(source: Path | None, fn, inputs: list, timeout=10) -> dict:
     path = Path(source) / fn.file
     if not path.is_file():
         return dict(status='not_run', reason='source file unavailable')
+    # The function under test runs confined (scripts/sandbox.py): no network, writes only
+    # under a private work directory, the source tree read-only. A host without a
+    # mechanism raises SandboxUnavailable here rather than running the code unconfined.
+    from ..nl.model import sandbox_module
+    sandbox = sandbox_module()
+    work = Path(tempfile.mkdtemp(prefix='autoform_native_replay_'))
     try:
-        proc = subprocess.run(['python3', '-c', NATIVE_RUNNER, str(path), fn.source_name, json.dumps(inputs)],
-                              cwd=path.parent, capture_output=True, text=True, timeout=timeout)
+        launch = sandbox.sandboxed(['python3', '-c', NATIVE_RUNNER, str(path), fn.source_name,
+                                    json.dumps(inputs)], cwd=path.parent, work=work,
+                                   env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'),
+                                   read_only=[path.parent])
+        proc = subprocess.run(launch.argv, cwd=launch.cwd, env=launch.env, capture_output=True,
+                              text=True, timeout=timeout, start_new_session=True)
         line = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ''
-        return dict(status='ran', result=json.loads(line)) if line else \
-            dict(status='error', reason=proc.stderr[-500:])
+        return dict(status='ran', result=json.loads(line), sandbox=launch.record) if line else \
+            dict(status='error', reason=proc.stderr[-500:], sandbox=launch.record)
     except (subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         return dict(status='error', reason=str(exc))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def native_agrees(native: dict, model_repr: str):

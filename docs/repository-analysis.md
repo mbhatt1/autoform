@@ -48,7 +48,9 @@ files. VCS metadata and the active output workspace are explicitly excluded. Fil
 presence in an AST does not show that every function parsed successfully. Export
 truncation and the lack of an independent compiler function census remain visible.
 Files outside the selected directory, including external dependencies, are outside
-the inventory. Native execution is not a filesystem or network sandbox.
+the inventory. Native execution runs in the worker sandbox (no network, writes only
+under its work directory; `native-build.json` records the mechanism), which is not a
+container and limits no CPU or memory.
 
 Requirements in `autoform.properties.json` or `--properties` are frozen before source
 execution. Mixed-language routing requires each exact subject to appear in a fresh

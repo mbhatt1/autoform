@@ -45,6 +45,10 @@ int owner(void) { return initialized_by; }
     f = function('owner')
     library = native.compile_sources(source, [f], tmp_path / 'work')
     assert library(f)() != os.getpid(), 'constructor or function ran in the driver'
+    # native-build.json says how the worker was confined; `sandboxed` is derived from it.
+    execution = library.info['execution']
+    assert execution['sandbox']['mechanism'] and 'enforced' in execution['sandbox']
+    assert execution['sandboxed'] == bool(execution['sandbox']['enforced'])
 
 
 def test_native_results_preserve_width_state_and_output_channel(tmp_path, native):
@@ -94,7 +98,12 @@ def test_native_descendant_cannot_keep_result_pipe_or_resources(tmp_path, native
     import fcntl
     source = tmp_path / 'source'
     source.mkdir()
-    lock = tmp_path / 'descendant.lock'
+    # Inside the work directory: the sandbox denies the native code every write
+    # elsewhere (tests/test_sandbox.py shows that), and a child that cannot take the
+    # lock would make this a test of the sandbox, not of descendant cleanup.
+    work = tmp_path / 'work'
+    work.mkdir()
+    lock = work / 'descendant.lock'
     (source / 'native.c').write_text('''
 #include <sys/file.h>
 #include <fcntl.h>
@@ -118,7 +127,7 @@ int spawn(void) {
 }
 '''.replace('LOCK_PATH', json.dumps(str(lock))))
     f = function('spawn')
-    library = native.compile_sources(source, [f], tmp_path / 'work')
+    library = native.compile_sources(source, [f], work)
     result = library(f).observe([], timeout=1)
     assert result['status'] == 'ok' and result['values'][0] > 0
     # A killed process releases its file locks even if the system has not yet

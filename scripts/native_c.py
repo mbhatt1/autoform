@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 
+import sandbox
 import source_context
 
 TYPES = {'i8': ('int8_t', ctypes.c_int8), 'u8': ('uint8_t', ctypes.c_uint8),
@@ -29,15 +30,20 @@ class NativeExecutionError(RuntimeError):
         super().__init__('native execution: ' + json.dumps(result, sort_keys=True))
 
 
-def worker(request, timeout=None):
+def worker(request, timeout=None, work=None):
     """Load and invoke native code outside this process, with a parent deadline.
 
     This contains crashes and hangs, including constructors and descendants that
-    remain in the worker's process group. It is not a filesystem/network sandbox.
+    remain in the worker's process group. The worker runs under `scripts/sandbox.py`:
+    no network, writes only under `work` (default: the library's directory). It is
+    not a limit on CPU or memory beyond the deadline.
     """
     timeout = DEFAULT_TIMEOUT if timeout is None else timeout
     if not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
         raise ValueError('native timeout must be positive and finite')
+    work = work or Path(str(request.get('library', '.'))).resolve().parent
+    launch = sandbox.sandboxed(
+        [sys.executable, '-I', str(Path(__file__).with_name('native_c_worker.py')), '0'], work=work)
     try:
         read_fd, write_fd = os.pipe()
     except OSError as exc:
@@ -45,8 +51,9 @@ def worker(request, timeout=None):
     proc = None
     try:
         try:
+            argv = launch.argv[:-1] + [str(write_fd)]
             proc = subprocess.Popen(
-                [sys.executable, '-I', str(Path(__file__).with_name('native_c_worker.py')), str(write_fd)],
+                argv, env=launch.env,
                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 pass_fds=(write_fd,), start_new_session=True)
         finally:
@@ -96,9 +103,10 @@ def worker(request, timeout=None):
 
 class NativeFunction:
     """A library/symbol/ABI description; it never dlopens in the parent."""
-    def __init__(self, path, symbol, arguments, result):
+    def __init__(self, path, symbol, arguments, result, work=None):
         self.path, self.symbol = str(Path(path).resolve()), symbol
         self.arguments, self.result = list(arguments), result
+        self.work = str(Path(work).resolve()) if work else None
         self.argtypes = [TYPES[t][1] for t in arguments]
         self.restype = TYPES[result][1]
 
@@ -110,7 +118,7 @@ class NativeFunction:
             return dict(status='input_error', detail='arguments are outside the declared integer ABI')
         result = worker(dict(operation='call', library=self.path, symbol=self.symbol,
                              arguments=self.arguments, result=self.result,
-                             values=list(values), repeat=repeat), timeout=timeout)
+                             values=list(values), repeat=repeat), timeout=timeout, work=self.work)
         if result['status'] == 'ok':
             returned = result.get('values')
             if (not isinstance(returned, list) or len(returned) != repeat or any(
@@ -130,26 +138,31 @@ def identity(f):
 
 
 class NativeLibrary:
-    def __init__(self, context):
+    def __init__(self, context, work=None):
         self.functions = {}
         self.libraries = []
         self.skipped = {}
+        self.work = str(Path(work).resolve()) if work else None
+        # The sandbox record is evidence, not decoration: a reader of native-build.json
+        # must see whether the code ran confined, and under which mechanism.
+        confinement = sandbox.report()
         self.info = dict(context=context, units=[], dependencies_sha256={},
                          files_attempted=0, files_compiled=0, entry_points=0,
                          execution=dict(worker='subprocess', timeout_seconds=DEFAULT_TIMEOUT,
-                                        parent_loads_library=False, sandboxed=False))
+                                        parent_loads_library=False, sandbox=confinement,
+                                        sandboxed=bool(confinement.get('enforced'))))
 
     def __call__(self, f):
         return self.functions.get(identity(f))
 
     def load(self, path, funcs):
         outcome = worker(dict(operation='probe', library=str(Path(path).resolve()),
-                              symbols=[symbol for _, symbol in funcs]))
+                              symbols=[symbol for _, symbol in funcs]), work=self.work)
         if outcome['status'] != 'ok':
             raise NativeExecutionError(outcome)
         loaded = {}
         for f, symbol in funcs:
-            fn = NativeFunction(path, symbol, f['paramIntegerTypes'], f['returnIntegerType'])
+            fn = NativeFunction(path, symbol, f['paramIntegerTypes'], f['returnIntegerType'], work=self.work)
             loaded[identity(f)] = fn
         self.libraries.append(str(path))
         self.functions.update(loaded)
@@ -168,9 +181,12 @@ def compile_sources(source, funcs, work):
     work.mkdir(parents=True, exist_ok=True)
     # dlopen caches by path, even if the file at that path was rebuilt. Reusing
     # names in one process silently executes the previous corpus's library.
+    # The caller's work directory is the only tree the native code may write to; the
+    # build products live in a fresh subdirectory of it.
+    scratch_root = work.resolve()
     work = Path(tempfile.mkdtemp(prefix='build-', dir=work))
     context = source_context.profile(source)
-    result = NativeLibrary(context)
+    result = NativeLibrary(context, scratch_root)
     if not context['native_model_matches_host']:
         result.info['status'] = 'unsupported: target integer model differs from host ABI'
         return result

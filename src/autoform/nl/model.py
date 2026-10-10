@@ -62,6 +62,29 @@ from .formalize import LEAN_SLOTS, lake
 
 HERE = Path(__file__).resolve()
 PYVALUES = HERE.with_name('pyvalues.py')
+
+
+def sandbox_module():
+    """`scripts/sandbox.py`: the one confinement layer for every process that runs the
+    code under test (shared with the differential oracle and the native worker)."""
+    global _SANDBOX
+    try:
+        return _SANDBOX
+    except NameError:
+        pass
+    import importlib.util
+    path = HERE.parents[3] / 'scripts' / 'sandbox.py'
+    spec = importlib.util.spec_from_file_location('_autoform_sandbox', path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f'sandbox layer not found at {path}')
+    _SANDBOX = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(_SANDBOX)
+    return _SANDBOX
+
+
+def sandbox_record() -> dict:
+    """What confines the subject processes this stage launches; written into the stage's artifact."""
+    return sandbox_module().report()
 LEAN_TIMEOUT = 600
 BUILD_TIMEOUT = 1800
 TRACE_TIMEOUT = 900
@@ -1817,8 +1840,12 @@ def _run_script(script: str, cfg: dict, work: Path, stem: str, timeout: int, cwd
     env = {k: v for k, v in os.environ.items() if k not in ('PYTHONPATH',)}
     env['PYTHONHASHSEED'] = '0'
     env['PYTHONDONTWRITEBYTECODE'] = '1'
+    # The subject runs confined: no network, writes only under `work` (scripts/sandbox.py).
+    # The subject's own tree (`cwd`) is read-only; a missing mechanism raises here.
+    launch = sandbox_module().sandboxed([SUBJECT_PYTHON, '-c', script, str(cfg_path)], cwd=str(cwd or work),
+                                        env=env, work=work, read_only=[str(cwd)] if cwd else [])
     try:
-        proc = subprocess.run([SUBJECT_PYTHON, '-c', script, str(cfg_path)], cwd=str(cwd or work), env=env,
+        proc = subprocess.run(launch.argv, cwd=launch.cwd, env=launch.env,
                               capture_output=True, text=True, timeout=timeout, start_new_session=True)
     except subprocess.TimeoutExpired:
         return None, f'timed out after {timeout}s'
@@ -3033,7 +3060,8 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
         kinds[f.kind]['discovered'] += 1
         kinds[f.kind]['attempted'] += f.info.name in {r.fn.info.name for r in order}
     meta = {
-        'module': module, 'discovered': len(fns), 'attempted': len(order), 'skipped': len(skipped),
+        'module': module, 'sandbox': sandbox_record(),
+        'discovered': len(fns), 'attempted': len(order), 'skipped': len(skipped),
         'not_attempted_budget': len(over_budget), 'by_kind': kinds,
         'statuses': {s: sum(1 for r in order if r.record.status == s)
                      for s in ('VALIDATED', 'DISAGREES', 'UNTESTABLE', 'FAILED')},

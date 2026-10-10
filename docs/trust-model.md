@@ -292,6 +292,42 @@ the tool.
 * **Nothing here is a security claim.** Effect classification is a heuristic over pattern
   lists, not a soundness result.
 
+### What the sandbox does and does not do
+
+Every process that runs the code under test — the differential oracle (which traces the
+corpus's own test suite in its own process, so it re-executes itself confined), its Node,
+JVM and Go drivers, the native C worker, the harness native replay (`verifier.native_replay`), the nl tracer,
+runtime runner, coverage fuzzer and emitted-test `pytest` — is launched through one layer, `scripts/sandbox.py`. The
+subject gets no network and a filesystem it can read but write only inside its work
+directory (plus, for the oracle, the report directory, `.lake` and the oracle cache); its
+`TMPDIR` is moved inside the work directory so the shared temp directory is not a hole.
+On macOS this is `sandbox-exec` with a generated seatbelt profile (`deny network*`,
+`deny file-write*` with the work directory allowed); on Linux it is `bwrap` (host tree
+read-only, work directory bound read-write, empty network namespace) or, failing that,
+`unshare -rn`, which denies the network and binds the subject's tree read-only but does
+**not** deny writes elsewhere — its record says so. The existing deadlines and
+process-group kills are unchanged: every mechanism execs the subject in place or dies with
+its parent.
+
+What it does: stops the two things this document assumes the subject cannot do, reach the
+network and write outside its scratch tree, and makes the confinement part of the evidence.
+`conformance.json`, `native-build.json`, `emit.json`, `model.meta.json`, `fuzz.json`,
+`run.json` and the harness replay record carry `sandbox: {mechanism, enforced, ...}`; a run entered without a mechanism
+**refuses** and says what to install; `AUTOFORM_SANDBOX=off` is the only way to run
+unconfined and it is written into every one of those artifacts as `enforced: false`.
+`tests/test_sandbox.py` is the exit criterion: a subject that connects to a listening
+port and writes beside its work directory fails at both, in Python and in C through the
+native worker, and the same fixtures succeed unsandboxed in the control run.
+
+What it does not do: it is not a container, not a syscall filter, not a limit on CPU,
+memory or descriptors (the deadlines and the worker's core limit are), not a defence
+against a kernel or `sandbox-exec` defect, and it does not hide the host from the subject
+— everything readable stays readable, including this repository and the corpus. The
+`unshare` fallback confines the network only. A subject that already runs inside the
+sandbox launches its children unconfined-by-us but inside the same sandbox (recorded as
+`inherited: true`). None of this changes what a conformance figure means; it changes what a
+run can do to the machine that produced it.
+
 ## 6. How to check any of this yourself
 
 Every figure in this repository is regenerable.

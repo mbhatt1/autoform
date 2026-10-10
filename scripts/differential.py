@@ -43,6 +43,7 @@ import runtime_backends
 import external_bases
 import oracle_cache
 import deep_json
+import sandbox
 import struct
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                "cartographer"))
@@ -76,6 +77,11 @@ import atexit as _atexit
 import tempfile as _tempfile
 WORK = _tempfile.mkdtemp(prefix="autoform_diff_%d_" % os.getpid())
 _atexit.register(lambda: __import__("shutil").rmtree(WORK, ignore_errors=True))
+# The sandboxed re-execution (see `sandbox_reexec`) hands this process a private box that
+# holds its TMPDIR; the box is ours to remove.
+if os.environ.get("AUTOFORM_SANDBOX_BOX"):
+    _atexit.register(lambda: __import__("shutil").rmtree(os.environ["AUTOFORM_SANDBOX_BOX"],
+                                                         ignore_errors=True))
 
 # Test-suite-derived cases must be reproducible too. Set-iteration and dict-key hashing
 # feed which calls the suite makes and in which order, so an unseeded interpreter gives
@@ -1843,9 +1849,9 @@ def java_backend(src_root, holefree, ncases, kotlin=False):
         # `-proc:none` keeps a project's annotation processors off our compile path;
         # implicit compilation stays ON so classes pulled in via -sourcepath land in
         # `classes/` and are present on the classpath when the driver runs.
-        r = subprocess.run(["javac", "-nowarn", "-proc:none", *sourcepath,
-                            "-d", classes, src],
-                           capture_output=True, text=True)
+        r = sandbox.sandboxed(["javac", "-nowarn", "-proc:none", *sourcepath,
+                               "-d", classes, src], cwd=work, work=work).run(
+            capture_output=True, text=True, start_new_session=True)
         if r.returncode == 0:
             compiled.add(src)
         else:
@@ -1868,9 +1874,9 @@ def java_backend(src_root, holefree, ncases, kotlin=False):
     if not cands:
         return [], info, skipped
     open(os.path.join(work, "AutoformDriver.java"), "w").write(JAVA_DRIVER)
-    r = subprocess.run(["javac", "-nowarn", "-d", classes,
-                        os.path.join(work, "AutoformDriver.java")],
-                       capture_output=True, text=True)
+    r = sandbox.sandboxed(["javac", "-nowarn", "-d", classes,
+                           os.path.join(work, "AutoformDriver.java")], cwd=work, work=work).run(
+        capture_output=True, text=True, start_new_session=True)
     if r.returncode != 0:
         info["driver"] = "failed to compile: " + r.stderr[:200]
         return [], info, skipped
@@ -1902,9 +1908,10 @@ def java_backend(src_root, holefree, ncases, kotlin=False):
             calls.append("|".join([str(len(calls)), m.group("cls"), m.group("meth"),
                                    str(len(argtypes))] + enc))
             plan.append((f["name"], vals))
-    out = subprocess.run(["java", "-cp", classpath, "AutoformDriver"],
-                         input="\n".join(calls) + "\n",
-                         capture_output=True, text=True, timeout=300)
+    launch = sandbox.sandboxed(["java", "-cp", classpath, "AutoformDriver"], cwd=work, work=work)
+    info["sandbox"] = launch.record
+    out = launch.run(input="\n".join(calls) + "\n",
+                     capture_output=True, text=True, timeout=300, start_new_session=True)
     got = {}
     for line in out.stdout.splitlines():
         p = line.split("|")
@@ -1953,6 +1960,58 @@ def node_backend(src_root, holefree, ncases, lang):
 
 # ---------------------------------------------------------------------------- main
 
+def sandbox_record():
+    """The confinement of the running oracle process, for conformance.json."""
+    inherited = sandbox.active()
+    if inherited:
+        return dict(inherited, inherited=True)
+    if sandbox.policy() == "off":
+        return sandbox.off_record()
+    return sandbox.none_record("differential.main() was entered in process; the oracle "
+                               "re-executes itself under the sandbox only from its "
+                               "command-line entry (python scripts/differential.py ...)")
+
+
+def sandbox_reexec():
+    """Re-execute the whole oracle inside the sandbox.
+
+    The Python leg runs the corpus's test suite under `sys.settrace` in THIS process, so
+    the process itself is what has to be confined: no network, writes only to the
+    report directory (cwd), the Lean build tree (`.lake`), the oracle cache and a private
+    TMPDIR. Without a mechanism the run is REFUSED, with a conformance.json that says so
+    (a stale report from an earlier run must not be read as this run's result), unless
+    `AUTOFORM_SANDBOX=off`, which the report records."""
+    if sandbox.active() or sandbox.policy() == "off":
+        return
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    argv = sys.argv[1:]
+    cache = (os.path.abspath(argv[argv.index("--cache-dir") + 1]) if "--cache-dir" in argv
+             else os.path.join(repo, ".autoform-work"))
+    os.makedirs(cache, exist_ok=True)
+    writable = [os.getcwd(), os.path.join(repo, ".lake"), cache]
+    # The trees the `unshare` fallback binds read-only: the corpus and its test suite
+    # (the mechanisms that deny writes everywhere else do not need the list).
+    subject = [a for i, a in enumerate(argv) if os.path.isdir(a)
+               and (i == 0 or argv[i - 1] != "--cache-dir")]
+    if os.environ.get("AUTOFORM_DIFF_KEEP"):
+        os.makedirs(os.environ["AUTOFORM_DIFF_KEEP"], exist_ok=True)
+        writable.append(os.environ["AUTOFORM_DIFF_KEEP"])
+    box = _tempfile.mkdtemp(prefix="autoform_sandbox_%d_" % os.getpid())
+    try:
+        launch = sandbox.sandboxed([sys.executable, *sys.argv], cwd=os.getcwd(), work=box,
+                                   writable=writable, read_only=subject)
+    except sandbox.SandboxUnavailable as exc:
+        __import__("shutil").rmtree(box, ignore_errors=True)
+        print("REFUSING to run: " + str(exc))
+        json.dump({"status": "REFUSED: no sandbox", "sandbox": sandbox.none_record(str(exc)),
+                   "argv": sys.argv[1:], "agree": 0, "total": 0, "divergences": 0,
+                   "inconclusive": 0, "rate": "n/a"},
+                  open("conformance.json", "w"), indent=1)
+        sys.exit(2)
+    env = dict(launch.env, AUTOFORM_SANDBOX_BOX=box)
+    os.execve(launch.argv[0], launch.argv, env)
+
+
 def main():
     argv = [a for a in sys.argv[1:]]
     tests_override = None
@@ -1981,6 +2040,13 @@ def main():
         i = argv.index("--cache-dir"); cache_dir = argv[i + 1]; del argv[i:i + 2]
     ast_path, src_root, lean_mod = argv[0], argv[1], argv[2]
     ncases = int(argv[3]) if len(argv) > 3 else 5
+    # What confines THIS process. The Python leg traces the corpus's test suite in
+    # process, so the oracle re-executes itself inside the sandbox from its command-line
+    # entry (`sandbox_reexec`); a `main()` entered in process (the test suite's fixture)
+    # is not confined and says so. Each driver it spawns records its own launch.
+    SANDBOX = sandbox_record()
+    print("sandbox: %s%s" % (SANDBOX["mechanism"],
+                             "" if SANDBOX.get("enforced") else " (NOT enforced: %s)" % SANDBOX.get("reason")))
     # Static coverage and sampling use the same source bodies as the Lean ledger,
     # including refusals introduced when suspended generators are lowered.
     funcs = analysis_functions(deep_json.load(ast_path))
@@ -2009,7 +2075,7 @@ def main():
               "extensions %s. Defaulting to CPython would report agreement between the "
               "Lean semantics and a runtime that never ran this code." % sorted(exts))
         json.dump({"module": module_tag, "ast": os.path.abspath(ast_path),
-                   "status": "REFUSED: unknown source language",
+                   "status": "REFUSED: unknown source language", "sandbox": SANDBOX,
                    "extensions": exts, "agree": 0, "total": 0, "divergences": 0,
                    "inconclusive": 0, "rate": "n/a",
                    "coverage": {"population": len(funcs), "compared": 0,
@@ -2484,6 +2550,7 @@ def main():
                        'insertion order and internal mutation versions are outside this claim.')
 
     result = {"module": module_tag, "source_root": os.path.abspath(src_root),
+              "sandbox": SANDBOX,
               "interpreter_fuel": FUEL, "initializer_fuel": FUEL,
               "ast": os.path.abspath(ast_path), "runtime": runtime,
               "runtime_version": runtime_version(lang),
@@ -3204,4 +3271,5 @@ if __name__ == "__main__":
     # AST decoding and traversal use explicit stacks. Keep native execution on the
     # main thread so signal deadlines work and source recursion retains Python's
     # normal limit, instead of changing it process-wide to 300,000.
+    sandbox_reexec()
     sys.exit(main())
