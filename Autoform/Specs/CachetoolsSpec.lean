@@ -395,24 +395,19 @@ so an inequality between two functions is not evidence about either of them. Pin
 values is what gives it teeth. The lesson generalises: a witness that asserts a relation
 between two computations tests neither unless the relation is pinned on both sides. -/
 -- RELAND: survived -- predicted to break (both getters holed); property definitions translate now.
-theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
-    (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
+theorem Cache_size_fields_distinct :
+    (runMethod 10 sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
         = .val (.int 128)
-  ∧ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2
+  ∧ (runMethod 10 sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2
         = .val (.int 3)
-  ∧ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
-      ≠ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2 := by
-  have hmax := Cache_maxsize_mrefines sampleCache (.ref 0) []
-    ⟨0, .int 128, rfl, by exact ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
-  have hcur := Cache_currsize_mrefines sampleCache (.ref 0) []
-    ⟨0, .int 3, rfl, by exact ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
-  have hm : (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
-      = .val (.int 128) := by
-    simpa [readField, sampleCache, Heap.get, Outcome.toEResult] using congrArg Prod.snd hmax
-  have hc : (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2
-      = .val (.int 3) := by
-    simpa [readField, sampleCache, Heap.get, Outcome.toEResult] using congrArg Prod.snd hcur
-  exact ⟨hm, hc, by rw [hm, hc]; intro he; cases he⟩
+  ∧ (runMethod 10 sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
+      ≠ (runMethod 10 sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2 := by
+  -- Evaluated by the kernel on the concrete heap, not derived from the parent theorems:
+  -- a witness that re-derives from an unchanged statement is invisible to the mutation
+  -- gate (§4, finding 1), and this one scored 0/4 that way on 2026-10-09.
+  refine ⟨rfl, rfl, ?_⟩
+  show EResult.val (.int 128) ≠ EResult.val (.int 3)
+  intro he; cases he
 
 /-! ### `Cache.__contains__` — membership, and the *polarity* of `in`
 
@@ -444,20 +439,12 @@ absent one. This is the anti-vacuity witness for `Cache_contains_mrefines` — a
 specification satisfied by `fun _ => true` would pass the equation above only if that
 equation were itself wrong, and this makes the discrimination concrete. -/
 -- RELAND: survives.
-theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
-    (runMethod fuel [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+theorem Cache_contains_discriminates :
+    (runMethod 12 [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 1]).2 = .val (.bool true)
-  ∧ (runMethod fuel [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+  ∧ (runMethod 12 [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 2]).2 = .val (.bool false) := by
-  have present := Cache_contains_mrefines
-    [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
-    (.ref 0) [.int 1] ⟨0, .int 1, [(.int 1, .int 9)], rfl, rfl, ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
-  have absent := Cache_contains_mrefines
-    [{ cls := "cachetools/__init__.py:<module>.Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
-    (.ref 0) [.int 2] ⟨0, .int 2, [(.int 1, .int 9)], rfl, rfl, ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
-  constructor
-  · simpa [readField, Heap.get, Val.beq, Outcome.toEResult] using congrArg Prod.snd present
-  · simpa [readField, Heap.get, Val.beq, Outcome.toEResult] using congrArg Prod.snd absent
+  exact ⟨rfl, rfl⟩
 
 /-! ### `TLRUCache._Item.__lt__` — retired
 
@@ -500,13 +487,10 @@ theorem Timer_exit_mrefines :
 
 /-- The decrement is a decrement: on a concrete timer at nesting 1, exit leaves 0. -/
 -- RELAND: survives.
-theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
-    readField ((runMethod fuel [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [("_Timer__nesting", .int 1)] }]
+theorem Timer_exit_decrements :
+    readField ((runMethod 12 [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [("_Timer__nesting", .int 1)] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" (.ref 0) [.unit]).1) 0
         "_Timer__nesting" = .int 0 := by
-  have hr := Timer_exit_mrefines [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [("_Timer__nesting", .int 1)] }]
-    (.ref 0) [.unit] ⟨0, 1, .unit, rfl, rfl, ⟨_, rfl, rfl, rfl⟩⟩ fuel hf
-  rw [hr]
   rfl
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
@@ -534,16 +518,13 @@ theorem Timer_init_mrefines :
 
 /-- Both fields are actually written, with the right values in the right places. -/
 -- RELAND: survives.
-theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
-    readField (runMethod fuel [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
+theorem Timer_init_sets_both :
+    readField (runMethod 12 [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
       0 "_Timer__timer" = .int 99
-  ∧ readField (runMethod fuel [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
+  ∧ readField (runMethod 12 [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
       0 "_Timer__nesting" = .int 0 := by
-  have hr := Timer_init_mrefines [{ cls := "cachetools/__init__.py:<module>._TimedCache._Timer", fields := [] }]
-    (.ref 0) [.int 99] ⟨0, .int 99, rfl, rfl, ⟨_, rfl, rfl⟩⟩ fuel hf
-  rw [hr]
   exact ⟨rfl, rfl⟩
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields
@@ -664,52 +645,55 @@ theorem cache_clear_zeroes_the_box (k : Nat) (h : Heap) (r : Ref) (hb : HasClass
 
 /-! ## 4. What the mutation gate actually said
 
-Run: `scripts/mutate.py Autoform/Generated/Cachetools.lean Autoform.Generated.Cachetools
+Run (2026-10-09, after the re-land on the final exporter and semantics):
+`scripts/mutate.py Autoform/Generated/Cachetools.lean Autoform.Generated.Cachetools
 --spec-file Autoform/Specs/CachetoolsSpec.lean --spec-module Autoform.Specs.CachetoolsSpec
---decls <the 15 functions above> --subject <theorem→function map>`. 57 mutants of the
-*generated* module, 2 rejected as not type-correct, 0 inconclusive, 0 coarse.
+--generated --max-mutants 60 --seed 20260819 --decls <the 12 subject functions of the map>
+--subject <theorem→function map>`. 51 mutants of the *generated* module, 51 run,
+0 rejected as not type-correct, 0 inconclusive, 0 coarse attributions.
 
-**On-subject score: 78 / 88 = 88.6%.** Thirteen of the twenty-one theorems are
-`HAS TEETH` (100%). Every one of the ten survivors was examined; none is a case of a
-theorem failing to notice a behavioural change:
+**On-subject score: 68 / 73 = 93.2%.** Twelve of the seventeen theorems are `HAS TEETH`
+(100%). Every one of the five survivors was examined; none is a case of a theorem failing
+to notice a behavioural change:
 
-* **4 × `ast-seq-delete` of a docstring** (`getsizeof`, `maxsize`, `currsize`, and the
-  latter two again under `Cache_size_fields_distinct`). The deleted statement is
-  `Stmt.expr (Expr.lit (Lit.str "..."))` — Python's docstring, translated as
+* **4 × `ast-seq-delete` of a docstring** (`maxsize` and `currsize`, each once under its
+  own `_mrefines` and once more under `Cache_size_fields_distinct`). The deleted statement
+  is `Stmt.expr (Expr.lit (Lit.str "..."))` — Python's docstring, translated as
   evaluate-and-discard. Deleting a discarded pure literal is a **provably equivalent
-  mutant**; no specification of observable behaviour can, or should, kill it.
+  mutant**; no specification of observable behaviour can, or should, kill it. These three
+  theorems are therefore reported `WEAK` (3/4, 3/4, 6/8), and that verdict is correct
+  about the gate's operator set, not about the theorems.
 * **1 × `ast-ret->expr` in `_cachedmethod._none`.** The body is `.ret (.lit .unit)`;
   under `.expr` the body falls through to `Ctl.normal`, which `applyFunc` maps to
   `EResult.val Val.unit` — the same observable. Equivalent mutant, and a real property of
-  the semantics: a Python function that falls off the end returns `None`.
-* **2 × `ast-name` swaps under `TLRUItem_lt_irrefl`.** That witness compares an item with
-  *itself*, so `self` and `other` denote the same reference and swapping them cannot
-  change the answer. The parent `TLRUItem_lt_mrefines` kills both (6/6).
-* **2 × `ast-int` in `_uncached_info.cache_clear`.** The only mutable point in that
-  function sits *after* `Stmt.hole "scope:nonlocal-write"`, so it is unreachable: the
-  interpreter stops at the hole. Dead-code mutant.
-* **1 theorem with no mutants at all**: `_DefaultSize.__setitem__` has body `.skip`.
-  There is nothing to perturb, so `DefaultSize_setitem_mrefines` is reported `UNTESTED`
-  rather than given a score. That is the honest verdict, not a pass.
+  the semantics: a Python function that falls off the end returns `None`. With one mutant
+  and one survivor the theorem is reported `VACUOUS` (0/1); it is not.
+* **2 theorems with no mutants at all**: `_DefaultSize.__setitem__` has body `.skip`, and
+  `_TimedCache.expire`'s body offers the operator set nothing it rewrites (the gate prints
+  `no mutant generated for declaration` for both). `DefaultSize_setitem_mrefines` and
+  `TimedCache_expire_raises` are reported `UNTESTED` rather than given a score. That is
+  the honest verdict, not a pass.
 
 Two findings the gate produced about *this file*, both recorded because they generalise:
 
 1. **Witness corollaries proved by rewriting their parent theorem are invisible to the
-   gate.** The five `_discriminates` / `_irrefl` / `_decrements` / `_sets_both` /
-   `_distinct` witnesses originally scored **0/32**. When a mutant breaks the parent,
-   Lean reports the error at the parent and still admits its *statement* downstream, so
-   the corollary re-derives from an unchanged statement and never fails. They were
-   rewritten to evaluate the interpreter directly, and went to 28/32. This is the same
-   shape as STRATEGY.md 14: a theorem stated in terms of the thing being mutated moves
-   with it.
+   gate.** `Cache_size_fields_distinct`, `Cache_contains_discriminates`,
+   `Timer_exit_decrements` and `Timer_init_sets_both` were restated on 2026-10-09 as
+   `∀ fuel ≥ N` consequences of their parents and scored **0 / 23** that way: when a mutant
+   breaks the parent, Lean reports the error at the parent and still admits its
+   *statement* downstream, so the corollary re-derives from an unchanged statement and
+   never fails. They now evaluate the interpreter directly (`rfl` on the concrete heap —
+   `Val` has no `DecidableEq`, so `decide` is not available) and score 25 / 27. This is the
+   same shape as STRATEGY.md 14: a theorem stated in terms of the thing being mutated
+   moves with it.
 2. **An inequality between two functions tests neither.** `Cache_size_fields_distinct`
    originally claimed only `maxsize ≠ currsize` and scored **0/8** — mutating one
-   accessor leaves the other alone, so the two still differ. Pinning both values took it
-   to 6/8 (the remaining two being the docstring-deletion equivalents).
+   accessor leaves the other alone, so the two still differ. Pinning both values is what
+   gives it its 6/8 (the remaining two being the docstring-deletion equivalents).
 
-The score over the *whole* mutant population is 1.8%–12.7% per theorem. That number is
-not a vacuity measurement, it is a **coverage** measurement: these theorems describe 15
-of 233 translated functions, so most mutants are in code they never mention. The two must
+The score over the *whole* mutant population is 2%–16% per theorem. That number is not
+a vacuity measurement, it is a **coverage** measurement: these theorems describe 12 of
+209 translated functions, so most mutants are in code they never mention. The two must
 not be conflated, which is why `mutate.py --subject` reports them separately.
 
 ## 5. Open obligations
