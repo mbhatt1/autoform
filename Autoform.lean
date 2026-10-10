@@ -47,6 +47,10 @@ import Autoform.NL.Basis
 -- in ONE build, kernel-checked together, replayed together by `leanchecker --fresh`.
 import Autoform.BuiltinBase
 import Autoform.Contracts
+-- Hand-written, split by hand on 2026-10-10 into `Autoform/Specs/CachetoolsSpec/Base.lean`
+-- + `Part1..6.lean` (theorems moved verbatim, same namespace) after measuring every
+-- theorem alone: the single file held 13.6 GB; two constructor theorems hold ~11 GB each
+-- in parts of their own and every other part is under 2.2 GB (figures in ci.yml).
 import Autoform.Specs.CachetoolsSpec
 -- Split by `scripts/synth_specs.py --split-gb` (2026-10-10): an umbrella over
 -- `Autoform/SpecsGen/Cachetools/Base.lean` + `Part1..9.lean`, the same shape as V8Base

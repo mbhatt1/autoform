@@ -119,19 +119,26 @@ jobs:
       # (`--split-gb 4`, roadmap 3.1): `Cachetools/Base.lean` + `Cachetools/Part1..9.lean`
       # under an umbrella, each part packed under a predicted 4 GB from the budget probe's
       # per-theorem profile. Measured 2026-10-10 (/usr/bin/time -l lake env lean, peak
-      # RSS): Base 1.21 GB, Part1 1.55, Part2 1.81, Part3 11.27, Part4 1.69, Part5 1.53,
-      # Part6 1.48, Part7 2.28, Part8 1.48, Part9 1.73, umbrella 1.18. One theorem --
+      # RSS): Base 1.21 GB, Part1 1.56, Part2 1.81, Part3 11.27, Part4 1.68, Part5 1.63,
+      # Part6 1.49, Part7 2.25, Part8 1.51, Part9 1.73, umbrella 1.18. One theorem --
       # `conform_cachetools___init___py__module__Cache___len`, Part3 -- costs 11.27 GB on
       # its own (a single kernel evaluation; per-case `decide +kernel`, `rfl` and `cbv`
       # variants were measured and are no cheaper), so the split cannot bound it and the
       # umbrella says so. That one part is still built alone, before anything else;
       # every other part is under 2.3 GB and the umbrella picks them up with the rest.
-      # `Autoform.Specs.CachetoolsSpec` is hand-written and still 13.6 GB in one process;
-      # it stays sequenced by hand.
+      # `Autoform.Specs.CachetoolsSpec` (hand-written) was split by hand the same way on
+      # 2026-10-10 -- `CachetoolsSpec/Base.lean` + `Part1..6.lean`, theorems moved
+      # verbatim, same namespace -- after measuring every theorem alone. Measured peak
+      # RSS: Base 1.99 GB, Part1 1.36, Part2 1.73, Part3 1.94, Part4 11.06, Part5 2.11,
+      # Part6 11.11, umbrella 1.17. Two theorems cost ~11 GB each on their own, the two
+      # constructor specifications (`Timer_init_mrefines`, Part4; `TTLLink_init_mrefines`,
+      # Part6: `simp +decide` through two heap writes under class metadata), so those two
+      # parts are built alone as well. Everything else is under 2.2 GB.
       - name: lake build
         run: |
           taskset -c 0 lake build Autoform.SpecsGen.Cachetools.Part3
-          taskset -c 0 lake build Autoform.Specs.CachetoolsSpec
+          taskset -c 0 lake build Autoform.Specs.CachetoolsSpec.Part4
+          taskset -c 0 lake build Autoform.Specs.CachetoolsSpec.Part6
           taskset -c 0 lake build Autoform.CI
 
       - uses: actions/setup-python@v5
