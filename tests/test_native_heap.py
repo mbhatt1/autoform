@@ -389,3 +389,42 @@ end Autoform.Generated.GraphTest
     assert (result.returncode == 0) == correct, result.stdout + result.stderr
     if not correct:
         assert 'kernel computation did not establish the claim' in result.stdout
+
+
+def test_lambda_identities_are_named_the_way_the_exporter_names_them(differential, tmp_path):
+    """The exporter numbers a file's lambdas in source order and qualifies them by the
+    enclosing scopes. A receiver holding `getsizeof=lambda x: x` (cachetools'
+    regression tests for `Cache.__setitem__`) was refused as
+    `callable-source-identity-unresolved` until the index named lambdas too."""
+    from native_heap import function_identities
+    path = tmp_path / 'lam.py'
+    path.write_text('class T:\n'
+                    '    def a(self):\n'
+                    '        return lambda x: x\n'
+                    '    def b(self):\n'
+                    '        return lambda x: x + 1\n'
+                    'top = lambda: 0\n')
+    ns = {}
+    exec(compile(path.read_text(), str(path), 'exec'), ns)
+    funcs = [{'name': 'lam.py:<module>.' + name, 'file': 'lam.py'}
+             for name in ('T.a', 'T.b', 'T.a.<lambda>0', 'T.b.<lambda>1', '<lambda>2')]
+    identities = function_identities(funcs, tmp_path)
+    enc = differential.GraphEncoder({}, identities)
+    assert enc.enc(ns['T']().a()) == ('fn', 'lam.py:<module>.T.a.<lambda>0')
+    assert enc.enc(ns['T']().b()) == ('fn', 'lam.py:<module>.T.b.<lambda>1')
+    assert enc.enc(ns['top']) == ('fn', 'lam.py:<module>.<lambda>2')
+
+
+def test_two_lambdas_on_one_line_are_refused(differential, tmp_path):
+    """`co_firstlineno` cannot tell them apart, so the line names neither."""
+    from native_heap import function_identities
+    path = tmp_path / 'same.py'
+    path.write_text('f = lambda: 1; g = lambda: 2\n')
+    ns = {}
+    exec(compile(path.read_text(), str(path), 'exec'), ns)
+    funcs = [{'name': 'same.py:<module>.<lambda>%d' % i, 'file': 'same.py'} for i in (0, 1)]
+    identities = function_identities(funcs, tmp_path)
+    assert not identities
+    for fn in (ns['f'], ns['g']):
+        with pytest.raises(differential.Unencodable, match='source-identity-unresolved'):
+            differential.GraphEncoder({}, identities).enc(fn)

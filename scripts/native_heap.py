@@ -80,8 +80,21 @@ def function_identities(funcs, root):
         except (OSError, SyntaxError, UnicodeError):
             continue
         definitions = {}
+        # The exporter names a lambda `<lambda>N` with N counting the file's lambdas in
+        # source order (line, then column), qualified by the enclosing classes, defs and
+        # lambdas: `tests/__init__.py:<module>.CacheTestMixin.test_x.<lambda>2`. A lambda's
+        # code object has the lambda's own line as `co_firstlineno`, so it is keyed like
+        # a def. Until this was indexed, every receiver holding a test's `getsizeof=lambda
+        # x: x` was refused (`callable-source-identity-unresolved`) and the oracle could
+        # not adjudicate the cachetools `Cache.__setitem__` regression cases at all
+        # (docs/evidence-cachetools.md).
+        lambda_number = {
+            (node.lineno, node.col_offset): index
+            for index, node in enumerate(sorted(
+                (n for n in ast.walk(tree) if isinstance(n, ast.Lambda)),
+                key=lambda n: (n.lineno, n.col_offset)))}
 
-        def walk(node, prefix='', owner=None, repeated_scope=False):
+        def walk(node, prefix='', owner=None, repeated_scope=False, in_loop=False):
             for child in ast.iter_child_nodes(node):
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     name = child.name
@@ -90,13 +103,24 @@ def function_identities(funcs, root):
                     qual = prefix + name
                     line = min([child.lineno] + [d.lineno for d in child.decorator_list])
                     definitions.setdefault(qual, []).append((line, not repeated_scope))
-                    walk(child, qual + '.', owner, True)
+                    walk(child, qual + '.', owner, True, in_loop)
+                elif isinstance(child, ast.Lambda):
+                    # A lambda is a local allocation wherever it appears (a test's
+                    # `getsizeof=lambda x: x` is one object per test run), so the
+                    # nested-def rule above would refuse every one of them. Two objects
+                    # from one location inside ONE observation are still refused by the
+                    # encoder (`callable-source-identity-collision`); only a lambda
+                    # created in a loop, where that is the normal case, is refused here.
+                    qual = prefix + '<lambda>%d' % lambda_number[child.lineno, child.col_offset]
+                    definitions.setdefault(qual, []).append((child.lineno, not in_loop))
+                    walk(child, qual + '.', owner, True, in_loop)
                 elif isinstance(child, ast.ClassDef):
-                    walk(child, prefix + child.name + '.', child.name, repeated_scope)
+                    walk(child, prefix + child.name + '.', child.name, repeated_scope, in_loop)
                 else:
-                    walk(child, prefix, owner, repeated_scope or
-                         isinstance(child, (ast.For, ast.AsyncFor, ast.While)))
+                    loop = isinstance(child, (ast.For, ast.AsyncFor, ast.While))
+                    walk(child, prefix, owner, repeated_scope or loop, in_loop or loop)
         walk(tree)
+        claims = {}
         for qual, lines in definitions.items():
             target = rel + ':<module>.' + qual
             target = raw_bodies.get(target, target)
@@ -105,7 +129,13 @@ def function_identities(funcs, root):
             # identity distinction. Use lexical source nesting, not the mutable
             # function __qualname__, to refuse this boundary.
             if len(lines) == 1 and lines[0][1] and target in exported:
-                result[path, lines[0][0]] = target
+                claims.setdefault((path, lines[0][0]), []).append(target)
+        # Two definitions on one line (`f = lambda: 1; g = lambda: 2`) share a
+        # `co_firstlineno`, so the location names neither of them: refuse both rather
+        # than let the last one claim the line.
+        for key, targets in claims.items():
+            if len(targets) == 1:
+                result[key] = targets[0]
     return result
 
 
