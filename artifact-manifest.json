@@ -21,6 +21,13 @@
    "render_bytes": 2060887,
    "render_sha256": "27b4fe8cc814bb8fff1589ca08192c9ab0e54bca797b97a721ee986a726cbe1d"
   },
+  "CommonsLang3": {
+   "ast_bytes": 1597749,
+   "ast_sha256": "d6e4354775d00705a054a7e63306c709493eee148e0326e5d38ad6195ca4959e",
+   "ast_tracked": true,
+   "render_bytes": 855983,
+   "render_sha256": "c445586f44a655459af4778b26dc689ce956e3f9bc44f1df61af172e0acad91c"
+  },
   "Jinja2": {
    "ast_bytes": 7898905,
    "ast_sha256": "f01eacec0541c62fae029a344746a5e828e61070d9950cc92f892ec1668e636d",
@@ -150,6 +157,11 @@
    "corpus": "Click",
    "corpus_ast_sha256": "51b74421c6880be8d63691bc303a9f60a37da4ca465dbca3ab35b3e6bf523e32",
    "source": "ast-Click.json"
+  },
+  "SpecsGen/CommonsLang3": {
+   "corpus": "CommonsLang3",
+   "corpus_ast_sha256": "d6e4354775d00705a054a7e63306c709493eee148e0326e5d38ad6195ca4959e",
+   "source": "ast-CommonsLang3.json"
   },
   "SpecsGen/Jinja2": {
    "corpus": "Jinja2",

@@ -62,6 +62,9 @@ import Autoform.SpecsGen.V8BaseSample
 import Autoform.SpecsGen.LinuxLib
 import Autoform.SpecsGen.LinuxLibSample
 import Autoform.Specs.CppCastSpec
+-- The first non-Python corpus at scale: commons-lang3 3.17.0 (Java, 9 files of
+-- `org.apache.commons.lang3`, 488 functions), observation theorems from the JVM oracle.
+import Autoform.SpecsGen.CommonsLang3
 
 -- V8 `src/base` laws: 73 modules, with the shared context and all 73 domains in
 -- `V8Base.Base`. One Lean process retains every `rfl` term it elaborates, and each of

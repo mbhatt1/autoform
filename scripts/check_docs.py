@@ -46,6 +46,37 @@ CHECKS = [
      "ledger-Cachetools.json", "functions", int),
     ("docs/languages.md", r"the ledger's population \((\d+) for", 
      "ledger-Cachetools.json", "functions", int),
+    # The Java corpus row (commons-lang3, 2026-10-10): the matrix row quotes the ledger,
+    # the oracle figures come from the tracked run snapshot evidence-CommonsLang3.json
+    # (conformance.json is a gitignored run product, as ledger-*.json is; CI regenerates
+    # the ledger from the built module before running this script).
+    ("docs/languages.md",
+     r"\|\s*Java \(commons-lang3[^|]*\|.*?\|\s*(\d+)\s*\|\s*\d+ \(\d+%\)",
+     "ledger-CommonsLang3.json", "functions", int),
+    ("docs/languages.md",
+     r"\|\s*Java \(commons-lang3[^|]*\|.*?\|\s*\d+\s*\|\s*(\d+) \(\d+%\)",
+     "ledger-CommonsLang3.json", "holeFree", int),
+    ("docs/languages.md",
+     r"\|\s*Java \(commons-lang3[^|]*\|.*?\|\s*\d+\s*\|\s*\d+ \(\d+%\)\s*\|\s*(\d+) \(\d+%\)",
+     "ledger-CommonsLang3.json", "verifiableCore", int),
+    ("docs/languages.md", r"\*\*(\d+) functions compared, \d+/\d+ cases agree, \d+ divergences",
+     "evidence-CommonsLang3.json", "compared_functions", int),
+    ("docs/languages.md", r"\*\*\d+ functions compared, (\d+)/\d+ cases agree, \d+ divergences",
+     "evidence-CommonsLang3.json", "agree", int),
+    ("docs/languages.md", r"\*\*\d+ functions compared, \d+/(\d+) cases agree, \d+ divergences",
+     "evidence-CommonsLang3.json", "total", int),
+    ("docs/languages.md", r"\*\*\d+ functions compared, \d+/\d+ cases agree, (\d+) divergences",
+     "evidence-CommonsLang3.json", "divergences", int),
+    ("docs/languages.md", r"\*\*\d+ functions compared, \d+/\d+ cases agree, \d+ divergences,\s*(\d+) cases inconclusive",
+     "evidence-CommonsLang3.json", "inconclusive", int),
+    ("docs/languages.md", r"Ledger \(`ledger-CommonsLang3.json`\): (\d+) functions",
+     "ledger-CommonsLang3.json", "functions", int),
+    ("docs/languages.md", r"Ledger \(`ledger-CommonsLang3.json`\): \d+ functions, (\d+) hole-free",
+     "ledger-CommonsLang3.json", "holeFree", int),
+    ("docs/languages.md", r"Ledger \(`ledger-CommonsLang3.json`\): \d+ functions, \d+ hole-free \(\d+%\), (\d+) in the",
+     "ledger-CommonsLang3.json", "verifiableCore", int),
+    ("docs/languages.md", r"(\d+) holes in \d+ functions \(table above\)",
+     "ledger-CommonsLang3.json", "holes", int),
 ]
 
 
@@ -60,6 +91,10 @@ CHECKS = [
 # module must agree on the facts they share. Population is the sharpest one.
 CROSS = [
     ("ledger-Cachetools.json", "functions", "ast-Cachetools.json", None,
+     "function count"),
+    ("ledger-CommonsLang3.json", "functions", "ast-CommonsLang3.json", None,
+     "function count"),
+    ("evidence-CommonsLang3.json", "population", "ast-CommonsLang3.json", None,
      "function count"),
 ]
 

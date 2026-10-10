@@ -68,6 +68,8 @@ SPECS = {
     "SpecsGen/V8BaseSample": "V8BaseSample",
     "Specs/V8Spec": "V8BaseSample",
     "Specs/CachetoolsSpec": "Cachetools",
+    # Java corpus, re-landed 2026-10-10 (docs/languages.md, "Java at scale").
+    "SpecsGen/CommonsLang3": "CommonsLang3",
     # The scale corpora (docs/scale.md), re-landed 2026-09-21 with provenance.
     "SpecsGen/Requests": "Requests",
     "SpecsGen/Click": "Click",

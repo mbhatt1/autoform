@@ -300,6 +300,16 @@ jobs:
           lake env lean .ci-ledger/Ledger.lean
           test -s ledger-Cachetools.json  # never let a silent no-op look like success
 
+      # Same for the Java corpus (commons-lang3): docs/languages.md's matrix row quotes
+      # its ledger, and check_docs binds those figures to ledger-CommonsLang3.json.
+      - name: Regenerate ledger-CommonsLang3.json from the built module
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-ledger
+          sed 's/@MODULE@/CommonsLang3/g' scripts/ledger.lean.tmpl > .ci-ledger/LedgerCommonsLang3.lean
+          lake env lean .ci-ledger/LedgerCommonsLang3.lean
+          test -s ledger-CommonsLang3.json
+
       - name: check_docs — documented figures match the artifacts
         run: python3 scripts/check_docs.py
 

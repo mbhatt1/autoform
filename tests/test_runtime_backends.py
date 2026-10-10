@@ -143,3 +143,62 @@ def test_no_cases_is_nonzero_and_writes_report(tmp_path, differential, monkeypat
     monkeypatch.chdir(tmp_path)
     assert differential.main() == 2
     assert json.loads((tmp_path / "conformance.json").read_text())["total"] == 0
+
+
+# --------------------------------------------------------------------------- #
+# JVM backend: a `CharSequence` parameter is a String slot (commons-lang3's
+# `StringUtils` surface is almost entirely `CharSequence`-typed), and a corpus that is a
+# SUBSET of a larger tree names the rest of that tree with AUTOFORM_JAVA_SOURCEPATH.
+# --------------------------------------------------------------------------- #
+
+def _java_funcs(*names):
+    return [function(n, "Text.java", list("abcdefg"[:n.count(",") + (0 if n.endswith("()") else 1)]))
+            for n in names]
+
+
+@pytest.mark.skipif(not shutil.which("javac") or not shutil.which("java"), reason="JDK unavailable")
+def test_jvm_backend_passes_strings_through_charsequence_parameters(tmp_path, differential):
+    (tmp_path / "Text.java").write_text(
+        "public class Text {\n"
+        "  public static int len(CharSequence cs) { return cs == null ? -1 : cs.length(); }\n"
+        "  public static boolean same(CharSequence a, String b) { return a.toString().equals(b); }\n"
+        "  public static CharSequence echo(CharSequence cs) { return cs; }\n"
+        "}\n")
+    funcs = _java_funcs("Text.len:int(java.lang.CharSequence)",
+                        "Text.same:boolean(java.lang.CharSequence,java.lang.String)",
+                        "Text.echo:java.lang.CharSequence(java.lang.CharSequence)")
+    cases, info, skipped = differential.java_backend(str(tmp_path), funcs, 4)
+    # The CharSequence RETURN is still refused: `enc` has no faithful encoding for it.
+    assert skipped == {"Text.echo:java.lang.CharSequence(java.lang.CharSequence)": "non-primitive signature"}
+    assert info["primitive_static_candidates"] == 2 and info["cases_built"] == 8
+    for c in cases:
+        if c["name"].startswith("Text.len"):
+            (kind, text), = c["args"]
+            assert kind == "str" and c["outcome"] == ("val", ("int", len(text)))
+        else:
+            (ka, a), (kb, b) = c["args"]
+            assert (ka, kb) == ("str", "str") and c["outcome"] == ("val", ("bool", a == b))
+
+
+@pytest.mark.skipif(not shutil.which("javac") or not shutil.which("java"), reason="JDK unavailable")
+def test_jvm_backend_resolves_a_subset_corpus_against_extra_source_roots(tmp_path, differential, monkeypatch):
+    """A corpus exported as a subset of a tree: `A` (in the subset) uses `B` (outside it)."""
+    subset = tmp_path / "subset" / "com" / "example"
+    full = tmp_path / "full" / "com" / "example"
+    subset.mkdir(parents=True); full.mkdir(parents=True)
+    (subset / "A.java").write_text("package com.example;\npublic class A { public static int f(int x) { return B.v() + x; } }\n")
+    (full / "B.java").write_text("package com.example;\npublic class B { static int v() { return 7; } }\n")
+    funcs = [function("com.example.A.f:int(int)", "com/example/A.java", ["x"])]
+    monkeypatch.delenv(differential.JAVA_SOURCEPATH_ENV, raising=False)
+    cases, info, skipped = differential.java_backend(str(tmp_path / "subset"), funcs, 2)
+    assert not cases and "extra_source_roots" not in info
+    assert list(skipped.values())[0].startswith("javac failed"), skipped
+    monkeypatch.setenv(differential.JAVA_SOURCEPATH_ENV, str(tmp_path / "full"))
+    cases, info, skipped = differential.java_backend(str(tmp_path / "subset"), funcs, 2)
+    assert not skipped, skipped
+    assert info["extra_source_roots"] == [str(tmp_path / "full")] and info["cases_built"] == 2
+    assert cases[0]["outcome"] == ("val", ("int", 7 + cases[0]["args"][0][1]))
+    # A root that does not exist is a configuration error, reported, never ignored.
+    monkeypatch.setenv(differential.JAVA_SOURCEPATH_ENV, str(tmp_path / "nowhere"))
+    cases, info, _ = differential.java_backend(str(tmp_path / "subset"), funcs, 2)
+    assert not cases and "missing directory" in info["driver"]
