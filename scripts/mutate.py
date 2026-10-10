@@ -58,6 +58,7 @@ import sys
 import tempfile
 
 import proof_artifacts
+import generated_module
 
 # ---------------------------------------------------------------------------
 # declaration map: which source lines belong to which declaration
@@ -123,8 +124,11 @@ class Mutant:
         return f"{self.decl} L{self.line} [{self.op}]\n  - {self.old.rstrip()}\n  + {self.new.rstrip()}"
 
     def to_json(self):
-        return {"op": self.op, "line": self.line, "decl": self.decl,
-                "before": self.old.rstrip(), "after": self.new.rstrip()}
+        record = {"op": self.op, "line": self.line, "decl": self.decl,
+                  "before": self.old.rstrip(), "after": self.new.rstrip()}
+        if getattr(self, "part", None):
+            record["part"] = self.part
+        return record
 
 
 def _pair_swaps(pairs):
@@ -445,7 +449,10 @@ def run_build(root, module, timeout):
             out, err = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             timed_out = True
-            os.killpg(process.pid, signal.SIGKILL)
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
             try:
                 out, err = process.communicate(timeout=5)
             except subprocess.TimeoutExpired:
@@ -460,9 +467,11 @@ def run_build(root, module, timeout):
         if process is not None:
             # Killing lake alone leaves its Lean compiler alive and able to write
             # stale build artifacts during the subsequent restoration build.
+            # macOS answers EPERM, not ESRCH, for a group whose only member is the
+            # exited (zombie) leader -- i.e. after every build that finished normally.
             try:
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):
                 pass
             process.wait()
             process.stdout.close()
@@ -597,10 +606,21 @@ def main():
     root = find_root(path)
     base = os.path.basename(path)
 
-    with open(path, "r", encoding="utf-8") as f:
-        original = f.read()
-    lines = original.splitlines(keepends=True)
-    decls = parse_decls(lines)
+    # A sharded translated module (`render_lean.py --shard-functions`) keeps its
+    # definitions in part files the root imports; the mutation population is all of them.
+    if "Autoform/Generated/" in path.replace(os.sep, "/"):
+        model = [os.path.abspath(str(p)) for p in generated_module.model_files(path)]
+    else:
+        model = [path]
+    sharded = len(model) > 1
+    originals = {}
+    for p in model:
+        with open(p, "r", encoding="utf-8") as f:
+            originals[p] = f.read()
+    file_lines = {p: originals[p].splitlines(keepends=True) for p in model}
+    file_decls = {p: parse_decls(file_lines[p]) for p in model}
+    original, lines, decls = originals[path], file_lines[path], file_decls[path]
+    model_decls = [d for p in model for d in file_decls[p]]
 
     # Where do the theorems live? Same file by default; a separate file when the subject
     # is a machine-generated module, which by construction contains no theorems at all.
@@ -623,13 +643,13 @@ def main():
                 build_module != "Autoform.SpecsGen." + evidence.get("module", "")):
             ap.error("specification report does not match the built subject and proof module")
         bindings = evidence.get('artifact_hashes', {})
-        if (bindings.get('model') != proof_artifacts.digest(path)
+        if (bindings.get('model') != generated_module.model_digest(path)
                 or bindings.get('proof') != proof_artifacts.digest(spec_path)):
             ap.error('specification report does not match the current model and proof source')
         proven = [s for s in evidence.get("specs", []) if s.get("proved") and s.get("definition")]
         if not proven:
             ap.error("specification report has no proved subjects")
-        known_defs = {d.name for d in decls if d.kind in DEF_KINDS}
+        known_defs = {d.name for d in model_decls if d.kind in DEF_KINDS}
         known_theorems = {d.name for d in spec_decls if d.kind in THEOREM_KINDS}
         if any(s["definition"] not in known_defs or s["id"] not in known_theorems for s in proven):
             ap.error("specification report names a missing definition or theorem")
@@ -655,30 +675,43 @@ def main():
     # Safety net: a mutation run that is interrupted (or killed by an impatient operator)
     # otherwise leaves a mutant on disk, where a concurrent commit can capture it. The
     # backup is written once, before anything is touched, and removed on a clean exit.
-    backup = path + ".mutate-backup"
-    try:
-        with open(backup, "x", encoding="utf-8") as f:
-            f.write(original)
-    except FileExistsError:
-        print('REFUSING TO MUTATE: existing backup may belong to an active or interrupted run: ' + backup)
-        return 2
+    backups = []
+    for p in model:
+        backup = p + ".mutate-backup"
+        try:
+            with open(backup, "x", encoding="utf-8") as f:
+                f.write(originals[p])
+        except FileExistsError:
+            for owned in backups:
+                os.remove(owned)
+            print('REFUSING TO MUTATE: existing backup may belong to an active or interrupted run: ' + backup)
+            return 2
+        backups.append(backup)
 
     backup_owned = True
 
     def restore_source():
         nonlocal backup_owned
         if backup_owned:
-            with open(path, "w", encoding="utf-8") as stream:
-                stream.write(original)
-            if os.path.exists(backup):
-                os.remove(backup)
+            for p in model:
+                with open(p, "w", encoding="utf-8") as stream:
+                    stream.write(originals[p])
+            for backup in backups:
+                if os.path.exists(backup):
+                    os.remove(backup)
             backup_owned = False
 
     # Cover candidate generation and the baseline too: an interrupt before the
     # mutation loop must not strand its exclusive backup marker.
     try:
-        all_mutants = (gen_mutants_generated(lines, decls) if generated
-                       else gen_mutants(lines, decls))
+        all_mutants = []
+        for p in model:
+            for mutant in (gen_mutants_generated(file_lines[p], file_decls[p]) if generated
+                           else gen_mutants(file_lines[p], file_decls[p])):
+                mutant.file = p
+                if sharded:
+                    mutant.part = os.path.relpath(p, root)
+                all_mutants.append(mutant)
         if args.decls:
             keep = {d.strip() for d in args.decls.split(",") if d.strip()}
             all_mutants = [m for m in all_mutants if m.decl in keep]
@@ -735,9 +768,9 @@ def main():
 
         try:
             for i, mut in enumerate(mutants, 1):
-                new_lines = list(lines)
+                new_lines = list(file_lines[mut.file])
                 new_lines[mut.line - 1] = mut.new
-                with open(path, "w", encoding="utf-8") as f:
+                with open(mut.file, "w", encoding="utf-8") as f:
                     f.write("".join(new_lines))
 
                 rc, out, timed_out = run_build(root, build_module, args.timeout)
@@ -752,8 +785,11 @@ def main():
                 # Errors in the *mutated* file mean the mutant is not well-typed; errors in
                 # the *spec* file mean a theorem noticed. When the two are the same file
                 # these collapse to the original behaviour.
-                errs = error_lines(out, path, root)
-                spec_errs = errs if spec_path == path else error_lines(out, spec_path, root)
+                # Put this part back before the next mutant lands in another one.
+                with open(mut.file, "w", encoding="utf-8") as f:
+                    f.write(originals[mut.file])
+                errs = error_lines(out, mut.file, root)
+                spec_errs = errs if spec_path == mut.file else error_lines(out, spec_path, root)
                 # Errors in files that are neither the mutated file nor the spec file are
                 # somebody else's problem: a broken dependency, a concurrent edit, a stale
                 # cache. Counting such a build failure as a "kill" would credit the theorem
@@ -761,9 +797,10 @@ def main():
                 # exists to prevent — so those mutants are reported INCONCLUSIVE and left
                 # out of the score entirely.
                 foreign = [l for l in all_error_lines(out, root)
-                           if l[0] not in (os.path.realpath(path), os.path.realpath(spec_path))]
-                hit_defs = {decl_at(decls, l).name for l in errs
-                            if decl_at(decls, l) and decl_at(decls, l).kind in DEF_KINDS}
+                           if l[0] not in (os.path.realpath(mut.file), os.path.realpath(spec_path))]
+                hit_defs = {decl_at(file_decls[mut.file], l).name for l in errs
+                            if decl_at(file_decls[mut.file], l)
+                            and decl_at(file_decls[mut.file], l).kind in DEF_KINDS}
                 hit_thms = {decl_at(spec_decls, l).name for l in spec_errs
                             if decl_at(spec_decls, l)
                             and decl_at(spec_decls, l).kind in THEOREM_KINDS}

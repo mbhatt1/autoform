@@ -92,7 +92,9 @@ PYEOF
 "$PYTHON" scripts/check_provenance.py --strict --artifact "ast-$MOD.json"
 
 echo "==> [4/9] render"
-"$PYTHON" cartographer/render_lean.py "ast-$MOD.json" "Autoform/Generated/$MOD.lean" "$MOD"
+# Tracked corpora are pinned as single-module renders (artifact-manifest.json).
+"$PYTHON" cartographer/render_lean.py "ast-$MOD.json" "Autoform/Generated/$MOD.lean" "$MOD" \
+  --shard-functions 0
 
 echo "==> [5/9] manifest: re-record the AST/render pins"
 "$PYTHON" scripts/check_render.py --record "$MOD"

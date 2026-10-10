@@ -70,7 +70,10 @@ def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turn
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGKILL)   # the agent may have spawned lean processes
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)   # the agent may have spawned lean processes
+        except (ProcessLookupError, PermissionError):  # exited; macOS says EPERM
+            pass
         proc.communicate()
         raise LLMError(f'model call timed out after {timeout}s')
     try:

@@ -173,6 +173,24 @@ Eight stages, each announced:
 then instantiates `scripts/ledger.lean.tmpl` and `#eval`s it, which prints the ledger and
 writes `ledger-<Module>.json`.
 
+**Large models render in parts.** With `AUTOFORM_SHARD_FUNCTIONS=N` (the installed CLI's
+`--shard-functions N`, default 1000; `0` disables it), stage 4 writes definitions into
+`Autoform/Generated/<Module>/PartNNNN.lean`, at most N functions each. The parts import
+only the semantics, so stage 5 elaborates them in parallel, and each `lean` process holds
+one part instead of the whole corpus. The root module imports every part and still defines
+`moduleInits` and `program`, so every downstream name is unchanged. A model of N functions
+or fewer renders as the single module it always was. Tracked corpora are always rendered
+unsharded, because their pins in `artifact-manifest.json` are hashes of that render. See
+[`scale.md`](scale.md) §4.
+
+**Proof budget.** Stage 8 compiles each candidate theorem alone before emitting the module.
+Any candidate that runs past `AUTOFORM_THEOREM_TIMEOUT` seconds (default 300) or
+`AUTOFORM_THEOREM_MEMORY_GB` resident (default 16) is excluded by name. Up to
+`AUTOFORM_PROBE_JOBS` (default 2) probes run concurrently. Each exclusion and its reason
+appear in the generated module (`budgetExcluded`, printed when it builds) and in
+`specs.json` (`budget_excluded`). A candidate that simply fails to prove is not affected:
+it stays an open obligation.
+
 Stage 6 failures are recorded and propagate a nonzero exit status after the ledger.
 Proof synthesis runs only after successful conformance. Stage logs, reports and a
 final `pipeline.json` live in `artifacts/pipeline/<Module>/`. A new run invalidates

@@ -7,6 +7,7 @@ from pathlib import Path
 import proof_artifacts
 import deep_json
 import security_specs
+import generated_module
 
 
 def read(path):
@@ -147,7 +148,7 @@ def emit(root, report, module, source, stages, repository=None, security_request
     artifacts = {}
     for path in (report / 'conformance.json', report / 'specs.json', report / 'audit.json',
                  report / 'mutation.json', report / 'context.json', report / 'repository.json',
-                 root / 'Autoform/Generated' / (module + '.lean'),
+                 *generated_module.model_files(root / 'Autoform/Generated' / (module + '.lean')),
                  root / 'Autoform/SpecsGen' / (module + '.lean')):
         if path.is_file():
             try:

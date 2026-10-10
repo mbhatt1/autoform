@@ -1596,20 +1596,24 @@ def main():
         # worse than no proof, and the mutation gate's own backup file is the reliable
         # in-flight marker.
         blockers = []
-        if os.path.exists(gen_path + ".mutate-backup"):
-            blockers.append("a mutation run is in flight (%s.mutate-backup exists)"
-                            % os.path.basename(gen_path))
-        try:
-            if "__mutated" in open(gen_path, encoding="utf-8").read():
-                blockers.append("the module contains mutation markers (`__mutated`)")
-        except OSError as e:
-            blockers.append("could not read the subject: %r" % e)
+        # A sharded model's definitions are in its parts; a live mutant can be in any.
+        model_files = [str(p) for p in runtime_backends.generated_module.model_files(gen_path)]
+        for path in model_files:
+            if os.path.exists(path + ".mutate-backup"):
+                blockers.append("a mutation run is in flight (%s.mutate-backup exists)"
+                                % os.path.basename(path))
+            try:
+                if "__mutated" in open(path, encoding="utf-8").read():
+                    blockers.append("%s contains mutation markers (`__mutated`)"
+                                    % os.path.basename(path))
+            except OSError as e:
+                blockers.append("could not read the subject: %r" % e)
         # The marker check is necessary but not sufficient: `scripts/mutate.py` also
         # mutates *values* (`.int 0` -> `.int 1`), which leave no marker, and it removes
         # its `.mutate-backup` between mutants. For a tracked module the reliable test is
         # that it matches the commit — observed in practice: a gate was mid-cycle with no
         # backup file present and a live one-line numeric mutation in the tree.
-        r = subprocess.run(["git", "diff", "--quiet", "--", gen_path],
+        r = subprocess.run(["git", "diff", "--quiet", "--", *model_files],
                            capture_output=True, cwd=REPO)
         if r.returncode == 1:
             blockers.append("the subject differs from its committed version (a mutation "
@@ -1641,7 +1645,8 @@ def main():
     if core is None:
         return 2
     artifact_hashes = {'ast': runtime_backends.sha256(args.ast),
-                       'model': runtime_backends.sha256(gen_path)}
+                       # every part of a sharded model, not just its root
+                       'model': runtime_backends.generated_module.model_digest(gen_path)}
     if args.conformance:
         artifact_hashes['conformance'] = runtime_backends.sha256(args.conformance)
     funcs = deep_json.load(args.ast)

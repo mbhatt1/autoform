@@ -16,7 +16,7 @@ Two invariants this file exists to protect:
 Usage: render_lean.py ast.json Out.lean [ModuleName]
 """
 import json
-import threading, sys, re, os
+import threading, sys, re, os, glob
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 import deep_json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -578,20 +578,26 @@ def render_func(f, nm) -> list:
         "",
     ]
 
-def _run_main():
-    src, dst = sys.argv[1], sys.argv[2]
-    module = sys.argv[3] if len(sys.argv) > 3 else "Translated"
-    funcs = lower_generators(deep_json.load(src))
-    dialect = infer_dialect(funcs)
-    if dialect == '.python':
-        funcs = lower_truth_values(lower_truth_conditions(funcs))
-    auxiliary = [helper for function in funcs
-                 for kind in ('generatorHelpers', 'truthHelpers', 'decoratedEntries')
-                 for helper in function.get(kind, [])]
+def shard_size(argv):
+    """`--shard-functions N` (or `AUTOFORM_SHARD_FUNCTIONS`): split the definitions into
+    part modules of at most N functions. 0 or absent renders one module, byte-identical
+    to the unsharded output, which is what every tracked render pin is a hash of."""
+    value = os.environ.get("AUTOFORM_SHARD_FUNCTIONS", "0")
+    if "--shard-functions" in argv:
+        i = argv.index("--shard-functions")
+        value = argv[i + 1]
+        del argv[i:i + 2]
+    try:
+        n = int(value)
+    except ValueError:
+        raise SystemExit(f"render_lean: --shard-functions needs an integer, got {value!r}")
+    if n < 0:
+        raise SystemExit("render_lean: --shard-functions must be >= 0")
+    return n
 
-    out = [
-        "import Autoform.Lang.Core.Semantics",
-        "",
+
+def module_options(count):
+    return [
         "-- Lean's default `maxRecDepth` (512) is a guard against runaway elaboration, not",
         "-- a statement about reasonable programs. A deep-embedded function body is one",
         "-- term, so the elaborator's recursion depth tracks the *source's* nesting depth:",
@@ -604,7 +610,7 @@ def _run_main():
         "-- which elaborates as nested cons cells -- one frame or more per function, and",
         "-- Ansible has 5,546. So the limit has to scale with the module's function count,",
         "-- not with how deep its code happens to be.",
-        f"set_option maxRecDepth {max(8000, 8 * len(funcs) + 8000)}",
+        f"set_option maxRecDepth {max(8000, 8 * count + 8000)}",
         "",
         "-- Lean's default `maxHeartbeats` (200000) budgets ONE declaration's own",
         "-- elaboration cost, separately from `maxRecDepth` above (which bounds nesting",
@@ -623,6 +629,31 @@ def _run_main():
         "-- against a genuine runaway elaboration bug while someone is editing them).",
         "set_option maxHeartbeats 0",
         "",
+    ]
+
+
+def part_paths(dst, module):
+    """The part directory of a sharded render: `<dir of dst>/<module>/PartNNNN.lean`."""
+    return os.path.join(os.path.dirname(os.path.abspath(dst)), module)
+
+
+def _run_main():
+    argv = sys.argv[1:]
+    shard = shard_size(argv)
+    src, dst = argv[0], argv[1]
+    module = argv[2] if len(argv) > 2 else "Translated"
+    funcs = lower_generators(deep_json.load(src))
+    dialect = infer_dialect(funcs)
+    if dialect == '.python':
+        funcs = lower_truth_values(lower_truth_conditions(funcs))
+    auxiliary = [helper for function in funcs
+                 for kind in ('generatorHelpers', 'truthHelpers', 'decoratedEntries')
+                 for helper in function.get(kind, [])]
+
+    out = [
+        "import Autoform.Lang.Core.Semantics",
+        "",
+        *module_options(len(funcs)),
         "/-!",
         f"# {module} — machine-generated",
         "",
@@ -644,6 +675,7 @@ def _run_main():
     ]
     names = []
     seen = set()
+    rendered = []
     for f in funcs + auxiliary:
         nm = ident(f["name"])
         while nm in seen:
@@ -651,10 +683,54 @@ def _run_main():
         seen.add(nm)
         names.append(nm)
         try:
-            out.extend(render_func(f, nm))
+            rendered.append(render_func(f, nm))
         except ValueError as e:
             raise SystemExit(f"render_lean: in function {f.get('name')!r} "
                              f"(from {f.get('file','?')}): {e}")
+    # A sharded render puts the definitions in part modules that import only the
+    # semantics, never each other, so `lake build` elaborates them in parallel and each
+    # `lean` process holds one part, not the corpus. The root module keeps everything
+    # else -- the import list, `moduleInits` and `program` -- so every name downstream
+    # (`Autoform.Generated.<M>.program`, each `def`) is the same as unsharded.
+    part_dir = part_paths(dst, module)
+    parts = ([rendered[k:k + shard] for k in range(0, len(rendered), shard)]
+             if shard and len(rendered) > shard else [])
+    stale = sorted(glob.glob(os.path.join(part_dir, "Part*.lean")))
+    for path in stale:
+        os.remove(path)
+    if parts:
+        os.makedirs(part_dir, exist_ok=True)
+        part_modules = []
+        for k, chunk in enumerate(parts, 1):
+            part = f"Part{k:04d}"
+            part_modules.append(f"Autoform.Generated.{module}.{part}")
+            body = [
+                "import Autoform.Lang.Core.Semantics",
+                "",
+                *module_options(len(chunk)),
+                "/-!",
+                f"# {module}, part {k} of {len(parts)} — machine-generated",
+                "",
+                "Emitted by `cartographer/render_lean.py --shard-functions`; the module",
+                f"`Autoform.Generated.{module}` imports every part and assembles `program`.",
+                "Do not edit: regenerate.",
+                "-/",
+                "",
+                f"namespace Autoform.Generated.{module}",
+                "open Autoform.Core",
+                "",
+            ]
+            for lines in chunk:
+                body.extend(lines)
+            body.append(f"end Autoform.Generated.{module}")
+            with open(os.path.join(part_dir, part + ".lean"), "w") as fh:
+                fh.write("\n".join(body))
+        out[0:1] = ["import " + m for m in part_modules]
+    else:
+        if os.path.isdir(part_dir) and not os.listdir(part_dir):
+            os.rmdir(part_dir)
+        for lines in rendered:
+            out.extend(lines)
 
     # Module-level bindings are exported as zero-argument *initializer* functions, one
     # per source file, whose bodies are runs of `Stmt.setGlobal`. Running them is what
@@ -726,7 +802,8 @@ def _run_main():
     out.append(f"end Autoform.Generated.{module}")
     with open(dst, "w") as fh:
         fh.write("\n".join(out))
-    print(f"rendered {len(funcs)} functions -> {dst}")
+    print(f"rendered {len(funcs)} functions -> {dst}"
+          + (f" ({len(parts)} parts under {os.path.relpath(part_dir)})" if parts else ""))
 
 def main():
     """Render on a thread with a large stack.

@@ -24,6 +24,12 @@ from . import __version__
 from .repository import is_git_url, resolve_source
 
 
+# Functions per rendered part. Lean's resident memory grows ~300x with the generated
+# module (docs/scale.md section 4); parts this size stay near 1-2 GB each and build in
+# parallel. A model at or under this size renders as the single module it always was.
+SHARD_FUNCTIONS = 1000
+
+
 def runtime_payload():
     resource = resources.files("autoform").joinpath("runtime.zip")
     if resource.is_file():
@@ -149,7 +155,7 @@ def _run_command(command, *, env, cleanup_timeout=10, timeout=None):
             forwarded = True
             try:
                 os.killpg(process.pid, cancellation)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):
                 pass
 
     def cancel(signum, _frame):
@@ -185,7 +191,7 @@ def _run_command(command, *, env, cleanup_timeout=10, timeout=None):
                 # Detached sessions are outside this cleanup boundary.
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
+                except (ProcessLookupError, PermissionError):
                     pass
                 process.wait()
         finally:
@@ -623,6 +629,10 @@ def main(argv=None):
         command.add_argument("--keep-checkout", action="store_true",
                              help="keep the cloned source tree under <workspace>/sources "
                                   "after the run instead of deleting it")
+        command.add_argument("--shard-functions", type=int, default=SHARD_FUNCTIONS,
+                             help="render the model in parts of at most N functions that "
+                                  "Lean elaborates in parallel, bounding each process's "
+                                  f"memory (default: {SHARD_FUNCTIONS}; 0 = one module)")
         if name == "source":
             command.add_argument("--timeout", type=float,
                                  help="overall wall-clock limit in seconds for the whole run "
@@ -643,6 +653,8 @@ def main(argv=None):
     regress.add_argument("--subdir", help="directory inside the checkout to analyze at both commits")
     regress.add_argument("--timeout", type=float,
                          help="wall-clock limit in seconds for EACH of the two pipeline runs")
+    regress.add_argument("--shard-functions", type=int, default=SHARD_FUNCTIONS,
+                         help=f"functions per rendered part (default: {SHARD_FUNCTIONS}; 0 = one module)")
     regress.add_argument("--keep-checkout", action="store_true",
                          help="keep both cloned trees under <workspace>/sources after the run")
     regress.add_argument("--machine", action="store_true",
@@ -697,7 +709,12 @@ def main(argv=None):
     if args.command in ('source', 'regress') and args.timeout is not None and (
             not math.isfinite(args.timeout) or args.timeout <= 0):
         parser.error('--timeout must be a finite positive number')
+    if getattr(args, 'shard_functions', 0) < 0:
+        parser.error('--shard-functions must be >= 0')
     env = environment()
+    if hasattr(args, 'shard_functions'):
+        # Read by cartographer/render_lean.py in every pipeline that renders a model.
+        env['AUTOFORM_SHARD_FUNCTIONS'] = str(args.shard_functions)
     if args.command == "doctor":
         try:
             return doctor(env, strict=args.strict, as_json=args.json)

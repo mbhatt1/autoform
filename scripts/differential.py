@@ -31,6 +31,7 @@ import json, subprocess, random, importlib.util, re, glob, io
 import contextlib, inspect, functools, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wasm_backend
+import generated_module
 import runtime_backends
 import deep_json
 import struct
@@ -2506,7 +2507,8 @@ def main():
     # `scripts/mutate.py` edits the generated module in place and keeps the pristine
     # copy beside it. If that backup exists, the module under test is currently a
     # MUTANT: its divergences are injected faults, not evidence about the semantics.
-    mutating = os.path.exists(gen + ".mutate-backup")
+    mutating = any(os.path.exists(str(p) + ".mutate-backup")
+                   for p in generated_module.model_files(gen))
     result["mutation_in_progress"] = mutating
     if mutating:
         print("WARNING: %s.mutate-backup exists — a mutation run owns this module right "
@@ -2530,6 +2532,18 @@ def main():
     # divergences that reproduced nowhere (`Cache.__contains__` inverted,
     # `_DefaultSize.pop` returning 0: both were live mutants).
     snap_dir = os.path.join(WORK, "lean-snapshot")
+    blib_root = os.path.join(repo, ".lake/build/lib/lean")
+
+    def snapshot_generated(blib, snap):
+        """Copy the root module's compiled artifacts and every part it imports
+        (`render_lean.py --shard-functions`); a part left out would be loaded from the
+        live tree, which is exactly the moving target the snapshot exists to avoid."""
+        import shutil
+        for f in generated_module.build_files(repo, lean_mod):
+            if f.exists():
+                dest = os.path.join(snap, os.path.relpath(f, blib))
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                shutil.copy(f, dest)
     lean_env = dict(env)
     try:
         import shutil
@@ -2539,10 +2553,7 @@ def main():
         shutil.copytree(os.path.join(blib, "Autoform/Lang"),
                         os.path.join(snap_dir, "Autoform/Lang"))
         os.makedirs(os.path.join(snap_dir, "Autoform/Generated"), exist_ok=True)
-        for ext in (".olean", ".ilean"):
-            src_f = os.path.join(blib, "Autoform/Generated", lean_mod + ext)
-            if os.path.exists(src_f):
-                shutil.copy(src_f, os.path.join(snap_dir, "Autoform/Generated"))
+        snapshot_generated(blib, snap_dir)
         base = subprocess.run(["lake", "env", "printenv", "LEAN_PATH"],
                               capture_output=True, text=True, env=env, cwd=repo)
         lean_env["LEAN_PATH"] = snap_dir + ":" + base.stdout.strip()
@@ -2694,10 +2705,7 @@ def main():
                                 os.path.join(snap_dir, "Autoform/Lang"))
                 os.makedirs(os.path.join(snap_dir, "Autoform/Generated"),
                             exist_ok=True)
-                for ext in (".olean", ".ilean"):
-                    f2 = os.path.join(blib, "Autoform/Generated", lean_mod + ext)
-                    if os.path.exists(f2):
-                        shutil.copy(f2, os.path.join(snap_dir, "Autoform/Generated"))
+                snapshot_generated(blib, snap_dir)
             return lean_eval(idxs, depth, retried=True)
         if not saw_meta:
             # Bisecting an environment failure costs one lake invocation per case and
@@ -2734,9 +2742,10 @@ def main():
         import hashlib
         h = hashlib.sha256()
         root = snap_dir if isolated else os.path.join(repo, ".lake/build/lib/lean")
-        for p in (os.path.join(root, "Autoform/Lang/Core/Semantics.olean"),
-                  os.path.join(root, "Autoform/Lang/Core/Observation.olean"),
-                  os.path.join(root, "Autoform/Generated", lean_mod + ".olean")):
+        compiled = [os.path.join(root, os.path.relpath(p, blib_root))
+                    for p in generated_module.build_files(repo, lean_mod, (".olean",))]
+        for p in [os.path.join(root, "Autoform/Lang/Core/Semantics.olean"),
+                  os.path.join(root, "Autoform/Lang/Core/Observation.olean")] + compiled:
             try:
                 h.update(open(p, "rb").read())
             except OSError:
@@ -2759,7 +2768,7 @@ def main():
     result["build_stable"] = stable and not mutating
     result["provenance"] = {
         "ast_sha256": ast_fingerprint,
-        "generated_sha256": runtime_backends.sha256(generated),
+        "generated_sha256": generated_module.model_digest(generated),
         "source_sha256": fingerprints, "semantics_sha256": semantics_fingerprint}
     result["build_stable"] = result["build_stable"] and (
         runtime_backends.sha256(ast_path) == ast_fingerprint and

@@ -279,7 +279,7 @@ def run_group(cmd, cwd, env=None, timeout=None) -> tuple[int, str, str]:
     except subprocess.TimeoutExpired:
         try:
             os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
             pass
         proc.communicate()
         raise

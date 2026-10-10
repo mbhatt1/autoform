@@ -79,7 +79,10 @@ def run_lean(root: Path, path: Path, timeout: int):
         out, _ = proc.communicate(timeout=timeout)
         code = proc.returncode
     except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGKILL)
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):  # exited; macOS says EPERM
+            pass
         out, _ = proc.communicate()
         code = 124
     return code, out or '', round(time.time() - started, 2)

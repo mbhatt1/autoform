@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import hashlib
 import deep_json
+import generated_module
 
 
 def sha256(path):
@@ -31,7 +32,8 @@ def load_observations(report_path, ast_path, source_root, module, generated):
     """Accept runtime evidence only for these exact source/model artifacts."""
     report = deep_json.load(report_path)
     funcs = deep_json.load(ast_path)
-    expected = dict(ast_sha256=sha256(ast_path), generated_sha256=sha256(generated),
+    expected = dict(ast_sha256=sha256(ast_path),
+                    generated_sha256=generated_module.model_digest(generated),
                     source_sha256=source_fingerprints(source_root, funcs),
                     semantics_sha256=semantics_fingerprints())
     if report.get("module") != module or report.get("provenance") != expected:

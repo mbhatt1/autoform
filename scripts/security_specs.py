@@ -16,6 +16,7 @@ import sys
 import deep_json
 import proof_artifacts
 import runtime_backends
+import generated_module
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'cartographer'))
@@ -162,7 +163,7 @@ def lean_run(root, report, source, tag, timeout):
         if process is not None:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):
                 pass
             process.wait()
     return code, log.read_text()
@@ -178,7 +179,8 @@ def generate(root, report, source, module, properties, timeout=180):
     (report / 'properties.json').write_bytes(request)
     data = load_properties(report / 'properties.json', functions)
     model = root / 'Autoform/Generated' / (module + '.lean')
-    before = {name: proof_artifacts.digest(path) for name, path in
+    before = {name: (generated_module.model_digest(path) if name == 'model'
+                     else proof_artifacts.digest(path)) for name, path in
               [('model', model), ('ast', ast), ('properties', report / 'properties.json')]}
     source_hashes = runtime_backends.source_fingerprints(source, functions)
     if not source_hashes:
@@ -235,7 +237,9 @@ run_cmd liftTermElabM do
     proof.write_text(header(module) + '\nnamespace ' + proof_module + '\n\n' +
                      '\n'.join(declarations) + '\nend ' + proof_module + '\n')
     for name, path in [('model', model), ('ast', ast), ('properties', report / 'properties.json')]:
-        if proof_artifacts.digest(path) != before[name]:
+        current = (generated_module.model_digest(path) if name == 'model'
+                   else proof_artifacts.digest(path))
+        if current != before[name]:
             raise ValueError('security proof input changed during generation: ' + name)
     if runtime_backends.source_fingerprints(source, functions) != source_hashes:
         raise ValueError('source changed during property generation')
@@ -275,13 +279,15 @@ def certify(root, report, source, module, stages):
     model = root / 'Autoform/Generated' / (module + '.lean')
     proof = root / 'Autoform/Security' / (module + '.lean')
     ast = report / ('ast-' + module + '.json')
-    required = [model, proof, ast, *[report / name for name in
+    required = [*generated_module.model_files(model), proof, ast, *[report / name for name in
                 ('properties.json', 'security-claims.json', 'security-mutation.json', 'context.json')]]
     if not isinstance(files, dict) or any(not isinstance(files.get(proof_artifacts.key(root, p)), str)
                                           for p in required):
         failures.append('security evidence is not bound to the replay')
     for key, path in [('model', model), ('proof', proof), ('ast', ast), ('properties', report / 'properties.json')]:
-        if not path.is_file() or obj(specs.get('artifact_hashes')).get(key) != proof_artifacts.digest(path):
+        current = (generated_module.model_digest(path) if key == 'model' and path.is_file()
+                   else proof_artifacts.digest(path) if path.is_file() else None)
+        if current is None or obj(specs.get('artifact_hashes')).get(key) != current:
             failures.append('security generation input changed: ' + key)
     try:
         functions = deep_json.load(ast)

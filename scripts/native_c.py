@@ -87,7 +87,7 @@ def worker(request, timeout=None):
             # not outlive a case or keep descriptors and CPU resources forever.
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):
                 pass
             proc.wait()
             if proc.stdin is not None:

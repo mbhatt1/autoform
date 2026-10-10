@@ -149,7 +149,7 @@ class Assurance:
                         # their own child sessions before forcing this group to exit.
                         try:
                             os.killpg(process.pid, signal.SIGINT)
-                        except ProcessLookupError:
+                        except (ProcessLookupError, PermissionError):
                             pass
                         try:
                             process.wait(timeout=2)
@@ -159,7 +159,7 @@ class Assurance:
                     # covers this process group, not processes escaping into new sessions.
                     try:
                         os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
+                    except (ProcessLookupError, PermissionError):
                         pass
                     process.wait()
         except OSError as exc:
