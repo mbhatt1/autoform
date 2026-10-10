@@ -60,6 +60,8 @@ testpaths = ["tests"]
 norecursedirs = [
   "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
   "artifacts", "workspace", ".autoform-work", "gridsentinel",
+  # a witness project that imports a pinned corpus (cachetools); run only by its own test
+  "defect",
 ]
 
 [tool.setuptools]
