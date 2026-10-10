@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-LinuxLcm.json",
+ "artifact_bytes": 9697,
+ "artifact_sha256": "fa1ccfd0c96f7b359b5dbf0c1df68ddf1c88f3181d1dc296fc312d7f26b11f38",
+ "command": "git clone --filter=blob:none --sparse --depth 1 --branch v7.2 https://github.com/torvalds/linux.git linux-v7.2 && git -C linux-v7.2 sparse-checkout set --no-cone /Kbuild /Kconfig /Makefile /lib/math/gcd.c /lib/math/lcm.c /include/linux/ /include/asm-generic/ /include/uapi/asm-generic/ /tools/include/ && autoform.sh linux-v7.2/lib/math LinuxLcm",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "26a141ceac8506a6885e4ee7c6013e53d2e6774dd90b9a6c0c3a95491dab1497",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/Users/mbhatt/.cache/autoform/corpora/linux-v7.2/lib/math",
+ "source_revision": "git:8d3ae59288f1e7d58d76558a6ee96d533bc5019f"
+}

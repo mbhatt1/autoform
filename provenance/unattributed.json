@@ -24,6 +24,13 @@
     "now pulls in jump_label.h. Recording today's exporter against the old artifact would be",
     "the false claim this file exists to refuse, so the record was removed and the artifact is",
     "named here until lib/math is re-landed for real (new AST, new specs, new record).",
+    "It LEFT on 2026-10-10 that way: lib/math/gcd.c + lcm.c re-exported from the kernel tag",
+    "v7.2 (commit 8d3ae59288f1, a sparse checkout whose exact command the record carries),",
+    "recorded by scripts/provenance.py, specs regenerated. The artifact it replaced was not",
+    "any lib/math: its gcd was the Euclidean `while ((r = a % b) != 0)` that lib/gcd.c carried",
+    "before the v4.7 binary-GCD rewrite, and its lcm.c had no lcm_not_zero, so the scratch",
+    "repository (commit 93388a24, not in torvalds/linux) held a pre-2015 lib/ under that",
+    "name. No tag's lib/math matches it; the current stable tag was used instead.",
     "",
     "ast-V8Numbers.json and ast-V8Base.json are the weakest entries in this file and say so:",
     "they name the commit that produced or changed the artifact and nothing about the tree it",
@@ -97,13 +104,6 @@
       "source_hint": null,
       "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
       "reproduction_attempted": false,
-      "reproduced": false
-    },
-    "ast-LinuxLcm.json": {
-      "artifact_sha256": "436076cc096a98c76a2f56d63ce8bb11327ab7abcd2d700c2d6419666ad1a7be",
-      "source_hint": "linux lib/math @ git:93388a248e5bed124e4d757ce7c0824006ca469e (scratch checkout, gone); gcd.c/lcm.c at 165768bb7 are in ~/.cache/autoform/corpora/linux-lib-math-gcd-lcm/lib/math",
-      "reason": "Had a record (Joern 4.0.606, `autoform.sh LinuxLcm`) that stopped verifying on 2026-10-09 when cartographer/compiler/*.scala changed. Re-export from the available lib/math DIFFERS: 6 functions (binary_gcd, gcd, lcm, lcm_not_zero, 2 file globals) against 4 here, because that gcd.c is a later revision (static key efficient_ffs_key, binary_gcd); its native oracle compiled 0/1 units (include/linux/gcd.h -> jump_label.h -> WARN_ON_ONCE undeclared outside Kbuild). Autoform/SpecsGen/LinuxLcm.lean (conform_gcd, conform_lcm) describes THIS artifact. Closes by re-landing lib/math: new AST, regenerated specs, a real record.",
-      "reproduction_attempted": true,
       "reproduced": false
     },
     "ast-LinuxLibSample.json": {

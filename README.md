@@ -56,6 +56,7 @@ autoform --workspace ./proofs source  /path/to/src MyProject     # translate, co
 autoform --workspace ./proofs assure  /path/to/src MyProject     # ...plus gate, audit, assurance case
 autoform --workspace ./proofs regress /path/to/repo MyProject --base v1.2.0 --head main
 autoform --workspace ./proofs regress /path/to/repo MyProject --base v1.2.0 --machine --files lib/lcm.c lib/gcd.c
+autoform --workspace ./proofs pr      /path/to/repo --base v1.2.0 --sarif pr.sarif --markdown pr.md   # evidence level per changed function
 autoform --workspace ./proofs machine /path/to/binary MyBinary
 autoform formalize MyProject            # infer and judge candidate claims, verify in the kernel
 autoform autoformalize /path/to/src     # code -> English -> Lean statements -> kernel proofs
@@ -141,9 +142,9 @@ Three figures are reported because one would mislead: **hole-free** is an upper 
 **call-closed** additionally requires every callee to resolve in the program and is the
 verifiable core; **dynamic-hole risk** counts constructs that can still hole on some
 input. The other re-landed corpora (`ledger-<M>.json`, `Autoform/SpecsGen/<M>.lean`):
-requests 2.32.5 — 226/260 hole-free, core 134, 147 agree / 0 diverge, 29 specs;
-click 8.2.1 — 475/549, core 265, 135 / 0, 47 specs with 12 subjects excluded by name;
-jinja2 3.1.6 — 662/817, core 438, 133 / 0, 50 specs with 6 over the proof budget.
+requests 2.32.5 — 226/260 hole-free, core 134, 147 agree / 0 diverge, 29 specs, 0 over the proof budget;
+click 8.2.1 — 475/549, core 265, 165 / 0, 71 specs, 0 over the proof budget;
+jinja2 3.1.6 — 662/817, core 438, 167 / 0, 70 specs, 0 over the proof budget.
 
 ## Languages
 

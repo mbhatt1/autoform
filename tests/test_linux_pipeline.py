@@ -256,3 +256,64 @@ int lock_helper(int x) { spin_lock(&x); return x; }
     metadata = json.loads((tmp_path / 'ast.json.meta.json').read_text())
     assert not metadata['sourceCensusComplete']
     assert metadata['truncatedByMethodLimit'] == 0
+
+
+def test_kernel_static_key_header_compiles_outside_kbuild(tmp_path, differential):
+    """`include/linux/gcd.h` (v6.17+) includes <linux/jump_label.h>, whose real body
+    needs a configured Kbuild tree, so every unit reaching gcd.h failed to compile and
+    the oracle saw 0/1 units of lib/math. The generated include directory now shadows
+    jump_label.h with a shim in which a static key reads as its initial value, and the
+    compat header supplies the tools tree's <linux/bitops.h> (`__ffs`), which the real
+    include/linux/kernel.h reaches and the tools copy does not."""
+    if shutil.which('cc') is None:
+        pytest.skip('C compiler unavailable')
+    source = make_kernel(tmp_path)
+    (tmp_path / 'include/linux/jump_label.h').write_text(
+        '#error "the real jump_label.h needs a configured Kbuild tree"\n')
+    (tmp_path / 'include/linux/gcd.h').write_text(
+        '#include <linux/jump_label.h>\nDECLARE_STATIC_KEY_TRUE(efficient_ffs_key);\n'
+        'unsigned long gcd(unsigned long a, unsigned long b);\n')
+    (tmp_path / 'tools/include/linux').mkdir(parents=True)
+    (tmp_path / 'tools/include/linux/bitops.h').write_text(
+        'static inline unsigned int __ffs(unsigned long word)\n'
+        '{ return __builtin_ctzl(word); }\n')
+    (source / 'gcd.c').write_text(
+        '#include <linux/kernel.h>\n#include <linux/gcd.h>\n'
+        'DEFINE_STATIC_KEY_TRUE(efficient_ffs_key);\n'
+        'static unsigned long binary_gcd(unsigned long a, unsigned long b)\n'
+        '{ return 1000 + __ffs(a | b); }\n'
+        'unsigned long gcd(unsigned long a, unsigned long b)\n'
+        '{ if (static_branch_likely(&efficient_ffs_key)) return binary_gcd(a, b);\n'
+        '  return 0; }\n')
+    f = dict(scalar('gcd', 'gcd.c', ['a', 'b']), paramIntegerTypes=['u64', 'u64'],
+             returnIntegerType='u64')
+    result = differential.c_runtime(str(source), [f])
+    assert result.info['files_compiled'] == 1, result.info
+    # The key is initially true and nothing outside Kbuild toggles it, so the
+    # static-branch path is the one taken; __ffs resolves through tools/include.
+    assert result(f)(8, 0) == 1003
+
+
+def test_kernel_unit_links_against_a_sibling_with_no_entry_point(tmp_path, differential):
+    """`lcm` calls `gcd`, and once the exporter marks every function in gcd.c with a
+    hole (its `for (;;)` is `control:FOR:elided-clause`) gcd.c exposes no scalar entry
+    point, is never compiled as a unit, and so was never offered as a link partner:
+    lcm.c failed to link and the oracle had no translation unit at all. A unit that
+    did not link is now retried with its same-directory siblings as plain partners."""
+    if shutil.which('cc') is None:
+        pytest.skip('C compiler unavailable')
+    source = make_kernel(tmp_path)
+    (source / 'gcd.c').write_text(
+        'unsigned long gcd(unsigned long a, unsigned long b)\n'
+        '{ for (;;) { if (!b) return a; unsigned long t = a % b; a = b; b = t; } }\n')
+    (source / 'lcm.c').write_text(
+        'unsigned long gcd(unsigned long a, unsigned long b);\n'
+        'unsigned long lcm(unsigned long a, unsigned long b)\n'
+        '{ return a && b ? (a / gcd(a, b)) * b : a | b; }\n')
+    # Only lcm is offered: gcd.c has no hole-free function and is not a unit.
+    f = dict(scalar('lcm', 'lcm.c', ['a', 'b']), paramIntegerTypes=['u64', 'u64'],
+             returnIntegerType='u64')
+    result = differential.c_runtime(str(source), [f])
+    assert result.info['files_compiled'] == 1, result.info
+    assert any(u.get('link_partners') == ['gcd.c'] for u in result.info['units'])
+    assert result(f)(4, 6) == 12 and result(f)(0, 6) == 6

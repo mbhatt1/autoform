@@ -98,8 +98,28 @@ theorem X : ∀ fuel, FUEL ≤ fuel → ((dom_X).all (lawY C fuel f_…)) = true
 The route, in `Autoform/SpecsGen/Basis.lean`: `runCase_fuel_mono_all` reduces a `Case`
 to `applyFunc_fuel_mono_all`; `all_transfer` lifts a per-element guard-and-law
 implication over the domain list. The per-law `_fuel_mono_all` lemmas include
-finalizers and require the same evaluated guards as other functions. The generator
-uses these unrestricted entry points.
+finalizers. The generator uses these unrestricted entry points.
+
+The guard is the transport's only side condition: nothing is assumed about the context,
+the table, or any body the run does or does not reach (`FuelMono.lean`, "Reachability
+form of the side condition", `applyFunc_fuel_mono_of_defined`). How it is discharged
+depends on the family:
+
+* `conform_*` (and `charact_*`): the recorded outcome is a value or an exception, and the
+  law says the interpreter reproduced it, so the run completed. `lawConform_defined`
+  turns the law into the guard; the generated proof checks `defined o.expected` on the
+  recorded literal and evaluates each case **once** in the kernel.
+* every other family: the `g…` guard is evaluated over the law's own domain, because no
+  outside observation says what the result was, and `lawCommutes` in particular is
+  satisfied by two `outOfFuel` results.
+
+Where the kernel's time actually goes is not the transport. Measured on Click
+(2026-10-10): a call to a bare builtin name misses `Ctx.resolve`'s exact lookup and scans
+every table key by suffix, and each `String.toList` in that scan decoded a UTF-8 key
+through well-founded recursion, about 40 MB and 150 ms of kernel work per key -- 24 GB
+over the Click table, which is why 30 conformance theorems across Requests, Click and
+Jinja2 were over the 16 GB proof budget. `strEndsWith`/`strStartsWith`/`stripSig` now
+compare byte lists (`Semantics.lean`, with the agreement proofs), which never decode.
 
 Run `./assure.sh examples/python_control ControlFlow` to regenerate native
 comparisons, conformance proofs, mutation checks and independent replay for the
