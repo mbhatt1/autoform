@@ -1030,6 +1030,35 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
       | (k, _) :: ps, some f   => if strEndsWith k suffix then none else go ps (some f)
     go ctx.table none
 
+/-- The callee of a by-name call `f(args)`.
+
+A bare Python name is looked up in the enclosing scopes, the module and then the builtins
+(Language Reference §4.2.2); it never names a method, which is reachable only through a
+receiver or its class. `Ctx.resolve`'s unique-suffix fallback does not know that: on
+Jinja2, `set()` resolved to the program's only `….set`, `_MemcachedClient.set`, and raised
+an arity `TypeError` where CPython builds an empty set. A bare name whose resolution is a
+declared class's method is therefore not resolved here, and the call goes on to the
+value, dunder and builtin paths. Dotted names and other dialects are unchanged. -/
+def Ctx.resolveCall (ctx : Ctx) (f : String) : Option Func :=
+  match ctx.resolve f with
+  | some fn =>
+      if ctx.dialect == .python && !f.toList.contains '.' &&
+          ctx.classDecls.any (fun d => fn.name == d.name ++ "." ++ f)
+      then none else some fn
+  | none => none
+
+theorem Ctx.resolveCall_resolve {ctx : Ctx} {f : String} {fn : Func}
+    (h : ctx.resolveCall f = some fn) : ctx.resolve f = some fn := by
+  unfold Ctx.resolveCall at h
+  cases hr : ctx.resolve f with
+  | none => rw [hr] at h; cases h
+  | some g =>
+      rw [hr] at h
+      dsimp only at h
+      split at h
+      · cases h
+      · exact h
+
 /-! ## The calling convention
 
 `f(*xs, k=v, **d)` and `def f(a, *args, **kwargs)` are one mechanism, split across two
@@ -2519,7 +2548,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr (vs, kws)) =>
-        match ctx.resolve f with
+        match ctx.resolveCall f with
         | some fn =>
             -- A `@classmethod` called through its qualified name (`C.make(3)` lowered to a
             -- direct call) is still bound to its class: CPython passes `cls` whether the
@@ -5231,6 +5260,29 @@ private def attrMissMetaProg : Program :=
        | .exn (.str "AttributeError") => true | _ => false
 #guard match runFunc attrMissMetaProg 200 "m.py:<module>.caught" [] with
        | .val (.str "AttributeError") => true | _ => false
+
+/-- A bare call never resolves to a method (`Ctx.resolveCall`). `set()` beside a class
+whose only `….set` is a method: CPython builds an empty set, which Core does not model,
+so the honest answer is the builtin's hole -- not the method's arity `TypeError`. -/
+private def bareCallProg : Program :=
+  { dialect := .python
+  , classDecls := [{ name := "m.py:<module>.K", shortName := "K", bases := ["__builtin.object"] }]
+  , funcs :=
+      [ { name := "m.py:<module>.K.set", params := ["self"], body := .ret (.lit (.int 1)) }
+      , { name := "m.py:<module>.bare", params := [], body := .ret (.call "set" []) }
+      , { name := "m.py:<module>.helper", params := [], body := .ret (.lit (.int 2)) }
+      , { name := "m.py:<module>.viaSuffix", params := [], body := .ret (.call "helper" []) }
+      , { name := "m.py:<module>.dotted", params := [],
+          body := .ret (.call "K.set" [.lit (.int 0)]) } ] }
+
+#guard match runFunc bareCallProg 50 "m.py:<module>.bare" [] with
+       | .hole "call:set" => true | _ => false
+-- A module-level function is still found by its bare name, and a dotted name still
+-- reaches the method.
+#guard match runFunc bareCallProg 50 "m.py:<module>.viaSuffix" [] with
+       | .val (.int 2) => true | _ => false
+#guard match runFunc bareCallProg 50 "m.py:<module>.dotted" [] with
+       | .val (.int 1) => true | _ => false
 #guard match runFunc attrMissMetaProg 200 "m.py:<module>.present" [] with
        | .val (.int 1) => true | _ => false
 #guard match runFunc attrMissMetaProg 200 "m.py:<module>.viaProperty" [] with

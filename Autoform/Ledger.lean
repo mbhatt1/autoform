@@ -325,9 +325,10 @@ def Ctx.resolvable (isMethod : Bool) (ctx : Ctx) (n : String) : Bool :=
     -- class does — a static ledger has no receiver.
     ctx.table.any (fun q => strEndsWith q.1 ("." ++ n))
   else
-    -- Mirrors `Ctx.resolve` exactly, ambiguity and all: two suffix matches resolve to
-    -- nothing, so two matches must not count as resolvable.
-    (ctx.resolve n).isSome
+    -- Mirrors the by-name call path exactly, ambiguity and all: two suffix matches
+    -- resolve to nothing, so two matches must not count as resolvable; and a bare Python
+    -- name whose only suffix match is a method is not resolved (`Ctx.resolveCall`).
+    (ctx.resolveCall n).isSome
     -- Modelled builtins are resolvable too. `knowsFree` is exact at the name level and is
     -- the *guard* in front of `builtin`, so an unlisted case is dead code rather than a
     -- ledger overstatement — the drift direction that matters cannot rot.
@@ -375,6 +376,12 @@ structure ResolveIndex where
   /-- For each name that some key ends with after a dot, how many keys do. `1` means
   `Ctx.resolve`'s uniqueness condition holds; `≥ 2` means it resolves to `none`. -/
   suffixCount : Std.HashMap String Nat
+  /-- For each dotted tail, the last key that ends with it; with `suffixCount = 1` this is
+  the key `Ctx.resolve` returns. -/
+  suffixKey : Std.HashMap String String := ∅
+  /-- Keys that are a declared class's name followed by one more segment: methods, which
+  a bare Python call never resolves to (`Ctx.resolveCall`). -/
+  methodKeys : Std.HashSet String := ∅
   deriving Inhabited
 
 /-- Every string `k` ends with immediately after a `'.'`, longest first. `"a.b.c"` gives
@@ -389,11 +396,22 @@ def dottedTails (k : String) : List String :=
   | []      => []
   | _ :: ps => (nonEmptySuffixes ps).map (fun t => ".".intercalate t)
 
-def ResolveIndex.build (t : FuncTable) : ResolveIndex :=
+/-- `k` without its last dotted segment (`"a.b.c"` gives `"a.b"`; no dot gives `none`). -/
+def dottedOwner (k : String) : Option String :=
+  match (k.splitOn ".").reverse with
+  | _ :: owner@(_ :: _) => some (".".intercalate owner.reverse)
+  | _ => none
+
+def ResolveIndex.build (t : FuncTable) (classes : List ClassDecl := []) : ResolveIndex :=
+  let declared : Std.HashSet String := classes.foldl (fun s d => s.insert d.name) ∅
   t.foldl (fun idx (k, _) =>
     { exact := idx.exact.insert k
     , suffixCount := (dottedTails k).foldl
-        (fun m n => m.insert n ((m.getD n 0) + 1)) idx.suffixCount })
+        (fun m n => m.insert n ((m.getD n 0) + 1)) idx.suffixCount
+    , suffixKey := (dottedTails k).foldl (fun m n => m.insert n k) idx.suffixKey
+    , methodKeys := match dottedOwner k with
+        | some owner => if declared.contains owner then idx.methodKeys.insert k else idx.methodKeys
+        | none => idx.methodKeys })
     { exact := ∅, suffixCount := ∅ }
 
 /-- The index's answer to `Ctx.resolvable`. Mirrors it arm for arm, including the
@@ -401,7 +419,10 @@ def ResolveIndex.build (t : FuncTable) : ResolveIndex :=
 def ResolveIndex.resolvable (idx : ResolveIndex) (dialect : Dialect)
     (isMethod : Bool) (n : String) : Bool :=
   if isMethod then idx.suffixCount.getD n 0 ≥ 1
-  else idx.exact.contains n || idx.suffixCount.getD n 0 == 1
+  else idx.exact.contains n
+       || (idx.suffixCount.getD n 0 == 1
+           && !(dialect == .python && !n.toList.contains '.'
+                && idx.methodKeys.contains (idx.suffixKey.getD n "")))
        || Stdlib.knowsFree dialect n || Iteration.knowsFree dialect n
 
 /-- Hole-free **and** every call target resolves inside the program.
@@ -410,13 +431,13 @@ The reference definition: `Ctx.resolvable` per call site, quadratic. Kept becaus
 the one that obviously mirrors the interpreter, and because it is the thing
 `Program.callClosureAgrees` checks the index against. -/
 def Program.callClosedRef (p : Program) : List Func :=
-  let ctx : Ctx := { dialect := p.dialect, table := p.table }
+  let ctx : Ctx := { dialect := p.dialect, table := p.table, classDecls := p.classDecls }
   p.verifiableCore.filter (fun f => f.calls.all (fun c => ctx.resolvable c.1 c.2))
 
 /-- Hole-free **and** every call target resolves inside the program, via the index. This
 is what the ledger reports. -/
 def Program.callClosed (p : Program) : List Func :=
-  let idx := ResolveIndex.build p.table
+  let idx := ResolveIndex.build p.table p.classDecls
   p.verifiableCore.filter (fun f =>
     f.calls.all (fun c => idx.resolvable p.dialect c.1 c.2))
 
@@ -476,7 +497,7 @@ def contractedCallees : Dialect → List String
 /-- Hole-free, and every call target either resolves inside the program or is a
 contracted callee. A superset of `callClosed`; the difference is `closedByContract`. -/
 def Program.callClosedWith (p : Program) (contracts : List String) : List Func :=
-  let idx := ResolveIndex.build p.table
+  let idx := ResolveIndex.build p.table p.classDecls
   p.verifiableCore.filter (fun f =>
     f.callees.all (fun c => idx.resolvable p.dialect c.1 c.2.1 || contracts.contains c.2.2))
 
@@ -628,6 +649,23 @@ private def cx : Ctx := { dialect := .python, table := tbl }
 #guard ix.resolvable .python false "plain" == true
 -- A substring that is not a dotted tail: `"lper"` must not match `".helper"`.
 #guard ix.resolvable .python false "lper" == cx.resolvable false "lper"
+
+-- A bare call whose only suffix match is a declared class's method is not resolvable
+-- (`Ctx.resolveCall`): `set()` beside `K.set` reaches the builtin, not the method. The
+-- same name stays resolvable on the method path and as a dotted name.
+private def ktbl : FuncTable :=
+  [ ("m.py:<module>.K.set", { name := "m.py:<module>.K.set", params := ["self"], body := .skip })
+  , ("m.py:<module>.solo",  { name := "m.py:<module>.solo",  params := [], body := .skip }) ]
+private def kclasses : List ClassDecl := [{ name := "m.py:<module>.K", shortName := "K" }]
+private def kix : ResolveIndex := ResolveIndex.build ktbl kclasses
+private def kcx : Ctx := { dialect := .python, table := ktbl, classDecls := kclasses }
+#guard kix.resolvable .python false "set" == kcx.resolvable false "set"
+#guard kix.resolvable .python false "set" == false
+#guard kix.resolvable .python true "set" == kcx.resolvable true "set"
+#guard kix.resolvable .python false "K.set" == kcx.resolvable false "K.set"
+#guard kix.resolvable .python false "K.set" == true
+#guard kix.resolvable .python false "solo" == kcx.resolvable false "solo"
+#guard kix.resolvable .python false "solo" == true
 #guard ix.resolvable .python false "lper" == false
 #guard ix.resolvable .python true "lper" == cx.resolvable true "lper"
 -- A modelled builtin is resolvable on the free path even though it is not in the table.

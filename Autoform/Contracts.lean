@@ -625,6 +625,12 @@ def methodkeyWith (e : Expr) : Func :=
 def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
 
+/-- The fragment declares no classes, so a by-name call here is never refused as a bare
+method reference (`Ctx.resolveCall`). -/
+@[simp] theorem exists_classDecl_keysProgramWith (e : Expr) (P : ClassDecl → Prop) :
+    (∃ x, x ∈ (keysProgramWith e).classDecls ∧ P x) ↔ False := by
+  simp [keysProgramWith]
+
 @[simp] theorem constructionGap_keysProgramWith (e : Expr) (cls : String) :
     (ctxOf (keysProgramWith e)).constructionGap cls = none := rfl
 
@@ -867,7 +873,7 @@ theorem methodkey_refinesUnder_value :
         show (k+7)+1 = k+8 from rfl, hvf (k+8) h ρ (by omega)]
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
-  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, ctx_fold, Ctx.resolveCall, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, resolveCtor_hashedTuple, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
@@ -907,7 +913,7 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   -- about `evalExpr e` become a fact about the argument list `[e]`.
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
+    substS, substE, substEL, he, Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
     applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, hpost]
 
 /-- The contract-relative theorem plus its satisfiability proof, which is the pair a
@@ -987,7 +993,7 @@ theorem methodkey_refines :
   obtain ⟨self, rest, rfl⟩ := List.exists_cons_of_ne_nil hargs
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgram, ctx_fold,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgram, ctx_fold, Ctx.resolveCall,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init', resolveCtor_hashedTuple',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, Env.set, Env.get, Val.truthy,
@@ -1018,7 +1024,7 @@ theorem methodkey_holes (k : Nat) (args : List Val) :
     runFunc keysProgramHoled (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
+    f_cachetools_keys_py__module__methodkey, Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,
     applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, Env.get, Val.truthy,
     Heap.get, Heap.alloc]
