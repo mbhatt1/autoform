@@ -2956,18 +2956,19 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
     names = {f.info.name: lean_ident(f.info.name, taken) for f in attempt}
     done: dict = {}
     order = []
-    spent = [0.0]
+    spent = [0.0, 0.0]          # total so far, dearest function so far (the estimate for the next)
     over_budget = []
     for level in _levels(attempt):
         def job(f):
-            if budget_usd is not None and spent[0] >= budget_usd:
-                over_budget.append(f.info.name)
+            if llm.over_budget(spent[0], budget_usd, spent[1]):
+                over_budget.append(llm.budget_skip(f.info.name, spent[0], budget_usd, spent[1]))
                 return None
             stem = re.sub(r'[^A-Za-z0-9_]', '_', names[f.info.name])
             r = model_function(f, names[f.info.name], module, lean_root, work / stem,
                                traced.get(f.info.name, []), dict(done), repairs=repairs, second=second, ask=ask,
                                ctx=ctx)
             spent[0] += r.cost
+            spent[1] = max(spent[1], r.cost)
             return r
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
             for r in pool.map(job, level):
@@ -2975,9 +2976,11 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
                     continue
                 done[r.fn.info.name] = r
                 order.append(r)
+    if budget_usd is not None:
+        llm.record_skips(out_dir, 'model', over_budget)
     if over_budget:
         notes.append(f'budget ${budget_usd} reached: {len(over_budget)} functions not attempted: '
-                     + ', '.join(over_budget[:40]))
+                     + ', '.join(s['function'] for s in over_budget[:40]))
     modelled = [r for r in order if r.lean_src]
     build_info = {}
     if modelled:

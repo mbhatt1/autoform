@@ -243,8 +243,10 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             inputs = _hash('model', source_fingerprint(source), module, str(lean_root), ref, subdir, functions,
                            second, repairs, *([tests] if tests else []))
         else:
-            extra = {'describe': [functions] + ([tests] if tests else []), 'check': [runtime, domain_size],
-                     'prove': [budget_usd],
+            extra = {'describe': [functions] + ([tests] if tests else []) + ([budget_usd] if budget_usd is not None
+                                                                              else []),
+                     'formalize': [budget_usd] if budget_usd is not None else [],
+                     'check': [runtime, domain_size], 'prove': [budget_usd],
                      'refine': [_file_bytes(out, 'statements'), budget_usd, domain_size],
                      'select': [judge, budget_usd, max_properties_per_function, prove],
                      'adjudicate': [judge, _file_bytes(out, 'english'), _file_bytes(out, 'selection'), runtime,
@@ -296,7 +298,7 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                     if tests:
                         kw['tests'] = tests
                     if budget_usd is not None:   # the model stage starts no new function past it
-                        kw['budget_usd'] = budget_usd
+                        kw['budget_usd'] = remaining
                     result = fn(root, out, str(lean_root), module=module, repairs=repairs, second=second, **kw)
                 else:
                     translation = _load(out, 'translation')
@@ -305,6 +307,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                             kw['functions'] = functions
                         if tests:
                             kw['tests'] = tests
+                        if budget_usd is not None:   # stops at a function; names the rest in budget.json
+                            kw['budget_usd'] = remaining
                         result = fn(translation, out, **kw)
                     elif stage == 'formalize':
                         selection = _load(out, 'selection') if judge else None
@@ -313,6 +317,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                             result = formalize_within_budget(fn, translation, _load(out, 'english'), out, selection,
                                                              _above_reserve(remaining, selection), **kw)
                         else:
+                            if budget_usd is not None:
+                                kw['budget_usd'] = remaining
                             result = fn(translation, _load(out, 'english'), out, **kw)
                     elif stage == 'select':
                         result = fn(translation, _load(out, 'english'), out, judge=judge, budget_usd=remaining,
@@ -406,20 +412,30 @@ def preflight(lean_root, *, budget_usd=None, domain_size=64, parallel=None, repa
         errors.append(f'no Lean project at {root} (no lakefile); pass --lean-root')
     if not Path(lake()).is_file():
         errors.append('lake not found on PATH or in ~/.elan/bin; install Lean with elan')
-    if needs_model and not shutil.which('claude'):
-        errors.append('the claude CLI is not on PATH; it writes the models, English and statements')
     if needs_model:
-        from .llm import LLMError, claude_auth
+        from .llm import LLMError, claude_auth, sdk_available
         try:
             mode = claude_auth()
         except LLMError as exc:
             errors.append(str(exc))
-        else:
-            if mode == 'login' and os.environ.get('ANTHROPIC_API_KEY'):
-                warnings.append('ANTHROPIC_API_KEY is set but not used: model calls use the logged-in claude '
-                                'account (AUTOFORM_CLAUDE_AUTH=api-key bills the key instead)')
-            if mode == 'api-key' and not os.environ.get('ANTHROPIC_API_KEY'):
-                errors.append('AUTOFORM_CLAUDE_AUTH=api-key but ANTHROPIC_API_KEY is not set')
+            mode = None
+        if mode == 'api':
+            if not sdk_available():
+                errors.append('AUTOFORM_CLAUDE_AUTH=api but the anthropic SDK is not installed '
+                              '(pip install "anthropic>=1,<2")')
+            if not os.environ.get('ANTHROPIC_API_KEY'):
+                errors.append('AUTOFORM_CLAUDE_AUTH=api but ANTHROPIC_API_KEY is not set')
+            if not shutil.which('claude'):
+                warnings.append('the claude CLI is not on PATH: the api backend writes the models, English and '
+                                'statements, but the prove and refine agents need the CLI and will fail')
+        elif not shutil.which('claude'):
+            errors.append('the claude CLI is not on PATH; it writes the models, English and statements')
+        if mode == 'login' and os.environ.get('ANTHROPIC_API_KEY'):
+            warnings.append('ANTHROPIC_API_KEY is set but not used: model calls use the logged-in claude '
+                            'account (AUTOFORM_CLAUDE_AUTH=api-key bills the key through the CLI, =api calls '
+                            'the Messages API directly)')
+        if mode == 'api-key' and not os.environ.get('ANTHROPIC_API_KEY'):
+            errors.append('AUTOFORM_CLAUDE_AUTH=api-key but ANTHROPIC_API_KEY is not set')
     for name, v, lo in (('--budget-usd', budget_usd, 0.0), ('--domain-size', domain_size, 1),
                         ('--parallel', parallel, 1), ('--repairs', repairs, 0), ('--repair-rounds', repair_rounds, 0)):
         if v is not None and v < lo:
@@ -446,8 +462,9 @@ def main(argv=None) -> int:
     ap.add_argument('--no-prove', action='store_true', help='stop after checking')
     ap.add_argument('--no-runtime', action='store_true', help='do not execute the source code')
     ap.add_argument('--budget-usd', type=float,
-                    help='total model spend cap; with a judge it is allocated across functions by utility and '
-                         'enforced for formalize, repairs and proving (otherwise for proving only)')
+                    help='total model spend cap for the run (resumed stages included): every model stage stops '
+                         'at the function that would cross it and names the rest in budget.json; with a judge '
+                         'the budget is also allocated across properties by utility')
     ap.add_argument('--judge', default='auto',
                     help='typed-decision judge for selection and counterexample adjudication: auto (SemIf if '
                          'installed, else heuristic), semif, heuristic, replay:PATH, or none')

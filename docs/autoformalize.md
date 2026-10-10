@@ -332,9 +332,10 @@ reaches level L1. Otherwise it stays at L0, and the reason is recorded.
 
 - Lean 4 via elan (`lake` on PATH or in `~/.elan/bin`), and this checkout built with
   `lake build` (the model modules import `Autoform.NL.Basis`).
-- The `claude` CLI. All model calls go through `claude -p`. `AUTOFORM_CLAUDE_AUTH=login`
-  (the default) uses the logged-in account and ignores `ANTHROPIC_API_KEY`.
-  `AUTOFORM_CLAUDE_AUTH=api-key` bills the key instead, for machines with no login such as CI.
+- A model backend (see [Backends and budget](#backends-and-budget)): the `claude` CLI
+  (`AUTOFORM_CLAUDE_AUTH=login`, the default, or `api-key`), or the Anthropic Messages API
+  through the `anthropic` SDK (`AUTOFORM_CLAUDE_AUTH=api`). The proving agents always need
+  the CLI.
 - The Python the analysed code needs (`AUTOFORM_PYTHON`, default `python3`), with the
   code's own dependencies importable. The model stage runs the real functions.
 
@@ -365,13 +366,41 @@ autoform autoformalize ./src MyLib --deep-too       # both, and attempt L1
 Exit status: 2 if the preflight failed or no translation was produced, 1 if there are
 potential bugs, else 0.
 
-## Costs
+## Backends and budget
 
-Every language-model call goes through headless Claude Code (`llm.py`). Calls that use no
-tools are cached on disk by prompt, so rerunning one costs nothing.
-The prove and L1 stages call an agent per statement. `--budget-usd` caps the total spend
-of those two stages (with a judge, also of formalize and repairs, allocated by utility).
-Accepted proofs are cached and re-checked by the kernel, not trusted. The per-stage spend is listed in `run.json` and in the report.
+Every text call of every stage goes through `llm.ask` / `llm.ask_json` (`llm.py`), and is
+cached on disk by prompt hash, so rerunning one costs nothing whichever backend answered.
+`AUTOFORM_CLAUDE_AUTH` selects the backend:
+
+| value | calls | billed to | spend measured as |
+|---|---|---|---|
+| `login` (default) | headless Claude Code (`claude -p`) | the logged-in plan; `ANTHROPIC_API_KEY` is removed from the child environment | the CLI's own `total_cost_usd` |
+| `api-key` | headless Claude Code | `ANTHROPIC_API_KEY`, for machines with no login such as CI | the CLI's own `total_cost_usd` |
+| `api` | the Anthropic Messages API through the `anthropic` Python SDK (optional; `pip install "anthropic>=1,<2"` or the `[llm]` extra) | `ANTHROPIC_API_KEY` | the response usage (input, output, cache-write and cache-read tokens) times the price table `llm.PRICES`, kept in one place with its date `llm.PRICES_DATE`; a model without a row is refused before the call |
+
+The `api` backend's model is `AUTOFORM_LLM_MODEL` or `llm.DEFAULT_API_MODEL`
+(`claude-opus-5-5`). It runs no tools: the model, describe and formalize stages are
+plain text calls and work unchanged; the proving agents (`prove`, `refine`, and the
+`autoform formalize --prover` path) run headless Claude Code with Lean access
+(`autoform.harness.prover.ClaudeCodeAgent`) and still need the `claude` CLI, billed under
+the same `ANTHROPIC_API_KEY`. The preflight errors when the SDK or the key is missing and
+warns when the CLI is, in which case those stages are recorded as failed and the report is
+still written. A tool-using call under `api` raises `LLMError` rather than pretending.
+
+`--budget-usd` is the spend cap for the whole run, resumed stages included (`run.json`
+carries the per-stage spend and the total). Each model stage receives what is left and
+stops at a function: no new function (describe: batch of functions; formalize: a
+function's properties; model: a function; prove: a statement) starts once the stage's
+measured spend plus the dearest unit it has paid for so far would cross the cap. What was
+not started is named in `budget.json` with the stage, the function (and property), the
+amount spent at that point and the estimate, and the pipeline continues to the report,
+whose **Spent vs budget** section lists the budget, the spend per stage and every skip
+by name; each function lists its own. A function describe skipped is left out of
+`english.json`, so no later stage spends on it. Raising the budget on a rerun repeats the
+stages whose budget changed; their earlier calls are cache hits, so only the skipped
+functions are paid for. With a judge the budget is also allocated across properties by
+utility, as described under [Budget](#budget---budget-usd---max-properties-per-function).
+Accepted proofs are cached and re-checked by the kernel, not trusted.
 
 ## Limits
 

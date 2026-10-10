@@ -1,2 +1,6 @@
 # Runtime observations -> mined, kernel-checked specifications.
 hypothesis>=6,<7
+# Optional: the Messages API backend of the autoformalizer (AUTOFORM_CLAUDE_AUTH=api).
+# The default backend is the claude CLI and needs no package; autoform.nl.llm imports
+# this lazily and names the missing package if the api backend is selected without it.
+anthropic>=1,<2
