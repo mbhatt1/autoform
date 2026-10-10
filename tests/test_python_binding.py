@@ -55,10 +55,19 @@ def test_source_python_binding(tmp_path, numeric_env):
         cases.append(dict(subject=name, arguments=args, keywords=kws, native=outcome))
         encoded = [f'.lit (.int ({v}))' for v in args]
         encoded += [f'.kwargE {json.dumps(k)} (.lit (.int ({v})))' for k, v in kws]
-        calls.append(f'(evalExpr {PROGRAM_CONTEXT} 512 [] [] '
-                     f'(.call "binding.py:<module>.{name}" [{", ".join(encoded)}])).2')
+        calls.append(f'(observed (evalExpr {PROGRAM_CONTEXT} 512 [] [] '
+                     f'(.call "binding.py:<module>.{name}" [{", ".join(encoded)}])))')
         expected.append(result)
-    header = model.read_text() + '\nopen Autoform.Core Autoform.Generated.Binding\n'
+    # `**kw` is a dict *object* (`boxKwargs`): a returned tuple carries a reference into
+    # the result heap, while `lean_value` renders the native dict as a literal. Read the
+    # payload back before comparing. One level is enough for these fixtures — every
+    # value is an int, a tuple of ints, or the kwargs dict itself.
+    header = model.read_text() + '\nopen Autoform.Core Autoform.Generated.Binding\n' + (
+        'def observed (r : Heap × EResult) : EResult :=\n'
+        '  match r.2 with\n'
+        '  | .val (.tuple vs) => .val (.tuple (vs.map (Val.unbox r.1)))\n'
+        '  | .val v => .val (Val.unbox r.1 v)\n'
+        '  | e => e\n')
     driver = header + 'def main : IO Unit := do\n'
     for call, want in zip(calls, expected):
         driver += f'  IO.println (reprStr ({call}) == reprStr ({want} : EResult))\n'
