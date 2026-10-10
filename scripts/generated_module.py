@@ -92,7 +92,9 @@ def spec_part_names(umbrella: Path, module: str) -> list[str]:
     """`Base` and `PartN` names imported by a split specification umbrella, in order."""
     if not umbrella.is_file():
         return []
-    pattern = re.compile(r"import Autoform\.SpecsGen\.%s\.(Base|Part\d+)\s*$" % re.escape(module))
+    # `Autoform.SpecsGen.<M>` (generated) and `Autoform.Specs.<M>` (hand-written, split
+    # the same way) both qualify; the umbrella's own directory decides which.
+    pattern = re.compile(r"import Autoform\.(?:SpecsGen|Specs)\.%s\.(Base|Part\d+)\s*$" % re.escape(module))
     parts = []
     for line in umbrella.read_text(encoding="utf-8").splitlines():
         if not line.startswith("import "):

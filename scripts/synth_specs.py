@@ -1408,7 +1408,7 @@ Part %(n)d of %(parts)d of `Autoform/SpecsGen/%(ns)s.lean`: theorems only. The c
 frozen globals heap and every domain are in `Autoform/SpecsGen/%(ns)s/Base.lean`; the
 parts share one namespace, so every name is the one the unsplit module would have had.
 Predicted peak of this part alone: %(predicted_gb).2f GB (base %(base_gb).2f GB + the
-probe-measured cost of each theorem), under the %(limit_gb)g GB split threshold. -/
+probe-measured cost of each theorem), %(verdict)s the %(limit_gb)g GB split threshold%(oversize_note)s. -/
 namespace Autoform.SpecsGen.%(ns)s
 
 open Autoform.Core Autoform.Refine Autoform.SpecsGen
@@ -1430,12 +1430,12 @@ One Lean process retains every by-computation proof term it elaborates (commit e
 at %(total_gb).2f GB -- base %(base_gb).2f GB (imports, `h0`, the domains) plus the
 probe-measured cost of every theorem -- against a `--split-gb %(limit_gb)g` threshold.
 `scripts/synth_specs.py` therefore emitted it as `%(ns)s/Base.lean` (context and domains,
-elaborated once) and `%(ns)s/Part1.lean` .. `Part%(parts)d.lean` (theorems only, each
-predicted under the threshold), all in this namespace, and this umbrella imports them.
+elaborated once) and `%(ns)s/Part1.lean` .. `Part%(parts)d.lean` (theorems only, packed
+next-fit under the threshold), all in this namespace, and this umbrella imports them.
 No statement was weakened: the parts are a partition of the same theorems.
 
 Per-part prediction (GB): %(table)s.
-
+%(oversize)s
 The `#audit_depends` / `#audit_axioms` gates are at the end of each part, for the theorems
 that part states; `obligations`, `excludedSubjects` and `budgetExcluded` are declared
 here, once, for the whole module. -/
@@ -1604,10 +1604,15 @@ def emit_split(cands, module, obligations_extra, plan, ns=None):
     files["%s/Base.lean" % ns] = "\n".join(base)
     nparts = len(plan["parts"])
     for n, part in enumerate(plan["parts"], 1):
+        over = part["predicted_kb"] > plan["limit_kb"]
         out = [PART_HEADER % {"module": module, "ns": ns, "n": n, "parts": nparts,
                               "predicted_gb": part["predicted_kb"] / 1048576.0,
                               "base_gb": plan["base_kb"] / 1048576.0,
-                              "limit_gb": plan["limit_kb"] / 1048576.0}]
+                              "limit_gb": plan["limit_kb"] / 1048576.0,
+                              "verdict": "OVER" if over else "under",
+                              "oversize_note": (": this one theorem alone exceeds it, so no "
+                                                "split bounds it; a cheaper proof or a tighter "
+                                                "`--theorem-memory-gb` would") if over else ""}]
         part_thms = []
         for cid in part["ids"]:
             c = survivors.get(cid)
@@ -1632,10 +1637,17 @@ def emit_split(cands, module, obligations_extra, plan, ns=None):
     table = ", ".join("Part%d %.2f (%d theorem%s)" % (n, p["predicted_kb"] / 1048576.0,
                                                       len(p["ids"]), "" if len(p["ids"]) == 1 else "s")
                       for n, p in enumerate(plan["parts"], 1))
+    oversize = ""
+    if plan.get("oversize"):
+        oversize = ("\nNOT bounded by the split: %s -- each of these theorems alone is predicted over "
+                    "the threshold and sits in a part of its own. The split cannot bring a single "
+                    "kernel evaluation under the limit; only a cheaper proof or an exclusion "
+                    "(`--theorem-memory-gb`, which names it in `budgetExcluded`) can.\n"
+                    % ", ".join("`%s`" % cid for cid in plan["oversize"]))
     umb.append(UMBRELLA_DOC % {"parts": nparts, "total_gb": plan["total_kb"] / 1048576.0,
                                "base_gb": plan["base_kb"] / 1048576.0,
                                "limit_gb": plan["limit_kb"] / 1048576.0, "ns": ns,
-                               "table": table})
+                               "table": table, "oversize": oversize})
     umb.append("namespace Autoform.SpecsGen.%s\n" % ns)
     umb.append("open Autoform.Core Autoform.Refine Autoform.SpecsGen\n")
     umb.extend(_declarations_text(ns, obs))

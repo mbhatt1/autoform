@@ -195,6 +195,35 @@ appear in the generated module (`budgetExcluded`, printed when it builds) and in
 `specs.json` (`budget_excluded`). A candidate that simply fails to prove is not affected:
 it stays an open obligation.
 
+**Build shape.** The same probe is the per-theorem memory profile: every candidate's peak
+resident size and wall time are recorded (`specs.json`, `memory_profile`), and the empty
+module is probed once for the base cost every process pays. One Lean process retains every
+by-computation proof term it elaborates, so the predicted peak of the single-file module
+is the base plus the sum of its theorems' costs. When that exceeds `AUTOFORM_SPLIT_GB`
+(`--split-gb`, default 4; `0` disables) stage 8 emits the module the way
+`Autoform/SpecsGen/V8Base` is laid out: `Autoform/SpecsGen/<Module>/Base.lean` (the
+context, the frozen globals heap and every domain), `<Module>/PartN.lean` (theorems only,
+each part predicted under the threshold, with its own `#audit_depends`/`#audit_axioms`
+gate) and an umbrella `<Module>.lean` that imports them and declares `obligations`,
+`excludedSubjects` and `budgetExcluded`. Every file shares the unsplit module's namespace,
+so no theorem changes its name; `specs.json` records the plan (`split`). Parts are built
+one at a time. A theorem whose cost alone exceeds the threshold gets a part of its own and
+is named in the umbrella's header and in the log: no split bounds it, and the only ways
+to bound it are a cheaper proof or exclusion by `AUTOFORM_THEOREM_MEMORY_GB`.
+
+**Cache.** `.autoform-work/cache/<digest>/` memoizes, per function AST digest, what a
+re-land recomputes although nothing changed: the oracle's Lean answer for each recorded
+case (`lean-*.json`) and the synthesizer's refutation, guard, proof-fuel, execution-hint
+and probe verdicts per candidate (`synth-*.json`); the oracle's Python observation phase
+(suite trace, random and constructed calls), which runs as one process, is memoized whole
+under the AST digest, and the call-closed core and globals heap under the model digest.
+Each entry is further keyed by a digest of everything the verdict depends on: the rendered
+model, the Lean sources a proof can reach, the harness scripts, the budgets, the test
+suite and source tree. A cached "proved" is only a hint that the same text is emitted;
+`lake build` re-verifies it and is a no-op exactly when its own traces say nothing
+changed. `AUTOFORM_NO_CACHE=1` (or `synth_specs.py --no-cache`) bypasses the cache;
+`AUTOFORM_CACHE_DIR` relocates it. See `scripts/work_cache.py`.
+
 Stage 6 failures are recorded and propagate a nonzero exit status after the ledger.
 Proof synthesis runs only after successful conformance. Stage logs, reports and a
 final `pipeline.json` live in `artifacts/pipeline/<Module>/`. A new run invalidates

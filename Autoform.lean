@@ -48,6 +48,10 @@ import Autoform.NL.Basis
 import Autoform.BuiltinBase
 import Autoform.Contracts
 import Autoform.Specs.CachetoolsSpec
+-- Split by `scripts/synth_specs.py --split-gb` (2026-10-10): an umbrella over
+-- `Autoform/SpecsGen/Cachetools/Base.lean` + `Part1..9.lean`, the same shape as V8Base
+-- below, so that no part but one holds more than 2.3 GB (the single-file module held
+-- 13.0 GB). The umbrella's header names the one theorem no split bounds.
 import Autoform.SpecsGen.Cachetools
 import Autoform.Specs.V8Spec
 import Autoform.SpecsGen.V8BaseSample

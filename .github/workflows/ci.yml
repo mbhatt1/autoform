@@ -109,18 +109,28 @@ jobs:
       # heaviest by-computation spec modules hold more than this runner's memory. The
       # umbrella says which modules the runner proves; V8Base is gated by check_specs.py
       # and by the release checklist's full build.
-      # Even pinned to one core, Lake keeps several elaborations in flight. Two of them,
-      # `Autoform.SpecsGen.Cachetools` and `Autoform.Specs.CachetoolsSpec`, are independent
-      # (both import only `Autoform.Generated.Cachetools`) and each elaborates at ~13 GB
-      # (measured 2026-10-10 with /usr/bin/time -l: 13.0 GB and 13.6 GB peak RSS; a
-      # `lean -M 6000` run shows the spec file's memory is cumulative across its
-      # proofs, not one bad theorem). Scheduled together they exceed the runner, and that
-      # is exactly where this job died on 2026-10-10 (exit 143 after job 401/405, those two
-      # the only modules of the umbrella left unbuilt). Built one at a time each fits, so
-      # they are sequenced by hand before the umbrella picks up the rest.
+      # Even pinned to one core, Lake keeps several elaborations in flight, and two
+      # modules used to need ~13 GB each: `Autoform.SpecsGen.Cachetools` (13.0 GB) and
+      # `Autoform.Specs.CachetoolsSpec` (13.6 GB), measured 2026-10-10 with
+      # /usr/bin/time -l. Scheduled together they exceeded the runner (exit 143 after job
+      # 401/405 on 2026-10-10).
+      #
+      # `Autoform.SpecsGen.Cachetools` is now emitted split by `scripts/synth_specs.py`
+      # (`--split-gb 4`, roadmap 3.1): `Cachetools/Base.lean` + `Cachetools/Part1..9.lean`
+      # under an umbrella, each part packed under a predicted 4 GB from the budget probe's
+      # per-theorem profile. Measured 2026-10-10 (/usr/bin/time -l lake env lean, peak
+      # RSS): Base 1.21 GB, Part1 1.55, Part2 1.81, Part3 11.27, Part4 1.69, Part5 1.53,
+      # Part6 1.48, Part7 2.28, Part8 1.48, Part9 1.73, umbrella 1.18. One theorem --
+      # `conform_cachetools___init___py__module__Cache___len`, Part3 -- costs 11.27 GB on
+      # its own (a single kernel evaluation; per-case `decide +kernel`, `rfl` and `cbv`
+      # variants were measured and are no cheaper), so the split cannot bound it and the
+      # umbrella says so. That one part is still built alone, before anything else;
+      # every other part is under 2.3 GB and the umbrella picks them up with the rest.
+      # `Autoform.Specs.CachetoolsSpec` is hand-written and still 13.6 GB in one process;
+      # it stays sequenced by hand.
       - name: lake build
         run: |
-          taskset -c 0 lake build Autoform.SpecsGen.Cachetools
+          taskset -c 0 lake build Autoform.SpecsGen.Cachetools.Part3
           taskset -c 0 lake build Autoform.Specs.CachetoolsSpec
           taskset -c 0 lake build Autoform.CI
 
@@ -367,7 +377,11 @@ jobs:
           #   * SpecsGen/V8Base: the module is an umbrella over Autoform/SpecsGen/V8Base/
           #     Part*.lean since e36b8f1 (one shared Base, 73 parts), so the theorems are
           #     counted there; Base.lean holds the single context theorem.
-          check SpecsGen-Cachetools 20  Autoform/SpecsGen/Cachetools.lean
+          #   * SpecsGen/Cachetools: since the 2026-10-10 regeneration `synth_specs.py`
+          #     emits it split (`--split-gb`): the umbrella Autoform/SpecsGen/Cachetools.lean
+          #     holds only `obligations`, the theorems are in Cachetools/Part*.lean and are
+          #     counted there, like V8Base. Still 20.
+          check SpecsGen-Cachetools 20  Autoform/SpecsGen/Cachetools/Part*.lean
           check SpecsGen-V8Base     284 Autoform/SpecsGen/V8Base/Part*.lean
           check SpecsGen-Basis      35  Autoform/SpecsGen/Basis.lean
           check SpecsGen-LinuxLib   12  Autoform/SpecsGen/LinuxLib.lean
@@ -387,26 +401,38 @@ jobs:
       # because every generated corpus declared `Autoform.Generated.program`; each corpus
       # now owns `Autoform.Generated.<Module>`, so they all coexist in one build.
 
-      # SpecsGen/Cachetools.lean claims that `#audit_depends` fails the build for any
+      # SpecsGen/Cachetools claims that `#audit_depends` fails the build for any
       # theorem whose proof never mentions the implementation it constrains. That gate
       # only covers the theorems it is asked about, so a theorem added without a matching
       # `#audit_depends` line would be ungated and the build would stay green. This step
       # checks that the two lists are the same set, and that the module still declares
       # its open obligations by name (an empty list is a claim; a missing one is silence).
+      # The module is split (see the build step): the theorems and their gates are in
+      # Cachetools/Part*.lean, each part gating exactly the theorems it states, and the
+      # umbrella Cachetools.lean declares `obligations`. The umbrella is also checked to
+      # import every part on disk, so a part nothing imports cannot pad the count above.
       - name: SpecsGen/Cachetools — every theorem is under the anti-vacuity gate
         run: |
           set -euo pipefail
-          f=Autoform/SpecsGen/Cachetools.lean
-          theorems=$(grep -o '^ *theorem [A-Za-z0-9_]*' "$f" | awk '{print $2}' | sort)
-          gated=$(grep -o '^#audit_depends [A-Za-z0-9_]*' "$f" | awk '{print $2}' | sort)
-          if [ "$theorems" != "$gated" ]; then
-            echo "theorems and #audit_depends lines differ (< theorem only, > gate only):"
-            diff <(echo "$theorems") <(echo "$gated") || true
-            exit 1
-          fi
-          grep -q '^def obligations : List OpenObligation :=' "$f" || {
-            echo "SpecsGen/Cachetools.lean no longer declares its open obligations."; exit 1; }
-          echo "$(echo "$theorems" | grep -c .) theorems, each with an #audit_depends line; obligations declared"
+          umbrella=Autoform/SpecsGen/Cachetools.lean
+          fail=0
+          for f in Autoform/SpecsGen/Cachetools/Part*.lean; do
+            theorems=$(grep -o '^ *theorem [A-Za-z0-9_]*' "$f" | awk '{print $2}' | sort)
+            gated=$(grep -o '^#audit_depends [A-Za-z0-9_]*' "$f" | awk '{print $2}' | sort)
+            if [ "$theorems" != "$gated" ]; then
+              echo "$f: theorems and #audit_depends lines differ (< theorem only, > gate only):"
+              diff <(echo "$theorems") <(echo "$gated") || true
+              fail=1
+            fi
+            part=$(basename "$f" .lean)
+            grep -q "^import Autoform.SpecsGen.Cachetools.$part\$" "$umbrella" || {
+              echo "$umbrella does not import $part; the part is not in the build"; fail=1; }
+          done
+          grep -q '^def obligations : List OpenObligation :=' "$umbrella" || {
+            echo "SpecsGen/Cachetools.lean no longer declares its open obligations."; fail=1; }
+          [ "$fail" -eq 0 ] || exit 1
+          n=$(cat Autoform/SpecsGen/Cachetools/Part*.lean | grep -c '^ *theorem ')
+          echo "$n theorems over $(ls Autoform/SpecsGen/Cachetools/Part*.lean | wc -l) parts, each with an #audit_depends line in its part; obligations declared"
 
       # The artifact policy makes the AST the tracked source of truth and the
       # render a build product. check_render verifies both halves against

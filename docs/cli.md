@@ -146,6 +146,8 @@ failed checks named. It never claims whole-program correctness.
 | `AUTOFORM_CASES` | oracle | random cases per function (default 5) |
 | `AUTOFORM_THEOREM_TIMEOUT`, `AUTOFORM_THEOREM_MEMORY_GB`, `AUTOFORM_PROBE_JOBS` | `synth_specs.py` | per-theorem proof budget (300 s, 16 GB, 2 jobs); an over-budget candidate is excluded by name |
 | `AUTOFORM_SPEC_EXCLUDE` | `synth_specs.py` | `;`-separated subjects to leave out, recorded in the module |
+| `AUTOFORM_SPLIT_GB` | `synth_specs.py` | split the proof module into `<M>/Base.lean` + `<M>/PartN.lean` when its predicted single-process peak exceeds this many GB (default 4; `0` disables) |
+| `AUTOFORM_NO_CACHE`, `AUTOFORM_CACHE_DIR` | oracle, `synth_specs.py` | bypass or relocate `.autoform-work/cache` (verdicts keyed by function AST digest; `docs/running.md` §2) |
 | `AUTOFORM_MUTANTS` | `assure` | mutants per gate run (default `max(8, 2 × proved)`) |
 | `AUTOFORM_CFLAGS`, `CPP_DEFINES`, `AUTOFORM_COMPILE_COMMANDS` | C/C++ parsing and native runs | compiler flags, defines, a compilation database |
 | `AUTOFORM_FRONTEND`, `AUTOFORM_DATA_MODEL` | parse/export | force a Joern frontend; `lp64`/`ilp32` integer model |
