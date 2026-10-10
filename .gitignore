@@ -145,3 +145,6 @@ Autoform/Generated/*/Part*.lean
 # changed functions and its report directory are products of a run, never tracked.
 Autoform/SpecsGen/PullRequest*.lean
 artifacts/pr/
+
+# CI scratch: generated ledger driver (ledger-*.json is the artifact)
+.ci-ledger/

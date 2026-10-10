@@ -106,7 +106,44 @@ KERNEL_COMPAT_HEADER = (
     '#ifndef swap\n'
     '#define swap(a, b) \\\n'
     '\tdo { __typeof__(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)\n'
+    '#endif\n'
+    '/* include/linux/kernel.h includes <linux/bitops.h> (__ffs, __fls, hweight);\n'
+    ' * the tools copy does not, so lib/math/gcd.c\'s binary_gcd() could not see\n'
+    ' * __ffs. The tools tree\'s own bitops.h is used where it exists. */\n'
+    '#if defined(__has_include)\n'
+    '#if __has_include(<linux/bitops.h>)\n'
+    '#include <linux/bitops.h>\n'
+    '#endif\n'
     '#endif\n')
+
+
+# include/linux/gcd.h (since v6.17, "lib/math/gcd: use static key to select
+# implementation at runtime") includes <linux/jump_label.h>, whose real body needs a
+# configured Kbuild tree (WARN_ON_ONCE, <asm/jump_label.h>, self-patching code), so
+# every unit reaching gcd.h failed to compile and lib/math had 0 observable units.
+# Outside Kbuild a static key is a plain boolean read: DEFINE_STATIC_KEY_TRUE(k) is a
+# key that is initially enabled and nothing in a portable-userspace build ever
+# toggles it, so static_branch_likely(&k) is the key's initial value. That is the
+# documented meaning of an untoggled key and the only part of jump-label semantics a
+# scalar helper such as gcd() depends on. The shim shadows the real header through the
+# generated include directory, which is searched first. It defines no function whose
+# behaviour is under comparison; the kernel's own gcd.c is what gets compiled.
+KERNEL_JUMP_LABEL_SHIM = (
+    '/* autoform: <linux/jump_label.h> for a portable-userspace build. A static key\n'
+    ' * reads as its initial value; nothing here can toggle one (no jump labels). */\n'
+    '#pragma once\n'
+    'struct static_key_true { int enabled; };\n'
+    'struct static_key_false { int enabled; };\n'
+    '#define DECLARE_STATIC_KEY_TRUE(name) extern struct static_key_true name\n'
+    '#define DECLARE_STATIC_KEY_FALSE(name) extern struct static_key_false name\n'
+    '#define DEFINE_STATIC_KEY_TRUE(name) struct static_key_true name = { 1 }\n'
+    '#define DEFINE_STATIC_KEY_FALSE(name) struct static_key_false name = { 0 }\n'
+    '#define DEFINE_STATIC_KEY_TRUE_RO(name) DEFINE_STATIC_KEY_TRUE(name)\n'
+    '#define DEFINE_STATIC_KEY_FALSE_RO(name) DEFINE_STATIC_KEY_FALSE(name)\n'
+    '#define static_branch_likely(key) (!!(key)->enabled)\n'
+    '#define static_branch_unlikely(key) (!!(key)->enabled)\n'
+    '#define static_branch_maybe(config, key) (!!(key)->enabled)\n'
+    '#define static_key_enabled(key) (!!(key)->enabled)\n')
 
 
 def native_flags(context, work):
@@ -133,6 +170,9 @@ def native_flags(context, work):
         compat = headers.parent / 'autoform-kernel-compat.h'
         compat.write_text(KERNEL_COMPAT_HEADER)
         flags += ['-include', str(compat)]
+        # <linux/gcd.h> includes <linux/jump_label.h>; see KERNEL_JUMP_LABEL_SHIM.
+        (headers.parent / 'linux').mkdir(exist_ok=True)
+        (headers.parent / 'linux' / 'jump_label.h').write_text(KERNEL_JUMP_LABEL_SHIM)
         # Native compilation resolves attributes via the actual headers. Parser-only
         # attribute substitutions must not override compiler semantics/linkage.
         flags = [f for f in flags if f[2:].split('=', 1)[0] not in KERNEL_ATTRIBUTES]

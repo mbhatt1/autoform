@@ -47,13 +47,24 @@ import Autoform.NL.Basis
 -- in ONE build, kernel-checked together, replayed together by `leanchecker --fresh`.
 import Autoform.BuiltinBase
 import Autoform.Contracts
+-- Hand-written, split by hand on 2026-10-10 into `Autoform/Specs/CachetoolsSpec/Base.lean`
+-- + `Part1..6.lean` (theorems moved verbatim, same namespace) after measuring every
+-- theorem alone: the single file held 13.6 GB; two constructor theorems hold ~11 GB each
+-- in parts of their own and every other part is under 2.2 GB (figures in ci.yml).
 import Autoform.Specs.CachetoolsSpec
+-- Split by `scripts/synth_specs.py --split-gb` (2026-10-10): an umbrella over
+-- `Autoform/SpecsGen/Cachetools/Base.lean` + `Part1..9.lean`, the same shape as V8Base
+-- below, so that no part but one holds more than 2.3 GB (the single-file module held
+-- 13.0 GB). The umbrella's header names the one theorem no split bounds.
 import Autoform.SpecsGen.Cachetools
 import Autoform.Specs.V8Spec
 import Autoform.SpecsGen.V8BaseSample
 import Autoform.SpecsGen.LinuxLib
 import Autoform.SpecsGen.LinuxLibSample
 import Autoform.Specs.CppCastSpec
+-- The first non-Python corpus at scale: commons-lang3 3.17.0 (Java, 9 files of
+-- `org.apache.commons.lang3`, 488 functions), observation theorems from the JVM oracle.
+import Autoform.SpecsGen.CommonsLang3
 
 -- V8 `src/base` laws: 73 modules, with the shared context and all 73 domains in
 -- `V8Base.Base`. One Lean process retains every `rfl` term it elaborates, and each of

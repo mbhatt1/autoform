@@ -20,8 +20,9 @@ that was skipped because a tool was missing is an unmet gate, not a pass, and
 - [ ] `AUTOFORM_TEST_JOERN=1 AUTOFORM_REQUIRE_LEAN=1 python -m pytest tests/test_source_numeric.py ... -q`
       (the full list below): the numeric suite is `5 passed, 2 xfailed` or better, and
       **no** gated test skipped -- grep the `-rs` output for `set AUTOFORM_TEST_JOERN`.
-- [ ] `python scripts/check_render.py` → 0, or 3 with *only* `Ansible`, `LinuxCrypto`,
-      `LinuxLib` unverifiable (the documented exceptions in `docs/integrity.md`).
+- [ ] `python scripts/check_render.py` → `0`, nothing `UNVERIFIABLE`. There are no
+      documented exceptions any more: the three untracked large corpora left the manifest
+      on 2026-10-10 (`docs/integrity.md`, "Input availability").
 - [ ] `python scripts/check_docs.py`, `check_specs_fresh.py`, `check_provenance.py` all `0`.
 - [ ] `python -m build` from a clean checkout; `twine check --strict`;
       `python scripts/check_distribution.py dist/candidate` passes.

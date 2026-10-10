@@ -118,7 +118,7 @@ def test_api_backend_needs_key_and_sdk(api_env, monkeypatch):
     monkeypatch.setitem(sys.modules, 'anthropic', None)   # import anthropic -> ImportError
     monkeypatch.setattr(llm, 'sdk_available', lambda: False)
     assert llm.available() is False
-    with pytest.raises(llm.LLMError, match='pip install "anthropic'):
+    with pytest.raises(llm.LLMError, match='needs the anthropic SDK'):
         llm.ask('p', api_env)
     errors, warnings = pipeline.preflight(ROOT, needs_model=True)
     assert any('anthropic SDK is not installed' in e for e in errors)
