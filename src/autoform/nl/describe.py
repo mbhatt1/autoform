@@ -319,13 +319,16 @@ def tests_from(fns: list, test_dirs) -> int:
 
 def describe(translation: dict, out_dir: Path, *, functions=None, parallel: int = 4,
              batch_size: int = BATCH, model: str | None = None,
-             use_model: bool | None = None, tests=()) -> list:
+             use_model: bool | None = None, tests=(), budget_usd: float | None = None) -> list:
     """Write out_dir/english.json ([EnglishSpec]) and english.meta.json; return the specs.
 
     functions: optional names (qualified or source) to restrict to.
     use_model: None = use the CLI when available; False = fallback only.
     tests: extra test directories whose lines calling a function are shown as evidence
     (for functions the translation recorded no test lines for).
+    budget_usd: no further batch starts once the spend plus the measured cost of a batch
+    would cross it; the functions not described are named in budget.json and left out of
+    english.json, so no later stage spends on them.
     """
     t0 = time.time()
     out_dir = Path(out_dir)
@@ -348,18 +351,36 @@ def describe(translation: dict, out_dir: Path, *, functions=None, parallel: int 
         use_model = llm.available()
     keyed = [(f'f{i + 1}', fn) for i, fn in enumerate(todo)]
     batches = [keyed[i:i + batch_size] for i in range(0, len(keyed), batch_size)]
-    answers, cost, errors = {}, 0.0, []
+    answers, cost, errors, over = {}, 0.0, [], []
     if use_model and batches:
-        with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
-            for got, c, err in pool.map(lambda b: _ask_batch(b, language, model), batches):
-                answers.update(got)
-                cost += c
-                if err:
-                    errors.append(err)
+        # Waves of `parallel` batches; before each wave the budget is checked against the
+        # dearest batch measured so far, so the stage stops at a function, never mid-wave.
+        width = max(1, parallel)
+        waves = [batches[i:i + width] for i in range(0, len(batches), width)]
+        per_batch = 0.0
+        with ThreadPoolExecutor(max_workers=width) as pool:
+            for wi, wave in enumerate(waves):
+                if llm.over_budget(cost, budget_usd, per_batch * len(wave)):
+                    over = [fn for later in waves[wi:] for b in later for _, fn in b]
+                    break
+                results = list(pool.map(lambda b: _ask_batch(b, language, model), wave))
+                for got, c, err in results:
+                    answers.update(got)
+                    cost += c
+                    if err:
+                        errors.append(err)
+                per_batch = max([per_batch] + [c for _, c, _ in results])
+        if budget_usd is not None:
+            skips = [llm.budget_skip(fn['name'], cost, budget_usd, per_batch) for fn in over]
+            llm.record_skips(out_dir, 'describe', skips)
+            skipped += [dict(function=s['function'], reason=s['reason']) for s in skips]
+    over_names = {fn['name'] for fn in over}
 
     specs, issues = [], []
     model_name = model or os.environ.get('AUTOFORM_LLM_MODEL') or 'claude-code'
     for key, fn in keyed:
+        if fn['name'] in over_names:
+            continue
         spec, problems = None, []
         if key in answers:
             spec, problems = validate(fn, answers[key], model_name)

@@ -107,8 +107,10 @@ and each divergence is kernel-checked. Exit `1` on a regression or a divergence.
 Each owns its flags; `autoform <cmd> --help` is the reference.
 `autoformalize` writes a language model's Lean model of each function and validates it
 against real executions and a second translation (`--deep` uses the Joern translation
-instead; `--deep-too` proves the two equal). It needs a model provider
-(`AUTOFORM_CLAUDE_AUTH=login|api-key`) and caps spend with `--budget-usd`.
+instead; `--deep-too` proves the two equal). It needs a model backend
+(`AUTOFORM_CLAUDE_AUTH=login|api-key|api`, see `docs/autoformalize.md`) and caps the
+run's spend with `--budget-usd`: every model stage stops at the function that would cross
+the cap and names the rest in `budget.json` and the report.
 `formalize` needs a translated module in the workspace and, for the default judge, a
 SemIf (OpenJev) installation. `machine` needs the `[machine]` extra; `--assemble`
 also needs `clang`. The checkout entry points `./autoform.sh`, `./assure.sh` and
@@ -149,7 +151,8 @@ failed checks named. It never claims whole-program correctness.
 | `AUTOFORM_MUTANTS` | `assure` | mutants per gate run (default `max(8, 2 × proved)`) |
 | `AUTOFORM_CFLAGS`, `CPP_DEFINES`, `AUTOFORM_COMPILE_COMMANDS` | C/C++ parsing and native runs | compiler flags, defines, a compilation database |
 | `AUTOFORM_FRONTEND`, `AUTOFORM_DATA_MODEL` | parse/export | force a Joern frontend; `lp64`/`ilp32` integer model |
-| `AUTOFORM_CLAUDE_AUTH` | `autoformalize`, `formalize --prover` | `login` (default) or `api-key` |
+| `AUTOFORM_CLAUDE_AUTH` | `autoformalize`, `formalize --prover` | `login` (default) or `api-key` (the `claude` CLI), or `api` (the Messages API through the `anthropic` SDK; text stages only) |
+| `AUTOFORM_LLM_MODEL` | `autoformalize` | model for the text stages (`api`: default `claude-opus-5-5`, must have a row in `llm.PRICES`) |
 | `AUTOFORM_ALLOW_DIRTY` | checkout entry points | run over modified tracked artifacts (never over a live mutant) |
 | `AUTOFORM_SCRATCH`, `AUTOFORM_PYTHON` | scripts | scratch directory; the Python the stages run under |
 | `AUTOFORM_DIFF_KEEP`, `AUTOFORM_NO_REEXEC` | oracle debugging | keep the Lean file a case failed in; skip the `PYTHONHASHSEED=0` re-exec |
