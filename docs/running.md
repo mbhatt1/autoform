@@ -30,6 +30,37 @@ move with every change; where a document and an artifact disagree, the artifact 
 
 ## 1. Prerequisites
 
+### One command: `scripts/bootstrap.sh`
+
+From a fresh clone, this installs everything below and ends in the trust audit's
+`VERDICT: PASS`, or fails at a named step:
+
+```sh
+git clone <this repository> autoform && cd autoform
+scripts/bootstrap.sh
+```
+
+In order: elan and the toolchain in `lean-toolchain`; a `.venv` from the first Python 3.10+
+it finds (`python3.12`, `python3.11`, `python3.13`, `python3`, or `AUTOFORM_PYTHON`) with
+`requirements.txt`; the Joern release pinned in `joern-version` into `JOERN_HOME`
+(default `~/joern`), its zip verified against the release's `.sha512` before unpacking and
+the jars on disk checked against the pin afterwards; the build with the memory sequencing
+CI uses (`Autoform.SpecsGen.Cachetools`, then `Autoform.Specs.CachetoolsSpec`, then
+`Autoform.CI`, under `taskset -c 0` on Linux and one after another on macOS, which has no
+`taskset`); the cachetools corpus at the commit `ast-Cachetools.json` was exported from
+(`AUTOFORM_CACHETOOLS_DIR`, default `/tmp/cachetools`, as CI); the "oracle is alive"
+check (the differential oracle must compare more than zero cases); then
+`scripts/audit_all.py --strict --module Autoform.CI`. It finishes by printing `git status`,
+which is clean on a fresh clone. A second run re-checks each step and rebuilds only what
+changed. The things it will not do are said in its output rather than skipped: it never
+installs a JDK (Joern needs one; CI uses temurin 21), and it refuses to overwrite a Joern
+in `JOERN_HOME` that does not match the pin. `AUTOFORM_BOOTSTRAP_ROOT=Autoform` builds and
+audits the whole project including the V8Base parts, which CI cannot (`Autoform/CI.lean`).
+Written and run on macOS arm64; the Linux branches follow `.github/workflows/ci.yml` and
+have not been run on Ubuntu from this script. Expect the first run to take the better
+part of an hour, most of it in the build. The rest of this section is what the script does
+by hand.
+
 ### Lean, via `elan`
 
 The toolchain is pinned in `lean-toolchain` (Lean 4.30.0-rc1 at the time of writing).
@@ -88,11 +119,15 @@ while having failed**, leaving no `joern-cli` directory and a shell that reports
 Fetch the release asset directly instead:
 
 ```sh
-# pick a release from https://github.com/joernio/joern/releases (4.0.606 is known-good)
-curl -L -o joern-cli.zip \
-  https://github.com/joernio/joern/releases/download/v4.0.606/joern-cli.zip
-mkdir -p ~/joern && unzip -q joern-cli.zip -d ~/joern
-~/joern/joern-cli/joern --version
+# the release ships per-platform zips: joern-cli-{linux,macos}-{x86_64,arm64}.zip
+# (there is no joern-cli.zip); the .sha512 beside each names it as target/<asset>
+v=$(cat joern-version); a=joern-cli-macos-arm64.zip
+mkdir -p target ~/joern
+curl -fL -o target/$a https://github.com/joernio/joern/releases/download/v$v/$a
+curl -fL -o $a.sha512 https://github.com/joernio/joern/releases/download/v$v/$a.sha512
+shasum -a 512 -c $a.sha512                        # sha512sum -c on Linux
+unzip -q target/$a -d ~/joern
+python3 scripts/provenance.py joern-version --check
 ```
 
 The scripts look for `"$JOERN_HOME/joern-cli"` with `JOERN_HOME` defaulting to `~/joern`,

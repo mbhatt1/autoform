@@ -101,6 +101,20 @@ artifacts/pipeline/
 ast-Pipeline*.json
 ledger-Pipeline*.json
 Autoform/SpecsGen/Pipeline*.lean
+# Products of `./autoform.sh <dir> Demo` and of `./autoform.sh <dir>` (module name
+# defaults to `Translated`): a hand-run of the checkout pipeline on an ad-hoc tree, not a
+# corpus. The checkout entry point writes beside the tracked corpora on purpose (that is
+# how ast-Cachetools.json is produced), so an ad-hoc module's products are named here the
+# way the Pipeline* test products are. Rename the module before tracking a real corpus.
+ast-Demo.json
+ast-Translated.json
+provenance/ast-Demo.json.prov.json
+provenance/ast-Translated.json.prov.json
+Autoform/SpecsGen/Demo.lean
+Autoform/SpecsGen/Translated.lean
+# A wheel at the repository root is a download (a kconfiglib-*.whl once arrived with a
+# Linux trial), never a product of this tree; built wheels live under dist/.
+/*.whl
 # Generated independent-property proofs; their inputs live in properties.json.
 Autoform/Security/*.lean
 Autoform/SpecsGen/*.compile.log

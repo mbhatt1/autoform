@@ -143,6 +143,9 @@ stale is worse than documentation that says "run this to find out".
 
 ## Practical workflow
 
+On a fresh clone, `scripts/bootstrap.sh` installs the pinned toolchains and runs the
+build, the conformance oracle and the audit in one go (docs/running.md §1).
+
 ```sh
 lake build                                 # must be clean
 python3 scripts/audit_all.py --strict      # axioms, escape hatches, kernel replay
