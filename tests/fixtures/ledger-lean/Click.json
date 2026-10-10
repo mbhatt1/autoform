@@ -1,0 +1,158 @@
+{
+ "ast": "ast-Click.json",
+ "astSha256": "51b74421c6880be8d63691bc303a9f60a37da4ca465dbca3ab35b3e6bf523e32",
+ "ledger": {
+  "closedByContract": 3,
+  "closedByTranslation": 264,
+  "contractsUsed": [
+   {
+    "callee": ".get",
+    "sites": 7
+   }
+  ],
+  "dialect": "python",
+  "dynamicHoleRisk": 6473,
+  "functions": 549,
+  "holeFree": 475,
+  "holes": 106,
+  "holesByLabel": [
+   {
+    "count": 13,
+    "label": "class-construction:unresolved-lexical-identity:TypeVar"
+   },
+   {
+    "count": 11,
+    "label": "genexpr:free-variable-cells"
+   },
+   {
+    "count": 8,
+    "label": "op:starredUnpack"
+   },
+   {
+    "count": 8,
+    "label": "lit:bytes"
+   },
+   {
+    "count": 6,
+    "label": "control:TRY-handler-type"
+   },
+   {
+    "count": 5,
+    "label": "decorator:external:contextlib.contextmanager"
+   },
+   {
+    "count": 5,
+    "label": "expr:genExp"
+   },
+   {
+    "count": 5,
+    "label": "decorator:external:contextmanager"
+   },
+   {
+    "count": 4,
+    "label": "op:formatString:nested-spec"
+   },
+   {
+    "count": 4,
+    "label": "op:raise-cause"
+   },
+   {
+    "count": 4,
+    "label": "class-construction:unresolved-lexical-identity:Popen"
+   },
+   {
+    "count": 3,
+    "label": "control:TRY-handler-binding"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:BufferedWriter"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:ParamSpec"
+   },
+   {
+    "count": 2,
+    "label": "exception:payload:filename"
+   },
+   {
+    "count": 2,
+    "label": "scope:nonlocal-write"
+   },
+   {
+    "count": 2,
+    "label": "expr:BLOCK-prelude"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:BytesIO"
+   },
+   {
+    "count": 2,
+    "label": "expr:BLOCK-impure"
+   },
+   {
+    "count": 2,
+    "label": "exception:payload:exit_code"
+   },
+   {
+    "count": 2,
+    "label": "call:python-receiver-signature"
+   },
+   {
+    "count": 1,
+    "label": "lit:unquoted"
+   },
+   {
+    "count": 1,
+    "label": "lit:ellipsis"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:IntRange"
+   },
+   {
+    "count": 1,
+    "label": "expr:comprehension-position"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:S_ISDIR"
+   },
+   {
+    "count": 1,
+    "label": "op:delete-field"
+   },
+   {
+    "count": 1,
+    "label": "generator:yieldFromS"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:AnsiToWin32"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:S_ISREG"
+   },
+   {
+    "count": 1,
+    "label": "exception:payload:strerror"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:UUID"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:BufferedReader"
+   }
+  ],
+  "module": "Click",
+  "nodes": 29818,
+  "verifiableCore": 264
+ },
+ "module": "Click",
+ "producedBy": "scripts/ledger.lean.tmpl via `lake env lean` (Program.ledgerJson)"
+}

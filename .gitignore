@@ -77,6 +77,9 @@ Autoform/Generated/*.lean
 ast-Ansible.json
 ast-LinuxLib.json
 ast-LinuxCrypto.json
+# Django's AST (28 MB; docs/GOAL-arbitrary-codebases.md milestone 5) is a local product of
+# scripts/ledger_corpus.sh; ledger-Django.json is covered by the ledger-*.json rule above.
+ast-Django.json
 # ast-V8Base.json is TRACKED: 3.2 MB, and 74 spec files / 285 theorems under
 # Autoform/SpecsGen/V8Base/ are tracked and pinned to it. Tracked theorems whose
 # corpus no clone can produce are unverifiable (STRATEGY 55).

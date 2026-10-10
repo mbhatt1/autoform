@@ -1,0 +1,102 @@
+{
+ "ast": "ast-Requests.json",
+ "astSha256": "c3169319ceec6b78e033341bf0547af2907c5c54ca02eeaba6a3424093e17e8b",
+ "ledger": {
+  "closedByContract": 0,
+  "closedByTranslation": 134,
+  "contractsUsed": [
+   {
+    "callee": ".copy",
+    "sites": 3
+   },
+   {
+    "callee": ".get",
+    "sites": 2
+   },
+   {
+    "callee": ".items",
+    "sites": 1
+   }
+  ],
+  "dialect": "python",
+  "dynamicHoleRisk": 3819,
+  "functions": 260,
+  "holeFree": 226,
+  "holes": 42,
+  "holesByLabel": [
+   {
+    "count": 13,
+    "label": "control:TRY-handler-type"
+   },
+   {
+    "count": 5,
+    "label": "call:python-defaults"
+   },
+   {
+    "count": 5,
+    "label": "lit:bytes"
+   },
+   {
+    "count": 2,
+    "label": "function:python-default-evaluation"
+   },
+   {
+    "count": 2,
+    "label": "control:TRY-handler-binding"
+   },
+   {
+    "count": 2,
+    "label": "decorator:external:contextlib.contextmanager"
+   },
+   {
+    "count": 2,
+    "label": "expr:BLOCK-prelude"
+   },
+   {
+    "count": 2,
+    "label": "class-construction:unresolved-lexical-identity:QueryValueEx"
+   },
+   {
+    "count": 1,
+    "label": "genexpr:free-variable-cells"
+   },
+   {
+    "count": 1,
+    "label": "generator:free-variable-cells"
+   },
+   {
+    "count": 1,
+    "label": "generator:yieldFromS"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:ZipFile"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Cookie"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:OpenKey"
+   },
+   {
+    "count": 1,
+    "label": "expr:genExp"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:Session"
+   },
+   {
+    "count": 1,
+    "label": "class-construction:unresolved-lexical-identity:RLock"
+   }
+  ],
+  "module": "Requests",
+  "nodes": 16610,
+  "verifiableCore": 134
+ },
+ "module": "Requests",
+ "producedBy": "scripts/ledger.lean.tmpl via `lake env lean` (Program.ledgerJson)"
+}

@@ -245,6 +245,22 @@ Measured in one process per corpus, `callClosedRef` vs `callClosed`, identical r
 run still pays O(F) per call on a large program. The index above does nothing for that,
 and the assoc-list constraint from the proofs applies there too.
 
+**The ledger from the AST — measured 2026-10-10.** Even with the index, the Lean ledger
+needs the generated module elaborated first (the 244 s / 3.3 GB-per-part build above)
+and then read back, which is what the milestone-5 budget of 60 s in
+`docs/GOAL-arbitrary-codebases.md` cannot contain. `scripts/ledger.py` computes the same
+`ledger-<M>.json` from `ast-<M>.json` without Lean, mirroring `Autoform/Ledger.lean` arm
+for arm; `tests/test_ledger_py.py` holds it equal to the Lean ledger, field for field, on
+five pinned corpora and on one Django part. On a fresh export of Django 6.1.1's `django/`
+(9,750 functions and 907 module initializers exported, 10,658 functions after the
+generator lowering; `scripts/ledger_corpus.sh`),
+one run on this machine: `joern-parse` 39 s, `export_ast.sc` 220 s at 6.6 GB, sharded
+render 13 s, **ledger 7.1 s at 0.7 GB**; `lake build` of one part 15 s at 2.5 GB, and
+Lean's ledger of that part alone 114 s at 2.1 GB, most of it the 1,970-row class table.
+The coverage figures that export produced are in the milestone-5 status line, bound by
+`scripts/check_docs.py` when `ledger-Django.json` is on disk; the Django row in the
+tables above is the older export and is left as measured then.
+
 ### 4. Memory grows with the generated module
 
 Peak RSS is dominated by `lean` elaborating the generated module, and it grows faster
