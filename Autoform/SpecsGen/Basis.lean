@@ -434,7 +434,7 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
   simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
-    seedClassAttrDefaults, hcad, seedClassAttrs,
+    seedClassAttrDefaults, hcad, seedClassAttrs, boxKwargs, hkw,
     execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
@@ -534,7 +534,7 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
   simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
-    seedClassAttrDefaults, hcad, seedClassAttrs,
+    seedClassAttrDefaults, hcad, seedClassAttrs, boxKwargs, hkw,
     execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
