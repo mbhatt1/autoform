@@ -30,10 +30,11 @@ This is the function `Refine.lean` obligation (4) was about: its effect is on tw
 objects, reached through pointers read from the receiver, and no statement about a single
 object can specify it. The specification here is in two layers.
 
-`TTLLink_unlink_mrefines` is the exact equation (`MRefines`, result and post-heap) for any
-heap in which `self` is a `_Link` whose two slots hold references to `_Link`s: the heap
-afterwards is `self.prev` with its `next` slot written and `self.next` with its `prev` slot
-written, nothing else, and the result is `None`.
+`TTLLink_unlink_mrefines` is the exact equation (`applyFunc` on the generated function
+`f_…TTLCache__Link_unlink` itself, result and post-heap) for any heap in which `self` is a
+`_Link` whose two slots hold references to `_Link`s: the heap afterwards is `self.prev` with
+its `next` slot written and `self.next` with its `prev` slot written, nothing else, and the
+result is `None`.
 
 `TTLLink_unlink_ring` is the **functional specification against the representation
 predicate**: for every heap holding a ring `root :: L₁ ++ x :: L₂` of `_Link` nodes on
@@ -46,8 +47,10 @@ no interpreter) applied to one evaluation of the body (`execStmt_dlink_unlink`);
 specific to `cachetools` below is only the class-metadata facts — `next` and `prev` are
 slots of `TTLCache._Link` with their own storage keys, and `_Link` has `object`'s
 `__setattr__` — and the `rfl` that the generated body is the body `Refine.lean` reasons
-about (`TTLLink_unlink_body`). That `rfl` is what makes the mutation gate bite: a mutant of
-the generated `unlink` fails there.
+about. That `rfl` is written in each behavioural theorem's own proof (`f.body = dlinkUnlinkBody`,
+passed as the argument `hb` of `TTLLink_unlink_step`), not reached through the pin
+`TTLLink_unlink_body`, so a mutant of the generated `unlink` makes the proof fail at that
+theorem's own line.
 
 What this does **not** say: that the ring is the one `TTLCache` built. `DRing` is a
 predicate on a heap region, and the theorem holds for any heap satisfying it, which is the
@@ -131,8 +134,12 @@ theorem TTLLink_unlink_body :
     f_cachetools___init___py__module__TTLCache__Link_unlink.body = dlinkUnlinkBody := rfl
 
 /-- One call of the generated `unlink`, for any heap in which `self` is a `_Link` with
-`prev = p` and `next = n` and both neighbours are `_Link`s. -/
-theorem TTLLink_unlink_step (k : Nat) (h : Heap) {x p n : Ref}
+`prev = p` and `next = n` and both neighbours are `_Link`s. The body equation `hb` is an
+argument, not a use of the pin: each behavioural theorem supplies it as `rfl` in its own
+proof, so a mutant of the generated body fails at that theorem's line. -/
+theorem TTLLink_unlink_step (k : Nat) (h : Heap)
+    (hb : f_cachetools___init___py__module__TTLCache__Link_unlink.body = dlinkUnlinkBody)
+    {x p n : Ref}
     (hx : Represents ttlLinkRep h x ⟨p, n⟩)
     (hp : HasClass h p LinkCls) (hn : HasClass h n LinkCls) :
     applyFunc (ctxOf P) (k+8) h f_cachetools___init___py__module__TTLCache__Link_unlink
@@ -147,7 +154,7 @@ theorem TTLLink_unlink_step (k : Nat) (h : Heap) {x p n : Ref}
         f_cachetools___init___py__module__TTLCache__Link_unlink.body
       = ((h.setField p linkNextKey (.ref n)).setField n linkPrevKey (.ref p),
          .normal (Env.set (Env.set [("self", .ref x)] "next" (.ref n)) "prev" (.ref p))) := by
-    rw [TTLLink_unlink_body]
+    rw [hb]
     exact execStmt_dlink_unlink (ctxOf P) k h [("self", .ref x)] hjs rfl rfl rfl hox
       (hcx ▸ link_gap_next) (hcx ▸ link_gap_prev)
       (link_readSlot_next hcx hfn) (link_readSlot_prev hcx hfp)
@@ -158,30 +165,23 @@ theorem TTLLink_unlink_step (k : Nat) (h : Heap) {x p n : Ref}
 /-- The node at `x` as the heap presents it, if it is a `_Link` with both pointers. -/
 def linkOf (h : Heap) (x : Ref) : Option DLink := (h.get x).bind ttlLinkRep.abs
 
-/-- **`unlink`, exactly.** Result `None`; heap: `self.prev`'s `next` slot and `self.next`'s
-`prev` slot rewritten, in that order, nothing else. Stated with `Heap.setField` on the
-right so that the rest of the heap is neither assumed nor lost, as `Timer_exit_mrefines`
-does. The domain asks for the three objects to be `_Link`s: the receiver because its
-slots are read, the neighbours because a slot write consults the receiver's class. -/
-theorem TTLLink_unlink_mrefines :
-    MRefines "cachetools/__init__.py:<module>.TTLCache._Link.unlink" 8
-      (fun h self args => ∃ x a, self = .ref x ∧ args = [] ∧ Represents ttlLinkRep h x a
-                            ∧ HasClass h a.prev LinkCls ∧ HasClass h a.next LinkCls)
-      (fun h self _ => match self with
-        | .ref x => match linkOf h x with
-          | some a => ((h.setField a.prev linkNextKey (.ref a.next)).setField a.next linkPrevKey (.ref a.prev),
-                       .ret .unit)
-          | none   => (h, .ret .unit)
-        | _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨x, ⟨p, n⟩, rfl, rfl, hx, hp, hn⟩
-  refine forall_ge_of_forall_add (N := 8) ?_
-  intro k
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache__Link_unlink rfl]
-  have hlink : linkOf h x = some ⟨p, n⟩ := by
-    obtain ⟨o, ho, _, ha⟩ := hx
-    simp [linkOf, ho, ha]
-  simp only [hlink, Outcome.toEResult_ret]
-  exact TTLLink_unlink_step k h hx hp hn
+/-- **`unlink`, exactly.** For the generated function `f_…TTLCache__Link_unlink` itself
+(`applyFunc`, not a lookup by name): for every `_Link` `x` with `prev = a.prev`,
+`next = a.next` whose neighbours are `_Link`s, and every fuel budget at least 8, the result
+is `None` and the heap is `a.prev` with its `next` slot and `a.next` with its `prev` slot
+rewritten, in that order, nothing else. Stated with `Heap.setField` on the right so that the
+rest of the heap is neither assumed nor lost, as `Timer_exit_mrefines` does. The hypotheses
+ask for the three objects to be `_Link`s: the receiver because its slots are read, the
+neighbours because a slot write consults the receiver's class. -/
+theorem TTLLink_unlink_mrefines (h : Heap) (x : Ref) (a : DLink)
+    (hx : Represents ttlLinkRep h x a) (hp : HasClass h a.prev LinkCls)
+    (hn : HasClass h a.next LinkCls) (fuel : Nat) (hf : 8 ≤ fuel) :
+    applyFunc (ctxOf P) fuel h f_cachetools___init___py__module__TTLCache__Link_unlink
+        (some (.ref x)) [] []
+      = ((h.setField a.prev linkNextKey (.ref a.next)).setField a.next linkPrevKey (.ref a.prev),
+         .val .unit) := by
+  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 8 := ⟨fuel - 8, by omega⟩
+  exact TTLLink_unlink_step k h rfl hx hp hn
 
 /-- **`unlink` removes its node from the ring — for every ring.** The functional
 specification against the representation predicate: in any heap holding the ring
@@ -190,8 +190,8 @@ specification against the representation predicate: in any heap holding the ring
 theorem TTLLink_unlink_ring (h : Heap) (root x : Ref) (L₁ L₂ : List Ref)
     (hring : DRing ttlLinkRep h root (L₁ ++ x :: L₂))
     (hnd : (root :: (L₁ ++ x :: L₂)).Nodup) (fuel : Nat) (hf : 8 ≤ fuel) :
-    ∃ h', runMethod fuel h "cachetools/__init__.py:<module>.TTLCache._Link.unlink" (.ref x) []
-            = (h', .val .unit)
+    ∃ h', applyFunc (ctxOf P) fuel h f_cachetools___init___py__module__TTLCache__Link_unlink
+            (some (.ref x)) [] [] = (h', .val .unit)
       ∧ DRing ttlLinkRep h' root (L₁ ++ L₂)
       ∧ (∀ s, s ≠ L₁.getLastD root → s ≠ L₂.headD root → h'.get s = h.get s)
       ∧ h'.get x = h.get x := by
@@ -225,8 +225,7 @@ theorem TTLLink_unlink_ring (h : Heap) (root x : Ref) (L₁ L₂ : List Ref)
     · rw [e]; exact fun e' => hroot_nin (e' ▸ List.mem_append_right _ List.mem_cons_self)
     · exact fun e' => hx_nin₂ (e' ▸ m)
   refine ⟨_, ?_, hring', ?_, ?_⟩
-  · rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache__Link_unlink rfl]
-    exact TTLLink_unlink_step k h hx hp hn
+  · exact TTLLink_unlink_step k h rfl hx hp hn
   · intro s hsp hsn
     rw [Heap.get_setField_of_ne hsn, Heap.get_setField_of_ne hsp]
   · rw [Heap.get_setField_of_ne hxn, Heap.get_setField_of_ne hxp]
