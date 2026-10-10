@@ -1,6 +1,6 @@
 {
  "ast": "ast-Django.json",
- "astSha256": "d42aaf77412dd845066c666945c2ef9fff3a5f234f72236976ccb9d33c226d05",
+ "astSha256": "d8a2eaba8e80bf7dfc495727d0847be9785bcf6108f63a724d74375b7c6d7cf5",
  "ledger": {
   "closedByContract": 0,
   "closedByTranslation": 416,
@@ -211,6 +211,6 @@
  },
  "module": "Django",
  "part": 1,
- "producedBy": "scripts/ledger.py ast-Django.json Django --part 1 --shard-functions 1000 --emit-lean-check <f>; lake build Autoform.Generated.Django.Part0001; lake env lean <f> (Program.ledgerJson)",
+ "producedBy": "scripts/ledger_corpus.sh <sdist>/django Django --lean-part 1 (lake build Autoform.Generated.Django.Part0001; lake env lean on scripts/ledger.py --emit-lean-check; Program.ledgerJson)",
  "shardFunctions": 1000
 }

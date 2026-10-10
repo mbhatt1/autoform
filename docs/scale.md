@@ -259,7 +259,14 @@ render 13 s, **ledger 7.1 s at 0.7 GB**; `lake build` of one part 15 s at 2.5 GB
 Lean's ledger of that part alone 114 s at 2.1 GB, most of it the 1,970-row class table.
 The coverage figures that export produced are in the milestone-5 status line, bound by
 `scripts/check_docs.py` when `ledger-Django.json` is on disk; the Django row in the
-tables above is the older export and is left as measured then.
+tables above is the older export and is left as measured then. A second run of the same
+driver on the same tree, on a loaded machine, measured parse 55 s, export 383 s, render
+26 s, ledger 20.8 s — and produced an AST with a different sha256: five Joern-resolved
+callee names in three functions (`__builtin.dict.hex.get_new_connection` against
+`__builtin.dict.__iter__.hex.get_new_connection`, and the like) came out differently,
+with every ledger figure identical. The exporter is therefore not byte-deterministic on
+Django; `tests/fixtures/ledger-lean/Django-Part0001.json` pins the export it was computed
+from by digest and says so when the AST on disk is another one.
 
 ### 4. Memory grows with the generated module
 
