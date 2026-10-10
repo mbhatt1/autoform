@@ -88,6 +88,13 @@
    "render_bytes": 5255045,
    "render_sha256": "da6afd59fdbb6a29f5b41658d96216879a0f9355e8650bb0b39e25b90663415d"
   },
+  "LinuxLcm": {
+   "ast_bytes": 5008,
+   "ast_sha256": "436076cc096a98c76a2f56d63ce8bb11327ab7abcd2d700c2d6419666ad1a7be",
+   "ast_tracked": true,
+   "render_bytes": 4815,
+   "render_sha256": "79ce86886bb919ffa413389fcd5ce16c48e479f9161ed2b4acaa34d68e0ff43d"
+  },
   "LinuxLib": {
    "ast_bytes": 22263110,
    "ast_hint": "/tmp/final-LinuxLib.json",
