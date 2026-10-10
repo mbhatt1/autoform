@@ -31,11 +31,11 @@
    "render_sha256": "7e845e9e3978f0cc9b10c1a69d8d5abd17f6812ccc8e6ac6a6ba2ca235ba386d"
   },
   "Jinja2": {
-   "ast_bytes": 6491674,
-   "ast_sha256": "5a3fdf3ccafd361896f5d255838ad31d3d08ad7a3b9811ffbbf564ea73cb81e2",
+   "ast_bytes": 7899504,
+   "ast_sha256": "c0978f07d574a127949eb1c046181569a58258eaba788fa9b063fd345c5ebd4f",
    "ast_tracked": true,
-   "render_bytes": 2011983,
-   "render_sha256": "f1b961305c126a14575fae10488e8a01cbab4cd0201ce8f3fefbfbeadd4672f5"
+   "render_bytes": 3475268,
+   "render_sha256": "fe4cde028b18f4d94c342c715d44e36110b5c3d878e79773499c6ba342ed8d3d"
   },
   "LangC": {
    "ast_bytes": 175419,
@@ -170,6 +170,11 @@
    "corpus": "Click",
    "corpus_ast_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
    "source": "ast-Click.json"
+  },
+  "SpecsGen/Jinja2": {
+   "corpus": "Jinja2",
+   "corpus_ast_sha256": "c0978f07d574a127949eb1c046181569a58258eaba788fa9b063fd345c5ebd4f",
+   "source": "ast-Jinja2.json"
   },
   "SpecsGen/LinuxLib": {
    "corpus": "LinuxLibSample",
