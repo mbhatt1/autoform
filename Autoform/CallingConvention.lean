@@ -158,11 +158,11 @@ A `**` splice whose key names a positional parameter binds that parameter; one t
 not lands in `**kw`. -/
 
 -- CPython: k(**{'a':1}) ==  (1, {})
-#eval run "c10"  -- val (tuple [int 1, dict []])
+#eval run "c10"  -- val (tuple [int 1, ref 1]): `**kw` is a dict OBJECT (`boxKwargs`); heap[1] = dict []
 -- CPython: k(**{'z':9}) ==  (None, {'z': 9})   -- `None` is modelled as `unit`
-#eval run "c11"  -- val (tuple [unit, dict [(str "z", int 9)]])
+#eval run "c11"  -- val (tuple [unit, ref 1]): heap[1] = dict [(str "z", int 9)]
 -- CPython: k(a=5)       ==  (5, {})
-#eval run "c12"  -- val (tuple [int 5, dict []])
+#eval run "c12"  -- val (tuple [int 5, ref 0]): heap[0] = dict []
 
 /-! ## All four forms in one call, and iterating a tuple and a dict -/
 
@@ -196,6 +196,18 @@ rather than as expressions. -/
 -- No CPython counterpart: `x = *[1]` is a SyntaxError.
 #eval run "s1"   -- hole "op:starred-outside-call"
 
+/-- The call with its heap: `**kw` is a dict OBJECT (`boxKwargs`), so a theorem about what
+lands in it has to say where it landed. -/
+private def runWithHeap (n : String) : Heap × EResult :=
+  let ctx : Ctx := { dialect := prog.dialect, table := prog.table }
+  match ctx.resolve n with
+  | some fn => applyFunc ctx 60 [] fn none [] []
+  | none    => ([], .hole s!"entry:{n}")
+#eval reprStr (runWithHeap "c10")
+#eval reprStr (runWithHeap "c11")
+#eval reprStr (runWithHeap "c12")
+#eval reprStr (runWithHeap "c13")
+
 /-! ## The same facts as theorems
 
 `#eval`s are evidence a reader can check; these are checked by the kernel. -/
@@ -210,20 +222,21 @@ theorem vararg_after_a_positional_param :
     runFunc prog 60 "c7" [] = .val (.tuple [.int 1, .tuple [.int 2, .int 3]]) := by rfl
 
 theorem doubleStar_binds_a_named_param :
-    runFunc prog 60 "c10" [] = .val (.tuple [.int 1, .dict []]) := by rfl
+    runWithHeap "c10"
+      = ([ { cls := "dict", fields := [], payload := .dict [(.str "a", .int 1)] }
+         , { cls := "dict", fields := [], payload := .dict [] } ],
+         .val (.tuple [.int 1, .ref 1])) := by rfl
 
 set_option maxRecDepth 100000 in
 theorem doubleStar_overflow_lands_in_kwargs :
-    runFunc prog 60 "c11" [] = .val (.tuple [.unit, .dict [(.str "z", .int 9)]]) := by
-  simp +decide [runFunc, prog, caller, f_f, f_g, f_h, f_k, f_m, Program.table, Heap.get,
-    Ctx.resolveCall, Ctx.resolve, Ctx.resolve.go, String.endsWith, applyFunc, bindParams, Func.literalDefaults, Func.posParams,
-    kwargsRejected, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList,
-    evalPairs, strKeyed, Stdlib.dictOfPairs, Stdlib.dictSet, Val.beq, Env.set, Env.get, Heap.alloc]
-
+    runWithHeap "c11"
+      = ([ { cls := "dict", fields := [], payload := .dict [(.str "z", .int 9)] }
+         , { cls := "dict", fields := [], payload := .dict [(.str "z", .int 9)] } ],
+         .val (.tuple [.unit, .ref 1])) := by rfl
 theorem all_four_forms_together :
-    runFunc prog 60 "c13" []
-      = .val (.tuple [ .tuple [.int 1, .int 2, .int 3]
-                     , .dict [(.str "x", .int 4), (.str "y", .int 5)] ]) := by rfl
+    (runWithHeap "c13").2 = .val (.tuple [ .tuple [.int 1, .int 2, .int 3], .ref 2 ])
+    ∧ (runWithHeap "c13").1.payload 2 = .dict [(.str "x", .int 4), (.str "y", .int 5)] := by
+  constructor <;> rfl
 
 theorem starred_noniterable_raises :
     runFunc prog 60 "e1" [] = .exn (.str "TypeError") := by rfl

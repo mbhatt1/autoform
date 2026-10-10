@@ -679,12 +679,17 @@ TestValueDunders` pins the shape.
   the callee node is itself a `Call`; an unnamed callee of any other shape stays
   `call:no-callee-name`. Emitting `call ""` was tried once and was worse than the hole --
   it typechecked, counted as translated, and resolved to nothing at run time.
-* **`mcall:<m>:unboxed-container` — documented, not closed.** After the switchover the one
-  remaining source of an unboxed `Val.dict` in a Python program is `bindParams` itself:
-  `**kwargs` is built as a value at the kwarg binding in `Semantics.lean`, not allocated.
-  A mutating method on `kwargs` (`kwargs.pop(...)`) therefore still holes. Making
-  `bindParams` allocate would give it a heap argument -- the `applyBinop` re-typing
-  problem -- so it is recorded here rather than done.
+* **`mcall:<m>:unboxed-container` — closed (2026-10-09).** The last source of an unboxed
+  `Val.dict` in a Python program was `bindParams`, which built `**kwargs` as a value.
+  `boxKwargs` now allocates the collector right after binding, as a dict display is
+  allocated (Language Reference §4.8.2: a new mapping receives the surplus keywords), so
+  `kwargs` has identity -- `self._info = kwargs` stores a reference, and `kwargs.pop(...)`
+  mutates the object. `bindParams` itself stays heap-free. The oracle made the gap a
+  divergence on click's `CompletionItem.__init__` once its `__getattr__` class became
+  comparable: CPython's post-heap held `_info → dict object`, Core an immediate dict. The
+  `FuelMono` clauses absorb the extra step; `CallingConvention.lean` states the kwargs
+  theorems with the heap (`runWithHeap`), and `Contracts.lean`'s `methodkey` theorems name
+  address 2 for the `_HashedTuple` (two collectors are allocated before it).
 
 #### 10.9 What the oracle found on `click` 8.2.1 (2026-09-21)
 
