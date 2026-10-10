@@ -169,34 +169,15 @@ jobs:
       # check found nothing and must not pass), 3 = everything comparable verified but
       # some module could not be checked at all.
       #
-      # Only 3 is tolerated, and only for the three corpora whose ASTs are too large to
-      # track in git (docs/integrity.md) -- Ansible, LinuxCrypto, LinuxLib. Those are a
-      # standing, documented condition, so treating 3 as a hard failure made this step
-      # permanently red, which is how a genuine mismatch would have gone unnoticed among
-      # the noise. A module becoming unverifiable for any OTHER reason still fails.
-      # The tolerated list below is the ONE in docs/integrity.md ("Input availability"):
-      # Ansible, LinuxCrypto and LinuxLib have tracked manifests but untracked ASTs.
-      # Change both or neither.
+      # Every exit but 0 fails. Until 2026-10-10 exit 3 was tolerated for exactly
+      # Ansible, LinuxCrypto and LinuxLib, whose manifest entries pinned ASTs that no
+      # clone could see (`ast_hint: /tmp/final-<M>.json`); those entries are gone from
+      # artifact-manifest.json (docs/integrity.md, "Input availability"), so a module
+      # the manifest promises and the tree cannot verify is now a failure, whichever
+      # module it is. Do not add an allow-list back: a tolerated UNVERIFIABLE is the
+      # noise a genuine mismatch hides in.
       - name: check_render — committed modules are renders of committed ASTs
-        run: |
-          set -o pipefail
-          status=0
-          python3 scripts/check_render.py 2>&1 | tee /tmp/check_render.log || status=$?
-          if [ "$status" -eq 0 ]; then exit 0; fi
-          if [ "$status" -ne 3 ]; then
-            echo "check_render failed with exit $status (1 = mismatch, 2 = nothing compared)." >&2
-            exit "$status"
-          fi
-          unexpected=$(grep '^UNVERIFIABLE ' /tmp/check_render.log \
-            | sed 's/^UNVERIFIABLE \([A-Za-z0-9_]*\):.*/\1/' \
-            | grep -vxE 'Ansible|LinuxCrypto|LinuxLib' || true)
-          if [ -n "$unexpected" ]; then
-            echo "check_render: unexpected UNVERIFIABLE module(s):" >&2
-            echo "$unexpected" >&2
-            echo "Only Ansible, LinuxCrypto and LinuxLib may be unverifiable (ASTs too large to track)." >&2
-            exit 3
-          fi
-          echo "check_render: verified everything comparable; the 3 large corpora remain unverifiable by policy."
+        run: python3 scripts/check_render.py
 
       # A specification is a statement about a SPECIFIC RENDERING of a corpus. Closing a
       # hole changes what the translated function computes, so improving coverage can turn

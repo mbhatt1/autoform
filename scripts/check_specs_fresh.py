@@ -76,6 +76,8 @@ SPECS = {
     "SpecsGen/Flask": "Flask",
     "SpecsGen/Rich": "Rich",
     "SpecsGen/Django": "Django",
+    # Linux lib/math (gcd.c, lcm.c), re-landed 2026-10-10 from kernel tag v7.2.
+    "SpecsGen/LinuxLcm": "LinuxLcm",
 }
 
 

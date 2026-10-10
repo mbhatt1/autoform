@@ -70,13 +70,30 @@ historical corpus proofs belong to the repository build and release gate.
 `Autoform/SpecsGen/V8Exp.lean` and `V8Exp2.lean` are tracked but outside the root
 import graph; a root replay alone provides no replay evidence for those files.
 
-**Input availability.** `ast-V8Base.json` is tracked. The manifest also promises
-`Ansible`, `LinuxLib`, and `LinuxCrypto`, whose AST bytes are not tracked. A hash
-and an out-of-tree path do not make those inputs available to a clean clone, nor
-establish their source revision or extraction history. Missing inputs remain
-`UNVERIFIABLE` until the exact bytes can be supplied and checked. Re-exporting a
-different source revision with today's exporter produces new evidence, not a
-reproduction of the old artifact.
+**Input availability.** `ast-V8Base.json` is tracked. Until 2026-10-10 the manifest
+also promised `Ansible`, `LinuxLib` and `LinuxCrypto`, whose AST bytes were never
+tracked: each entry pinned a digest and an out-of-tree path (`/tmp/final-<M>.json`)
+that no clone, and by then no machine, could resolve, so `check_render.py` reported
+all three `UNVERIFIABLE` on every run and CI carried an allow-list naming them. A hash
+and a path do not make an input available, nor establish its source revision or
+extraction history, and re-exporting today would not help: the ASTs were 137 MB,
+22 MB and 19 MB (far too large to track), their source revisions were never recorded
+(Ansible "2.22.0.dev0", an unnamed kernel tree), and `cartographer/export_ast.sc` has
+changed since, so a fresh export from any tree is new evidence, not a reproduction of
+the pinned artifact. **Those three entries were removed from `artifact-manifest.json`
+and the CI allow-list with them.** What remains of each corpus is what was always
+there: `docs/evidence-<M>.md` and the committed `core-oracle-<M>.json` /
+`evidence-<M>.json`, which are dated measurements of an artifact the repository no
+longer pins and cannot recompute. They are kept as history and say so at the top. A
+future re-land of any of them is a new corpus: a recorded source revision, a tracked
+AST or a committed, digest-checked re-export in CI, a provenance record, and new
+numbers. `LinuxLibSample` (7 functions extracted from the old `ast-LinuxLib.json`)
+is tracked and unaffected.
+
+`LinuxLcm` (Linux `lib/math/gcd.c` + `lcm.c`) was re-landed the same day from the
+kernel tag `v7.2` (commit `8d3ae59288f1`); `provenance/ast-LinuxLcm.json.prov.json`
+names the sparse checkout and the exact command, and the kernel units compile
+outside Kbuild through the `jump_label.h` shim `scripts/source_context.py` documents.
 
 `Autoform/Generated/SC.lean` has neither a tracked AST nor a manifest entry and
 is outside both import graphs. `check_render.py` cannot establish its derivation,

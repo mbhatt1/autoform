@@ -1,5 +1,15 @@
 # Evidence for `Ansible` (Python, 5,546 functions)
 
+> **Unpinned on 2026-10-10 (docs/integrity.md, "Input availability").** The
+> `artifact-manifest.json` entry for `Ansible` was removed: `ast-Ansible.json` was never
+> tracked, the `/tmp/final-Ansible.json` it pointed at no longer exists on any machine,
+> its source revision was never recorded, and the exporter has changed since, so
+> nothing in the repository can regenerate or verify the artifact this document
+> measures. `scripts/check_render.py` no longer reports it and CI no longer
+> allow-lists it. Everything below is a dated measurement of an artifact the
+> repository no longer pins; re-landing `Ansible` means a new corpus with a recorded
+> source revision, not a refresh of these numbers.
+
 > **Staleness notice added during the merge (STRATEGY.md §40).** The figures in this
 > document were produced against the `Autoform/Generated/<M>.lean` that was committed at
 > the time. That module has since been re-rendered: every large corpus's committed render
