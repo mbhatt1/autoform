@@ -289,8 +289,10 @@ def test_formalize_stops_at_a_function_under_budget(tmp_path, monkeypatch):
     assert len(stmts) == 6 and not (tmp_path / 'g' / FILES['budget']).exists()
 
 
-def test_requirements_list_the_optional_sdk():
+def test_requirements_name_the_optional_sdk():
+    # The SDK is an extra, not a hard requirement: the default backend is the CLI, and
+    # CI's `pip install -r requirements.txt` must not pull a package no gate uses.
     text = (ROOT / 'requirements.txt').read_text()
-    assert re.search(r'^anthropic>=1,<2$', text, re.M) and 'Optional' in text
+    assert not re.search(r'^anthropic', text, re.M) and "'.[llm]'" in text
     assert 'llm = ["anthropic>=1,<2"]' in (ROOT / 'pyproject.toml').read_text()
     assert 'AUTOFORM_CLAUDE_AUTH=api' in (ROOT / 'docs/autoformalize.md').read_text()
