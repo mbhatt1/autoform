@@ -158,6 +158,61 @@ for _n in ast.walk(tree):
         for _a in _n.names:
             _imported_modules.add(_a.asname or _a.name)
 
+# Module-scope import bindings, `bound name -> (level, module, attribute)`: `import a.b`
+# binds `a` to module `a` (attribute None); `import a.b as z` binds `z` to `a.b`;
+# `from m import X as Y` binds `Y` to attribute `X` of `m`, level counting the leading
+# dots. A base class spelled through one of these is an imported class; the exporter
+# resolves it to a corpus class or marks it external. A name bound to two DIFFERENT
+# things by imports (`import os.path as os`, say), or by an import inside a block, is
+# left out: which binding is live is a flow question. `import collections` beside
+# `import collections.abc` binds `collections` once.
+_import_bindings = {}
+_import_binding_rows = {}
+for _n in tree.body:
+    _rows = []
+    if isinstance(_n, ast.Import):
+        for _a in _n.names:
+            if _a.asname:
+                _rows.append((_a.asname, (0, _a.name, None)))
+            else:
+                _rows.append((_a.name.split('.')[0], (0, _a.name.split('.')[0], None)))
+    elif isinstance(_n, ast.ImportFrom):
+        for _a in _n.names:
+            if _a.name != '*':
+                _rows.append((_a.asname or _a.name, (_n.level, _n.module or '', _a.name)))
+    for _name, _row in _rows:
+        _import_binding_rows.setdefault(_name, set()).add(_row)
+        _import_bindings[_name] = _row
+
+def imported_base(spelling, scopes):
+    # `(level, module, attribute path)` when a base's root name is a module-level import
+    # binding visible from the class statement, else None. The symbol must resolve to the
+    # module scope (no local or enclosing binding) and be bound by exactly one import and
+    # nothing else.
+    root, *tail = spelling.split('.')
+    for scope in reversed(scopes):
+        try:
+            symbol = scope.lookup(root)
+        except KeyError:
+            continue
+        if scope is scopes[0]:
+            break
+        if symbol.is_local() or symbol.is_parameter():
+            return None
+    try:
+        symbol = scopes[0].lookup(root)
+    except KeyError:
+        return None
+    if not symbol.is_imported() or symbol.is_assigned() or symbol.is_parameter():
+        return None
+    if len(_import_binding_rows.get(root, ())) != 1:
+        return None
+    level, module, attribute = _import_bindings[root]
+    path = ([] if attribute is None else [attribute]) + tail
+    if not path:
+        return None  # a bare module is not a class
+    return {'level': level, 'module': module, 'attribute': '.'.join(path)}
+
 # `id(func) -> enclosing function`, for the `nonlocal` box analysis.
 _parent_function = {}
 def _index_parents(node, current):
@@ -742,7 +797,11 @@ def class_metadata(node, scopes):
             if (statement.name.startswith('__') and statement.name.endswith('__')
                     and decorators and statement.name != '__init__'):
                 barrier = 'class-definition:special-method-descriptor'
-            if statement.name in ('__getattribute__', '__getattr__'):
+            # `__getattribute__` intercepts every read, so the namespace is unusable
+            # without its model. `__getattr__` runs only after an ordinary lookup MISSES
+            # (Language Reference 3.3.2), so it is a plain method here and Core reports
+            # the miss itself as the gap (`field:<name>:__getattr__-hook`).
+            if statement.name == '__getattribute__':
                 barrier = 'class-definition:custom-attribute-hook'
             if statement.name in ('__init_subclass__', '__set_name__'):
                 barrier = 'class-definition:custom-class-hook'
@@ -837,7 +896,8 @@ def class_metadata(node, scopes):
         spelling = base.id if isinstance(base, ast.Name) else dotted_name(base)
         bases.append({'name': spelling,
                       'resolvedName': declared_base(spelling, scopes),
-                      'builtinObject': spelling == 'object' and builtin_name('object', scopes)})
+                      'builtinObject': spelling == 'object' and builtin_name('object', scopes),
+                      'imported': imported_base(spelling, scopes) if spelling else None})
     return {'name': path, 'shortName': node.name, 'bases': bases,
             'slots': slot_names,
             'attributes': list(attrs.values()), 'definitionBarrier': barrier,
@@ -11302,6 +11362,44 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     else stmt(body)
   }
 
+  /** A base class spelled through an import binding (`imported_base` in the sidecar):
+    * the corpus class it names when the import resolves to a module of this CPG (the
+    * same path arithmetic as `importValue`), or the external marker
+    * `<external><module>.<qualname>` when it does not -- `Core.ExternalBases` decides
+    * whether that external class is contracted. `None` when the import is inside the
+    * CPG but the class is not where it points (a relative import of a name the module
+    * does not declare), which stays an unresolved base. */
+  def importedBase(file: String, base: ujson.Value): Option[String] =
+    base.obj.get("imported").filter(_ != ujson.Null).flatMap { imported =>
+      val level = imported("level").num.toInt
+      val module = imported("module").str
+      val attribute = imported("attribute").str
+      val dir = file.split('/').dropRight(1).dropRight(math.max(level - 1, 0)).toList
+      val moduleSegs = module.split('.').filter(_.nonEmpty).toList
+      if (level > 0) {
+        val path = (dir ++ moduleSegs).mkString("/")
+        moduleAtTolerant(path).flatMap { m =>
+          Some(m + "." + attribute).filter(classByFullName.contains)
+        }
+      } else {
+        // `import a.b.c` then `a.b.c.X`: the module is the longest prefix that is a module
+        // of this CPG; the rest is the class path inside it.
+        val segs = moduleSegs ++ attribute.split('.').toList
+        val inCpg = (segs.length - 1 to 1 by -1).view.flatMap { i =>
+          moduleAtTolerant(segs.take(i).mkString("/")).toList
+            .map(m => (m, segs.drop(i).mkString(".")))
+        }.headOption
+        inCpg match {
+          case Some((m, cls)) => Some(m + "." + cls).filter(classByFullName.contains)
+          case None =>
+            // Not in this CPG at all: external. `prefixInCpg` means a same-named package
+            // (`collections/` inside Ansible) shadows the stdlib one -- ambiguous, unresolved.
+            if (prefixInCpg(segs.mkString("/"))) None
+            else Some("<external>" + segs.mkString("."))
+        }
+      }
+    }
+
   /** Translate one method with the right scope/dialect state installed. `isModule` marks
     * the file-level pseudo-method, where every identifier assignment is a global write. */
   def classDeclarations(mod: String): List[ujson.Value] =
@@ -11309,10 +11407,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       info.obj.get("classDeclarations").toList.flatMap(_.arr.toList).map { declaration =>
         val scope = declaration("name").str
         val owner = mod + "." + scope
+        val file = mod.stripSuffix(":<module>")
         val bases = declaration("bases").arr.toList.zipWithIndex.map { case (base, index) =>
           if (base("builtinObject").bool) "__builtin.object"
           else base.obj.get("resolvedName").filter(_ != ujson.Null).map(v => mod + "." + v.str)
             .filter(classByFullName.contains)
+            .orElse(importedBase(file, base))
             .getOrElse("<unresolved-base>" + owner + ":" + index.toString)
         }
         val attributes = declaration("attributes").arr.toList.map { attribute =>

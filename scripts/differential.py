@@ -32,6 +32,7 @@ import contextlib, inspect, functools, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wasm_backend
 import runtime_backends
+import external_bases
 import deep_json
 import struct
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -203,7 +204,14 @@ class Encoder:
         key = (os.path.realpath(source), name) if source else None
         identity = self.class_identities.get(key)
         if identity is None:
-            raise Unencodable('class-identity-unresolved:' + name)
+            # Not a corpus class. A contracted external base (`scripts/external_bases.py`)
+            # is encodable under its marker once the LIVE class is checked against the
+            # pinned contract; anything else -- a test-defined subclass, an uncontracted
+            # stdlib class, a version whose ABC differs -- is refused by name.
+            reason = external_bases.verify(cls)
+            if reason is not None:
+                raise Unencodable('class-identity-unresolved:' + name + ':' + reason)
+            identity = external_bases.PREFIX + external_bases.external_name(cls)
         return identity
 
     def enc(self, v, depth=0, in_key=False):

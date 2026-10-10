@@ -1,9 +1,20 @@
 import Std
+import Autoform.Lang.Core.ExternalBases
 
 /-!
 Python class lookup needs an ordered namespace, not a search for any same-named
-method. Qualified names identify declarations. Unresolved external bases require a namespace contract; an inconsistent
-hierarchy has no usable prefix. C3 follows https://docs.python.org/3/howto/mro.html.
+method. Qualified names identify declarations. An external base is usable only under a
+namespace contract (`ExternalBases.lean`: the names it defines and its abstract methods);
+an uncontracted one leaves the hierarchy unresolved, and an inconsistent hierarchy has no
+usable prefix. C3 follows https://docs.python.org/3/howto/mro.html.
+
+A contracted external base is one node of the order, standing for the base and its own
+ancestors together (`MutableMapping` for `MutableMapping, Mapping, Collection, ...`). Its
+contract is the union of what those define, so a name they provide is found at the node
+and anything else falls through to `object`. The one approximation: a name defined both
+by an in-corpus class placed *after* the base in the real C3 order and by one of the
+base's ancestors is answered by the node (a hole), where CPython answers the in-corpus
+class. That is a lost answer, never a wrong one.
 -/
 
 namespace Autoform.Core
@@ -145,7 +156,11 @@ def linearizeAt : Nat → List ClassDecl → String → ClassOrder
                       match declaration.inheritanceBarrier with
                       | some reason => .incomplete [name] reason
                       | none => .complete (name :: order)
-        | [] => .incomplete [] ("class-hierarchy:unresolved-base:" ++ name)
+        | [] =>
+          match externalContract name with
+          -- Contracted external base: a complete order of its own, ending at `object`.
+          | some _ => .complete [name, "__builtin.object"]
+          | none => .incomplete [] ("class-hierarchy:unresolved-base:" ++ name)
         | _ => .invalid ("class-hierarchy:duplicate-identity:" ++ name)
 
 def linearize (declarations : List ClassDecl) (name : String) : ClassOrder :=
@@ -184,12 +199,33 @@ def ownAttribute (declarations : List ClassDecl) (owner attr : String) :
     if objectAttributes.contains attr then some (.opaque ("class-attribute:object:" ++ attr))
     else none
   else
-    (declarations.find? (·.name == owner)).bind fun declaration =>
-      (declaration.attributes.find? (·.1 == attr)).map Prod.snd
+    match declarations.find? (·.name == owner) with
+    | some declaration => (declaration.attributes.find? (·.1 == attr)).map Prod.snd
+    | none =>
+      -- A contracted external base provides exactly its contract's names; their code is
+      -- not translated, so each is an opaque member (a hole when it is reached).
+      match externalContract owner with
+      | some contract =>
+          if contract.provides.contains attr
+          then some (.opaque ("class-attribute:external-base:" ++ owner ++ ":" ++ attr))
+          else none
+      | none => none
 
 def lookupIn (declarations : List ClassDecl) (order : List String) (attr : String) :
     Option (String × ClassAttribute) :=
   order.findSome? fun owner => (ownAttribute declarations owner attr).map (owner, ·)
+
+/-- An abstract method of a contracted external base in the order that no class before
+the base implements: CPython refuses to instantiate such a class (`object.__new__` checks
+`__abstractmethods__`), so construction must not proceed as if it had. -/
+def unimplementedAbstract (declarations : List ClassDecl) (order : List String) :
+    Option String :=
+  order.findSome? fun owner =>
+    (externalContract owner).bind fun contract =>
+      contract.abstract.find? fun name =>
+        match lookupIn declarations order name with
+        | some (definer, _) => definer == owner
+        | none => true
 
 /-- Select the first class namespace containing the name, before applying any
 descriptor precedence or consulting an instance dictionary. -/
