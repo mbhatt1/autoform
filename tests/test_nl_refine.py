@@ -79,7 +79,7 @@ def test_model_path_is_the_default(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, '_impl', stubs.impl)
     src, out = _src(tmp_path), tmp_path / 'run'
     res = pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT)
-    assert stubs.calls == list(pipeline.MODEL_STAGES) == ['model', 'describe', 'formalize', 'check', 'prove']
+    assert stubs.calls == list(pipeline.MODEL_STAGES) == ['model', 'describe', 'formalize', 'check', 'prove', 'emit']
     assert stubs.kw['model']['source_root'] == str(src.resolve()) and stubs.kw['model']['second'] is True
     run = json.loads((out / 'run.json').read_text())
     assert run['mode'] == 'model' and run['stages']['model']['output'] == 'translation.json, models.json'
@@ -397,6 +397,6 @@ def test_cli_preflight_stops_before_spending(tmp_path, monkeypatch, capsys):
     errors, _ = pipeline.preflight(None)
     assert any('ANTHROPIC_API_KEY is not set' in e for e in errors)
     monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', 'bogus')
-    assert any('must be login or api-key' in e for e in pipeline.preflight(None)[0])
+    assert any('must be one of login, api-key, api' in e for e in pipeline.preflight(None)[0])
     errors, _ = pipeline.preflight(None, domain_size=0)
     assert any('--domain-size' in e for e in errors)

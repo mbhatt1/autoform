@@ -96,14 +96,26 @@ def ast_hole_count(path):
     return len(re.findall(r'"(?:label|hole)"\s*:\s*"[^"]+"', open(path).read()))
 
 
+def specsgen_sources(path):
+    """A spec module's text: the file itself, plus its `<Module>/` directory of parts when
+    the generator split it (split-modules: `Base` and `PartN`)."""
+    out = [open(path, encoding="utf-8").read()]
+    part_dir = os.path.splitext(path)[0]
+    if os.path.isdir(part_dir):
+        for name in sorted(os.listdir(part_dir)):
+            if name.endswith(".lean"):
+                out.append(open(os.path.join(part_dir, name), encoding="utf-8").read())
+    return "\n".join(out)
+
+
 def specsgen_theorem_count(path):
     """Theorems a generated spec module proves: one `#audit_axioms` line each."""
-    return len(re.findall(r'^#audit_axioms ', open(path, encoding="utf-8").read(), re.M))
+    return len(re.findall(r'^#audit_axioms ', specsgen_sources(path), re.M))
 
 
 def specsgen_budget_excluded_count(path):
     """Entries of the module's `budgetExcluded` list; 0 when the generator emitted none."""
-    src = open(path, encoding="utf-8").read()
+    src = specsgen_sources(path)
     m = re.search(r'^def budgetExcluded : List \(String × String × String\) :=\n(.*?)\n\n',
                   src, re.S | re.M)
     return len(re.findall(r'\("', m.group(1))) if m else 0

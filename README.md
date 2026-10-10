@@ -56,6 +56,7 @@ autoform --workspace ./proofs source  /path/to/src MyProject     # translate, co
 autoform --workspace ./proofs assure  /path/to/src MyProject     # ...plus gate, audit, assurance case
 autoform --workspace ./proofs regress /path/to/repo MyProject --base v1.2.0 --head main
 autoform --workspace ./proofs regress /path/to/repo MyProject --base v1.2.0 --machine --files lib/lcm.c lib/gcd.c
+autoform --workspace ./proofs pr      /path/to/repo --base v1.2.0 --sarif pr.sarif --markdown pr.md   # evidence level per changed function
 autoform --workspace ./proofs machine /path/to/binary MyBinary
 autoform formalize MyProject            # infer and judge candidate claims, verify in the kernel
 autoform autoformalize /path/to/src     # code -> English -> Lean statements -> kernel proofs

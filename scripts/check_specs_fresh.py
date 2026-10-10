@@ -76,6 +76,8 @@ SPECS = {
     "SpecsGen/Flask": "Flask",
     "SpecsGen/Rich": "Rich",
     "SpecsGen/Django": "Django",
+    # Linux lib/math (gcd.c, lcm.c), re-landed 2026-10-10 from kernel tag v7.2.
+    "SpecsGen/LinuxLcm": "LinuxLcm",
 }
 
 
@@ -195,7 +197,9 @@ def main() -> int:
             print("check_specs_fresh: selected specification pins not recorded; "
                   "missing specification or corpus evidence.", file=sys.stderr)
             return 2
-        json.dump(man, open(MANIFEST, "w"), indent=1, sort_keys=True)
+        with open(MANIFEST, "w") as fh:
+            json.dump(man, fh, indent=1, sort_keys=True)
+            fh.write("\n")      # the tracked file ends in a newline; a re-pin must not diff on that
         print(f"check_specs_fresh: pinned {ok} spec module(s)")
         return 0
     for k in skipped:

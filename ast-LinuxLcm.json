@@ -1,8 +1,8 @@
 [
  {
-  "name": "gcd",
+  "name": "binary_gcd",
   "file": "gcd.c",
-  "sourceName": "gcd",
+  "sourceName": "binary_gcd",
   "paramTypes": [
    "longunsigned",
    "longunsigned"
@@ -25,152 +25,349 @@
    "b": {
     "k": "seq",
     "a": {
-     "k": "ifte",
-     "c": {
-      "k": "binop",
-      "op": "num:c:u64:<",
-      "a": {
-       "k": "name",
-       "v": "a"
-      },
-      "b": {
-       "k": "name",
-       "v": "b"
-      }
-     },
-     "t": {
-      "k": "exprS",
-      "e": {
-       "k": "call",
-       "f": "swap",
-       "args": [
-        {
-         "k": "name",
-         "v": "a"
-        },
-        {
-         "k": "name",
-         "v": "b"
-        }
-       ]
-      }
-     },
+     "k": "assign",
+     "x": "r",
      "e": {
-      "k": "skip"
+      "k": "unop",
+      "op": "cast:u64",
+      "a": {
+       "k": "binop",
+       "op": "num:c:u64:|",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "name",
+        "v": "b"
+       }
+      }
      }
     },
     "b": {
      "k": "seq",
      "a": {
-      "k": "ifte",
-      "c": {
+      "k": "assign",
+      "x": "b",
+      "e": {
        "k": "unop",
-       "op": "!",
+       "op": "cast:u64",
        "a": {
-        "k": "name",
-        "v": "b"
-       }
-      },
-      "t": {
-       "k": "ret",
-       "e": {
-        "k": "unop",
-        "op": "cast:u64",
+        "k": "binop",
+        "op": "num:c:u64:>>>",
         "a": {
          "k": "name",
-         "v": "a"
+         "v": "b"
+        },
+        "b": {
+         "k": "call",
+         "f": "__ffs",
+         "args": [
+          {
+           "k": "name",
+           "v": "b"
+          }
+         ]
         }
        }
-      },
-      "e": {
-       "k": "skip"
       }
      },
      "b": {
       "k": "seq",
       "a": {
-       "k": "loop",
+       "k": "ifte",
        "c": {
-        "k": "bool",
-        "v": true
-       },
-       "body": {
-        "k": "seq",
+        "k": "binop",
+        "op": "num:c:u64:==",
         "a": {
-         "k": "assign",
-         "x": "r",
-         "e": {
-          "k": "unop",
-          "op": "cast:u64",
-          "a": {
-           "k": "binop",
-           "op": "num:c:u64:%",
-           "a": {
-            "k": "name",
-            "v": "a"
-           },
-           "b": {
-            "k": "name",
-            "v": "b"
-           }
-          }
-         }
+         "k": "name",
+         "v": "b"
         },
         "b": {
-         "k": "ifte",
-         "c": {
+         "k": "int",
+         "v": "1"
+        }
+       },
+       "t": {
+        "k": "ret",
+        "e": {
+         "k": "unop",
+         "op": "cast:u64",
+         "a": {
           "k": "binop",
-          "op": "num:c:u64:!=",
+          "op": "num:c:u64:&",
           "a": {
            "k": "name",
            "v": "r"
           },
           "b": {
-           "k": "int",
-           "v": "0"
-          }
-         },
-         "t": {
-          "k": "seq",
-          "a": {
-           "k": "assign",
-           "x": "a",
-           "e": {
-            "k": "unop",
-            "op": "cast:u64",
-            "a": {
-             "k": "name",
-             "v": "b"
-            }
-           }
-          },
-          "b": {
-           "k": "assign",
-           "x": "b",
-           "e": {
-            "k": "unop",
-            "op": "cast:u64",
-            "a": {
-             "k": "name",
-             "v": "r"
-            }
+           "k": "unop",
+           "op": "num:c:u64:-",
+           "a": {
+            "k": "name",
+            "v": "r"
            }
           }
+         }
+        }
+       },
+       "e": {
+        "k": "skip"
+       }
+      },
+      "b": {
+       "k": "holeS",
+       "label": "control:FOR:elided-clause"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "gcd",
+  "file": "gcd.c",
+  "sourceName": "gcd",
+  "paramTypes": [
+   "longunsigned",
+   "longunsigned"
+  ],
+  "returnType": "unsigned long",
+  "paramIntegerTypes": [
+   "u64",
+   "u64"
+  ],
+  "returnIntegerType": "u64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "efficient_ffs_key",
+    "e": {
+     "k": "boxNew",
+     "e": {
+      "k": "unit"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "r",
+       "e": {
+        "k": "unop",
+        "op": "cast:u64",
+        "a": {
+         "k": "binop",
+         "op": "num:c:u64:|",
+         "a": {
+          "k": "name",
+          "v": "a"
          },
-         "e": {
-          "k": "brk"
+         "b": {
+          "k": "name",
+          "v": "b"
          }
         }
        }
       },
       "b": {
-       "k": "ret",
-       "e": {
-        "k": "unop",
-        "op": "cast:u64",
+       "k": "seq",
+       "a": {
+        "k": "ifte",
+        "c": {
+         "k": "binop",
+         "op": "||",
+         "a": {
+          "k": "unop",
+          "op": "!",
+          "a": {
+           "k": "name",
+           "v": "a"
+          }
+         },
+         "b": {
+          "k": "unop",
+          "op": "!",
+          "a": {
+           "k": "name",
+           "v": "b"
+          }
+         }
+        },
+        "t": {
+         "k": "ret",
+         "e": {
+          "k": "unop",
+          "op": "cast:u64",
+          "a": {
+           "k": "name",
+           "v": "r"
+          }
+         }
+        },
+        "e": {
+         "k": "skip"
+        }
+       },
+       "b": {
+        "k": "seq",
         "a": {
-         "k": "name",
-         "v": "b"
+         "k": "ifte",
+         "c": {
+          "k": "call",
+          "f": "static_branch_likely",
+          "args": [
+           {
+            "k": "name",
+            "v": "efficient_ffs_key"
+           }
+          ]
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "unop",
+           "op": "cast:u64",
+           "a": {
+            "k": "call",
+            "f": "binary_gcd",
+            "args": [
+             {
+              "k": "name",
+              "v": "a"
+             },
+             {
+              "k": "name",
+              "v": "b"
+             }
+            ]
+           }
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "r",
+          "e": {
+           "k": "unop",
+           "op": "cast:u64",
+           "a": {
+            "k": "binop",
+            "op": "num:c:u64:&",
+            "a": {
+             "k": "name",
+             "v": "r"
+            },
+            "b": {
+             "k": "unop",
+             "op": "num:c:u64:-",
+             "a": {
+              "k": "name",
+              "v": "r"
+             }
+            }
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "loop",
+           "c": {
+            "k": "unop",
+            "op": "!",
+            "a": {
+             "k": "binop",
+             "op": "num:c:u64:&",
+             "a": {
+              "k": "name",
+              "v": "b"
+             },
+             "b": {
+              "k": "name",
+              "v": "r"
+             }
+            }
+           },
+           "body": {
+            "k": "assign",
+            "x": "b",
+            "e": {
+             "k": "unop",
+             "op": "cast:u64",
+             "a": {
+              "k": "binop",
+              "op": "num:c:u64:>>>",
+              "a": {
+               "k": "name",
+               "v": "b"
+              },
+              "b": {
+               "k": "int",
+               "v": "1"
+              }
+             }
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "ifte",
+            "c": {
+             "k": "binop",
+             "op": "num:c:u64:==",
+             "a": {
+              "k": "name",
+              "v": "b"
+             },
+             "b": {
+              "k": "name",
+              "v": "r"
+             }
+            },
+            "t": {
+             "k": "ret",
+             "e": {
+              "k": "unop",
+              "op": "cast:u64",
+              "a": {
+               "k": "name",
+               "v": "r"
+              }
+             }
+            },
+            "e": {
+             "k": "skip"
+            }
+           },
+           "b": {
+            "k": "holeS",
+            "label": "control:FOR:elided-clause"
+           }
+          }
+         }
         }
        }
       }
@@ -198,96 +395,153 @@
    "b"
   ],
   "body": {
-   "k": "seq",
-   "a": {
-    "k": "ifte",
-    "c": {
-     "k": "binop",
-     "op": "&&",
-     "a": {
-      "k": "name",
-      "v": "a"
-     },
-     "b": {
-      "k": "name",
-      "v": "b"
-     }
+   "k": "ifte",
+   "c": {
+    "k": "binop",
+    "op": "&&",
+    "a": {
+     "k": "name",
+     "v": "a"
     },
-    "t": {
-     "k": "ret",
-     "e": {
-      "k": "unop",
-      "op": "cast:u64",
-      "a": {
-       "k": "binop",
-       "op": "num:c:u64:*",
-       "a": {
-        "k": "binop",
-        "op": "num:c:u64:/",
-        "a": {
-         "k": "name",
-         "v": "a"
-        },
-        "b": {
-         "k": "call",
-         "f": "gcd",
-         "args": [
-          {
-           "k": "name",
-           "v": "a"
-          },
-          {
-           "k": "name",
-           "v": "b"
-          }
-         ]
-        }
-       },
-       "b": {
-        "k": "name",
-        "v": "b"
-       }
-      }
-     }
-    },
-    "e": {
-     "k": "ifte",
-     "c": {
-      "k": "binop",
-      "op": "num:c:u64:!=",
-      "a": {
-       "k": "name",
-       "v": "b"
-      },
-      "b": {
-       "k": "int",
-       "v": "0"
-      }
-     },
-     "t": {
-      "k": "ret",
-      "e": {
-       "k": "unop",
-       "op": "cast:u64",
-       "a": {
-        "k": "name",
-        "v": "b"
-       }
-      }
-     },
-     "e": {
-      "k": "skip"
-     }
+    "b": {
+     "k": "name",
+     "v": "b"
     }
    },
-   "b": {
+   "t": {
     "k": "ret",
     "e": {
      "k": "unop",
      "op": "cast:u64",
      "a": {
-      "k": "name",
-      "v": "a"
+      "k": "binop",
+      "op": "num:c:u64:*",
+      "a": {
+       "k": "binop",
+       "op": "num:c:u64:/",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "call",
+        "f": "gcd",
+        "args": [
+         {
+          "k": "name",
+          "v": "a"
+         },
+         {
+          "k": "name",
+          "v": "b"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    }
+   },
+   "e": {
+    "k": "ret",
+    "e": {
+     "k": "unop",
+     "op": "cast:u64",
+     "a": {
+      "k": "int",
+      "v": "0"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lcm_not_zero",
+  "file": "lcm.c",
+  "sourceName": "lcm_not_zero",
+  "paramTypes": [
+   "longunsigned",
+   "longunsigned"
+  ],
+  "returnType": "unsigned long",
+  "paramIntegerTypes": [
+   "u64",
+   "u64"
+  ],
+  "returnIntegerType": "u64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "l",
+     "e": {
+      "k": "unop",
+      "op": "cast:u64",
+      "a": {
+       "k": "call",
+       "f": "lcm",
+       "args": [
+        {
+         "k": "name",
+         "v": "a"
+        },
+        {
+         "k": "name",
+         "v": "b"
+        }
+       ]
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "binop",
+       "op": "num:c:u64:!=",
+       "a": {
+        "k": "name",
+        "v": "l"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "t": {
+       "k": "ret",
+       "e": {
+        "k": "unop",
+        "op": "cast:u64",
+        "a": {
+         "k": "name",
+         "v": "l"
+        }
+       }
+      },
+      "e": {
+       "k": "skip"
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "hole",
+       "label": "op:conditional"
+      }
      }
     }
    }
@@ -303,7 +557,13 @@
   "returnIntegerType": "",
   "params": [],
   "body": {
-   "k": "skip"
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "skip"
+   }
   }
  },
  {
@@ -316,7 +576,13 @@
   "returnIntegerType": "",
   "params": [],
   "body": {
-   "k": "skip"
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "skip"
+   }
   }
  }
 ]

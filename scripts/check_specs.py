@@ -48,8 +48,12 @@ def modules(names):
 
 def theorem_count(path):
     """Text count. Deliberately NOT the check -- it is the number this script exists to
-    stop anyone from trusting on its own. Reported only alongside an elaboration verdict."""
-    return len(re.findall(r'^\s*theorem ', open(path).read(), re.M))
+    stop anyone from trusting on its own. Reported only alongside an elaboration verdict.
+    A split module (`synth_specs.py --split-gb`) is counted over the parts its umbrella
+    imports, since the umbrella itself states nothing."""
+    import generated_module
+    return sum(len(re.findall(r'^\s*theorem ', open(p).read(), re.M))
+               for p in generated_module.spec_files(path))
 
 
 def elaborate(mod, timeout):

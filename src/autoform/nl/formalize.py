@@ -516,7 +516,8 @@ def formalize_one(translation: dict, fn: dict, spec: dict, prop: dict, scratch_d
         lean_prop=lean_prop,
         binders=[{'name': b['name'], 'type': b['type'], 'val': b.get('val', '')} for b in cand['binders']],
         pre=cand['pre'], post=cand['post'], elaborates=ok,
-        elaboration_log='\n'.join(log), attempts=attempts, entry=cand.get('entry', ''))
+        elaboration_log='\n'.join(log), attempts=attempts, entry=cand.get('entry', ''),
+        prompt_hash=llm.prompt_key(base + llm.json_suffix(['binders', 'pre', 'post'])))
     return stmt, {'id': sid, 'elaborates': ok, 'attempts': attempts, 'cost_usd': cost,
                   'seconds': round(time.time() - t0, 1)}
 
@@ -524,11 +525,14 @@ def formalize_one(translation: dict, fn: dict, spec: dict, prop: dict, scratch_d
 # ---------------------------------------------------------------- stage entry point
 
 def formalize(translation: dict, english: list, out_dir: Path, *, parallel: int = 3,
-              repairs: int = 3, ask=None) -> list:
+              repairs: int = 3, ask=None, budget_usd: float | None = None) -> list:
     """Formalize every English property; write `out_dir/statements.json`.
 
     `english` is a list of `EnglishSpec` dicts. Properties of functions missing from the
-    translation are skipped (recorded in `formalize-stats.json`)."""
+    translation are skipped (recorded in `formalize-stats.json`). With `budget_usd` the
+    functions are taken one at a time (their properties in parallel) and no function starts
+    once the spend plus the dearest function so far would cross the budget; the properties
+    not formalized are named in budget.json with the amount spent at that point."""
     out_dir = Path(out_dir)
     scratch = out_dir / 'scratch'
     scratch.mkdir(parents=True, exist_ok=True)
@@ -545,9 +549,25 @@ def formalize(translation: dict, english: list, out_dir: Path, *, parallel: int 
             else:
                 jobs.append((fn, spec, prop))
     t0 = time.time()
+    one = lambda j: formalize_one(translation, *j, scratch, repairs=repairs, ask=ask)  # noqa: E731
     with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
-        results = list(pool.map(lambda j: formalize_one(translation, *j, scratch, repairs=repairs, ask=ask),
-                                jobs))
+        if budget_usd is None:
+            results = list(pool.map(one, jobs))
+        else:
+            groups: dict = {}
+            for j in jobs:
+                groups.setdefault(j[0]['name'], []).append(j)
+            results, over, spent, dearest = [], [], 0.0, 0.0
+            for name, js in groups.items():
+                if llm.over_budget(spent, budget_usd, dearest):
+                    over += [llm.budget_skip(name, spent, budget_usd, dearest, property=j[2].get('id')) for j in js]
+                    continue
+                got = list(pool.map(one, js))
+                results += got
+                c = sum(st['cost_usd'] for _, st in got)
+                spent, dearest = spent + c, max(dearest, c)
+            llm.record_skips(out_dir, 'formalize', over)
+            skipped += [dict(function=s['function'], property=s['property'], reason=s['reason']) for s in over]
     statements = [s for s, _ in results]
     stats = [st for _, st in results]
     schema.dump(statements, out_dir / schema.FILES['statements'])

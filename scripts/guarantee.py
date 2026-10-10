@@ -103,7 +103,14 @@ def emit(root, report, module, source, stages, repository=None, security_request
     for name, path in [('model', model), ('proof', proof), ('conformance', report / 'conformance.json'),
                        ('ast', report / ('ast-' + module + '.json'))]:
         try:
-            current = proof_artifacts.digest(path)
+            # A sharded model and a split proof module are digested over every file the
+            # root imports, exactly as `synth_specs.py` recorded them.
+            if name == 'model':
+                current = generated_module.model_digest(path)
+            elif name == 'proof':
+                current = generated_module.spec_digest(path)
+            else:
+                current = proof_artifacts.digest(path)
         except OSError:
             current = None
         if current is None or bindings.get(name) != current:

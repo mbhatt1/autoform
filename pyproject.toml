@@ -32,6 +32,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+llm = ["anthropic>=1,<2"]
 machine = ["pypcode==3.3.3", "pyelftools==0.33", "macholib==1.16.4", "pefile==2024.8.26"]
 test = ["pytest>=8,<9", "build>=1.2,<2", "twine>=6,<7", "packaging>=24,<27", "tomli>=2,<3; python_version < '3.11'"]
 

@@ -90,6 +90,25 @@ Exposing unmangled field aliases in the value encoder would have made the number
 while leaving the transpiler wrong. Stricter refusal means more of the remaining agreements
 carry information.
 
+**Incremental runs.** The expensive half of the oracle is the Lean evaluation, and on a
+one-function change it was answering questions whose inputs had not moved. The oracle
+therefore keeps a per-function verdict store under `.autoform-work/oracle/<Module>/`
+(`scripts/oracle_cache.py`). A stored verdict is replayed only when every input it was
+computed from is byte-identical: the function's AST record and its rendered Lean
+definition; the same for every function it can reach by name, by dispatch on its own
+class and base classes, or through the classes of the objects in its cases (closed
+transitively, over-approximated on purpose); the module bodies and the rest of the
+rendered module; `Autoform/Lang/Core`; the renderer, the harness and the toolchain;
+the runtime's version; and the exact cases recorded by *this* run. The test suite is
+still traced every time -- the cases are part of the key, not something the cache
+assumes. A replayed verdict is never counted as a comparison: the summary reads
+`N COMPARED now, M cached from <timestamp>`, `coverage.by_status` says
+`compared: cached from <timestamp>`, and every replayed observation carries
+`cached_from`. A verdict is stored only when the interpreter answered the case against
+artifacts that held still (never from a mutant module or a tree that moved mid-run).
+`--no-cache` re-compares everything; the CI step that checks the oracle is alive passes
+it, so a warm cache can never stand in for a run.
+
 ### 2.2 The mutation gate — catches *specifications that constrain nothing*
 
 `scripts/mutate.py`. Injects a bug into the implementation, rebuilds, and asks whether the
