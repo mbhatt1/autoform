@@ -1,137 +1,152 @@
 {
- "_": [
-  "Artifacts that predate provenance recording. This file is a NAMED BACKLOG, not an",
-  "exemption: scripts/check_provenance.py prints every entry, by name, on every run, and",
-  "an entry stops applying the moment its artifact's digest changes -- regenerate one and",
-  "you must record real provenance for it. scripts/check_provenance.py --strict refuses",
-  "the backlog entirely.",
-  "",
-  "The four entries with reproduction_attempted=true were checked, not assumed: each was",
-  "re-exported from its source tree with the pinned Joern and the committed exporter, and",
-  "each DIFFERS. That is the finding, and it is why this file says `unattributed` rather",
-  "than quietly recording today's exporter digest against yesterday's artifact -- which",
-  "would have made a false claim look like a green check.",
-  "",
-  "ast-Cachetools.json is the one entry whose source revision was RECOVERED rather than",
-  "recorded: a fresh export of cachetools v7.1.7 reproduces its exact 209-entry (name,",
-  "file) set, which is what identifies the tag. It still DIFFERS in the bodies, so it",
-  "stays here -- but its source_hint is now a public tag rather than a dead scratch path.",
-  "",
-  "ast-V8Numbers.json and ast-V8Base.json are the weakest entries in this file and say so:",
-  "they name the commit that produced or changed the artifact and nothing about the tree it",
-  "came from. A C++ corpus that size cannot be identified by matching a fresh export the way",
-  "cachetools was. Do not read them as equivalent to the reproduction_attempted=true entries.",
-  "",
-  "An entry LEAVES this file exactly one way: a real record replaces it. When",
-  "scripts/reland_corpus.sh re-exports a corpus from its identified revision it calls",
-  "scripts/provenance.py record, which writes provenance/ast-<M>.json.prov.json (joern",
-  "version, exporter sha256, artifact digest, source revision, exact command), and then",
-  "deletes this file's entry for the same artifact. Both must happen: a record beside a",
-  "surviving backlog line makes check_provenance report a digest change against a baseline",
-  "that no longer applies. Do not edit an entry's digest by hand to match a regenerated",
-  "artifact -- that is the 'stale excuse' the checker's own message warns against.",
-  "",
-  "source_hint paths are per-session scratch directories. They are a lead for whoever",
-  "regenerates these, not a stable location, and check_provenance.py does not read them.",
-  "",
-  "The two *Sample entries are a different kind of gap from the rest, and say so: they",
-  "are not stale exports, they are EXTRACTIONS. Each is a byte-identical subset of an",
-  "untracked corpus AST (verified entry-by-entry against ast-LinuxLib.json and",
-  "ast-V8Base.json), and no extraction script is committed, so there is no `command`",
-  "that regenerates them and a record naming export_ast.sc + a source tree would be",
-  "false. Committing the extractor is what closes these, not a re-export."
- ],
- "artifacts": {
-  "ast-CMath.json": {
-   "artifact_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
-   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/ctest",
-   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Same 6 functions, but every integer literal is \"v\": 0 here and \"v\": \"0\" in a fresh export -- the literal representation changed and this artifact predates it. 23 diff lines.",
-   "reproduction_attempted": true,
-   "reproduced": false
-  },
-  "ast-LangC.json": {
-   "artifact_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangGo.json": {
-   "artifact_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangJS.json": {
-   "artifact_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangJava.json": {
-   "artifact_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangKt.json": {
-   "artifact_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LangTS.json": {
-   "artifact_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
-   "source_hint": null,
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-LinuxLibSample.json": {
-   "artifact_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
-   "source_hint": "extracted from ast-LinuxLib.json (untracked; .gitignore names it a local build product)",
-   "reason": "Not a Joern export: an EXTRACTION. All 7 entries were verified byte-identical to their (name, file) counterparts in ast-LinuxLib.json, which is gitignored and local-only. Commit 5fd17ae describes it as the call-closure of the functions Autoform/SpecsGen/LinuxLibSample.lean names. No extraction script is committed, so there is no exact command to record, and naming cartographer/export_ast.sc plus a Linux source tree would claim a regeneration path that does not produce this file. Attribution requires committing the extractor (and recording the parent AST it selects from).",
-   "reproduction_attempted": true,
-   "reproduced": false
-  },
-  "ast-Sample.json": {
-   "artifact_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
-   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/sample",
-   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 7 entries to the committed 5 -- the two module-initializer entries (`lib.py:<module>`, `<module-objects>:<module>`) postdate this artifact. 387 diff lines.",
-   "reproduction_attempted": true,
-   "reproduced": false
-  },
-  "ast-Stress.json": {
-   "artifact_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
-   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/stress",
-   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 8 entries to the committed 6; the extra two are the module initializers `ops.py:<module>` and `<module-objects>:<module>`.",
-   "reproduction_attempted": true,
-   "reproduced": false
-  },
-  "ast-V8Base.json": {
-   "artifact_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
-   "source_hint": null,
-   "reason": "Was in neither this backlog nor provenance/, which is an omission rather than a signal: every other tracked AST is accounted for one way or the other, and this one was simply never listed. It entered the tree in df77544 (2026-08-25, '285 tracked theorems were pinned to a corpus no clone could see'), which tracked the AST precisely so a clone could see the corpus. Same gap as ast-V8Numbers.json: the V8 tree and revision are not identified and the CPG was not kept, so reproduction was not attempted. Closing this needs the V8 revision recorded and a re-export from it.",
-   "reproduction_attempted": false,
-   "reproduced": false
-  },
-  "ast-V8BaseSample.json": {
-   "artifact_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
-   "source_hint": "extracted from ast-V8Base.json (untracked; .gitignore names it a local build product)",
-   "reason": "Not a Joern export: an EXTRACTION. All 4 entries were verified byte-identical to their (name, file) counterparts in ast-V8Base.json, which is gitignored and local-only. Commit 5fd17ae describes it as the call-closure of the functions Autoform/SpecsGen/V8BaseSample.lean names. No extraction script is committed, so there is no exact command to record, and naming cartographer/export_ast.sc plus a V8 source tree would claim a regeneration path that does not produce this file. Attribution requires committing the extractor (and recording the parent AST it selects from).",
-   "reproduction_attempted": true,
-   "reproduced": false
-  },
-  "ast-V8Numbers.json": {
-   "artifact_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
-   "source_hint": null,
-   "reason": "Regenerated by 52a6987 (2026-08-21, 'Wire float literals to Float.lean'), which is how the digest moved off the earlier baseline. Reproduction NOT attempted: the entries come from V8's conversions.cc, hash-seed.cc, ieee754.cc and math-random.cc, and neither the V8 tree nor its revision is identified anywhere in this repository, nor was the CPG kept. This is the weakest class of entry here -- it names when the artifact changed and under which commit, not what it was built from. Unlike ast-Cachetools.json, whose revision was recovered by matching a fresh export's function set, a C++ corpus of this size cannot be identified that way cheaply. Closing this needs the V8 revision recorded and a re-export from it.",
-   "reproduction_attempted": false,
-   "reproduced": false
+  "_": [
+    "Artifacts that predate provenance recording. This file is a NAMED BACKLOG, not an",
+    "exemption: scripts/check_provenance.py prints every entry, by name, on every run, and",
+    "an entry stops applying the moment its artifact's digest changes -- regenerate one and",
+    "you must record real provenance for it. scripts/check_provenance.py --strict refuses",
+    "the backlog entirely.",
+    "",
+    "The four entries with reproduction_attempted=true were checked, not assumed: each was",
+    "re-exported from its source tree with the pinned Joern and the committed exporter, and",
+    "each DIFFERS. That is the finding, and it is why this file says `unattributed` rather",
+    "than quietly recording today's exporter digest against yesterday's artifact -- which",
+    "would have made a false claim look like a green check.",
+    "",
+    "ast-Cachetools.json left this file on 2026-10-09 the one permitted way: re-exported from",
+    "the identified tag (cachetools v7.1.7) and recorded by scripts/provenance.py.",
+    "",
+    "ast-LinuxLcm.json ENTERED this file on 2026-10-09 from the other direction: it had a",
+    "record (linux lib/math @ git:93388a248e5b, command `autoform.sh LinuxLcm`), but the",
+    "exporter's Scala sources changed after that export and the scratch checkout is gone. A",
+    "re-export from the only lib/math available (the kernel at 165768bb7, where gcd.c carries",
+    "a static key and binary_gcd) produced a different source and so a different artifact (6",
+    "functions, not 4), with the native oracle compiling 0/1 units because include/linux/gcd.h",
+    "now pulls in jump_label.h. Recording today's exporter against the old artifact would be",
+    "the false claim this file exists to refuse, so the record was removed and the artifact is",
+    "named here until lib/math is re-landed for real (new AST, new specs, new record).",
+    "",
+    "ast-V8Numbers.json and ast-V8Base.json are the weakest entries in this file and say so:",
+    "they name the commit that produced or changed the artifact and nothing about the tree it",
+    "came from. A C++ corpus that size cannot be identified by matching a fresh export the way",
+    "cachetools was. Do not read them as equivalent to the reproduction_attempted=true entries.",
+    "",
+    "An entry LEAVES this file exactly one way: a real record replaces it. When",
+    "scripts/reland_corpus.sh re-exports a corpus from its identified revision it calls",
+    "scripts/provenance.py record, which writes provenance/ast-<M>.json.prov.json (joern",
+    "version, exporter sha256, artifact digest, source revision, exact command), and then",
+    "deletes this file's entry for the same artifact. Both must happen: a record beside a",
+    "surviving backlog line makes check_provenance report a digest change against a baseline",
+    "that no longer applies. Do not edit an entry's digest by hand to match a regenerated",
+    "artifact -- that is the 'stale excuse' the checker's own message warns against.",
+    "",
+    "source_hint paths are per-session scratch directories. They are a lead for whoever",
+    "regenerates these, not a stable location, and check_provenance.py does not read them.",
+    "",
+    "The two *Sample entries are a different kind of gap from the rest, and say so: they",
+    "are not stale exports, they are EXTRACTIONS. Each is a byte-identical subset of an",
+    "untracked corpus AST (verified entry-by-entry against ast-LinuxLib.json and",
+    "ast-V8Base.json), and no extraction script is committed, so there is no `command`",
+    "that regenerates them and a record naming export_ast.sc + a source tree would be",
+    "false. Committing the extractor is what closes these, not a re-export."
+  ],
+  "artifacts": {
+    "ast-CMath.json": {
+      "artifact_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
+      "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/ctest",
+      "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Same 6 functions, but every integer literal is \"v\": 0 here and \"v\": \"0\" in a fresh export -- the literal representation changed and this artifact predates it. 23 diff lines.",
+      "reproduction_attempted": true,
+      "reproduced": false
+    },
+    "ast-LangC.json": {
+      "artifact_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
+      "source_hint": null,
+      "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    },
+    "ast-LangGo.json": {
+      "artifact_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
+      "source_hint": null,
+      "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    },
+    "ast-LangJS.json": {
+      "artifact_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
+      "source_hint": null,
+      "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    },
+    "ast-LangJava.json": {
+      "artifact_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
+      "source_hint": null,
+      "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    },
+    "ast-LangKt.json": {
+      "artifact_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
+      "source_hint": null,
+      "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    },
+    "ast-LangTS.json": {
+      "artifact_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
+      "source_hint": null,
+      "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    },
+    "ast-LinuxLcm.json": {
+      "artifact_sha256": "436076cc096a98c76a2f56d63ce8bb11327ab7abcd2d700c2d6419666ad1a7be",
+      "source_hint": "linux lib/math @ git:93388a248e5bed124e4d757ce7c0824006ca469e (scratch checkout, gone); gcd.c/lcm.c at 165768bb7 are in ~/.cache/autoform/corpora/linux-lib-math-gcd-lcm/lib/math",
+      "reason": "Had a record (Joern 4.0.606, `autoform.sh LinuxLcm`) that stopped verifying on 2026-10-09 when cartographer/compiler/*.scala changed. Re-export from the available lib/math DIFFERS: 6 functions (binary_gcd, gcd, lcm, lcm_not_zero, 2 file globals) against 4 here, because that gcd.c is a later revision (static key efficient_ffs_key, binary_gcd); its native oracle compiled 0/1 units (include/linux/gcd.h -> jump_label.h -> WARN_ON_ONCE undeclared outside Kbuild). Autoform/SpecsGen/LinuxLcm.lean (conform_gcd, conform_lcm) describes THIS artifact. Closes by re-landing lib/math: new AST, regenerated specs, a real record.",
+      "reproduction_attempted": true,
+      "reproduced": false
+    },
+    "ast-LinuxLibSample.json": {
+      "artifact_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
+      "source_hint": "extracted from ast-LinuxLib.json (untracked; .gitignore names it a local build product)",
+      "reason": "Not a Joern export: an EXTRACTION. All 7 entries were verified byte-identical to their (name, file) counterparts in ast-LinuxLib.json, which is gitignored and local-only. Commit 5fd17ae describes it as the call-closure of the functions Autoform/SpecsGen/LinuxLibSample.lean names. No extraction script is committed, so there is no exact command to record, and naming cartographer/export_ast.sc plus a Linux source tree would claim a regeneration path that does not produce this file. Attribution requires committing the extractor (and recording the parent AST it selects from).",
+      "reproduction_attempted": true,
+      "reproduced": false
+    },
+    "ast-Sample.json": {
+      "artifact_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
+      "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/sample",
+      "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 7 entries to the committed 5 -- the two module-initializer entries (`lib.py:<module>`, `<module-objects>:<module>`) postdate this artifact. 387 diff lines.",
+      "reproduction_attempted": true,
+      "reproduced": false
+    },
+    "ast-Stress.json": {
+      "artifact_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
+      "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/stress",
+      "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 8 entries to the committed 6; the extra two are the module initializers `ops.py:<module>` and `<module-objects>:<module>`.",
+      "reproduction_attempted": true,
+      "reproduced": false
+    },
+    "ast-V8Base.json": {
+      "artifact_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
+      "source_hint": null,
+      "reason": "Was in neither this backlog nor provenance/, which is an omission rather than a signal: every other tracked AST is accounted for one way or the other, and this one was simply never listed. It entered the tree in df77544 (2026-08-25, '285 tracked theorems were pinned to a corpus no clone could see'), which tracked the AST precisely so a clone could see the corpus. Same gap as ast-V8Numbers.json: the V8 tree and revision are not identified and the CPG was not kept, so reproduction was not attempted. Closing this needs the V8 revision recorded and a re-export from it.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    },
+    "ast-V8BaseSample.json": {
+      "artifact_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
+      "source_hint": "extracted from ast-V8Base.json (untracked; .gitignore names it a local build product)",
+      "reason": "Not a Joern export: an EXTRACTION. All 4 entries were verified byte-identical to their (name, file) counterparts in ast-V8Base.json, which is gitignored and local-only. Commit 5fd17ae describes it as the call-closure of the functions Autoform/SpecsGen/V8BaseSample.lean names. No extraction script is committed, so there is no exact command to record, and naming cartographer/export_ast.sc plus a V8 source tree would claim a regeneration path that does not produce this file. Attribution requires committing the extractor (and recording the parent AST it selects from).",
+      "reproduction_attempted": true,
+      "reproduced": false
+    },
+    "ast-V8Numbers.json": {
+      "artifact_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
+      "source_hint": null,
+      "reason": "Regenerated by 52a6987 (2026-08-21, 'Wire float literals to Float.lean'), which is how the digest moved off the earlier baseline. Reproduction NOT attempted: the entries come from V8's conversions.cc, hash-seed.cc, ieee754.cc and math-random.cc, and neither the V8 tree nor its revision is identified anywhere in this repository, nor was the CPG kept. This is the weakest class of entry here -- it names when the artifact changed and under which commit, not what it was built from. Unlike ast-Cachetools.json, whose revision was recovered by matching a fresh export's function set, a C++ corpus of this size cannot be identified that way cheaply. Closing this needs the V8 revision recorded and a re-export from it.",
+      "reproduction_attempted": false,
+      "reproduced": false
+    }
   }
- }
 }
