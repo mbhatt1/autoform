@@ -24,11 +24,11 @@
    "render_sha256": "6beadfba44d21abde8c14f92168088d635bbd7c0eabfc84d805bc23f2140902e"
   },
   "Click": {
-   "ast_bytes": 4726613,
-   "ast_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
+   "ast_bytes": 4725779,
+   "ast_sha256": "51b74421c6880be8d63691bc303a9f60a37da4ca465dbca3ab35b3e6bf523e32",
    "ast_tracked": true,
-   "render_bytes": 2061729,
-   "render_sha256": "7e845e9e3978f0cc9b10c1a69d8d5abd17f6812ccc8e6ac6a6ba2ca235ba386d"
+   "render_bytes": 2060887,
+   "render_sha256": "27b4fe8cc814bb8fff1589ca08192c9ab0e54bca797b97a721ee986a726cbe1d"
   },
   "Jinja2": {
    "ast_bytes": 7899504,
@@ -168,7 +168,7 @@
   },
   "SpecsGen/Click": {
    "corpus": "Click",
-   "corpus_ast_sha256": "a050548cfbbb520a614a99fc5a7f9be5125d14ba6c453da56e0bd1691d4a8650",
+   "corpus_ast_sha256": "51b74421c6880be8d63691bc303a9f60a37da4ca465dbca3ab35b3e6bf523e32",
    "source": "ast-Click.json"
   },
   "SpecsGen/Jinja2": {

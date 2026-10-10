@@ -132699,7 +132699,7 @@
     "name": "click/_winconsole.py:<module>.Py_buffer",
     "shortName": "Py_buffer",
     "bases": [
-     "<unresolved-base>click/_winconsole.py:<module>.Py_buffer:0"
+     "<external>ctypes.Structure"
     ],
     "attributes": [
      {
@@ -132713,7 +132713,7 @@
     "name": "click/_winconsole.py:<module>._WindowsConsoleRawIOBase",
     "shortName": "_WindowsConsoleRawIOBase",
     "bases": [
-     "<unresolved-base>click/_winconsole.py:<module>._WindowsConsoleRawIOBase:0"
+     "<external>io.RawIOBase"
     ],
     "attributes": [
      {
@@ -132811,8 +132811,7 @@
       "kind": "method",
       "value": "click/_winconsole.py:<module>.ConsoleStream.__repr__"
      }
-    ],
-    "definitionBarrier": "class-definition:custom-attribute-hook"
+    ]
    }
   ],
   "classProperties": [
@@ -134787,7 +134786,7 @@
     "name": "click/_compat.py:<module>._NonClosingTextIOWrapper",
     "shortName": "_NonClosingTextIOWrapper",
     "bases": [
-     "<unresolved-base>click/_compat.py:<module>._NonClosingTextIOWrapper:0"
+     "<external>io.TextIOWrapper"
     ],
     "attributes": [
      {
@@ -134842,8 +134841,7 @@
       "kind": "method",
       "value": "click/_compat.py:<module>._FixupStream.seekable"
      }
-    ],
-    "definitionBarrier": "class-definition:custom-attribute-hook"
+    ]
    },
    {
     "name": "click/_compat.py:<module>._AtomicFile",
@@ -134885,8 +134883,7 @@
       "kind": "method",
       "value": "click/_compat.py:<module>._AtomicFile.__repr__"
      }
-    ],
-    "definitionBarrier": "class-definition:custom-attribute-hook"
+    ]
    }
   ],
   "classProperties": [
@@ -137296,8 +137293,7 @@
       "kind": "method",
       "value": "click/utils.py:<module>.LazyFile.__iter__"
      }
-    ],
-    "definitionBarrier": "class-definition:custom-attribute-hook"
+    ]
    },
    {
     "name": "click/utils.py:<module>.KeepOpenFile",
@@ -137334,8 +137330,7 @@
       "kind": "method",
       "value": "click/utils.py:<module>.KeepOpenFile.__iter__"
      }
-    ],
-    "definitionBarrier": "class-definition:custom-attribute-hook"
+    ]
    },
    {
     "name": "click/utils.py:<module>.PacifyFlushWrapper",
@@ -137357,8 +137352,7 @@
       "kind": "method",
       "value": "click/utils.py:<module>.PacifyFlushWrapper.__getattr__"
      }
-    ],
-    "definitionBarrier": "class-definition:custom-attribute-hook"
+    ]
    }
   ],
   "exceptionClasses": [
@@ -139855,7 +139849,6 @@
       "value": "<slot>click/shell_completion.py:<module>.CompletionItem._info"
      }
     ],
-    "definitionBarrier": "class-definition:custom-attribute-hook",
     "slots": [
      "value",
      "type",
@@ -140268,7 +140261,7 @@
     "name": "click/_textwrap.py:<module>.TextWrapper",
     "shortName": "TextWrapper",
     "bases": [
-     "<unresolved-base>click/_textwrap.py:<module>.TextWrapper:0"
+     "<external>textwrap.TextWrapper"
     ],
     "attributes": [
      {
@@ -146198,7 +146191,7 @@
     "name": "click/types.py:<module>.OptionHelpExtra",
     "shortName": "OptionHelpExtra",
     "bases": [
-     "<unresolved-base>click/types.py:<module>.OptionHelpExtra:0"
+     "<external>typing.TypedDict"
     ],
     "attributes": [],
     "definitionBarrier": "class-definition:decorator-or-metaclass"
@@ -150164,7 +150157,7 @@
     "name": "click/core.py:<module>.ParameterSource",
     "shortName": "ParameterSource",
     "bases": [
-     "<unresolved-base>click/core.py:<module>.ParameterSource:0"
+     "<external>enum.Enum"
     ],
     "attributes": [
      {
@@ -153681,14 +153674,13 @@
       "kind": "method",
       "value": "click/testing.py:<module>.EchoingStdin.__repr__"
      }
-    ],
-    "definitionBarrier": "class-definition:custom-attribute-hook"
+    ]
    },
    {
     "name": "click/testing.py:<module>.BytesIOCopy",
     "shortName": "BytesIOCopy",
     "bases": [
-     "<unresolved-base>click/testing.py:<module>.BytesIOCopy:0"
+     "<external>io.BytesIO"
     ],
     "attributes": [
      {
@@ -153724,7 +153716,7 @@
     "name": "click/testing.py:<module>._NamedTextIOWrapper",
     "shortName": "_NamedTextIOWrapper",
     "bases": [
-     "<unresolved-base>click/testing.py:<module>._NamedTextIOWrapper:0"
+     "<external>io.TextIOWrapper"
     ],
     "attributes": [
      {

@@ -100,6 +100,48 @@ theorem conform_click___init___py__module____getattr : ∀ fuel, FUEL ≤ fuel �
       lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
+def dom_conform_click__compat_py__module___FixupStream___init : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (-4)), ("_force_readable", Val.int (-8)), ("_force_writable", Val.int (-8))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (-2), Val.int (-5)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (2)), ("_force_readable", Val.int (-2)), ("_force_writable", Val.int (-5))] }], roots := [(base + 0)], budget := 348 }) },
+   { case := { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (1)), ("_force_readable", Val.int (1)), ("_force_writable", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5), Val.int (-2), Val.int (-1)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (5)), ("_force_readable", Val.int (-2)), ("_force_writable", Val.int (-1))] }], roots := [(base + 0)], budget := 348 }) },
+   { case := { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (-6)), ("_force_readable", Val.int (-2)), ("_force_writable", Val.int (4))] }], self := (some (Val.ref (base + 0))), args := [Val.int (6), Val.int (-6), Val.int (-1)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (6)), ("_force_readable", Val.int (-6)), ("_force_writable", Val.int (-1))] }], roots := [(base + 0)], budget := 348 }) },
+   { case := { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (2)), ("_force_readable", Val.int (-2)), ("_force_writable", Val.int (-5))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-6), Val.int (-2), Val.int (4)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (-6)), ("_force_readable", Val.int (-2)), ("_force_writable", Val.int (4))] }], roots := [(base + 0)], budget := 348 }) },
+   { case := { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (5)), ("_force_readable", Val.int (-2)), ("_force_writable", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-4), Val.int (-8), Val.int (-8)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (-4)), ("_force_readable", Val.int (-8)), ("_force_writable", Val.int (-8))] }], roots := [(base + 0)], budget := 350 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click__compat_py__module___FixupStream___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__compat_py__module___FixupStream___init).all (lawConform C fuel f_click__compat_py__module___FixupStream___init__)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click__compat_py__module___FixupStream___init).all (lawConform C 8 f_click__compat_py__module___FixupStream___init__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 8 f_click__compat_py__module___FixupStream___init__) (lawConform C 8 f_click__compat_py__module___FixupStream___init__) (lawConform C fuel f_click__compat_py__module___FixupStream___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click__compat_py__module___FixupStream_readable : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (1)), ("_force_readable", Val.int (1)), ("_force_writable", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.bool true), post := (some { heap := h0 ++ [{ cls := "click/_compat.py:<module>._FixupStream", fields := [("_stream", Val.int (1)), ("_force_readable", Val.int (1)), ("_force_writable", Val.int (1))] }], roots := [(base + 0)], budget := 356 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click__compat_py__module___FixupStream_readable : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click__compat_py__module___FixupStream_readable).all (lawConform C fuel f_click__compat_py__module___FixupStream_readable)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click__compat_py__module___FixupStream_readable).all (lawConform C 8 f_click__compat_py__module___FixupStream_readable) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 8 f_click__compat_py__module___FixupStream_readable) (lawConform C 8 f_click__compat_py__module___FixupStream_readable) (lawConform C fuel f_click__compat_py__module___FixupStream_readable)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
 def dom_conform_click__compat_py__module___get_windows_console_stream : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (16), Val.int (9), Val.int (19)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [], roots := [], budget := 62 }) },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (-18), Val.int (-15), Val.int (-18)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [], roots := [], budget := 62 }) },
@@ -477,6 +519,27 @@ theorem conform_click_parser_py__module____getattr : ∀ fuel, FUEL ≤ fuel →
       lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
+def dom_conform_click_shell_completion_py__module__CompletionItem___init : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.str "-t", Val.str "plain", Val.unit] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [("<slot>click/shell_completion.py:<module>.CompletionItem._info", Val.ref (base + 1)), ("<slot>click/shell_completion.py:<module>.CompletionItem.help", Val.unit), ("<slot>click/shell_completion.py:<module>.CompletionItem.type", Val.str "plain"), ("<slot>click/shell_completion.py:<module>.CompletionItem.value", Val.str "-t")] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0)], budget := 882 }) },
+   { case := { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.str "--test", Val.str "plain", Val.unit] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [("<slot>click/shell_completion.py:<module>.CompletionItem._info", Val.ref (base + 1)), ("<slot>click/shell_completion.py:<module>.CompletionItem.help", Val.unit), ("<slot>click/shell_completion.py:<module>.CompletionItem.type", Val.str "plain"), ("<slot>click/shell_completion.py:<module>.CompletionItem.value", Val.str "--test")] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0)], budget := 890 }) },
+   { case := { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.str "--help", Val.str "plain", Val.str "Show this message and exit."] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.CompletionItem", fields := [("<slot>click/shell_completion.py:<module>.CompletionItem._info", Val.ref (base + 1)), ("<slot>click/shell_completion.py:<module>.CompletionItem.help", Val.str "Show this message and exit."), ("<slot>click/shell_completion.py:<module>.CompletionItem.type", Val.str "plain"), ("<slot>click/shell_completion.py:<module>.CompletionItem.value", Val.str "--help")] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0)], budget := 950 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click_shell_completion_py__module__CompletionItem___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_shell_completion_py__module__CompletionItem___init).all (lawConform C fuel f_click_shell_completion_py__module__CompletionItem___init__)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_shell_completion_py__module__CompletionItem___init).all (lawConform C 8 f_click_shell_completion_py__module__CompletionItem___init__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 8 f_click_shell_completion_py__module__CompletionItem___init__) (lawConform C 8 f_click_shell_completion_py__module__CompletionItem___init__) (lawConform C fuel f_click_shell_completion_py__module__CompletionItem___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
 def dom_conform_click_shell_completion_py__module__FishComplete_format_completion : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.FishComplete", fields := [("cli", Val.ref (base + 1)), ("ctx_args", Val.ref (base + 11)), ("prog_name", Val.str "cli"), ("complete_var", Val.str "_CLI_COMPLETE")] }, { cls := "click/core.py:<module>.Group", fields := [("name", Val.str "cli"), ("context_settings", Val.ref (base + 2)), ("callback", Val.unit), ("params", Val.ref (base + 3)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 4)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.ref (base + 5)), (Val.str "b", Val.ref (base + 8))] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "a"), ("context_settings", Val.ref (base + 6)), ("callback", Val.unit), ("params", Val.ref (base + 7)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "b"), ("context_settings", Val.ref (base + 9)), ("callback", Val.unit), ("params", Val.ref (base + 10)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 13)), ("secondary_opts", Val.ref (base + 14)), ("type", Val.ref (base + 15)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 12)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [{ cls := "click/shell_completion.py:<module>.FishComplete", fields := [("cli", Val.ref (base + 1)), ("ctx_args", Val.ref (base + 11)), ("prog_name", Val.str "cli"), ("complete_var", Val.str "_CLI_COMPLETE")] }, { cls := "click/core.py:<module>.Group", fields := [("name", Val.str "cli"), ("context_settings", Val.ref (base + 2)), ("callback", Val.unit), ("params", Val.ref (base + 3)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool true), ("hidden", Val.bool false), ("deprecated", Val.bool false), ("commands", Val.ref (base + 4)), ("invoke_without_command", Val.bool false), ("subcommand_metavar", Val.str "COMMAND [ARGS]..."), ("chain", Val.bool false), ("_result_callback", Val.unit)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [(Val.str "a", Val.ref (base + 5)), (Val.str "b", Val.ref (base + 8))] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "a"), ("context_settings", Val.ref (base + 6)), ("callback", Val.unit), ("params", Val.ref (base + 7)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/core.py:<module>.Command", fields := [("name", Val.str "b"), ("context_settings", Val.ref (base + 9)), ("callback", Val.unit), ("params", Val.ref (base + 10)), ("help", Val.unit), ("epilog", Val.unit), ("options_metavar", Val.str "[OPTIONS]"), ("short_help", Val.unit), ("add_help_option", Val.bool true), ("_help_option", Val.unit), ("no_args_is_help", Val.bool false), ("hidden", Val.bool false), ("deprecated", Val.bool false)] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "list", fields := [], payload := .list [] }, { cls := "dict", fields := [], payload := .dict [] }, { cls := "click/core.py:<module>.Argument", fields := [("name", Val.str "src"), ("opts", Val.ref (base + 13)), ("secondary_opts", Val.ref (base + 14)), ("type", Val.ref (base + 15)), ("required", Val.bool false), ("callback", Val.unit), ("nargs", Val.int (-1)), ("multiple", Val.bool false), ("expose_value", Val.bool true), ("default", Val.unit), ("is_eager", Val.bool false), ("metavar", Val.unit), ("envvar", Val.unit), ("_custom_shell_complete", Val.unit), ("deprecated", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.str "src"] }, { cls := "list", fields := [], payload := .list [] }, { cls := "click/types.py:<module>.StringParamType", fields := [] }], roots := [(base + 0), (base + 1), (base + 2), (base + 3), (base + 4), (base + 5), (base + 6), (base + 7), (base + 8), (base + 9), (base + 10), (base + 11), (base + 12), (base + 13), (base + 14), (base + 15)], budget := 5102 }) }]
 
@@ -578,6 +641,27 @@ theorem conform_click_testing_py__module__CliRunner_get_default_prog_name : ∀ 
       lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
+def dom_conform_click_testing_py__module__EchoingStdin___init : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (-7)), ("_output", Val.int (7)), ("_paused", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (-6)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (3)), ("_output", Val.int (-6)), ("_paused", Val.bool false)] }], roots := [(base + 0)], budget := 322 }) },
+   { case := { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (1)), ("_output", Val.int (1)), ("_paused", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (-2)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (3)), ("_output", Val.int (-2)), ("_paused", Val.bool false)] }], roots := [(base + 0)], budget := 322 }) },
+   { case := { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (3)), ("_output", Val.int (-6)), ("_paused", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.int (-6), Val.int (8)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/testing.py:<module>.EchoingStdin", fields := [("_input", Val.int (-6)), ("_output", Val.int (8)), ("_paused", Val.bool false)] }], roots := [(base + 0)], budget := 322 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click_testing_py__module__EchoingStdin___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_testing_py__module__EchoingStdin___init).all (lawConform C fuel f_click_testing_py__module__EchoingStdin___init__)) = true := by
+  intro fuel hf
+  have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_testing_py__module__EchoingStdin___init).all (lawConform C 8 f_click_testing_py__module__EchoingStdin___init__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 8 f_click_testing_py__module__EchoingStdin___init__) (lawConform C 8 f_click_testing_py__module__EchoingStdin___init__) (lawConform C fuel f_click_testing_py__module__EchoingStdin___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
 def dom_conform_click_testing_py__module__Result___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "click/testing.py:<module>.Result", fields := [("runner", Val.int (0)), ("stdout_bytes", Val.int (3)), ("stderr_bytes", Val.int (1)), ("output_bytes", Val.int (7)), ("return_value", Val.int (-6)), ("exit_code", Val.int (1)), ("exception", Val.int (-4)), ("exc_info", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5), Val.int (8), Val.int (-5), Val.int (6), Val.int (3), Val.int (-7), Val.int (3), Val.int (2)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/testing.py:<module>.Result", fields := [("runner", Val.int (5)), ("stdout_bytes", Val.int (8)), ("stderr_bytes", Val.int (-5)), ("output_bytes", Val.int (6)), ("return_value", Val.int (3)), ("exit_code", Val.int (-7)), ("exception", Val.int (3)), ("exc_info", Val.int (2))] }], roots := [(base + 0)], budget := 602 }) },
    { case := { heap := h0 ++ [{ cls := "click/testing.py:<module>.Result", fields := [("runner", Val.int (-1)), ("stdout_bytes", Val.int (-7)), ("stderr_bytes", Val.int (6)), ("output_bytes", Val.int (3)), ("return_value", Val.int (5)), ("exit_code", Val.int (-4)), ("exception", Val.int (-7)), ("exc_info", Val.int (-5))] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (3), Val.int (1), Val.int (7), Val.int (-6), Val.int (1), Val.int (-4), Val.int (7)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/testing.py:<module>.Result", fields := [("runner", Val.int (0)), ("stdout_bytes", Val.int (3)), ("stderr_bytes", Val.int (1)), ("output_bytes", Val.int (7)), ("return_value", Val.int (-6)), ("exit_code", Val.int (1)), ("exception", Val.int (-4)), ("exc_info", Val.int (7))] }], roots := [(base + 0)], budget := 602 }) },
@@ -653,6 +737,25 @@ theorem conform_click_types_py__module__File___init : ∀ fuel, FUEL ≤ fuel �
   have hchecked : (dom_conform_click_types_py__module__File___init).all (lawConform C 8 f_click_types_py__module__File___init__) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
   exact all_transfer _ (gRunObs C 8 f_click_types_py__module__File___init__) (lawConform C 8 f_click_types_py__module__File___init__) (lawConform C fuel f_click_types_py__module__File___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_types_py__module__File_shell_complete : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/types.py:<module>.File", fields := [("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("lazy", Val.bool true), ("atomic", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.unit, Val.str ""] }, expected := EResult.val (Val.ref (base + 1)), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.File", fields := [("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("lazy", Val.bool true), ("atomic", Val.bool false)] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 2)] }, { cls := "click/shell_completion.py:<module>.CompletionItem", fields := [("<slot>click/shell_completion.py:<module>.CompletionItem._info", Val.ref (base + 3)), ("<slot>click/shell_completion.py:<module>.CompletionItem.help", Val.unit), ("<slot>click/shell_completion.py:<module>.CompletionItem.type", Val.str "file"), ("<slot>click/shell_completion.py:<module>.CompletionItem.value", Val.str "")] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0)], budget := 1308 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click_types_py__module__File_shell_complete : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__File_shell_complete).all (lawConform C fuel f_click_types_py__module__File_shell_complete)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_types_py__module__File_shell_complete).all (lawConform C 16 f_click_types_py__module__File_shell_complete) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 16 f_click_types_py__module__File_shell_complete) (lawConform C 16 f_click_types_py__module__File_shell_complete) (lawConform C fuel f_click_types_py__module__File_shell_complete)
     (fun c hgc hlc =>
       lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
@@ -833,6 +936,25 @@ theorem conform_click_types_py__module__Path_coerce_path_result : ∀ fuel, FUEL
       lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
+def dom_conform_click_types_py__module__Path_shell_complete : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/types.py:<module>.Path", fields := [("exists", Val.bool false), ("file_okay", Val.bool true), ("dir_okay", Val.bool true), ("readable", Val.bool true), ("writable", Val.bool false), ("executable", Val.bool false), ("resolve_path", Val.bool false), ("allow_dash", Val.bool true), ("type", Val.unit), ("name", Val.str "path")] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.unit, Val.str ""] }, expected := EResult.val (Val.ref (base + 1)), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.Path", fields := [("exists", Val.bool false), ("file_okay", Val.bool true), ("dir_okay", Val.bool true), ("readable", Val.bool true), ("writable", Val.bool false), ("executable", Val.bool false), ("resolve_path", Val.bool false), ("allow_dash", Val.bool true), ("type", Val.unit), ("name", Val.str "path")] }, { cls := "list", fields := [], payload := .list [Val.ref (base + 2)] }, { cls := "click/shell_completion.py:<module>.CompletionItem", fields := [("<slot>click/shell_completion.py:<module>.CompletionItem._info", Val.ref (base + 3)), ("<slot>click/shell_completion.py:<module>.CompletionItem.help", Val.unit), ("<slot>click/shell_completion.py:<module>.CompletionItem.type", Val.str "file"), ("<slot>click/shell_completion.py:<module>.CompletionItem.value", Val.str "")] }, { cls := "dict", fields := [], payload := .dict [] }], roots := [(base + 0)], budget := 1636 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 32 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click_types_py__module__Path_shell_complete : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_types_py__module__Path_shell_complete).all (lawConform C fuel f_click_types_py__module__Path_shell_complete)) = true := by
+  intro fuel hf
+  have hk : 32 ≤ fuel := Nat.le_trans (by decide : 32 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_types_py__module__Path_shell_complete).all (lawConform C 32 f_click_types_py__module__Path_shell_complete) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 32 f_click_types_py__module__Path_shell_complete) (lawConform C 32 f_click_types_py__module__Path_shell_complete) (lawConform C fuel f_click_types_py__module__Path_shell_complete)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
 def dom_conform_click_types_py__module__StringParamType___repr : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "click/types.py:<module>.StringParamType", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.str "STRING"), post := (some { heap := h0 ++ [{ cls := "click/types.py:<module>.StringParamType", fields := [] }], roots := [(base + 0)], budget := 186 }) }]
 
@@ -992,8 +1114,28 @@ theorem conform_click_utils_py__module__KeepOpenFile___exit : ∀ fuel, FUEL ≤
       lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
+def dom_conform_click_utils_py__module__KeepOpenFile___init : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.KeepOpenFile", fields := [("_file", Val.str "hello.txt")] }], self := (some (Val.ref (base + 0))), args := [Val.int (12)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.KeepOpenFile", fields := [("_file", Val.int (12))] }], roots := [(base + 0)], budget := 206 }) },
+   { case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.KeepOpenFile", fields := [("_file", Val.str "example.txt")] }], self := (some (Val.ref (base + 0))), args := [Val.str "example.txt"] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.KeepOpenFile", fields := [("_file", Val.str "example.txt")] }], roots := [(base + 0)], budget := 228 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click_utils_py__module__KeepOpenFile___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__KeepOpenFile___init).all (lawConform C fuel f_click_utils_py__module__KeepOpenFile___init__)) = true := by
+  intro fuel hf
+  have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_utils_py__module__KeepOpenFile___init).all (lawConform C 4 f_click_utils_py__module__KeepOpenFile___init__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 4 f_click_utils_py__module__KeepOpenFile___init__) (lawConform C 4 f_click_utils_py__module__KeepOpenFile___init__) (lawConform C fuel f_click_utils_py__module__KeepOpenFile___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
 def dom_conform_click_utils_py__module__LazyFile___enter : List Obs :=
-  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-989/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 0)), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-989/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], roots := [(base + 0)], budget := 762 }) }]
+  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1002/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 0)), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-1002/test_iter_lazyfile0/testdir/testfile"), ("mode", Val.str "r"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], roots := [(base + 0)], budget := 764 }) }]
 
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
@@ -1011,34 +1153,80 @@ theorem conform_click_utils_py__module__LazyFile___enter : ∀ fuel, FUEL ≤ fu
       lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
+def dom_conform_click_utils_py__module__LazyFile_close_intelligently : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "example.txt"), ("mode", Val.str "w"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.LazyFile", fields := [("name", Val.str "example.txt"), ("mode", Val.str "w"), ("encoding", Val.unit), ("errors", Val.str "strict"), ("atomic", Val.bool false), ("_f", Val.unit), ("should_close", Val.bool true)] }], roots := [(base + 0)], budget := 538 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click_utils_py__module__LazyFile_close_intelligently : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__LazyFile_close_intelligently).all (lawConform C fuel f_click_utils_py__module__LazyFile_close_intelligently)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_utils_py__module__LazyFile_close_intelligently).all (lawConform C 16 f_click_utils_py__module__LazyFile_close_intelligently) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 16 f_click_utils_py__module__LazyFile_close_intelligently) (lawConform C 16 f_click_utils_py__module__LazyFile_close_intelligently) (lawConform C fuel f_click_utils_py__module__LazyFile_close_intelligently)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
+def dom_conform_click_utils_py__module__PacifyFlushWrapper___init : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (-5))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (2))] }], roots := [(base + 0)], budget := 220 }) },
+   { case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-3)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (-3))] }], roots := [(base + 0)], budget := 222 }) },
+   { case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (-2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (1))] }], roots := [(base + 0)], budget := 220 }) },
+   { case := { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-5)] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [{ cls := "click/utils.py:<module>.PacifyFlushWrapper", fields := [("wrapped", Val.int (-5))] }], roots := [(base + 0)], budget := 222 }) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 4 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_click_utils_py__module__PacifyFlushWrapper___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_click_utils_py__module__PacifyFlushWrapper___init).all (lawConform C fuel f_click_utils_py__module__PacifyFlushWrapper___init__)) = true := by
+  intro fuel hf
+  have hk : 4 ≤ fuel := Nat.le_trans (by decide : 4 ≤ FUEL) hf
+  have hchecked : (dom_conform_click_utils_py__module__PacifyFlushWrapper___init).all (lawConform C 4 f_click_utils_py__module__PacifyFlushWrapper___init__) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (gRunObs C 4 f_click_utils_py__module__PacifyFlushWrapper___init__) (lawConform C 4 f_click_utils_py__module__PacifyFlushWrapper___init__) (lawConform C fuel f_click_utils_py__module__PacifyFlushWrapper___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
+
 /-- Everything this module states but does not prove. A `Prop`-valued `def` asserts nothing, so nothing here is admitted. -/
 def obligations : List OpenObligation :=
   []
 
 #eval IO.println (renderObligations "Click" obligations)
 
-/-- Subjects left out of this module by `--exclude-subjects` (no statement about them is made here, true or open). -/
-def excludedSubjects : List String :=
-  ["click/core.py:<module>.Command.__init__",
-   "click/core.py:<module>.CommandCollection.add_source",
-   "click/core.py:<module>.batch",
-   "click/formatting.py:<module>.HelpFormatter.write",
-   "click/formatting.py:<module>.HelpFormatter.write_paragraph",
-   "click/formatting.py:<module>.wrap_text._flush_par",
-   "click/parser.py:<module>._Argument.process",
-   "click/shell_completion.py:<module>.BashComplete.format_completion",
-   "click/shell_completion.py:<module>.ZshComplete.format_completion",
-   "click/types.py:<module>.DateTime.__init__",
-   "click/types.py:<module>.Tuple.arity",
-   "click/types.py:<module>._NumberRangeBase._describe_range"]
+/-- Candidates left out because, compiled alone, their proof exceeded the emission budget (`--theorem-timeout`, `--theorem-memory-gb`): `(theorem, subject, reason)`. Not stated here, true or open. -/
+def budgetExcluded : List (String × String × String) :=
+  [("conform_click_core_py__module__Command___init", "click/core.py:<module>.Command.__init__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_core_py__module__CommandCollection_add_source", "click/core.py:<module>.CommandCollection.add_source", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_core_py__module__batch", "click/core.py:<module>.batch", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_formatting_py__module__HelpFormatter_write", "click/formatting.py:<module>.HelpFormatter.write", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_formatting_py__module__HelpFormatter_write_paragraph", "click/formatting.py:<module>.HelpFormatter.write_paragraph", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_formatting_py__module__wrap_text__flush_par", "click/formatting.py:<module>.wrap_text._flush_par", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_parser_py__module___Argument_process", "click/parser.py:<module>._Argument.process", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_shell_completion_py__module__BashComplete_format_completion", "click/shell_completion.py:<module>.BashComplete.format_completion", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_shell_completion_py__module__CompletionItem___getattr", "click/shell_completion.py:<module>.CompletionItem.__getattr__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_shell_completion_py__module__ZshComplete_format_completion", "click/shell_completion.py:<module>.ZshComplete.format_completion", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_testing_py__module__EchoingStdin___repr", "click/testing.py:<module>.EchoingStdin.__repr__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_types_py__module__DateTime___init", "click/types.py:<module>.DateTime.__init__", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_types_py__module__Tuple_arity", "click/types.py:<module>.Tuple.arity", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_types_py__module___NumberRangeBase__describe_range", "click/types.py:<module>._NumberRangeBase._describe_range", "over the proof budget: kernel evaluation exceeded 16 GB resident"),
+   ("conform_click_utils_py__module__KeepOpenFile___repr", "click/utils.py:<module>.KeepOpenFile.__repr__", "over the proof budget: kernel evaluation exceeded 16 GB resident")]
 
-#eval IO.println s!"excluded subjects ─ Click ({excludedSubjects.length})"
+#eval IO.println s!"over the proof budget ─ Click ({budgetExcluded.length})"
 
 /-! ## Anti-vacuity gate
 
 `#audit_depends` fails the build if a theorem's proof term never mentions the generated definition it claims to be about — the necessary half of the gate. The sufficient half is `scripts/mutate.py`, run against this file. -/
 
 #audit_depends conform_click___init___py__module____getattr on f_click___init___py__module____getattr__
+#audit_depends conform_click__compat_py__module___FixupStream___init on f_click__compat_py__module___FixupStream___init__
+#audit_depends conform_click__compat_py__module___FixupStream_readable on f_click__compat_py__module___FixupStream_readable
 #audit_depends conform_click__compat_py__module___get_windows_console_stream on f_click__compat_py__module___get_windows_console_stream
 #audit_depends conform_click__compat_py__module__should_strip_ansi on f_click__compat_py__module__should_strip_ansi
 #audit_depends conform_click__termui_impl_py__module__Editor___init on f_click__termui_impl_py__module__Editor___init__
@@ -1058,15 +1246,18 @@ def excludedSubjects : List String :=
 #audit_depends conform_click_parser_py__module___Argument___init on f_click_parser_py__module___Argument___init__
 #audit_depends conform_click_parser_py__module___ParsingState___init on f_click_parser_py__module___ParsingState___init__
 #audit_depends conform_click_parser_py__module____getattr on f_click_parser_py__module____getattr__
+#audit_depends conform_click_shell_completion_py__module__CompletionItem___init on f_click_shell_completion_py__module__CompletionItem___init__
 #audit_depends conform_click_shell_completion_py__module__FishComplete_format_completion on f_click_shell_completion_py__module__FishComplete_format_completion
 #audit_depends conform_click_shell_completion_py__module__ShellComplete___init on f_click_shell_completion_py__module__ShellComplete___init__
 #audit_depends conform_click_termui_py__module__secho on f_click_termui_py__module__secho
 #audit_depends conform_click_testing_py__module__CliRunner___init on f_click_testing_py__module__CliRunner___init__
 #audit_depends conform_click_testing_py__module__CliRunner_get_default_prog_name on f_click_testing_py__module__CliRunner_get_default_prog_name
+#audit_depends conform_click_testing_py__module__EchoingStdin___init on f_click_testing_py__module__EchoingStdin___init__
 #audit_depends conform_click_testing_py__module__Result___init on f_click_testing_py__module__Result___init__
 #audit_depends conform_click_types_py__module__BoolParamType___repr on f_click_types_py__module__BoolParamType___repr__
 #audit_depends conform_click_types_py__module__CompositeParamType_arity on f_click_types_py__module__CompositeParamType_arity
 #audit_depends conform_click_types_py__module__File___init on f_click_types_py__module__File___init__
+#audit_depends conform_click_types_py__module__File_shell_complete on f_click_types_py__module__File_shell_complete
 #audit_depends conform_click_types_py__module__FloatParamType___repr on f_click_types_py__module__FloatParamType___repr__
 #audit_depends conform_click_types_py__module__FloatRange__clamp on f_click_types_py__module__FloatRange__clamp
 #audit_depends conform_click_types_py__module__IntParamType___repr on f_click_types_py__module__IntParamType___repr__
@@ -1076,6 +1267,7 @@ def excludedSubjects : List String :=
 #audit_depends conform_click_types_py__module__ParamType_get_missing_message on f_click_types_py__module__ParamType_get_missing_message
 #audit_depends conform_click_types_py__module__ParamType_shell_complete on f_click_types_py__module__ParamType_shell_complete
 #audit_depends conform_click_types_py__module__Path_coerce_path_result on f_click_types_py__module__Path_coerce_path_result
+#audit_depends conform_click_types_py__module__Path_shell_complete on f_click_types_py__module__Path_shell_complete
 #audit_depends conform_click_types_py__module__StringParamType___repr on f_click_types_py__module__StringParamType___repr__
 #audit_depends conform_click_types_py__module__UUIDParameterType___repr on f_click_types_py__module__UUIDParameterType___repr__
 #audit_depends conform_click_types_py__module__UnprocessedParamType___repr on f_click_types_py__module__UnprocessedParamType___repr__
@@ -1084,13 +1276,18 @@ def excludedSubjects : List String :=
 #audit_depends conform_click_types_py__module___NumberRangeBase__clamp on f_click_types_py__module___NumberRangeBase__clamp
 #audit_depends conform_click_utils_py__module__KeepOpenFile___enter on f_click_utils_py__module__KeepOpenFile___enter__
 #audit_depends conform_click_utils_py__module__KeepOpenFile___exit on f_click_utils_py__module__KeepOpenFile___exit__
+#audit_depends conform_click_utils_py__module__KeepOpenFile___init on f_click_utils_py__module__KeepOpenFile___init__
 #audit_depends conform_click_utils_py__module__LazyFile___enter on f_click_utils_py__module__LazyFile___enter__
+#audit_depends conform_click_utils_py__module__LazyFile_close_intelligently on f_click_utils_py__module__LazyFile_close_intelligently
+#audit_depends conform_click_utils_py__module__PacifyFlushWrapper___init on f_click_utils_py__module__PacifyFlushWrapper___init__
 
 /-! ## Axiom basis
 
 `#audit_axioms` fails the build on `sorryAx`, `ofReduceBool` or `ofReduceNat`, so "no admitted step, no `native_decide`" is checked here rather than asserted in prose. -/
 
 #audit_axioms conform_click___init___py__module____getattr
+#audit_axioms conform_click__compat_py__module___FixupStream___init
+#audit_axioms conform_click__compat_py__module___FixupStream_readable
 #audit_axioms conform_click__compat_py__module___get_windows_console_stream
 #audit_axioms conform_click__compat_py__module__should_strip_ansi
 #audit_axioms conform_click__termui_impl_py__module__Editor___init
@@ -1110,15 +1307,18 @@ def excludedSubjects : List String :=
 #audit_axioms conform_click_parser_py__module___Argument___init
 #audit_axioms conform_click_parser_py__module___ParsingState___init
 #audit_axioms conform_click_parser_py__module____getattr
+#audit_axioms conform_click_shell_completion_py__module__CompletionItem___init
 #audit_axioms conform_click_shell_completion_py__module__FishComplete_format_completion
 #audit_axioms conform_click_shell_completion_py__module__ShellComplete___init
 #audit_axioms conform_click_termui_py__module__secho
 #audit_axioms conform_click_testing_py__module__CliRunner___init
 #audit_axioms conform_click_testing_py__module__CliRunner_get_default_prog_name
+#audit_axioms conform_click_testing_py__module__EchoingStdin___init
 #audit_axioms conform_click_testing_py__module__Result___init
 #audit_axioms conform_click_types_py__module__BoolParamType___repr
 #audit_axioms conform_click_types_py__module__CompositeParamType_arity
 #audit_axioms conform_click_types_py__module__File___init
+#audit_axioms conform_click_types_py__module__File_shell_complete
 #audit_axioms conform_click_types_py__module__FloatParamType___repr
 #audit_axioms conform_click_types_py__module__FloatRange__clamp
 #audit_axioms conform_click_types_py__module__IntParamType___repr
@@ -1128,6 +1328,7 @@ def excludedSubjects : List String :=
 #audit_axioms conform_click_types_py__module__ParamType_get_missing_message
 #audit_axioms conform_click_types_py__module__ParamType_shell_complete
 #audit_axioms conform_click_types_py__module__Path_coerce_path_result
+#audit_axioms conform_click_types_py__module__Path_shell_complete
 #audit_axioms conform_click_types_py__module__StringParamType___repr
 #audit_axioms conform_click_types_py__module__UUIDParameterType___repr
 #audit_axioms conform_click_types_py__module__UnprocessedParamType___repr
@@ -1136,6 +1337,9 @@ def excludedSubjects : List String :=
 #audit_axioms conform_click_types_py__module___NumberRangeBase__clamp
 #audit_axioms conform_click_utils_py__module__KeepOpenFile___enter
 #audit_axioms conform_click_utils_py__module__KeepOpenFile___exit
+#audit_axioms conform_click_utils_py__module__KeepOpenFile___init
 #audit_axioms conform_click_utils_py__module__LazyFile___enter
+#audit_axioms conform_click_utils_py__module__LazyFile_close_intelligently
+#audit_axioms conform_click_utils_py__module__PacifyFlushWrapper___init
 
 end Autoform.SpecsGen.Click
