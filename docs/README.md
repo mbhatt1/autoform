@@ -5,6 +5,8 @@ is the design record, which carries the reasoning behind everything here.
 
 | Document | What it covers |
 |---|---|
+| [`cli.md`](cli.md) | The `autoform` command: every subcommand and flag, what a run leaves behind and what each artifact means, environment variables, exit codes. |
+| [`library.md`](library.md) | Using autoform from Python: the installed package, reading `guarantee.json` and the other artifacts, the oracle and gate scripts as modules, the Lean library. |
 | [`architecture.md`](architecture.md) | How the pieces fit: the approach, why the CPG is treated as a universal AST, the pipeline stage by stage, and what every module and script is for. Start here. |
 | [`core-language.md`](core-language.md) | Reference for the Core language: every `Val`/`Expr`/`Stmt` constructor, the heap/env/context model, the four evaluation outcomes, dialects, and the hole taxonomy. |
 | [`trust-model.md`](trust-model.md) | What is claimed and on what basis: the four independent oracles, the G1–G5 assurance goals, the status lattice, and an explicit list of what the system does *not* establish. |
@@ -15,12 +17,12 @@ is the design record, which carries the reasoning behind everything here.
 | [`packaging.md`](packaging.md) | Pip installation, writable workspaces, distribution validation and CI publishing. |
 | [`fuel.md`](fuel.md) | The fuel-indexed interpreter: why `outOfFuel` is not divergence, fuel monotonicity across all seven interpreter functions, finalizer state and failure propagation, and generated fuel-independent proofs. |
 | [`integrity.md`](integrity.md) | Checking that the program measured is the program intended. Each check is named after the incident that motivated it, including a mutant that survived four commits with every proof passing. |
-| [`contracts.md`](contracts.md) | Boundary contracts for code outside the verified core. |
+| [`contracts.md`](contracts.md) | Boundary contracts for code outside the verified core, and the external base-class contracts (`collections.abc`) that make `class C(MutableMapping)` resolvable. |
 | [`boxed-containers.md`](boxed-containers.md) | The design for mutable containers — the gap behind `setIndex:immutable-containers`. |
 | [`languages.md`](languages.md) | Per-language support, and what each front end does and does not provide. |
 | [`typed-numerics.md`](typed-numerics.md) | Preserving Joern's integer types through Core, numeric conformance tests, and remaining gaps. |
 | [`machine-code.md`](machine-code.md) | Binary and assembly formalization, raw p-code semantics, concrete proofs, and remaining coverage gaps. |
-| [`scale.md`](scale.md) | How the pipeline behaves on codebases larger than the reference corpus. |
+| [`scale.md`](scale.md) | How the pipeline behaves on codebases larger than the reference corpus, and sharded rendering (Django in 244 s at 3.3 GB). |
 | [`GOAL-arbitrary-codebases.md`](GOAL-arbitrary-codebases.md) | The bar for "works on arbitrary codebases", as eight milestones with named exit criteria — a goal statement, not a status report. |
 | [`ledger-schema.md`](ledger-schema.md) | The trust ledger as a SACM profile: node vocabulary, evidence types, combination rules. |
 | [`fvspec.md`](fvspec.md) | The FVSpec benchmark harness and the anti-vacuity screen run across it. |

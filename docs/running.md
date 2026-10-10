@@ -24,6 +24,10 @@ move with every change; where a document and an artifact disagree, the artifact 
 
 ---
 
+> The installed command is documented in [cli.md](cli.md) (subcommands, flags, artifacts,
+> environment variables, exit codes) and its use from Python in [library.md](library.md).
+> This page covers the checkout entry points and the mechanics behind both.
+
 ## 1. Prerequisites
 
 ### Lean, via `elan`
