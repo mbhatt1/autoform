@@ -94,6 +94,15 @@ to notice a behavioural change:
   `TimedCache_expire_raises` are reported `UNTESTED` rather than given a score. That is
   the honest verdict, not a pass.
 
+Survivor ranking (2026-10-10, `scripts/mutate.py --rank-existing` on that run's report, domains
+`tests/fixtures/vacuity/cachetools-accessors.json` and `cachetools-none-recorded.json`;
+record `tests/fixtures/vacuity/ranking-cachetools-2026-10-10.json`; `docs/trust-model.md`
+§2.2): the five survivor lines are three distinct mutants, each `equivalent-looking` over
+its domain, rank 1 of 3 by difference rate: 0/16 for each docstring deletion (a hand-made
+grid of 16 `Cache` receivers, not recorded: `Cache` is unencodable to the oracle) and 0/5
+for `_none` (the 5 recorded oracle cases). That agrees with the by-hand verdict above and is
+over those inputs only. The two `UNTESTED` theorems have no mutant, so nothing is rankable.
+
 Two findings the gate produced about *this file*, both recorded because they generalise:
 
 1. **Witness corollaries proved by rewriting their parent theorem are invisible to the

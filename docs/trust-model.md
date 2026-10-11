@@ -131,6 +131,50 @@ is inconclusive. Neither counts as a kill. Inconclusive checks and a failed rest
 build prevent the gate from passing. Timed-out compiler process groups are terminated
 before restoration so they cannot keep writing stale build artifacts.
 
+#### Ranking the survivors (`--rank-survivors`, `--rank-existing`)
+
+A flat list of survivors treats a deleted docstring and a deleted guard alike. The ranking
+borrows from Ben-David and Kupferman, *A framework for ranking vacuity results*: a vacuity
+result is more alarming the more likely the mutated specification is to hold on a random
+computation. Here, for each surviving mutant (once per distinct mutant, with the theorems it
+survived listed), the interpreter runs the original function and the mutated function on the
+same inputs from a stated domain, and the report gives `difference_rate`: the fraction of
+decided inputs on which the result or the final heap differs. Survivors are listed lowest
+rate first. A rate of 0 over the domain is marked `equivalent-looking`.
+
+    scripts/mutate.py <generated.lean> <module> --spec-file ... --rank-survivors \
+        --rank-domain CASES.json [--rank-max-samples 200] [--rank-timeout 600]
+    scripts/mutate.py <generated.lean> <module> --rank-existing mutation.json \
+        --rank-domain CASES.json --json ranked.json      # no build, no mutation
+
+The domain is whatever case files are named: `scripts/differential.py` records
+(`{name, heap, self, args}`; the `runtime_cases` of a `conformance.json` qualify). Each
+survivor's `domain`, `sample` (cases available, cap, run, decided, differing, hole,
+no-answer) and `difference_rate` go into `mutation.json` next to its record, plus a
+top-level `survivor_ranking` with the cap, wall-time cap and fuel. It is opt-in, capped
+(cases per survivor, total wall time) and never silent: a survivor with no case in the
+domain, a case that reaches a model hole, a Lean error or a timeout is listed by name with
+`difference_rate: null` and the reason, and a theorem whose verdict is `UNTESTED` is listed
+as having nothing to rank.
+
+What the rank means: how much of the domain the mutant is distinguishable on. A low rate
+says a theorem that missed the mutant was asked to see something almost nobody sees; a
+high rate says the mutant is a visible change that no theorem pins, which is the more
+usual meaning of "untested corner". What it does not mean: it is not a probability over
+all inputs (the domain is finite, usually small, and a recorded domain is only what the
+oracle could encode); `equivalent-looking` over a domain is not a proof of equivalence;
+and it changes no verdict, score or exit code. Where a domain is hand-made rather than
+recorded, the case file says so in its `note`.
+
+Run on the cachetools gate (2026-10-10; the tracked record is
+`tests/fixtures/vacuity/ranking-cachetools-2026-10-10.json`): the three distinct surviving
+mutants (the five survivor lines of the score are those three, two of them counted under two
+theorems each) are all `equivalent-looking` over their domains: 0 of 16 inputs differ for
+each docstring deletion (`Cache.maxsize`, `Cache.currsize`; hand-made domain, 16
+`(maxsize, currsize)` receivers), and 0 of 5 for `_none`'s `.ret .unit` becoming
+`.expr .unit` (the 5 recorded oracle cases). The two `UNTESTED` theorems have nothing to
+rank. A control (swapping the field read by `maxsize`) differs on 13 of the same 16.
+
 ### 2.3 Axiom sweep + `leanchecker --fresh` — catches *unsound proofs*
 
 `scripts/audit_all.py`, three independent checks:

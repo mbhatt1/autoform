@@ -1,0 +1,110 @@
+{
+ "note": "Recorded: the 5 cachetools._cachedmethod._none cases of conformance.json (runtime Python 3.11.13, sha256 b4bbf2bb4d82a8ae0d6fd252e8f56fc4334622ae4dbb94e85f93783392ddeec2, 2026-10-10). That is every recorded case of the run: it covers only this function.",
+ "cases": [
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._none",
+   "heap": [],
+   "self": null,
+   "args": [
+    [
+     "int",
+     -7
+    ]
+   ],
+   "outcome": [
+    "val",
+    [
+     "unit"
+    ]
+   ],
+   "post_heap": [],
+   "origin": "random",
+   "runtime": "cpython",
+   "comparison": "agree"
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._none",
+   "heap": [],
+   "self": null,
+   "args": [
+    [
+     "int",
+     15
+    ]
+   ],
+   "outcome": [
+    "val",
+    [
+     "unit"
+    ]
+   ],
+   "post_heap": [],
+   "origin": "random",
+   "runtime": "cpython",
+   "comparison": "agree"
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._none",
+   "heap": [],
+   "self": null,
+   "args": [
+    [
+     "int",
+     -6
+    ]
+   ],
+   "outcome": [
+    "val",
+    [
+     "unit"
+    ]
+   ],
+   "post_heap": [],
+   "origin": "random",
+   "runtime": "cpython",
+   "comparison": "agree"
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._none",
+   "heap": [],
+   "self": null,
+   "args": [
+    [
+     "int",
+     16
+    ]
+   ],
+   "outcome": [
+    "val",
+    [
+     "unit"
+    ]
+   ],
+   "post_heap": [],
+   "origin": "random",
+   "runtime": "cpython",
+   "comparison": "agree"
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._none",
+   "heap": [],
+   "self": null,
+   "args": [
+    [
+     "int",
+     14
+    ]
+   ],
+   "outcome": [
+    "val",
+    [
+     "unit"
+    ]
+   ],
+   "post_heap": [],
+   "origin": "random",
+   "runtime": "cpython",
+   "comparison": "agree"
+  }
+ ]
+}

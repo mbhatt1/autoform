@@ -1,0 +1,100 @@
+{
+ "date": "2026-10-10",
+ "command": "scripts/mutate.py Autoform/Generated/Cachetools.lean Autoform.Generated.Cachetools --spec-file Autoform/Specs/CachetoolsSpec.lean --rank-existing <mutation.json of /tmp/af-dbg/run-gate.sh> --rank-domain tests/fixtures/vacuity/cachetools-accessors.json --rank-domain tests/fixtures/vacuity/cachetools-none-recorded.json --json mutation-ranked.json",
+ "input_report_sha256": "1df72196c5c2ebddc7d1aae6238f3c1490bc323da1e87026013c248c3c6efbbc",
+ "gate_command": "/tmp/af-dbg/run-gate.sh (60 mutants, seed 20260819)",
+ "survivor_ranking": {
+  "order": "ascending difference_rate; lowest = survived while changing the result on the fewest inputs = highest vacuity risk; not-estimable last",
+  "domain": "recorded cases: cachetools-accessors.json (32 cases), cachetools-none-recorded.json (5 cases)",
+  "max_samples": 200,
+  "wall_time_cap_s": 600,
+  "fuel": 5000,
+  "seed": 20260819,
+  "survivors": [
+   {
+    "decl": "f_cachetools___init___py__module__Cache_maxsize",
+    "line": 336,
+    "op": "ast-seq-delete",
+    "part": null,
+    "theorems": [
+     "Cache_maxsize_mrefines",
+     "Cache_size_fields_distinct"
+    ],
+    "before": "            (.expr (.lit (.str \"The maximum size of the cache.\")))",
+    "after": "            .skip",
+    "domain": "recorded cases: cachetools-accessors.json (32 cases), cachetools-none-recorded.json (5 cases)",
+    "sample": {
+     "available": 16,
+     "cap": 200,
+     "run": 16,
+     "decided": 16,
+     "differing": 0,
+     "hole": 0,
+     "no_answer": 0
+    },
+    "vacuity": "equivalent-looking",
+    "difference_rate": 0.0,
+    "rank": 1
+   },
+   {
+    "decl": "f_cachetools___init___py__module__Cache_currsize",
+    "line": 345,
+    "op": "ast-seq-delete",
+    "part": null,
+    "theorems": [
+     "Cache_currsize_mrefines",
+     "Cache_size_fields_distinct"
+    ],
+    "before": "            (.expr (.lit (.str \"The current size of the cache.\")))",
+    "after": "            .skip",
+    "domain": "recorded cases: cachetools-accessors.json (32 cases), cachetools-none-recorded.json (5 cases)",
+    "sample": {
+     "available": 16,
+     "cap": 200,
+     "run": 16,
+     "decided": 16,
+     "differing": 0,
+     "hole": 0,
+     "no_answer": 0
+    },
+    "vacuity": "equivalent-looking",
+    "difference_rate": 0.0,
+    "rank": 1
+   },
+   {
+    "decl": "f_cachetools__cachedmethod_py__module___none",
+    "line": 4000,
+    "op": "ast-ret->expr",
+    "part": null,
+    "theorems": [
+     "cachedmethod_none_refines"
+    ],
+    "before": "  , body := (.ret (.lit .unit)) }",
+    "after": "  , body := (.expr (.lit .unit)) }",
+    "domain": "recorded cases: cachetools-accessors.json (32 cases), cachetools-none-recorded.json (5 cases)",
+    "sample": {
+     "available": 5,
+     "cap": 200,
+     "run": 5,
+     "decided": 5,
+     "differing": 0,
+     "hole": 0,
+     "no_answer": 0
+    },
+    "vacuity": "equivalent-looking",
+    "difference_rate": 0.0,
+    "rank": 1
+   }
+  ],
+  "untested_theorems": [
+   {
+    "theorem": "DefaultSize_setitem_mrefines",
+    "reason": "no mutant of its subject ran (verdict UNTESTED), so there is no survivor to rank"
+   },
+   {
+    "theorem": "TimedCache_expire_raises",
+    "reason": "no mutant of its subject ran (verdict UNTESTED), so there is no survivor to rank"
+   }
+  ]
+ }
+}

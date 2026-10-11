@@ -56,9 +56,11 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 import proof_artifacts
 import generated_module
+import vacuity_rank
 
 # ---------------------------------------------------------------------------
 # declaration map: which source lines belong to which declaration
@@ -566,6 +568,83 @@ def find_root(path):
     return os.getcwd()
 
 
+def rank_survivors(report, args, root, file_lines, file_decls, path):
+    """Annotate every surviving mutant with `difference_rate`, `sample`, `domain`.
+
+    Verdicts and scores in `report` are not touched. A survivor that cannot be estimated is
+    kept, with `difference_rate: null` and the reason."""
+    domains, sources = vacuity_rank.load_domains(args.rank_domain)
+    domain_note = "recorded cases: " + ", ".join(
+        f"{s['file']} ({s['cases']} cases)" for s in sources)
+    env = lake_env()
+    has_inits = any("moduleInits" in "".join(ls) for ls in file_lines.values())
+    deadline = time.monotonic() + args.rank_timeout
+    distinct = {}
+    for t, th in report["theorems"].items():
+        for sv in th["survivors"]:
+            key = (sv["decl"], sv["line"], sv["op"], sv.get("part"))
+            distinct.setdefault(key, {"sv": sv, "theorems": []})["theorems"].append(t)
+    items = []
+    for key, entry in distinct.items():
+        sv = entry["sv"]
+        part = sv.get("part")
+        fpath = os.path.join(root, part) if part else path
+        lines, decls = file_lines.get(fpath), file_decls.get(fpath)
+        item = {"decl": sv["decl"], "line": sv["line"], "op": sv["op"], "part": part,
+                "theorems": entry["theorems"], "before": sv["before"], "after": sv["after"]}
+        try:
+            if lines is None:
+                raise ValueError(f"mutated file {fpath} is not part of the model")
+            if lines[sv["line"] - 1].rstrip() != sv["before"]:
+                raise ValueError("the report's `before` text is not at that line of the "
+                                 "current source (stale report)")
+            decl = next(d for d in decls if d.name == sv["decl"])
+            orig_text = vacuity_rank.decl_text(lines, decl)
+            fname = vacuity_rank.func_name(orig_text)
+            mut_text = vacuity_rank.rename_def(
+                vacuity_rank.decl_text(lines, decl, sv["line"], sv["after"] + "\n"), sv["decl"])
+            remaining = int(deadline - time.monotonic())
+            if remaining <= 0:
+                raise ValueError(f"wall-time cap {args.rank_timeout}s reached before this survivor")
+            res = vacuity_rank.estimate(
+                root, args.module, args.rank_fuel, has_inits, sv["decl"], mut_text, fname,
+                domains, domain_note, args.rank_max_samples, remaining, env, args.seed)
+        except (ValueError, StopIteration) as exc:
+            res = {"domain": domain_note, "sample": {"cap": args.rank_max_samples},
+                   "vacuity": "not-estimable", "difference_rate": None,
+                   "reason": str(exc) or "declaration not found"}
+        item.update(res)
+        items.append(item)
+    ordered = vacuity_rank.rank(items)
+    fields = ("difference_rate", "sample", "domain", "vacuity", "rank", "reason")
+    by_key = {(i["decl"], i["line"], i["op"], i["part"]): i for i in ordered}
+    for th in report["theorems"].values():
+        for sv in th["survivors"]:
+            it = by_key[(sv["decl"], sv["line"], sv["op"], sv.get("part"))]
+            sv.update({k: it[k] for k in fields if k in it})
+    for rec in report["mutants"]:
+        it = by_key.get((rec["decl"], rec["line"], rec["op"], rec.get("part")))
+        if it and isinstance(rec.get("verdict"), dict) and "survived" in rec["verdict"].values():
+            rec.update({k: it[k] for k in fields if k in it})
+    report["survivor_ranking"] = {
+        "order": "ascending difference_rate; lowest = survived while changing the result on the "
+                 "fewest inputs = highest vacuity risk; not-estimable last",
+        "domain": domain_note, "max_samples": args.rank_max_samples,
+        "wall_time_cap_s": args.rank_timeout, "fuel": args.rank_fuel, "seed": args.seed,
+        "survivors": ordered,
+        "untested_theorems": [
+            {"theorem": t, "reason": "no mutant of its subject ran (verdict UNTESTED), so there "
+                                      "is no survivor to rank"}
+            for t, th in report["theorems"].items() if th.get("verdict") == "UNTESTED"]}
+    print("\n" + vacuity_rank.table(ordered))
+    for u in report["survivor_ranking"]["untested_theorems"]:
+        print(f"  --  NOT ESTIMABLE  theorem {u['theorem']}: {u['reason']}")
+    print(f"  (domain: {domain_note}; cap {args.rank_max_samples} cases/survivor, "
+          f"wall-time cap {args.rank_timeout}s, fuel {args.rank_fuel}; "
+          f"a rate is over this domain only. No verdict or score was changed.)")
+    return ordered
+
+
 def main():
     ap = argparse.ArgumentParser(description="Lean source-level mutation gate")
     ap.add_argument("lean_file")
@@ -599,7 +678,24 @@ def main():
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--json", dest="json_path", default="mutation.json")
     ap.add_argument("--seed", type=int, default=20260819)
+    ap.add_argument("--rank-survivors", action="store_true",
+                    help="after the gate, rank each surviving mutant by the fraction of a "
+                         "stated input domain on which its result differs from the original's "
+                         "(lowest = most alarming). Needs --rank-domain. Changes no verdict.")
+    ap.add_argument("--rank-existing", metavar="REPORT",
+                    help="rank the survivors of a finished report (no build, no mutation); "
+                         "writes the augmented report to --json, which must differ from REPORT")
+    ap.add_argument("--rank-domain", action="append", default=[], metavar="CASES.json",
+                    help="case file(s) in scripts/differential.py record format "
+                         "(conformance.json qualifies); repeatable")
+    ap.add_argument("--rank-max-samples", type=int, default=vacuity_rank.DEFAULT_MAX_SAMPLES,
+                    help="cap on cases per survivor (default %(default)s)")
+    ap.add_argument("--rank-timeout", type=int, default=vacuity_rank.DEFAULT_TIMEOUT,
+                    help="total wall-clock cap in seconds for all ranking (default %(default)s)")
+    ap.add_argument("--rank-fuel", type=int, default=vacuity_rank.DEFAULT_FUEL)
     args = ap.parse_args()
+    if (args.rank_survivors or args.rank_existing) and not args.rank_domain:
+        ap.error("--rank-survivors/--rank-existing need at least one --rank-domain file")
 
     random.seed(args.seed)
     path = os.path.abspath(args.lean_file)
@@ -621,6 +717,17 @@ def main():
     file_decls = {p: parse_decls(file_lines[p]) for p in model}
     original, lines, decls = originals[path], file_lines[path], file_decls[path]
     model_decls = [d for p in model for d in file_decls[p]]
+
+    if args.rank_existing:
+        if os.path.abspath(args.json_path) == os.path.abspath(args.rank_existing):
+            ap.error("--json must differ from --rank-existing: the finished report is not rewritten")
+        with open(args.rank_existing, encoding="utf-8") as stream:
+            prior = json.load(stream)
+        rank_survivors(prior, args, root, file_lines, file_decls, path)
+        with open(args.json_path, "w", encoding="utf-8") as f:
+            json.dump(prior, f, indent=2)
+        print(f"wrote {os.path.abspath(args.json_path)}")
+        return 0
 
     # Where do the theorems live? Same file by default; a separate file when the subject
     # is a machine-generated module, which by construction contains no theorems at all.
@@ -972,6 +1079,9 @@ def main():
                   f"reported here and credited to NO theorem's score.)")
         report["coarse_attributions"] = coarse
         report["caught_by_pins_only"] = pinned
+        if args.rank_survivors:
+            # After every verdict is final and the source is restored; adds fields only.
+            rank_survivors(report, args, root, file_lines, file_decls, path)
 
         with open(args.json_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
