@@ -157,3 +157,6 @@ artifacts/pr/
 # Its provenance record goes with it: a tracked record without its artifact is an orphan.
 ast-DefectCachetools.json
 provenance/ast-DefectCachetools.json.prov.json
+# Same for the 7.1.4 AST of the negative-getsizeof defect (3.2 MB, docs/evidence-cachetools-negative-size.md).
+ast-DefectCachetoolsNeg.json
+provenance/ast-DefectCachetoolsNeg.json.prov.json
