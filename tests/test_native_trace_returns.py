@@ -95,3 +95,48 @@ def test_native_trace_returns_and_gaps(tmp_path, monkeypatch, differential):
     assert stats['skip_ambiguous_trace_return'] == 1
     assert stats['skip_suspended_frame'] >= 2
     assert stats['test_runs'] == [{'dir': str(tmp_path), 'rc': 0}]
+
+
+CLOSURE_SOURCE = '''
+def outer(default):
+    def inner(name):
+        if name is None:
+            return default
+        return name
+    return inner
+
+def plain(x):
+    return x
+'''
+
+
+def test_nested_function_reading_its_enclosing_scope_is_refused(tmp_path, monkeypatch,
+                                                                differential):
+    """A traced call of a closure body carries the arguments, not the captured cells, so
+    the model would read the free name as an unbound global (Jinja2
+    `select_autoescape.autoescape`: CPython 'STRING', model `unit`). It is refused and
+    counted; a plain function in the same file is still recorded."""
+    path = tmp_path / 'closures.py'
+    path.write_text(CLOSURE_SOURCE)
+    namespace = {}
+    exec(compile(CLOSURE_SOURCE, str(path), 'exec'), namespace)
+    index = differential.build_lineno_index(str(tmp_path), ['closures.py'])
+    inner = 'closures.py:<module>.outer.inner'
+    plain = 'closures.py:<module>.plain'
+
+    def suite(_):
+        namespace['outer']('STRING')(None)
+        namespace['plain'](3)
+        return 0
+
+    monkeypatch.setattr(differential, 'run_suite', suite)
+    stats = {'skip_unencodable_args': 0, 'skip_unencodable_ret': 0}
+    previous = sys.gettrace()
+    try:
+        records = differential.trace_tests(str(tmp_path), [str(tmp_path)], index,
+            {inner, plain}, 5, stats, {inner: ['name'], plain: ['x']})
+    finally:
+        sys.settrace(previous)
+    assert [r['name'] for r in records] == [plain]
+    assert stats['skip_closure_captures'] == 1
+    assert stats['closure_capture_detail'] == {inner: ['default']}
