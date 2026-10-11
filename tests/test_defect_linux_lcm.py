@@ -5,7 +5,7 @@ Post-fix 74a5fef7cb0839c6b595f90c7914a62ac9d0bcf9  `return (a / gcd(a, b)) * b;`
 
 Tracked inputs: the four kernel sources (tests/fixtures/defect/linux_lcm/{prefix,postfix}),
 the pre-fix AST (ast-LinuxLcmPrefix.json + provenance record) and the recorded divergence
-rows (artifacts/defect/LinuxLcm/cross-revision/conformance.json).  Not tracked: the kernel
+rows (tests/fixtures/defect/linux_lcm/recorded-cross-revision.json, extracted from the run's gitignored conformance.json).  Not tracked: the kernel
 include skeleton, taken from the digest-pinned sparse clone ~/.cache/autoform/corpora/linux-v7.2.
 A missing skeleton, C compiler or Lean toolchain is a named SKIP, never a pass.
 """
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIX = ROOT / "tests" / "fixtures" / "defect" / "linux_lcm"
 CORPORA = Path(os.path.expanduser("~/.cache/autoform/corpora"))
 SKELETON = CORPORA / "linux-v7.2"
-ROW = ROOT / "artifacts" / "defect" / "LinuxLcm" / "cross-revision" / "conformance.json"
+ROW = ROOT / "tests" / "fixtures" / "defect" / "linux_lcm" / "recorded-cross-revision.json"
 AST = ROOT / "ast-LinuxLcmPrefix.json"
 M64 = 1 << 64
 

@@ -1,0 +1,613 @@
+{
+ "_": "Recorded cross-revision oracle run: model = pre-fix lib/lcm.c and lib/gcd.c (kernel 7b212edf86e2), runtime = post-fix source (74a5fef7cb08). Extracted from the run's conformance.json (a gitignored product): only the divergence rows and the counts. Regenerate with docs/evidence-linux-lcm.md.",
+ "agree": 86,
+ "divergence_detail": [
+  {
+   "args": "(int 9223372036854775808, int 2)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      9223372036854775808
+     ],
+     [
+      "int",
+      2
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 9223372036854775808 lean=int 0",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 0)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      9223372036854775808
+     ],
+     [
+      "int",
+      2
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "boundary-typed",
+    "outcome": [
+     "val",
+     [
+      "int",
+      9223372036854775808
+     ]
+    ],
+    "self": null
+   },
+   "origin": "boundary-typed"
+  },
+  {
+   "args": "(int 18446744073709551614, int 18446744073709551600)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551614
+     ],
+     [
+      "int",
+      18446744073709551600
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 15811494920322472816 lean=int 2",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 2)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551614
+     ],
+     [
+      "int",
+      18446744073709551600
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "random",
+    "outcome": [
+     "val",
+     [
+      "int",
+      15811494920322472816
+     ]
+    ],
+    "self": null
+   },
+   "origin": "random"
+  },
+  {
+   "args": "(int 1099511627776, int 1099511627776)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      1099511627776
+     ],
+     [
+      "int",
+      1099511627776
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 1099511627776 lean=int 0",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 0)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      1099511627776
+     ],
+     [
+      "int",
+      1099511627776
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "boundary-typed",
+    "outcome": [
+     "val",
+     [
+      "int",
+      1099511627776
+     ]
+    ],
+    "self": null
+   },
+   "origin": "boundary-typed"
+  },
+  {
+   "args": "(int 18446744073709551612, int 18446744073709551603)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551612
+     ],
+     [
+      "int",
+      18446744073709551603
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 12297829382473034428 lean=int 17",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 17)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551612
+     ],
+     [
+      "int",
+      18446744073709551603
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "random",
+    "outcome": [
+     "val",
+     [
+      "int",
+      12297829382473034428
+     ]
+    ],
+    "self": null
+   },
+   "origin": "random"
+  },
+  {
+   "args": "(int 18446744073709551598, int 14)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551598
+     ],
+     [
+      "int",
+      14
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 18446744073709551490 lean=int 9223372036854775682",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 9223372036854775682)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551598
+     ],
+     [
+      "int",
+      14
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "random",
+    "outcome": [
+     "val",
+     [
+      "int",
+      18446744073709551490
+     ]
+    ],
+    "self": null
+   },
+   "origin": "random"
+  },
+  {
+   "args": "(int 9223372036854775807, int 281474976710655)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      9223372036854775807
+     ],
+     [
+      "int",
+      281474976710655
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 9223331826143817143 lean=int 1317584365982580736",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 1317584365982580736)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      9223372036854775807
+     ],
+     [
+      "int",
+      281474976710655
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "boundary-typed",
+    "outcome": [
+     "val",
+     [
+      "int",
+      9223331826143817143
+     ]
+    ],
+    "self": null
+   },
+   "origin": "boundary-typed"
+  },
+  {
+   "args": "(int 9223372036854775808, int 65536)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      9223372036854775808
+     ],
+     [
+      "int",
+      65536
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 9223372036854775808 lean=int 0",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 0)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      9223372036854775808
+     ],
+     [
+      "int",
+      65536
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "boundary-typed",
+    "outcome": [
+     "val",
+     [
+      "int",
+      9223372036854775808
+     ]
+    ],
+    "self": null
+   },
+   "origin": "boundary-typed"
+  },
+  {
+   "args": "(int 18446744073709551609, int 15)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551609
+     ],
+     [
+      "int",
+      15
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 18446744073709551581 lean=int 6148914691236517170",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 6148914691236517170)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551609
+     ],
+     [
+      "int",
+      15
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "random",
+    "outcome": [
+     "val",
+     [
+      "int",
+      18446744073709551581
+     ]
+    ],
+    "self": null
+   },
+   "origin": "random"
+  },
+  {
+   "args": "(int 18446744073709551615, int 281474976710655)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551615
+     ],
+     [
+      "int",
+      281474976710655
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 18446744069414518783 lean=int 281474976710656",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 281474976710656)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551615
+     ],
+     [
+      "int",
+      281474976710655
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "boundary-typed",
+    "outcome": [
+     "val",
+     [
+      "int",
+      18446744069414518783
+     ]
+    ],
+    "self": null
+   },
+   "origin": "boundary-typed"
+  },
+  {
+   "args": "(int 18446744073709551598, int 16)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551598
+     ],
+     [
+      "int",
+      16
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 18446744073709551472 lean=int 9223372036854775664",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 9223372036854775664)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551598
+     ],
+     [
+      "int",
+      16
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "random",
+    "outcome": [
+     "val",
+     [
+      "int",
+      18446744073709551472
+     ]
+    ],
+    "self": null
+   },
+   "origin": "random"
+  },
+  {
+   "args": "(int 18446744073709551614, int 256)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551614
+     ],
+     [
+      "int",
+      256
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 18446744073709551360 lean=int 9223372036854775552",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 9223372036854775552)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551614
+     ],
+     [
+      "int",
+      256
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "boundary-typed",
+    "outcome": [
+     "val",
+     [
+      "int",
+      18446744073709551360
+     ]
+    ],
+    "self": null
+   },
+   "origin": "boundary-typed"
+  },
+  {
+   "args": "(int 4611686018427387904, int 2147483648)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      4611686018427387904
+     ],
+     [
+      "int",
+      2147483648
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 4611686018427387904 lean=int 0",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 0)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      4611686018427387904
+     ],
+     [
+      "int",
+      2147483648
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "boundary-typed",
+    "outcome": [
+     "val",
+     [
+      "int",
+      4611686018427387904
+     ]
+    ],
+    "self": null
+   },
+   "origin": "boundary-typed"
+  },
+  {
+   "args": "(int 18446744073709551602, int 10)",
+   "cached_from": null,
+   "case": {
+    "args": [
+     [
+      "int",
+      18446744073709551602
+     ],
+     [
+      "int",
+      10
+     ]
+    ],
+    "heap": [],
+    "self": null
+   },
+   "detail": "cc=int 18446744073709551546 lean=int 9223372036854775738",
+   "function": "lcm",
+   "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.int 9223372036854775738)",
+   "observation": {
+    "args": [
+     [
+      "int",
+      18446744073709551602
+     ],
+     [
+      "int",
+      10
+     ]
+    ],
+    "heap": [],
+    "name": "lcm",
+    "objs": {},
+    "origin": "random",
+    "outcome": [
+     "val",
+     [
+      "int",
+      18446744073709551546
+     ]
+    ],
+    "self": null
+   },
+   "origin": "random"
+  }
+ ],
+ "divergences": 13,
+ "inconclusive": 101,
+ "same_revision": {
+  "agree": 99,
+  "divergences": 0,
+  "inconclusive": 101,
+  "total": 99
+ },
+ "total": 99
+}

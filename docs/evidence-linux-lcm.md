@@ -49,7 +49,7 @@ provenance `provenance/ast-LinuxLcmPrefix.json.prov.json`, Joern 4.0.606, source
 commit hashes are pinned in the record's `command` and in the table above). It holds 4
 functions, all hole-free (`gcd`, `lcm` and the two module initializers).
 
-## Result (`artifacts/defect/LinuxLcm/{cross,same}-revision/`, tracked)
+## Result (`tests/fixtures/defect/linux_lcm/recorded-cross-revision.json`, tracked; the full conformance.json of each run is a gitignored product)
 
 | run | runtime source | compared | agree | divergences | inconclusive |
 |---|---|---|---|---|---|
