@@ -1,0 +1,933 @@
+{
+ "note": "Hand-made, NOT recorded from CPython: every (maxsize, currsize) in {0,1,5,100} x {0,1,3,100} on a single Cache object, with no arguments. Shape follows the precondition of Cache_maxsize_mrefines / Cache_currsize_mrefines (a Cache receiver with both fields). cachetools.Cache itself is unencodable to the oracle (external-base-uncontracted), so no recorded receiver exists.",
+ "cases": [
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        0
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        1
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        5
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        0
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        1
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        3
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "heap": [
+    [
+     "cachetools/__init__.py:<module>.Cache",
+     [
+      [
+       "_Cache__maxsize",
+       [
+        "int",
+        100
+       ]
+      ],
+      [
+       "_Cache__currsize",
+       [
+        "int",
+        100
+       ]
+      ]
+     ]
+    ]
+   ],
+   "self": [
+    "ref",
+    0
+   ],
+   "args": []
+  }
+ ]
+}
