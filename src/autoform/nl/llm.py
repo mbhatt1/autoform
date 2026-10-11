@@ -15,6 +15,15 @@ Backends (`AUTOFORM_CLAUDE_AUTH`):
            spend is computed from the response usage and `PRICES` (one table, dated). This
            backend runs no tools: a tool-using call (`tools != ''`) is refused, and the
            proving agents (`autoform.harness.prover.ClaudeCodeAgent`) still need the CLI.
+  bedrock  Claude on Amazon Bedrock through the same SDK's `AnthropicBedrock` client. AWS
+           credentials come from the standard chain (environment, shared profile, role);
+           the region from `AWS_REGION` or `AWS_DEFAULT_REGION`; the model is a Bedrock
+           model id or inference profile in `AUTOFORM_LLM_MODEL` (there is no default,
+           because Bedrock ids differ by region and account). Spend is estimated from the
+           response usage and Anthropic's list prices (`PRICES`), matched by the Claude
+           model name inside the Bedrock id; it is an estimate, not an AWS bill. No tools,
+           as for `api`. The proving agents run the `claude` CLI with
+           `CLAUDE_CODE_USE_BEDROCK=1`, so they bill Bedrock too.
 
 Spend is reported per call as `(text, cost_usd)`; the CLI reports its own cost, the api
 backend prices its usage. The per-run budget (`--budget-usd`) is enforced by the stages
@@ -37,7 +46,8 @@ from pathlib import Path
 CACHE = Path(os.environ.get('AUTOFORM_LLM_CACHE', Path.home() / '.cache/autoform/llm'))
 TOOLS_NONE = ''            # pure text answer
 TOOLS_LEAN = 'Bash(./check.sh:*),Read,Edit,Write,Grep,Glob'
-AUTH_MODES = ('login', 'api-key', 'api')
+AUTH_MODES = ('login', 'api-key', 'api', 'bedrock')
+SDK_MODES = ('api', 'bedrock')   # modes that call the Messages API through the SDK, with no tools
 
 DEFAULT_API_MODEL = 'claude-opus-5-5'
 API_MAX_TOKENS = 16000     # non-streaming ceiling that stays under the SDK's HTTP timeout
@@ -76,38 +86,83 @@ def sdk_available() -> bool:
 
 def available() -> bool:
     """Whether the configured backend can answer at all (no call is made)."""
-    if os.environ.get('AUTOFORM_CLAUDE_AUTH', 'login').strip().lower() == 'api':
+    mode = os.environ.get('AUTOFORM_CLAUDE_AUTH', 'login').strip().lower()
+    if mode == 'api':
         # A client already built (or injected by a test over a fake transport) answers
         # without the SDK being importable; otherwise both the key and the SDK are needed.
         return _API_CLIENT is not None or (bool(os.environ.get('ANTHROPIC_API_KEY')) and sdk_available())
+    if mode == 'bedrock':
+        # Credentials come from the AWS chain and cannot be checked without a call, so this
+        # reports only what can be: the SDK and a region (or an injected client).
+        return _API_CLIENT is not None or (sdk_available() and bool(bedrock_region()))
     return shutil.which('claude') is not None
 
 
 def claude_env() -> dict:
     """The environment for a `claude` child process under the chosen authentication."""
-    if claude_auth() in ('api-key', 'api'):
+    mode = claude_auth()
+    if mode == 'bedrock':
+        # The proving agents run the claude CLI; this routes it through Bedrock with the
+        # same AWS credentials and region the SDK client uses.
+        return dict(os.environ, CLAUDE_CODE_USE_BEDROCK='1')
+    if mode in ('api-key', 'api'):
         return dict(os.environ)
     return {k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'}
 
 
+def bedrock_region() -> str:
+    return os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or ''
+
+
 def api_model(model: str | None = None) -> str:
-    return model or os.environ.get('AUTOFORM_LLM_MODEL') or DEFAULT_API_MODEL
+    chosen = model or os.environ.get('AUTOFORM_LLM_MODEL')
+    if claude_auth() == 'bedrock':
+        if not chosen:
+            raise LLMError('AUTOFORM_CLAUDE_AUTH=bedrock needs AUTOFORM_LLM_MODEL: a Bedrock model id or '
+                           'inference profile (for example one from `aws bedrock list-inference-profiles`)')
+        return chosen
+    return chosen or DEFAULT_API_MODEL
+
+
+def price_row(model: str) -> tuple:
+    """The PRICES row for `model`: an exact name for the Messages API; for Bedrock the longest
+    PRICES name that appears inside the Bedrock id (`us.anthropic.claude-opus-5-5-v1:0`)."""
+    if model in PRICES:
+        return PRICES[model]
+    if claude_auth() == 'bedrock':
+        names = [name for name in PRICES if name in model]
+        if names:
+            return PRICES[max(names, key=len)]
+    raise LLMError(f'no price for model {model!r} in autoform.nl.llm.PRICES (dated {PRICES_DATE}); add a row'
+                   + ('; Bedrock ids are matched by the Claude model name inside them'
+                      if claude_auth() == 'bedrock' else ''))
 
 
 def api_cost_usd(model: str, usage) -> float:
     """USD for one Messages API response from its `usage` (an SDK object or a dict)."""
-    if model not in PRICES:
-        raise LLMError(f'no price for model {model!r} in autoform.nl.llm.PRICES (dated {PRICES_DATE}); add a row')
+    row = price_row(model)
     get = (usage.get if isinstance(usage, dict) else lambda k: getattr(usage, k, None))
     tokens = [float(get(k) or 0) for k in ('input_tokens', 'output_tokens', 'cache_creation_input_tokens',
                                            'cache_read_input_tokens')]
-    return sum(n * price for n, price in zip(tokens, PRICES[model])) / 1e6
+    return sum(n * price for n, price in zip(tokens, row)) / 1e6
 
 
 def api_client():
     """The SDK client (built once). Tests replace this with a client over a fake transport."""
     global _API_CLIENT
     if _API_CLIENT is None:
+        if claude_auth() == 'bedrock':
+            region = bedrock_region()
+            if not region:
+                raise LLMError('AUTOFORM_CLAUDE_AUTH=bedrock but neither AWS_REGION nor AWS_DEFAULT_REGION is set')
+            try:
+                import anthropic
+                _API_CLIENT = anthropic.AnthropicBedrock(aws_region=region)
+            except ImportError:
+                raise LLMError('AUTOFORM_CLAUDE_AUTH=bedrock needs the anthropic SDK with its Bedrock extra: '
+                               'pip install -e ".[bedrock]" (anthropic[bedrock]>=1,<2: boto3 resolves the AWS '
+                               'credentials)')
+            return _API_CLIENT
         key = os.environ.get('ANTHROPIC_API_KEY')
         if not key:
             raise LLMError('AUTOFORM_CLAUDE_AUTH=api but ANTHROPIC_API_KEY is not set')
@@ -125,20 +180,33 @@ def _api_errors() -> tuple:
         import anthropic
     except ImportError:   # a fake client in tests; nothing to translate
         return ()
-    return (anthropic.APIError,)
+    errors = (anthropic.APIError,)
+    if claude_auth() == 'bedrock':
+        # Credentials are resolved when a request is signed, so a missing profile, expired
+        # token or unreachable metadata service arrives as a botocore error, not an APIError.
+        try:
+            from botocore.exceptions import BotoCoreError
+            errors += (BotoCoreError,)
+        except ImportError:
+            pass
+    return errors
 
 
 def ask_api(prompt: str, *, model: str | None = None, timeout: int = 1800) -> tuple[str, float]:
     """One Messages API call; (text, cost_usd) with the cost priced from the response usage."""
     model = api_model(model)
-    if model not in PRICES:
-        raise LLMError(f'no price for model {model!r} in autoform.nl.llm.PRICES (dated {PRICES_DATE}); add a row')
+    price_row(model)       # refuse an unpriced model before any call is made
     client = api_client()
     try:
         resp = client.with_options(timeout=float(timeout)).messages.create(
             model=model, max_tokens=API_MAX_TOKENS, messages=[{'role': 'user', 'content': prompt}])
     except _api_errors() as exc:   # the SDK's APIError family: status, connection and timeout errors
         raise LLMError(f'model error ({type(exc).__name__}): {str(exc)[:500]}')
+    except ImportError as exc:     # boto3 is imported when the first Bedrock request is signed
+        if claude_auth() == 'bedrock':
+            raise LLMError('AUTOFORM_CLAUDE_AUTH=bedrock needs boto3 to sign requests: '
+                           f'pip install -e ".[bedrock]" ({exc})')
+        raise
     cost = api_cost_usd(model, resp.usage)
     text = ''.join(b.text for b in resp.content if getattr(b, 'type', '') == 'text')
     if resp.stop_reason == 'refusal':
@@ -161,10 +229,10 @@ def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turn
     if cache and not tools and hit.is_file():
         data = json.loads(hit.read_text())
         return data['text'], 0.0
-    if claude_auth() == 'api':
+    if claude_auth() in SDK_MODES:
         if tools:
-            raise LLMError('the api backend runs no tools; AUTOFORM_CLAUDE_AUTH=login or api-key for a call with '
-                           f'tools={tools!r}')
+            raise LLMError(f'the {claude_auth()} backend runs no tools; AUTOFORM_CLAUDE_AUTH=login or api-key for a '
+                           f'call with tools={tools!r}')
         text, cost = ask_api(prompt, model=model, timeout=timeout)
     else:
         text, cost = ask_cli(prompt, cwd, tools=tools, max_turns=max_turns, timeout=timeout, model=model)

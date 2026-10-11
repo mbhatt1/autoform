@@ -440,6 +440,14 @@ cached on disk by prompt hash, so rerunning one costs nothing whichever backend 
 | `login` (default) | headless Claude Code (`claude -p`) | the logged-in plan; `ANTHROPIC_API_KEY` is removed from the child environment | the CLI's own `total_cost_usd` |
 | `api-key` | headless Claude Code | `ANTHROPIC_API_KEY`, for machines with no login such as CI | the CLI's own `total_cost_usd` |
 | `api` | the Anthropic Messages API through the `anthropic` Python SDK (optional; `pip install "anthropic>=1,<2"` or the `[llm]` extra) | `ANTHROPIC_API_KEY` | the response usage (input, output, cache-write and cache-read tokens) times the price table `llm.PRICES`, kept in one place with its date `llm.PRICES_DATE`; a model without a row is refused before the call |
+| `bedrock` | Claude on Amazon Bedrock through the `anthropic` SDK's `AnthropicBedrock` client (`pip install -e '.[bedrock]'`, which adds `boto3`) | your AWS account, through the standard credential chain (environment, shared profile, role) and `AWS_REGION` or `AWS_DEFAULT_REGION` | the response usage times Anthropic's list prices, matched by the Claude model name inside the Bedrock id: an estimate, not an AWS bill |
+
+The `bedrock` backend has no default model, because Bedrock model ids differ by region and
+account: set `AUTOFORM_LLM_MODEL` to a model id or inference profile you have access to.
+A model whose id contains no name from `llm.PRICES` is refused before any call, so spend
+is never reported as zero. Like `api` it runs no tools; the proving agents run the
+`claude` CLI with `CLAUDE_CODE_USE_BEDROCK=1`, so they use the same account and region.
+Nothing here has been run against live Bedrock; the tests use a fake client.
 
 The `api` backend's model is `AUTOFORM_LLM_MODEL` or `llm.DEFAULT_API_MODEL`
 (`claude-opus-5-5`). It runs no tools: the model, describe and formalize stages are

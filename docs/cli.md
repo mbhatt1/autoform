@@ -135,7 +135,7 @@ Each owns its flags; `autoform <cmd> --help` is the reference.
 `autoformalize` writes a language model's Lean model of each function and validates it
 against real executions and a second translation (`--deep` uses the Joern translation
 instead; `--deep-too` proves the two equal). It needs a model backend
-(`AUTOFORM_CLAUDE_AUTH=login|api-key|api`, see `docs/autoformalize.md`) and caps the
+(`AUTOFORM_CLAUDE_AUTH=login|api-key|api|bedrock`, see `docs/autoformalize.md`) and caps the
 run's spend with `--budget-usd`: every model stage stops at the function that would cross
 the cap and names the rest in `budget.json` and the report. Its last stage writes the
 properties that survived checking as pytest tests into the analysed tree's
@@ -188,7 +188,7 @@ seconds, log), the selected `ast-<Module>.json`, and the same `conformance.json`
 | `AUTOFORM_MUTANTS` | `assure` | mutants per gate run (default `max(8, 2 × proved)`) |
 | `AUTOFORM_CFLAGS`, `CPP_DEFINES`, `AUTOFORM_COMPILE_COMMANDS` | C/C++ parsing and native runs | compiler flags, defines, a compilation database |
 | `AUTOFORM_FRONTEND`, `AUTOFORM_DATA_MODEL` | parse/export | force a Joern frontend; `lp64`/`ilp32` integer model |
-| `AUTOFORM_CLAUDE_AUTH` | `autoformalize`, `formalize --prover` | `login` (default) or `api-key` (the `claude` CLI), or `api` (the Messages API through the `anthropic` SDK; text stages only) |
+| `AUTOFORM_CLAUDE_AUTH` | `autoformalize`, `formalize --prover` | `login` (default) or `api-key` (the `claude` CLI), `api` (the Messages API through the `anthropic` SDK; text stages only), or `bedrock` (Claude on Amazon Bedrock through the same SDK, text stages only; needs `AUTOFORM_LLM_MODEL`, `AWS_REGION` and AWS credentials) |
 | `AUTOFORM_LLM_MODEL` | `autoformalize` | model for the text stages (`api`: default `claude-opus-5-5`, must have a row in `llm.PRICES`) |
 | `AUTOFORM_ALLOW_DIRTY` | checkout entry points | run over modified tracked artifacts (never over a live mutant) |
 | `AUTOFORM_SCRATCH`, `AUTOFORM_PYTHON` | scripts | scratch directory; the Python the stages run under |

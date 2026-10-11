@@ -451,6 +451,21 @@ def preflight(lean_root, *, budget_usd=None, domain_size=64, parallel=None, repa
             if not shutil.which('claude'):
                 warnings.append('the claude CLI is not on PATH: the api backend writes the models, English and '
                                 'statements, but the prove and refine agents need the CLI and will fail')
+        elif mode == 'bedrock':
+            from .llm import bedrock_region
+            if not sdk_available() and _llm._API_CLIENT is None:
+                errors.append('AUTOFORM_CLAUDE_AUTH=bedrock but the anthropic SDK is not installed '
+                              '(pip install -e ".[bedrock]")')
+            if not bedrock_region():
+                errors.append('AUTOFORM_CLAUDE_AUTH=bedrock but neither AWS_REGION nor AWS_DEFAULT_REGION is set')
+            if not os.environ.get('AUTOFORM_LLM_MODEL'):
+                errors.append('AUTOFORM_CLAUDE_AUTH=bedrock but AUTOFORM_LLM_MODEL (a Bedrock model id or '
+                              'inference profile) is not set')
+            warnings.append('bedrock: AWS credentials come from the standard chain and are checked at the '
+                            'first call, not here')
+            if not shutil.which('claude'):
+                warnings.append('the claude CLI is not on PATH: the bedrock backend writes the models, English '
+                                'and statements, but the prove and refine agents need the CLI and will fail')
         elif not shutil.which('claude'):
             errors.append('the claude CLI is not on PATH; it writes the models, English and statements')
         if mode == 'login' and os.environ.get('ANTHROPIC_API_KEY'):

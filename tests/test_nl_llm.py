@@ -296,3 +296,98 @@ def test_requirements_name_the_optional_sdk():
     assert not re.search(r'^anthropic', text, re.M) and "'.[llm]'" in text
     assert 'llm = ["anthropic>=1,<2"]' in (ROOT / 'pyproject.toml').read_text()
     assert 'AUTOFORM_CLAUDE_AUTH=api' in (ROOT / 'docs/autoformalize.md').read_text()
+
+
+# --- the bedrock backend: same client interface, AWS region and model id, no network -----------
+
+BEDROCK_MODEL = 'us.anthropic.claude-opus-5-5-v1:0'
+
+
+@pytest.fixture
+def bedrock_env(monkeypatch, tmp_path):
+    monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', 'bedrock')
+    monkeypatch.setenv('AWS_REGION', 'us-east-1')
+    monkeypatch.setenv('AUTOFORM_LLM_MODEL', BEDROCK_MODEL)
+    monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
+    monkeypatch.setattr(llm, 'CACHE', tmp_path / 'llm-cache')
+    monkeypatch.setattr(llm, '_API_CLIENT', None)
+    return tmp_path
+
+
+class _BedrockFake:
+    def __init__(self, usage=None):
+        self.usage = usage or _usage(1000, 500)
+        self.calls = []
+        self.messages = SimpleNamespace(create=self._create)
+
+    def with_options(self, **kw):
+        return self
+
+    def _create(self, *, model, max_tokens, messages):
+        self.calls.append(model)
+        return SimpleNamespace(model=model, stop_reason='end_turn', stop_details=None,
+                               content=[SimpleNamespace(type='text', text='ok')],
+                               usage=SimpleNamespace(**self.usage))
+
+
+def test_bedrock_prices_by_the_claude_name_inside_the_id(bedrock_env, monkeypatch):
+    fake = _BedrockFake(_usage(1_000_000, 1_000_000))
+    monkeypatch.setattr(llm, '_API_CLIENT', fake)
+    text, cost = llm.ask('hello', bedrock_env)
+    assert text == 'ok' and fake.calls == [BEDROCK_MODEL]
+    assert cost == pytest.approx(PRICE[0] + PRICE[1])
+    # the longest name wins: 'claude-opus-5-5' is not read as 'claude-opus-5'
+    assert llm.price_row('anthropic.claude-opus-5-5-v1:0') == llm.PRICES['claude-opus-5-5']
+    assert llm.price_row('eu.anthropic.claude-sonnet-5-v2:0') == llm.PRICES['claude-sonnet-5']
+
+
+def test_bedrock_refuses_what_it_cannot_price_or_name(bedrock_env, monkeypatch):
+    monkeypatch.setattr(llm, '_API_CLIENT', _BedrockFake())
+    monkeypatch.setenv('AUTOFORM_LLM_MODEL', 'arn:aws:bedrock:us-east-1:123456789012:inference-profile/custom-x')
+    with pytest.raises(llm.LLMError, match='no price for model'):
+        llm.ask('p1', bedrock_env)
+    monkeypatch.delenv('AUTOFORM_LLM_MODEL')
+    with pytest.raises(llm.LLMError, match='needs AUTOFORM_LLM_MODEL'):
+        llm.ask('p2', bedrock_env)
+    monkeypatch.setenv('AUTOFORM_LLM_MODEL', BEDROCK_MODEL)
+    with pytest.raises(llm.LLMError, match='runs no tools'):
+        llm.ask('p3', bedrock_env, tools=llm.TOOLS_LEAN)
+    assert not (bedrock_env / 'llm-cache').exists()      # nothing failed is cached
+
+
+def test_bedrock_client_is_built_with_the_region_and_needs_one(bedrock_env, monkeypatch):
+    built = []
+
+    class Recorder:
+        def __init__(self, **kw):
+            built.append(kw)
+
+    anthropic = pytest.importorskip('anthropic')
+    monkeypatch.setattr(anthropic, 'AnthropicBedrock', Recorder)
+    assert isinstance(llm.api_client(), Recorder) and built == [{'aws_region': 'us-east-1'}]
+    monkeypatch.setattr(llm, '_API_CLIENT', None)
+    monkeypatch.delenv('AWS_REGION')
+    monkeypatch.delenv('AWS_DEFAULT_REGION', raising=False)
+    assert llm.available() is False
+    with pytest.raises(llm.LLMError, match='AWS_REGION'):
+        llm.api_client()
+    monkeypatch.setenv('AWS_DEFAULT_REGION', 'eu-west-1')
+    assert llm.bedrock_region() == 'eu-west-1'
+
+
+def test_bedrock_cli_agents_are_routed_through_bedrock(bedrock_env, monkeypatch):
+    env = llm.claude_env()
+    assert env['CLAUDE_CODE_USE_BEDROCK'] == '1' and env['AWS_REGION'] == 'us-east-1'
+    monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', 'api-key')
+    assert 'CLAUDE_CODE_USE_BEDROCK' not in llm.claude_env()
+
+
+def test_bedrock_preflight_names_each_missing_piece(bedrock_env, monkeypatch):
+    monkeypatch.delenv('AWS_REGION')
+    monkeypatch.delenv('AWS_DEFAULT_REGION', raising=False)
+    monkeypatch.delenv('AUTOFORM_LLM_MODEL')
+    monkeypatch.setattr(llm, 'sdk_available', lambda: False)
+    errors, warnings = pipeline.preflight(ROOT, needs_model=True)
+    text = ' | '.join(errors)
+    assert 'AWS_REGION' in text and 'AUTOFORM_LLM_MODEL' in text and '[bedrock]' in text, errors
+    assert any('credentials come from the standard chain' in w for w in warnings), warnings
