@@ -116,8 +116,200 @@
        }
       },
       "b": {
-       "k": "holeS",
-       "label": "control:FOR:elided-clause"
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "loop",
+        "c": {
+         "k": "bool",
+         "v": true
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "a",
+           "e": {
+            "k": "unop",
+            "op": "cast:u64",
+            "a": {
+             "k": "binop",
+             "op": "num:c:u64:>>>",
+             "a": {
+              "k": "name",
+              "v": "a"
+             },
+             "b": {
+              "k": "call",
+              "f": "__ffs",
+              "args": [
+               {
+                "k": "name",
+                "v": "a"
+               }
+              ]
+             }
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "ifte",
+            "c": {
+             "k": "binop",
+             "op": "num:c:u64:==",
+             "a": {
+              "k": "name",
+              "v": "a"
+             },
+             "b": {
+              "k": "int",
+              "v": "1"
+             }
+            },
+            "t": {
+             "k": "ret",
+             "e": {
+              "k": "unop",
+              "op": "cast:u64",
+              "a": {
+               "k": "binop",
+               "op": "num:c:u64:&",
+               "a": {
+                "k": "name",
+                "v": "r"
+               },
+               "b": {
+                "k": "unop",
+                "op": "num:c:u64:-",
+                "a": {
+                 "k": "name",
+                 "v": "r"
+                }
+               }
+              }
+             }
+            },
+            "e": {
+             "k": "skip"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "ifte",
+             "c": {
+              "k": "binop",
+              "op": "num:c:u64:==",
+              "a": {
+               "k": "name",
+               "v": "a"
+              },
+              "b": {
+               "k": "name",
+               "v": "b"
+              }
+             },
+             "t": {
+              "k": "ret",
+              "e": {
+               "k": "unop",
+               "op": "cast:u64",
+               "a": {
+                "k": "binop",
+                "op": "num:c:u64:<<",
+                "a": {
+                 "k": "name",
+                 "v": "a"
+                },
+                "b": {
+                 "k": "call",
+                 "f": "__ffs",
+                 "args": [
+                  {
+                   "k": "name",
+                   "v": "r"
+                  }
+                 ]
+                }
+               }
+              }
+             },
+             "e": {
+              "k": "skip"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "ifte",
+              "c": {
+               "k": "binop",
+               "op": "num:c:u64:<",
+               "a": {
+                "k": "name",
+                "v": "a"
+               },
+               "b": {
+                "k": "name",
+                "v": "b"
+               }
+              },
+              "t": {
+               "k": "exprS",
+               "e": {
+                "k": "call",
+                "f": "swap",
+                "args": [
+                 {
+                  "k": "name",
+                  "v": "a"
+                 },
+                 {
+                  "k": "name",
+                  "v": "b"
+                 }
+                ]
+               }
+              },
+              "e": {
+               "k": "skip"
+              }
+             },
+             "b": {
+              "k": "assign",
+              "x": "a",
+              "e": {
+               "k": "unop",
+               "op": "cast:u64",
+               "a": {
+                "k": "binop",
+                "op": "num:c:u64:-",
+                "a": {
+                 "k": "name",
+                 "v": "a"
+                },
+                "b": {
+                 "k": "name",
+                 "v": "b"
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "b": {
+          "k": "skip"
+         }
+        }
+       }
       }
      }
     }
@@ -363,8 +555,274 @@
             }
            },
            "b": {
-            "k": "holeS",
-            "label": "control:FOR:elided-clause"
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "loop",
+             "c": {
+              "k": "bool",
+              "v": true
+             },
+             "body": {
+              "k": "seq",
+              "a": {
+               "k": "seq",
+               "a": {
+                "k": "loop",
+                "c": {
+                 "k": "unop",
+                 "op": "!",
+                 "a": {
+                  "k": "binop",
+                  "op": "num:c:u64:&",
+                  "a": {
+                   "k": "name",
+                   "v": "a"
+                  },
+                  "b": {
+                   "k": "name",
+                   "v": "r"
+                  }
+                 }
+                },
+                "body": {
+                 "k": "assign",
+                 "x": "a",
+                 "e": {
+                  "k": "unop",
+                  "op": "cast:u64",
+                  "a": {
+                   "k": "binop",
+                   "op": "num:c:u64:>>>",
+                   "a": {
+                    "k": "name",
+                    "v": "a"
+                   },
+                   "b": {
+                    "k": "int",
+                    "v": "1"
+                   }
+                  }
+                 }
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "ifte",
+                 "c": {
+                  "k": "binop",
+                  "op": "num:c:u64:==",
+                  "a": {
+                   "k": "name",
+                   "v": "a"
+                  },
+                  "b": {
+                   "k": "name",
+                   "v": "r"
+                  }
+                 },
+                 "t": {
+                  "k": "ret",
+                  "e": {
+                   "k": "unop",
+                   "op": "cast:u64",
+                   "a": {
+                    "k": "name",
+                    "v": "r"
+                   }
+                  }
+                 },
+                 "e": {
+                  "k": "skip"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "ifte",
+                  "c": {
+                   "k": "binop",
+                   "op": "num:c:u64:==",
+                   "a": {
+                    "k": "name",
+                    "v": "a"
+                   },
+                   "b": {
+                    "k": "name",
+                    "v": "b"
+                   }
+                  },
+                  "t": {
+                   "k": "ret",
+                   "e": {
+                    "k": "unop",
+                    "op": "cast:u64",
+                    "a": {
+                     "k": "name",
+                     "v": "a"
+                    }
+                   }
+                  },
+                  "e": {
+                   "k": "skip"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "ifte",
+                   "c": {
+                    "k": "binop",
+                    "op": "num:c:u64:<",
+                    "a": {
+                     "k": "name",
+                     "v": "a"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "b"
+                    }
+                   },
+                   "t": {
+                    "k": "exprS",
+                    "e": {
+                     "k": "call",
+                     "f": "swap",
+                     "args": [
+                      {
+                       "k": "name",
+                       "v": "a"
+                      },
+                      {
+                       "k": "name",
+                       "v": "b"
+                      }
+                     ]
+                    }
+                   },
+                   "e": {
+                    "k": "skip"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "assign",
+                    "x": "a",
+                    "e": {
+                     "k": "unop",
+                     "op": "cast:u64",
+                     "a": {
+                      "k": "binop",
+                      "op": "num:c:u64:-",
+                      "a": {
+                       "k": "name",
+                       "v": "a"
+                      },
+                      "b": {
+                       "k": "name",
+                       "v": "b"
+                      }
+                     }
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "assign",
+                     "x": "a",
+                     "e": {
+                      "k": "unop",
+                      "op": "cast:u64",
+                      "a": {
+                       "k": "binop",
+                       "op": "num:c:u64:>>>",
+                       "a": {
+                        "k": "name",
+                        "v": "a"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": "1"
+                       }
+                      }
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "ifte",
+                      "c": {
+                       "k": "binop",
+                       "op": "num:c:u64:&",
+                       "a": {
+                        "k": "name",
+                        "v": "a"
+                       },
+                       "b": {
+                        "k": "name",
+                        "v": "r"
+                       }
+                      },
+                      "t": {
+                       "k": "assign",
+                       "x": "a",
+                       "e": {
+                        "k": "unop",
+                        "op": "cast:u64",
+                        "a": {
+                         "k": "binop",
+                         "op": "num:c:u64:+",
+                         "a": {
+                          "k": "name",
+                          "v": "a"
+                         },
+                         "b": {
+                          "k": "name",
+                          "v": "b"
+                         }
+                        }
+                       }
+                      },
+                      "e": {
+                       "k": "skip"
+                      }
+                     },
+                     "b": {
+                      "k": "assign",
+                      "x": "a",
+                      "e": {
+                       "k": "unop",
+                       "op": "cast:u64",
+                       "a": {
+                        "k": "binop",
+                        "op": "num:c:u64:>>>",
+                        "a": {
+                         "k": "name",
+                         "v": "a"
+                        },
+                        "b": {
+                         "k": "int",
+                         "v": "1"
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "b": {
+               "k": "skip"
+              }
+             }
+            }
            }
           }
          }

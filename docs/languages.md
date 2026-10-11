@@ -49,7 +49,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby and Swift were **not tested**. Rust has n
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | Rust (gcd 2.3.0, `evidence-RustGcd.json`) | no Joern frontend: rustdoc JSON gives the public API, Charon + Aeneas emit the Lean | yes (Aeneas) | yes, in a separate Lake project on Lean v4.31.0 (Aeneas' pin, not Autoform's v4.30.0-rc1) | n/a (Aeneas' own `Result` monad) | 60 | 12 (20%) | 12 (20%) | 48 holes under 7 labels, all named from Charon/Aeneas/Lean | **yes** (native cargo harness, debug profile, sandboxed): 12 functions compared, 1178/1178 cases agree, 0 divergences; 121/144 case theorems kernel-checked (the 23 unproved all usize: the kernel cannot evaluate `System.Platform.numBits`). Re-derived by the Rust CI job from the digest-verified crate; see [rust.md](rust.md) |
-| Java (commons-lang3 3.17.0, tracked `ast-CommonsLang3.json`) | yes | yes | yes | `.java` ✅ | 488 | 422 (86%) | 196 (40%) | 0.7% | **yes** (JVM, `jvm-primitive-static-v2`, 2026-10-10): 32 functions compared, 87/87 cases agree, 0 divergences, 513 inconclusive on named dynamic holes (`evidence-CommonsLang3.json`) |
+| Java (commons-lang3 3.17.0, tracked `ast-CommonsLang3.json`) | yes | yes | yes | `.java` ✅ | 488 | 421 (86%) | 196 (40%) | 0.9% | **yes** (JVM, `jvm-primitive-static-v2`, 2026-10-10, after the Java `String` model): 83 functions compared, 196/196 cases agree, 0 divergences, 404 inconclusive on named dynamic holes (`evidence-CommonsLang3.json`) |
 | Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | TypeScript | yes | yes | yes | `.javascript` ✅ | 86 | 44 (51%) | 18 (20%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
 | JavaScript | yes | yes | yes | `.javascript` ✅ | 14 | 5 (35%) | 1 (7%) | 5% | Node backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
@@ -71,7 +71,7 @@ the counts, and until then the column says "not yet on this corpus". The first s
 the commons-lang3 one (2026-10-10): a tracked AST, a provenance record, a ledger, a JVM
 oracle run and a synthesized specification module (`Autoform/SpecsGen/CommonsLang3.lean`,
 imported from `Autoform.lean` and `Autoform/CI.lean`). See "Java at scale" below for what
-the 513 inconclusive cases are and why the compared count is 32 of 422 hole-free functions.
+the 404 inconclusive cases are and why the compared count is 83 of 421 hole-free functions.
 
 Percentages are from the ledger the pipeline printed (`ledger-Lang*.json`);
 `scripts/lang_matrix.py` recomputes them from the exported AST independently and agrees
@@ -123,7 +123,7 @@ translation. They are not the same set across languages, which is direct evidenc
 |---|---|
 | C | `op:indirection` 28, `op:cast` 18, `control:SWITCH` 14, `assign:lhs:indirectIndexAccess` 12, `op:indirectIndexAccess` 12, `assign:lhs:indirection` 12, `cstr:address-equality` 11, `op:postIncrement` 11, `op:postDecrement` 8, `control:FOR` 7, `control:GOTO` 5, `op:sizeOf` 5 |
 | Java | `op:alloc` 166, `control:THROW` 125, `op:cast` 123, `op:instanceOf` 90, `op:arrayInitializer` 43, `control:FOR` 30, `expr:BLOCK-impure` 20, `control:SWITCH` 15, `op:postIncrement` 15, `op:sizeOf` 13, `control:TRY-multiCatch` 4 |
-| Java (commons-lang3, current exporter, `ledger-CommonsLang3.json`) | `op:alloc:ctor-shape` 26, `op:alloc:array-decl` 20, `op:instanceOf` 18, `op:alloc:ctor-unresolved-class` 15, `control:TRY-handler-language` 13, `lit:unquoted` 8, `stmt:empty-ast-children` 6, `op:cast:opaque-type` 4, `expr:BLOCK-impure` 4, `op:cast:object` 1 (115 holes in 66 functions) |
+| Java (commons-lang3, current exporter, `ledger-CommonsLang3.json`) | `op:alloc:ctor-shape` 26, `op:alloc:array-decl` 20, `op:instanceOf` 18, `op:cast:opaque-type` 17, `op:alloc:ctor-unresolved-class` 15, `control:TRY-handler-language` 13, `lit:unquoted` 8, `expr:BLOCK-impure` 7, `stmt:empty-ast-children` 6, `op:cast:object` 1 (131 holes in 67 functions; the 16 more than before the Java `String` model are receivers that are now exported -- `((String) x).length()` used to drop its cast receiver, now the cast is translated or named) |
 | Go | `op:addressOf` 44, `stmt:IMPORT` 39, `lit:unquoted` 17, `stmt:TYPE_DECL` 13, `op:indirection` 12, `assign:arity` 7 (multi-return `a, b := f()`), `control:FOR` 6 |
 | TypeScript | `op:assignment` 26, `op:notNullAssert` 11, `control:THROW` 10, `stmt:TYPE_DECL` 9, `op:alloc` 7, `op:await` 7, `op:instanceOf` 5, `op:spread` 2 |
 | JavaScript (lodash) | `op:assignment` 111, `op:instanceOf` 100, `op:preIncrement` 91, `expr:BLOCK-impure` 44, `op:postIncrement` 44, `op:alloc` 27, `op:and` 23, `control:THROW` 16, `op:iterator` 6 |
@@ -780,15 +780,27 @@ same-package references (`ArrayUtils`, `ObjectUtils`, ...) against the full rele
 
 What the chain produced, each figure bound by `scripts/check_docs.py`:
 
-* Ledger (`ledger-CommonsLang3.json`): 488 functions, 422 hole-free (86%), 196 in the
-  verifiable core, 115 holes in 66 functions (table above).
+* Ledger (`ledger-CommonsLang3.json`): 488 functions, 421 hole-free (86%), 196 in the
+  verifiable core, 131 holes in 67 functions (table above).
 * Oracle (`evidence-CommonsLang3.json`, basis `jvm-primitive-static-v2`, OpenJDK 17
-  locally; CI installs 21): 199 static primitive-or-String candidates, 980 cases built,
-  195 functions exercised, **32 functions compared, 87/87 cases agree, 0 divergences,
-  513 cases inconclusive**. 35 hole-free functions were skipped as `non-primitive
-  signature` (arrays, `Boolean`, `Object`...) and 5 as instance methods.
-* Specification module: `Autoform/SpecsGen/CommonsLang3.lean`, observation theorems from
-  the agreeing cases, elaborated in `lake build Autoform.CI`.
+  locally; CI installs 21): 198 static primitive-or-String candidates, 976 cases built,
+  195 functions exercised, **83 functions compared, 196/196 cases agree, 0 divergences,
+  404 cases inconclusive**. 35 hole-free functions were skipped as `non-primitive
+  signature` (arrays, `Boolean`, `Object`...) and 5 as instance methods. Before the Java
+  `String` model (same corpus, previous exporter): 32 functions compared, 87/87 agree,
+  513 inconclusive, of which `call:length` was 299 cases in 102 functions,
+  `call:toString` 8 and `call:charAt` 7; after it `call:length` and `call:charAt` are 0
+  and `call:toString` is 3 (a static `toString` call, not a receiver method).
+  The first run after the String model recorded **2 divergences** in
+  `StringUtils.repeat(String,String,int)`: Core returned `unit` where the JVM returned the
+  repeated string. Cause: a pre-existing exporter bug -- javasrc2cpg names switch labels
+  by JumpTarget name, the lowering only knew the C names, so no Java `case` ever matched
+  and every Java `switch` was silently skipped; it had been hidden because `length()`
+  holed first. Fixed (classic switches lowered, arrow-form and non-literal labels named
+  holes, `tests/test_java_switch.py` against the JVM); the run above is after the fix.
+* Specification module: `Autoform/SpecsGen/CommonsLang3.lean` (split into
+  `CommonsLang3/Base.lean` + parts), 83 observation theorems from the agreeing cases,
+  elaborated in `lake build Autoform.CI`.
 
 Two exporter and two backend gaps were closed on the way, each with a test:
 
@@ -811,31 +823,42 @@ What is still open, by name and count (the "inconclusive" column), all of them *
 holes -- the function translated without a static hole and the interpreter reached a
 construct Core does not model under `.java`:
 
-* `call:length` 299 cases / 102 functions: `String.length()` / `CharSequence.length()`.
-  Core has string indexing by UTF-16 unit for `.javascript` only; Java `String` methods
-  (`length`, `charAt`, `trim`, `toCharArray`, `toString`, `replaceFirst`) have no model.
-  This is a `Semantics.lean` change (every proof module rebuilds) and was not made here.
-* `field:EMPTY:non-object` 31, `field:ROOT:non-object` 7, `field:TRUE:non-object` 5:
+* `call:length` (was 299 cases / 102 functions) is gone: `String`/`CharSequence`
+  `length`, `charAt`, `isEmpty`, `substring`, `equals`, `indexOf`, `startsWith`,
+  `endsWith` and `toString` are modelled with UTF-16 code-unit semantics on BMP strings
+  (`Stdlib.javaStringMethod`, docs/java-strings.md). The other `String` methods the corpus
+  calls are now named per method: `mcall:toCharArray:non-object` 14, `mcall:toLowerCase`
+  12, `mcall:trim` 10, `mcall:replaceFirst` 8, `mcall:lastIndexOf` 7, `mcall:concat` 4
+  (cases).
+* `field:EMPTY:non-object` 53, `field:INDEX_NOT_FOUND:non-object` 29,
+  `field:PAD_LIMIT:non-object` 11, `field:ROOT:non-object` 6, `field:TRUE:non-object` 5:
   reads of `static final` constants (`StringUtils.EMPTY`) -- Java class initializers
   (`<clinit>`) are not exported as module initializers.
-* `call:isNaN` 26, `call:anyNull` 11, `call:max` 5, `call:requireNonNull` 4: static
-  calls into `java.lang.Float/Math/Objects` and into `ObjectUtils`, outside the subset.
+* `call:isNaN` 26, `call:isWhitespace` 15, `call:isDigit` 11, `mcall:anyNull` 11,
+  `call:max` 6, `call:requireNonNull` 4: static calls into
+  `java.lang.Float/Character/Math/Objects` and into `ObjectUtils`, outside the subset.
 * `str:reference-equality` 25: `==` on two `String`s is identity in Java and a hole on
   purpose (§6 above).
-* `control:TRY-handler-language` 20 and `op:instanceOf` 15 are the static labels of the
-  same name reached at run time through callees.
+* `control:TRY-handler-language` 20 and `op:instanceOf` 64 are the static labels of the
+  same name reached at run time through callees (`op:instanceOf` grew from 15 because
+  calls that used to stop at `call:length` now run on into it).
 * Java `String + int` (JLS §5.1.11 string conversion) is a `binop:+` hole; it did not
   occur in this corpus's compared cases and is named in `tests/test_source_java_throw.py`.
 
 **The export is not byte-stable, and the pin says so.** Re-exporting the same CPG three
 times gave three different ASTs in three functions: Joern's overload resolution for one
 call alternates between `join(byte[],char,int,int)` and `join(short[],char,int,int)`
-(`StringUtils.join`, `Validate.notEmpty`, `Validate.validIndex`). None of the three is
-among the 32 compared functions, and none of the 31 specification theorems mentions them,
+(`StringUtils.join`, `Validate.notEmpty`, `Validate.validIndex`). The 2026-10-10 re-land
+measured it again: a second export of the same tree differed from the tracked one in five
+functions (`StringUtils.join(boolean[],char)`, `join(double[],char)` and the three
+`Validate.notEmpty` overloads). None of them is among the 83 compared functions (all five
+are "hole-free, no case built") and none of the 83 specification theorems mentions them,
 so the oracle figures above do not depend on the choice; the tracked AST carries one of the
 two resolutions, and a fresh export may carry the other. The same happens on Jinja2: the
-first export of a fresh CPG reorders two `fnref` arguments in `TemplateModule.__init__`,
-and later exports of that CPG match the tracked file (and the HEAD exporter reproduces the
+first export of a fresh CPG reorders two `fnref` arguments in `TemplateModule.__init__`
+(seen again in the 2026-10-10 re-land: two exports gave `f01eacec…`, the third, which is
+the tracked artifact and the one the oracle and specs ran on, gave `5524fe8e…`; its
+provenance record carries a `note` saying so), and later exports of that CPG match the tracked file (and the HEAD exporter reproduces the
 first-run output, so the cause is upstream of the exporter change). The provenance records
 name the command; they do not promise a byte-identical regeneration, and that is an open
 item (the fix belongs in the frontend pass that orders overload candidates, not in the

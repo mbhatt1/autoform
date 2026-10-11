@@ -1,221 +1,286 @@
 {
- "module": "CommonsLang3",
- "language": "Java",
- "corpus": "Apache Commons Lang 3.17.0 source release, 9 files of org.apache.commons.lang3 (see provenance/ast-CommonsLang3.json.prov.json)",
- "generated": "2026-10-10",
- "note": "conformance.json and ledger-*.json are gitignored run products; this file preserves the numbers docs/languages.md quotes for the commons-lang3 row, as evidence-LinuxLib.json does for LinuxLib. Regenerate with the command in the provenance record; check_docs.py binds the doc figures to the top-level fields here and to ledger-CommonsLang3.json.",
- "measurement_basis": "jvm-primitive-static-v2",
- "runtime": "jvm",
- "runtime_version": "openjdk version \"17.0.15\" 2025-04-15",
- "agree": 87,
- "total": 87,
- "divergences": 0,
- "inconclusive": 513,
- "population": 488,
- "hole_free": 422,
- "exercised": 195,
- "compared_functions": 32,
- "backend_info": {
-  "primitive_static_candidates": 199,
-  "extra_source_roots": [
-   "/Users/mbhatt/.cache/autoform/corpora/commons-lang3-3.17.0/src/commons-lang3-3.17.0-src/src/main/java"
+  "module": "CommonsLang3",
+  "language": "Java",
+  "corpus": "Apache Commons Lang 3.17.0 source release, 9 files of org.apache.commons.lang3 (see provenance/ast-CommonsLang3.json.prov.json)",
+  "generated": "2026-10-10",
+  "note": "conformance.json and ledger-*.json are gitignored run products; this file preserves the numbers docs/languages.md quotes for the commons-lang3 row, as evidence-LinuxLib.json does for LinuxLib. Regenerate with the command in the provenance record; check_docs.py binds the doc figures to the top-level fields here and to ledger-CommonsLang3.json.",
+  "measurement_basis": "jvm-primitive-static-v2",
+  "runtime": "jvm",
+  "runtime_version": "openjdk version \"17.0.15\" 2025-04-15",
+  "agree": 196,
+  "total": 196,
+  "divergences": 0,
+  "inconclusive": 404,
+  "population": 488,
+  "hole_free": 421,
+  "exercised": 195,
+  "compared_functions": 83,
+  "backend_info": {
+    "primitive_static_candidates": 198,
+    "extra_source_roots": [
+      "/Users/mbhatt/.cache/autoform/corpora/commons-lang3-3.17.0/src/commons-lang3-3.17.0-src/src/main/java"
+    ],
+    "files_compiled": 8,
+    "files_candidate": 8,
+    "source_roots": 2,
+    "cases_built": 976
+  },
+  "backend_skipped_by_reason": {
+    "non-primitive signature": 35,
+    "instance method": 5
+  },
+  "inconclusive_by_label": [
+    {
+      "label": "op:instanceOf",
+      "cases": 64,
+      "functions": 29
+    },
+    {
+      "label": "field:EMPTY:non-object",
+      "cases": 53,
+      "functions": 19
+    },
+    {
+      "label": "field:INDEX_NOT_FOUND:non-object",
+      "cases": 29,
+      "functions": 14
+    },
+    {
+      "label": "call:isNaN",
+      "cases": 26,
+      "functions": 8
+    },
+    {
+      "label": "str:reference-equality",
+      "cases": 25,
+      "functions": 8
+    },
+    {
+      "label": "control:TRY-handler-language",
+      "cases": 20,
+      "functions": 5
+    },
+    {
+      "label": "call:isWhitespace",
+      "cases": 15,
+      "functions": 7
+    },
+    {
+      "label": "mcall:toCharArray:non-object",
+      "cases": 14,
+      "functions": 4
+    },
+    {
+      "label": "mcall:toLowerCase:non-object",
+      "cases": 12,
+      "functions": 4
+    },
+    {
+      "label": "call:isDigit",
+      "cases": 11,
+      "functions": 4
+    },
+    {
+      "label": "field:PAD_LIMIT:non-object",
+      "cases": 11,
+      "functions": 5
+    },
+    {
+      "label": "mcall:anyNull:non-object",
+      "cases": 11,
+      "functions": 4
+    },
+    {
+      "label": "mcall:trim:non-object",
+      "cases": 10,
+      "functions": 3
+    },
+    {
+      "label": "mcall:replaceFirst:non-object",
+      "cases": 8,
+      "functions": 2
+    },
+    {
+      "label": "mcall:lastIndexOf:non-object",
+      "cases": 7,
+      "functions": 3
+    },
+    {
+      "label": "call:isLetter",
+      "cases": 6,
+      "functions": 2
+    },
+    {
+      "label": "call:isUpperCase",
+      "cases": 6,
+      "functions": 2
+    },
+    {
+      "label": "call:max",
+      "cases": 6,
+      "functions": 2
+    },
+    {
+      "label": "call:min",
+      "cases": 6,
+      "functions": 2
+    },
+    {
+      "label": "field:ROOT:non-object",
+      "cases": 6,
+      "functions": 2
+    },
+    {
+      "label": "op:alloc:ctor-shape",
+      "cases": 6,
+      "functions": 2
+    },
+    {
+      "label": "field:LF:non-object",
+      "cases": 5,
+      "functions": 2
+    },
+    {
+      "label": "field:TRUE:non-object",
+      "cases": 5,
+      "functions": 2
+    },
+    {
+      "label": "call:isLetterOrDigit",
+      "cases": 4,
+      "functions": 2
+    },
+    {
+      "label": "call:isLowerCase",
+      "cases": 4,
+      "functions": 1
+    },
+    {
+      "label": "call:requireNonNull",
+      "cases": 4,
+      "functions": 1
+    },
+    {
+      "label": "field:ON:non-object",
+      "cases": 4,
+      "functions": 1
+    },
+    {
+      "label": "mcall:concat:non-object",
+      "cases": 4,
+      "functions": 2
+    },
+    {
+      "label": "call:toString",
+      "cases": 3,
+      "functions": 1
+    },
+    {
+      "label": "field:HEX_DIGITS:non-object",
+      "cases": 3,
+      "functions": 1
+    },
+    {
+      "label": "field:NUL:non-object",
+      "cases": 3,
+      "functions": 2
+    },
+    {
+      "label": "mcall:isEmpty:non-object",
+      "cases": 3,
+      "functions": 2
+    },
+    {
+      "label": "mcall:replace:non-object",
+      "cases": 3,
+      "functions": 1
+    },
+    {
+      "label": "binop:+",
+      "cases": 1,
+      "functions": 1
+    },
+    {
+      "label": "call:valueOf",
+      "cases": 1,
+      "functions": 1
+    },
+    {
+      "label": "field:CHAR_STRING_ARRAY:non-object",
+      "cases": 1,
+      "functions": 1
+    },
+    {
+      "label": "field:SPACE:non-object",
+      "cases": 1,
+      "functions": 1
+    },
+    {
+      "label": "field:YES:non-object",
+      "cases": 1,
+      "functions": 1
+    },
+    {
+      "label": "mcall:allNotNull:non-object",
+      "cases": 1,
+      "functions": 1
+    },
+    {
+      "label": "mcall:toUpperCase:non-object",
+      "cases": 1,
+      "functions": 1
+    }
   ],
-  "files_compiled": 8,
-  "files_candidate": 8,
-  "source_roots": 2,
-  "cases_built": 980
- },
- "backend_skipped_by_reason": {
-  "non-primitive signature": 35,
-  "instance method": 5
- },
- "inconclusive_by_label": [
-  {
-   "label": "call:length",
-   "cases": 299,
-   "functions": 102
-  },
-  {
-   "label": "field:EMPTY:non-object",
-   "cases": 31,
-   "functions": 10
-  },
-  {
-   "label": "call:isNaN",
-   "cases": 26,
-   "functions": 8
-  },
-  {
-   "label": "str:reference-equality",
-   "cases": 25,
-   "functions": 8
-  },
-  {
-   "label": "control:TRY-handler-language",
-   "cases": 20,
-   "functions": 5
-  },
-  {
-   "label": "op:instanceOf",
-   "cases": 15,
-   "functions": 4
-  },
-  {
-   "label": "call:anyNull",
-   "cases": 11,
-   "functions": 4
-  },
-  {
-   "label": "call:trim",
-   "cases": 9,
-   "functions": 3
-  },
-  {
-   "label": "call:toString",
-   "cases": 8,
-   "functions": 2
-  },
-  {
-   "label": "call:replaceFirst",
-   "cases": 8,
-   "functions": 2
-  },
-  {
-   "label": "field:ROOT:non-object",
-   "cases": 7,
-   "functions": 2
-  },
-  {
-   "label": "call:toCharArray",
-   "cases": 7,
-   "functions": 2
-  },
-  {
-   "label": "call:charAt",
-   "cases": 7,
-   "functions": 2
-  },
-  {
-   "label": "call:max",
-   "cases": 5,
-   "functions": 2
-  },
-  {
-   "label": "field:TRUE:non-object",
-   "cases": 5,
-   "functions": 2
-  },
-  {
-   "label": "call:requireNonNull",
-   "cases": 4,
-   "functions": 1
-  },
-  {
-   "label": "call:min",
-   "cases": 4,
-   "functions": 2
-  },
-  {
-   "label": "field:ON:non-object",
-   "cases": 4,
-   "functions": 1
-  },
-  {
-   "label": "field:HEX_DIGITS:non-object",
-   "cases": 3,
-   "functions": 1
-  },
-  {
-   "label": "call:replace",
-   "cases": 3,
-   "functions": 1
-  },
-  {
-   "label": "field:INDEX_NOT_FOUND:non-object",
-   "cases": 3,
-   "functions": 3
-  },
-  {
-   "label": "call:toLowerCase",
-   "cases": 3,
-   "functions": 1
-  },
-  {
-   "label": "call:toUpperCase",
-   "cases": 2,
-   "functions": 1
-  },
-  {
-   "label": "binop:+",
-   "cases": 1,
-   "functions": 1
-  },
-  {
-   "label": "call:valueOf",
-   "cases": 1,
-   "functions": 1
-  },
-  {
-   "label": "field:YES:non-object",
-   "cases": 1,
-   "functions": 1
-  },
-  {
-   "label": "field:CHAR_STRING_ARRAY:non-object",
-   "cases": 1,
-   "functions": 1
+  "ledger": {
+    "functions": 488,
+    "holeFree": 421,
+    "verifiableCore": 196,
+    "holes": 131,
+    "nodes": 15240,
+    "dialect": "java",
+    "closedByTranslation": 196,
+    "closedByContract": 9,
+    "holesByLabel": [
+      {
+        "label": "op:alloc:ctor-shape",
+        "count": 26
+      },
+      {
+        "label": "op:alloc:array-decl",
+        "count": 20
+      },
+      {
+        "label": "op:instanceOf",
+        "count": 18
+      },
+      {
+        "label": "op:cast:opaque-type",
+        "count": 17
+      },
+      {
+        "label": "op:alloc:ctor-unresolved-class",
+        "count": 15
+      },
+      {
+        "label": "control:TRY-handler-language",
+        "count": 13
+      },
+      {
+        "label": "lit:unquoted",
+        "count": 8
+      },
+      {
+        "label": "expr:BLOCK-impure",
+        "count": 7
+      },
+      {
+        "label": "stmt:empty-ast-children",
+        "count": 6
+      },
+      {
+        "label": "op:cast:object",
+        "count": 1
+      }
+    ]
   }
- ],
- "ledger": {
-  "functions": 488,
-  "holeFree": 422,
-  "verifiableCore": 196,
-  "holes": 115,
-  "nodes": 14384,
-  "dialect": "java",
-  "closedByTranslation": 196,
-  "closedByContract": 9,
-  "holesByLabel": [
-   {
-    "label": "op:alloc:ctor-shape",
-    "count": 26
-   },
-   {
-    "label": "op:alloc:array-decl",
-    "count": 20
-   },
-   {
-    "label": "op:instanceOf",
-    "count": 18
-   },
-   {
-    "label": "op:alloc:ctor-unresolved-class",
-    "count": 15
-   },
-   {
-    "label": "control:TRY-handler-language",
-    "count": 13
-   },
-   {
-    "label": "lit:unquoted",
-    "count": 8
-   },
-   {
-    "label": "stmt:empty-ast-children",
-    "count": 6
-   },
-   {
-    "label": "op:cast:opaque-type",
-    "count": 4
-   },
-   {
-    "label": "expr:BLOCK-impure",
-    "count": 4
-   },
-   {
-    "label": "op:cast:object",
-    "count": 1
-   }
-  ]
- }
 }

@@ -988,6 +988,19 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
         if code.co_flags & (inspect.CO_GENERATOR | inspect.CO_COROUTINE | inspect.CO_ASYNC_GENERATOR):
             stats['skip_suspended_frame'] = stats.get('skip_suspended_frame', 0) + 1
             return None
+        # A nested function that reads its enclosing scope (`co_freevars`, the closure's
+        # cells) cannot be called faithfully from a traced snapshot: the case carries the
+        # arguments but not the captured values, and Core would read each free name as an
+        # unbound global. Found on Jinja2: `select_autoescape.autoescape(None)` returns its
+        # captured `default_for_string` ('STRING') in CPython and `unit` in the model.
+        # Refused and counted. `__class__` (the cell zero-argument `super()` reads) is not
+        # a capture the body evaluates as a name, so it does not refuse a method.
+        free = [v for v in code.co_freevars if v != "__class__"]
+        if free:
+            stats['skip_closure_captures'] = stats.get('skip_closure_captures', 0) + 1
+            detail = stats.setdefault('closure_capture_detail', {})
+            detail[key] = sorted(free)
+            return None
         snap = snapshot(frame, qual, key)
         if snap is None: return None
         enc, slf, args = snap
@@ -2554,6 +2567,12 @@ def main():
                        'exception unwinding, including returns of None after handled exceptions. '
                        'Ambiguous unwind types and suspended generator/coroutine frames are '
                        'counted as trace gaps, not fabricated call outcomes.')
+
+    if lang == 'python' and stats.get('test_runs'):
+        BASIS += '+closure-captures-v1'
+        BASIS_NOTE += (' Suite-traced calls of a nested function that reads enclosing-scope '
+                       'variables are refused (skip_closure_captures): a case carries arguments, '
+                       'not the captured cells.')
 
     if lang == 'python' and identities is None:
         BASIS_NOTE += (' No final heap graph is recorded for a legacy AST: outcomes are '

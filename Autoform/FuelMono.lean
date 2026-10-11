@@ -1914,6 +1914,13 @@ private theorem bindClassReceiver_body {fn bound : Func} {receiver : String}
   repeat' split at h
   all_goals cases h <;> rfl
 
+/-- The modelled external-base methods (`ExternalMethods.lean`) use no `tryFinally`. -/
+theorem externalMethod_tfFree {n : String} {fn : Func} (h : externalMethod n = some fn) :
+    tfFreeS fn.body = true := by
+  have hmem := List.mem_of_find?_eq_some h
+  have hall : ∀ f ∈ ExternalMethods.all, tfFreeS f.body = true := by decide
+  exact hall fn hmem
+
 /-- The table-wide condition implies the resolution-wide one: if no function in the table
 uses `tryFinally`, then neither does anything the interpreter can reach. -/
 theorem tfFree_of_table {ctx : Ctx}
@@ -1932,16 +1939,18 @@ theorem tfFree_of_table {ctx : Ctx}
         repeat' split at hr
         all_goals cases hr <;> rfl
       · split at hr
-        · unfold resolveClassBound at hr
-          obtain ⟨bound, hb, heq⟩ := Option.map_eq_some_iff.mp hr
-          obtain ⟨entry, he, hbind⟩ := Option.bind_eq_some_iff.mp hb
-          have hbody := bindClassReceiver_body hbind
-          cases heq
-          rw [hbody]
-          exact hT entry (List.mem_of_find?_eq_some he)
-        · rcases resolve_go_mem _ _ _ _ hr with ⟨q, hq, hq2⟩ | hacc
-          · exact hq2 ▸ hT q hq
-          · simp at hacc
+        · exact externalMethod_tfFree hr
+        · split at hr
+          · unfold resolveClassBound at hr
+            obtain ⟨bound, hb, heq⟩ := Option.map_eq_some_iff.mp hr
+            obtain ⟨entry, he, hbind⟩ := Option.bind_eq_some_iff.mp hb
+            have hbody := bindClassReceiver_body hbind
+            cases heq
+            rw [hbody]
+            exact hT entry (List.mem_of_find?_eq_some he)
+          · rcases resolve_go_mem _ _ _ _ hr with ⟨q, hq, hq2⟩ | hacc
+            · exact hq2 ▸ hT q hq
+            · simp at hacc
   refine ⟨hres, ?_⟩
   intro c m fn hr
   rw [Ctx.resolveMethod] at hr
@@ -1954,11 +1963,17 @@ theorem tfFree_of_table {ctx : Ctx}
     cases hr
     exact iterationMethod_tfFree hp
   · split at hr
-    · have hlookup (name : String)
-          (h : (ctx.table.find? (·.1 == name)).map Prod.snd = some fn) :
+    · have hlookup (name : String) (h : ctx.methodFunc name = some fn) :
           tfFreeS fn.body = true := by
-        obtain ⟨entry, he, hf⟩ := Option.map_eq_some_iff.mp h
-        exact hf ▸ hT entry (List.mem_of_find?_eq_some he)
+        unfold Ctx.methodFunc at h
+        split at h
+        · rename_i a f he
+          have hm := List.mem_of_find?_eq_some he
+          cases h
+          exact hT _ hm
+        · split at h
+          · exact externalMethod_tfFree h
+          · cases h
       split at hr
       all_goals first | exact hlookup _ hr | cases hr
     · split at hr

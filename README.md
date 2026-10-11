@@ -132,7 +132,7 @@ which fails the build when a document and an artifact disagree.
 |---|---|---|
 | semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **94 agree, 0 divergences, 133 INCONCLUSIVE** on 227 cases of `cachetools` v7.1.7 re-landed 2026-10-09 (the September artifact compared 245: it carried no class metadata and so could not refuse the test suite's own `TTLCache` subclasses; see `docs/integrity.md`). Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools --tests <tests>` |
 | the model translates the corpus | ledger | **204 of 209** functions hole-free, **150** in the verifiable core (`ledger-Cachetools.json`; `scripts/ledger.lean.tmpl`) |
-| specifications constrain behaviour | source-level mutation gate | **104 of 109 (95.4%)** theorem-mutant kills on `Autoform/Generated/Cachetools.lean` (60 mutants, 0 invalid, 0 inconclusive; 2026-10-10 on the merged tree, seed 20260819, `/tmp/af-dbg/mutation-final.json`). The unlink theorems `TTLLink_unlink_mrefines` and `TTLLink_unlink_ring` are stated on `applyFunc` of the generated function and score 14 of 14 each, as does the pin `TTLLink_unlink_body`; before that restatement they scored 0 of 14 because they reached the body only through the pin. The 5 surviving mutants (docstring deletions, one equivalent return) and 2 untested theorems are analysed in `Autoform/Specs/CachetoolsSpec.lean` §4 (that section still quotes the earlier run); **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution (`mutation-Imp.json`) |
+| specifications constrain behaviour | source-level mutation gate | **104 of 109 (95.4%)** theorem-mutant kills on `Autoform/Generated/Cachetools.lean` (60 mutants, 0 invalid, 0 inconclusive; seed 20260819; re-run 2026-10-11 after the batched Core change -- Java strings, boxed `dict()`, C `for (;;)`, `MutableMapping.popitem` -- with the same figure as the 2026-10-10 run, `/tmp/af-agents/cb-scratch/mutation-gate.json`). The unlink theorems `TTLLink_unlink_mrefines` and `TTLLink_unlink_ring` are stated on `applyFunc` of the generated function and score 14 of 14 each, as does the pin `TTLLink_unlink_body`; before that restatement they scored 0 of 14 because they reached the body only through the pin. The 5 surviving mutants (docstring deletions, one equivalent return) and 2 untested theorems are analysed in `Autoform/Specs/CachetoolsSpec.lean` §4 (that section still quotes the earlier run); **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution (`mutation-Imp.json`) |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean — `propext`, `Quot.sound`, `Classical.choice` only (`scripts/audit_all.py --strict`) |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
 | untranslated code is declared | hole counting + SACM assumptions | 5 holes, all named |
@@ -142,9 +142,9 @@ Three figures are reported because one would mislead: **hole-free** is an upper 
 **call-closed** additionally requires every callee to resolve in the program and is the
 verifiable core; **dynamic-hole risk** counts constructs that can still hole on some
 input. The other re-landed corpora (`ledger-<M>.json`, `Autoform/SpecsGen/<M>.lean`):
-requests 2.32.5 — 226/260 hole-free, core 134, 147 agree / 0 diverge, 29 specs, 0 over the proof budget;
-click 8.2.1 — 475/549, core 265, 165 / 0, 71 specs, 0 over the proof budget;
-jinja2 3.1.6 — 662/817, core 438, 167 / 0, 70 specs, 0 over the proof budget.
+requests 2.32.5 — 226/260 hole-free, core 134, 148 agree / 0 diverge, 30 specs, 0 over the proof budget;
+click 8.2.1 — 475/549, core 264, 180 / 0, 62 specs, 0 over the proof budget;
+jinja2 3.1.6 — 662/817, core 438, 193 / 0, 61 specs, 0 over the proof budget.
 
 ## Languages
 

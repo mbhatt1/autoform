@@ -523,6 +523,8 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact ihRef _ hd (by assumption))
   | (cases hy; exact pythonRaise_excSafe (by assumption))
   | (cases hy; exact (Stdlib.builtin_excSafe hd _ _ _ _ _ (by assumption)).weaken)
+  | exact (Stdlib.builtin_excSafe hd _ _ _ _ _
+      (boxBuiltin_exn_builtin hy (by assumption))).weaken
   | (cases hy; exact (Iteration.builtin_excSafe _ _ _ _ (by assumption)).weaken)
   | (cases hy; exact (Iteration.containerMethod_excSafe _ _ _ _ _ _ (by assumption)).weaken)
   | (cases hy; exact (Stdlib.method_pure_excSafe hd _ _ _ _ _ _ (by assumption)).weaken)
@@ -545,6 +547,13 @@ macro "exc_close" : tactic => `(tactic| first
   | (exfalso; rename_i hne; rw [hd] at hne; exact hne (by decide))
   | (exfalso; rename_i hne; simp [hd] at hne)
   | (trace_state; fail "exc_close: no closer applies"))
+
+/-- `dict()`'s allocation (`boxBuiltinResult`) passes a builtin's exception through. -/
+theorem boxBuiltin_exn_builtin {d d' : Dialect} {f : String} {h h₂ h' : Heap} {vs : List Val}
+    {r : EResult} {v : Val} (hy : boxBuiltinResult d f h₂ r = (h', .exn v))
+    (hb : Stdlib.builtin d' h f vs = some (h₂, r)) : Stdlib.builtin d' h f vs = some (h₂, .exn v) := by
+  obtain ⟨hr, _⟩ := boxBuiltinResult_exn_inv hy
+  rw [hb, hr]
 
 /-! Reduce the finalizer helpers, split `hy` on every `match`/`if` it contains, and
 close every leaf. -/

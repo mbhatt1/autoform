@@ -1,7 +1,7 @@
 {
  "artifact": "ast-Jinja2.json",
  "artifact_bytes": 7898905,
- "artifact_sha256": "f01eacec0541c62fae029a344746a5e828e61070d9950cc92f892ec1668e636d",
+ "artifact_sha256": "5524fe8e205eb5a83581c11916c62a32c387c387c248f34f97da14382cee6b2e",
  "command": "scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-sdist Jinja2",
  "cpg_schema_version": "1.7.70",
  "exporter": "cartographer/export_ast.sc",
@@ -9,10 +9,11 @@
  "exporter_sources": {
   "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
   "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
-  "cartographer/compiler/SourceCompiler.scala": "26a141ceac8506a6885e4ee7c6013e53d2e6774dd90b9a6c0c3a95491dab1497",
+  "cartographer/compiler/SourceCompiler.scala": "21383ac0c1c3bb8383a0eb4a743dea3510353bd8e89d3644cf5d9f05e306f63c",
   "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
  },
  "joern_version": "4.0.606",
+ "note": "The Jinja2 export is not byte-stable: on 2026-10-10 two exports of this tree with this exporter gave f01eacec... and a third gave this artifact (5524fe8e...); the only difference is the order of three fnref arguments in TemplateModule.__init__ (the first export of a fresh CPG reorders them, docs/languages.md). This record pins the artifact the oracle and specs were run on; a fresh export may give the other order. TemplateModule.__init__ is not compared (no live instance) and no theorem names it.",
  "recorded_by": "scripts/provenance.py record",
  "schema_version": 1,
  "source_path": "/Users/mbhatt/.cache/autoform/corpora/jinja2-3.1.6-sdist",

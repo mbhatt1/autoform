@@ -16,11 +16,11 @@ oracle cache (--no-cache: not consulted): 0 functions / 0 cases reported from ca
   DIVERGENCE lcm(int 4611686018427387904, int 2147483648): cc=int 4611686018427387904 lean=int 0 [boundary-typed]
   DIVERGENCE lcm(int 18446744073709551602, int 10): cc=int 18446744073709551546 lean=int 9223372036854775738 [random]
 
-module LinuxLcmPrefix (/tmp/af-agents/linux-lcm-work/postfix/lib, cc)
+module LinuxLcmPrefix (/private/tmp/af-agents/linux-lcm-work/postfix/lib, cc)
 measurement basis: c-native-typed-boundary-v4
 functions: 4 total, 4 hole-free, 2 exercised, 2 COMPARED (50% of all, 50% of hole-free)
 conformance: 86/99 agree (86%) vs cc, 13 divergences, 101 INCONCLUSIVE (hole / outOfFuel / unrepresentable)
-oracle cache: 2 functions stored under /tmp/af-agents/bug-linux/.autoform-work/oracle/LinuxLcmPrefix
+oracle cache: 2 functions stored under /tmp/af-agents/core-batch/.autoform-work/oracle/LinuxLcmPrefix
   INCONCLUSIVE x58  gcd: call:swap
   INCONCLUSIVE x43  lcm: call:swap
   by origin boundary-typed agree 42, diverge 7, inconclusive 49

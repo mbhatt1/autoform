@@ -1010,6 +1010,80 @@ inductive MethodResult where
   | mutating : EResult → Val → MethodResult
   deriving Repr, Inhabited
 
+/-! ### Java `String` / `CharSequence` (JLS §3.10.5, §4.3.3; `java.lang.String`)
+
+A Java string is a sequence of UTF-16 code units. A Lean `String` is a sequence of Unicode
+scalar values, so it can never hold a lone surrogate, and a string all of whose characters
+lie below U+10000 (the Basic Multilingual Plane) is *exactly* a sequence of UTF-16 code
+units, one per character. Every Java string method below is answered only on such strings
+(`javaBmp`); a receiver or string argument with a supplementary character is `none`, the
+caller's `mcall:` hole -- never an answer computed on code points, which would disagree with
+the JVM on `length`, `charAt` and every index.
+
+Under `.java` a caught exception cannot flow into these methods: a typed `catch` is the
+hole `control:TRY-handler-language`, so the Python caveat on `methodCore` (an exception
+value and a string are the same `Val`) has no Java witness. -/
+
+/-- Every character is in the BMP, so characters and UTF-16 code units coincide. -/
+def javaBmp (s : String) : Bool := s.toList.all (fun c => c.toNat < 0x10000)
+
+/-- `String.indexOf(String)`: the first index at which `t` occurs, `-1` if none
+(`"".indexOf("") = 0`, `"ab".indexOf("") = 0`). Structural on the receiver's characters,
+so the kernel computes it. -/
+def javaIndexFrom (t : List Char) : List Char → Nat → Int
+  | [],     i => if t.isEmpty then (i : Int) else -1
+  | c :: r, i => if t.isPrefixOf (c :: r) then (i : Int) else javaIndexFrom t r (i + 1)
+
+/-- `String.indexOf(int ch)` on a BMP receiver: the first index holding the code unit
+`ch`, `-1` if none. A BMP Lean string holds no surrogate code unit and no supplementary
+character, so for every other `int` (a surrogate, a supplementary code point, a negative
+or out-of-range value) the JVM's answer is `-1`, which is what the scan returns. -/
+def javaIndexOfChar (ch : Int) : List Char → Nat → Int
+  | [],     _ => -1
+  | c :: r, i => if (c.toNat : Int) == ch then (i : Int) else javaIndexOfChar ch r (i + 1)
+
+/-- The `java.lang.String` methods Core answers, on a `.str` receiver. `none` outside the
+BMP (see above) and for every shape not listed. Exceptions are the JVM's class names:
+`charAt`/`substring` out of range throw `StringIndexOutOfBoundsException` (Java 17 and 21
+both route through `String.checkIndex`/`checkBoundsBeginEnd`), and a `null` argument to
+`indexOf`/`startsWith`/`endsWith` dereferences it (`NullPointerException`). `equals`
+compares values (`String.equals`: true iff the argument is a `String` with the same code
+units); `==` on strings is NOT this -- it stays the reference-equality hole. -/
+def javaStringMethod (s : String) (name : String) (args : List Val) : Option EResult :=
+  if !javaBmp s then none else
+  let cs := s.toList
+  let sioobe : EResult := .exn (.str "StringIndexOutOfBoundsException")
+  let npe : EResult := .exn (.str "NullPointerException")
+  match name, args with
+  | "length",   []       => some (.val (.int cs.length))
+  | "isEmpty",  []       => some (.val (.bool cs.isEmpty))
+  | "toString", []       => some (.val (.str s))
+  | "charAt",   [.int i] =>
+      if 0 ≤ i ∧ i < cs.length then some (.val (.int (cs.getD i.toNat 'a').toNat))
+      else some sioobe
+  | "substring", [.int b] =>
+      if 0 ≤ b ∧ b ≤ cs.length then some (.val (.str (String.ofList (cs.drop b.toNat))))
+      else some sioobe
+  | "substring", [.int b, .int e] =>
+      if 0 ≤ b ∧ b ≤ e ∧ e ≤ cs.length then
+        some (.val (.str (String.ofList ((cs.take e.toNat).drop b.toNat))))
+      else some sioobe
+  | "equals", [.str t]   => if javaBmp t then some (.val (.bool (cs == t.toList))) else none
+  -- Not a `String`: `null`, a boxed number/boolean/character, an object, an array.
+  | "equals", [.unit]    => some (.val (.bool false))
+  | "equals", [.int _]   => some (.val (.bool false))
+  | "equals", [.bool _]  => some (.val (.bool false))
+  | "equals", [.float _] => some (.val (.bool false))
+  | "equals", [.ref _]   => some (.val (.bool false))
+  | "indexOf", [.str t]  => if javaBmp t then some (.val (.int (javaIndexFrom t.toList cs 0))) else none
+  | "indexOf", [.int ch] => some (.val (.int (javaIndexOfChar ch cs 0)))
+  | "indexOf", [.unit]   => some npe
+  | "startsWith", [.str t] => if javaBmp t then some (.val (.bool (t.toList.isPrefixOf cs))) else none
+  | "startsWith", [.unit]  => some npe
+  | "endsWith", [.str t]   => if javaBmp t then some (.val (.bool (t.toList.isSuffixOf cs))) else none
+  | "endsWith", [.unit]    => some npe
+  | _, _ => none
+
 /-- Methods on non-object receivers (`list`, `tuple`, `dict`).
 
 `none` means "not modelled": the caller keeps its `mcall:` hole. Note that this must be
@@ -1048,6 +1122,10 @@ def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : Lis
     | .dict kvs, "containsKey", [k] => pv (.bool (dictGet kvs k).isSome)
     | .dict kvs, "size", []     => pv (.int kvs.length)
     | .dict kvs, "isEmpty", []  => pv (.bool kvs.isEmpty)
+    | .str s, _, _ =>
+        match javaStringMethod s name args with
+        | some r => p r
+        | none   => none
     | _, _, _ => none
   | .javascript =>
     let p (r : EResult) : Option (Heap × MethodResult) := some (h, .pure r)
@@ -1170,7 +1248,9 @@ def jsMethodNames : List String := [ "push", "pop", "indexOf", "includes" ]
 
 /-- The `java.util.List`/`Map` names `methodCore .java` answers on a boxed collection. -/
 def javaMethodNames : List String :=
-  [ "<init>", "add", "get", "size", "isEmpty", "contains", "put", "containsKey" ]
+  [ "<init>", "add", "get", "size", "isEmpty", "contains", "put", "containsKey"
+  -- `java.lang.String` / `CharSequence` on a `.str` receiver (`javaStringMethod`).
+  , "length", "charAt", "substring", "equals", "indexOf", "startsWith", "endsWith", "toString" ]
 
 /-- Does `method` model this method name under this dialect?
 
@@ -1547,6 +1627,14 @@ private def javaMethodWitness : String → Val × List Val
   | "contains"    => (.list [], [.unit])
   | "put"         => (.dict [], [.unit, .unit])
   | "containsKey" => (.dict [], [.unit])
+  | "length"      => (.str "", [])
+  | "charAt"      => (.str "", [.int 0])
+  | "substring"   => (.str "", [.int 0])
+  | "equals"      => (.str "", [.unit])
+  | "indexOf"     => (.str "", [.unit])
+  | "startsWith"  => (.str "", [.unit])
+  | "endsWith"    => (.str "", [.unit])
+  | "toString"    => (.str "", [])
   | _             => (.unit, [])
 
 /-- Every name `knowsMethod .java` accepts is genuinely answered. -/
@@ -1567,6 +1655,86 @@ theorem knowsMethod_java_complete :
        | some (_, .mutating (.val (.int 1)) (.dict [(.str "a", .int 2)])) => true | _ => false
 #guard match method .java [] (.dict []) "get" [.str "zz"] with
        | some (_, .pure (.val .unit)) => true | _ => false
+
+/-! ### `java.lang.String` by computation
+
+Each statement below is closed by `rfl`: the kernel evaluates `method .java` on the
+literal. The same receivers and arguments are run on the JVM by
+`tests/test_java_strings.py`, which compares every answer here with `java` (Java 17
+locally, 21 in CI); the two lists are kept in step by that test, which reads this block. -/
+
+theorem java_str_length : method .java [] (.str "héllo") "length" [] =
+    some ([], .pure (.val (.int 5))) := rfl
+theorem java_str_length_empty : method .java [] (.str "") "length" [] =
+    some ([], .pure (.val (.int 0))) := rfl
+theorem java_str_isEmpty : method .java [] (.str "") "isEmpty" [] =
+    some ([], .pure (.val (.bool true))) := rfl
+theorem java_str_isEmpty_not : method .java [] (.str " ") "isEmpty" [] =
+    some ([], .pure (.val (.bool false))) := rfl
+-- `charAt` answers the UTF-16 code unit as a `char` (an integer, as every Java `char` is
+-- in Core): 'é' is U+00E9 = 233.
+theorem java_str_charAt : method .java [] (.str "héllo") "charAt" [.int 1] =
+    some ([], .pure (.val (.int 233))) := rfl
+theorem java_str_charAt_neg : method .java [] (.str "abc") "charAt" [.int (-1)] =
+    some ([], .pure (.exn (.str "StringIndexOutOfBoundsException"))) := rfl
+theorem java_str_charAt_end : method .java [] (.str "abc") "charAt" [.int 3] =
+    some ([], .pure (.exn (.str "StringIndexOutOfBoundsException"))) := rfl
+theorem java_str_substring1 : method .java [] (.str "abcdef") "substring" [.int 2] =
+    some ([], .pure (.val (.str "cdef"))) := rfl
+theorem java_str_substring1_len : method .java [] (.str "abc") "substring" [.int 3] =
+    some ([], .pure (.val (.str ""))) := rfl
+theorem java_str_substring1_past : method .java [] (.str "abc") "substring" [.int 4] =
+    some ([], .pure (.exn (.str "StringIndexOutOfBoundsException"))) := rfl
+theorem java_str_substring2 : method .java [] (.str "abcdef") "substring" [.int 1, .int 4] =
+    some ([], .pure (.val (.str "bcd"))) := rfl
+theorem java_str_substring2_empty : method .java [] (.str "abc") "substring" [.int 2, .int 2] =
+    some ([], .pure (.val (.str ""))) := rfl
+theorem java_str_substring2_inverted : method .java [] (.str "abc") "substring" [.int 2, .int 1] =
+    some ([], .pure (.exn (.str "StringIndexOutOfBoundsException"))) := rfl
+theorem java_str_equals : method .java [] (.str "ab") "equals" [.str "ab"] =
+    some ([], .pure (.val (.bool true))) := rfl
+theorem java_str_equals_not : method .java [] (.str "ab") "equals" [.str "aB"] =
+    some ([], .pure (.val (.bool false))) := rfl
+theorem java_str_equals_null : method .java [] (.str "ab") "equals" [.unit] =
+    some ([], .pure (.val (.bool false))) := rfl
+theorem java_str_equals_char : method .java [] (.str "a") "equals" [.int 97] =
+    some ([], .pure (.val (.bool false))) := rfl
+theorem java_str_indexOf : method .java [] (.str "banana") "indexOf" [.str "na"] =
+    some ([], .pure (.val (.int 2))) := rfl
+theorem java_str_indexOf_empty : method .java [] (.str "banana") "indexOf" [.str ""] =
+    some ([], .pure (.val (.int 0))) := rfl
+theorem java_str_indexOf_missing : method .java [] (.str "banana") "indexOf" [.str "x"] =
+    some ([], .pure (.val (.int (-1)))) := rfl
+theorem java_str_indexOf_char : method .java [] (.str "banana") "indexOf" [.int 110] =
+    some ([], .pure (.val (.int 2))) := rfl
+theorem java_str_indexOf_null : method .java [] (.str "a") "indexOf" [.unit] =
+    some ([], .pure (.exn (.str "NullPointerException"))) := rfl
+theorem java_str_startsWith : method .java [] (.str "prefix") "startsWith" [.str "pre"] =
+    some ([], .pure (.val (.bool true))) := rfl
+theorem java_str_startsWith_not : method .java [] (.str "prefix") "startsWith" [.str "fix"] =
+    some ([], .pure (.val (.bool false))) := rfl
+theorem java_str_endsWith : method .java [] (.str "prefix") "endsWith" [.str "fix"] =
+    some ([], .pure (.val (.bool true))) := rfl
+theorem java_str_endsWith_empty : method .java [] (.str "") "endsWith" [.str ""] =
+    some ([], .pure (.val (.bool true))) := rfl
+theorem java_str_toString : method .java [] (.str "abc") "toString" [] =
+    some ([], .pure (.val (.str "abc"))) := rfl
+
+/-- Outside the BMP every method is unanswered -- the caller's hole, never a code-point
+answer: "😀" is ONE Lean character and TWO UTF-16 code units, so `length` would be 1
+here and 2 on the JVM. -/
+theorem java_str_nonBmp_length : method .java [] (.str "a😀") "length" [] = none := rfl
+theorem java_str_nonBmp_arg : method .java [] (.str "ab") "equals" [.str "😀"] = none := rfl
+
+/-- The general form: on a non-BMP receiver no `java.lang.String` method answers. -/
+theorem javaStringMethod_nonBmp {s : String} (h : javaBmp s = false) (n : String)
+    (args : List Val) : javaStringMethod s n args = none := by
+  simp [javaStringMethod, h]
+
+/-- `length` on any BMP string is its number of characters = UTF-16 code units. -/
+theorem javaStringMethod_length {s : String} (h : javaBmp s = true) :
+    javaStringMethod s "length" [] = some (.val (.int s.toList.length)) := by
+  simp [javaStringMethod, h]
 
 /-- Every name `knowsMethod .javascript` accepts is genuinely answered. -/
 theorem knowsMethod_javascript_complete :

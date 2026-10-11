@@ -44,7 +44,7 @@ table. "Real corpus" means a measured open-source repository, not a fixture.
 | Language | Source -> Lean model | Differential oracle against the real runtime | Measured on a real corpus (languages.md) |
 |---|---|---|---|
 | Python | yes; the reference dialect | CPython; yes | `cachetools`: 209 functions, 204 hole-free, 150 in the verifiable core (bound by check_docs). Pipeline run on Django (`django/`, 10,623 functions) in [scale.md](scale.md) |
-| Java | yes; own dialect, 64-bit `long` | JVM backend; ran on a real corpus | Apache commons-lang3 3.17.0 subset: 488 functions, 422 hole-free, 196 in the verifiable core; oracle compared **32** functions, 87/87 cases agree, 0 divergences, 513 cases inconclusive (all bound by check_docs) |
+| Java | yes; own dialect, 64-bit `long` | JVM backend; ran on a real corpus | Apache commons-lang3 3.17.0 subset: 488 functions, 421 hole-free, 196 in the verifiable core; oracle compared **83** functions, 196/196 cases agree, 0 divergences, 404 cases inconclusive (all bound by check_docs) |
 | Go | yes; own dialect | `go test` backend; ran on a three-function fixture only | matrix row: 83 functions, 21 hole-free, 6 in the verifiable core (historical; oracle "not yet on this corpus") |
 | C | yes; typed fixed-width numerics, UB is a hole | `cc`; the matrix row records the oracle as crashed on that historical corpus; README lists `cc`/`clang` | matrix row: 59 functions, 17 hole-free, 8 in the verifiable core (historical). Linux `lib/math` (`LinuxLcm`) is re-landed from kernel v7.2 |
 | C++ | yes, through the C front end (README groups it with C) | as for C | no row in the support matrix. The V8 corpus (C++) is assessed in [evidence-V8Base.md](evidence-V8Base.md): "every function translated without holes" is marked UNSUPPORTED there |
@@ -65,7 +65,7 @@ Machine code (ELF, PE, Mach-O, assembly) is a separate path
 For a typical stack this means: Python and Java have the deepest evidence;
 Go, C, C++, Kotlin, TypeScript and JavaScript translate and type-check but have little or
 no oracle evidence on real code; Rust has a narrow real-crate result (integer library code that Aeneas translates) and Hack gets nothing. A hole-free function is
-far from a verified function (Java: 32 compared of 422 hole-free).
+far from a verified function (Java: 83 compared of 421 hole-free).
 
 ## 3. Security posture
 
@@ -167,10 +167,11 @@ bound"):
 * **Linux sandboxing needs unprivileged user namespaces.** CI relaxes the Ubuntu 24.04
   AppArmor restriction to get `bwrap`; on hosts that forbid it, only the network-only
   `unshare` fallback or no confinement is available.
-* **Java evidence is 32 of 422** hole-free functions compared with the real JVM
+* **Java evidence is 83 of 421** hole-free functions compared with the real JVM
   (commons-lang3 subset). The inconclusive cases are named in
-  [languages.md](languages.md): `String` methods such as `length()` have no model, and
-  Java class initializers are not exported.
+  [languages.md](languages.md): `String` methods beyond the modelled set
+  (`trim`, `toLowerCase`, `toCharArray`, ...), static calls into `java.lang`, and
+  Java class initializers, which are not exported.
 * **Joern, `lake` and compiler steps are not sandboxed** (section 3).
 * **Joern's export is not byte-stable** on some inputs: re-exports differ in the choice of
   an overload resolution on commons-lang3 and in an argument order on Jinja2

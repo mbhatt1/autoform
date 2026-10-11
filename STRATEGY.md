@@ -2174,8 +2174,10 @@ Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), 
   `step; continue` — an exact rewrite, not an approximation, so no hole is needed. The
   negative control is in `Semantics.lean`: the naive desugaring of the same loop is
   pinned as `outOfFuel` while the real one is pinned as the value `cc` prints. A `for`
-  with a clause elided is `control:FOR:elided-clause`, because Joern omits absent clauses
-  and nothing in the graph says which of the three the survivor was.
+  with a clause elided was `control:FOR:elided-clause`, because Joern omits absent clauses;
+  since 2026-10-10 a C `for` reads the clause slots from the children's `order` (C11
+  6.8.5.3: an omitted condition is a nonzero constant), `SourceCompiler.cForElided`,
+  tested against `cc` in `tests/test_c_for_elided.py`; a layout it cannot read keeps the hole.
 
 * **Brace initializers.** `{1,2,3}` is `Expr.listE`; `{ .a = 1, .b = 2 }` is `Expr.dictE`
   keyed by the field names, with `Dialect.fieldsOnDicts` making `s.a` read it back under a

@@ -22,18 +22,18 @@
       "render_sha256": "27b4fe8cc814bb8fff1589ca08192c9ab0e54bca797b97a721ee986a726cbe1d"
     },
     "CommonsLang3": {
-      "ast_bytes": 1597749,
-      "ast_sha256": "d6e4354775d00705a054a7e63306c709493eee148e0326e5d38ad6195ca4959e",
+      "ast_bytes": 1678878,
+      "ast_sha256": "25fac9abf4e508089a0510fa635ce48d5e4bc99195a1730eca897a043753bb2d",
       "ast_tracked": true,
-      "render_bytes": 855983,
-      "render_sha256": "c445586f44a655459af4778b26dc689ce956e3f9bc44f1df61af172e0acad91c"
+      "render_bytes": 900231,
+      "render_sha256": "7820000c6e1bbeed012180e4a2afddb6ec0bcd843687d7cdf33387977720d6dc"
     },
     "Jinja2": {
       "ast_bytes": 7898905,
-      "ast_sha256": "f01eacec0541c62fae029a344746a5e828e61070d9950cc92f892ec1668e636d",
+      "ast_sha256": "5524fe8e205eb5a83581c11916c62a32c387c387c248f34f97da14382cee6b2e",
       "ast_tracked": true,
       "render_bytes": 3474668,
-      "render_sha256": "74b895388aed2d08c71573b5f24a285326a5d408623208ca7aaec5a4744862aa"
+      "render_sha256": "5936c9dcfc1223a0b579bfbc17997c3d596627173dbb803b9a6aa75a3694e299"
     },
     "LangC": {
       "ast_bytes": 175419,
@@ -78,11 +78,11 @@
       "render_sha256": "90861a61a8281e335f62d08f15731c7f0aafa6a37d06db107ee3cd15c270d4b6"
     },
     "LinuxLcm": {
-      "ast_bytes": 9697,
-      "ast_sha256": "fa1ccfd0c96f7b359b5dbf0c1df68ddf1c88f3181d1dc296fc312d7f26b11f38",
+      "ast_bytes": 21445,
+      "ast_sha256": "bfd9bfee894920e3ef165a7e90729f3247191b9a9caa0815e95709762f785496",
       "ast_tracked": true,
-      "render_bytes": 6830,
-      "render_sha256": "843dbe94ab3cb361f64d83f079c8684a69fcf998a3f858cb0cf1f445f82955b8"
+      "render_bytes": 11766,
+      "render_sha256": "176d504ce19d4c4181abd15299ef75262e550ffc3162d23034650710ae8ee468"
     },
     "LinuxLcmPrefix": {
       "ast_bytes": 4998,
@@ -167,17 +167,17 @@
     },
     "SpecsGen/CommonsLang3": {
       "corpus": "CommonsLang3",
-      "corpus_ast_sha256": "d6e4354775d00705a054a7e63306c709493eee148e0326e5d38ad6195ca4959e",
+      "corpus_ast_sha256": "25fac9abf4e508089a0510fa635ce48d5e4bc99195a1730eca897a043753bb2d",
       "source": "ast-CommonsLang3.json"
     },
     "SpecsGen/Jinja2": {
       "corpus": "Jinja2",
-      "corpus_ast_sha256": "f01eacec0541c62fae029a344746a5e828e61070d9950cc92f892ec1668e636d",
+      "corpus_ast_sha256": "5524fe8e205eb5a83581c11916c62a32c387c387c248f34f97da14382cee6b2e",
       "source": "ast-Jinja2.json"
     },
     "SpecsGen/LinuxLcm": {
       "corpus": "LinuxLcm",
-      "corpus_ast_sha256": "fa1ccfd0c96f7b359b5dbf0c1df68ddf1c88f3181d1dc296fc312d7f26b11f38",
+      "corpus_ast_sha256": "bfd9bfee894920e3ef165a7e90729f3247191b9a9caa0815e95709762f785496",
       "source": "ast-LinuxLcm.json"
     },
     "SpecsGen/LinuxLib": {

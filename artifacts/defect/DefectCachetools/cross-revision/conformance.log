@@ -1,42 +1,43 @@
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: decorating class methods with @cachedmethod is deprecated
+  sys.exit(main())
+/tmp/af-agents/core-batch/scripts/differential.py:2488: DeprecationWarning: decorating class methods with @cachedmethod is deprecated
+  got = fn(*args)
+/tmp/af-agents/core-batch/scripts/differential.py:2488: DeprecationWarning: 19
+  got = fn(*args)
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: -16
+  sys.exit(main())
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: -12
+  sys.exit(main())
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: -18
+  sys.exit(main())
+sandbox: seatbelt
 language: python (.py x498) -> runtime cpython
 test suite: /Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.7-sdist-with-tests/tests/test_cache.py
 cases recorded from the test suite: 523
-/tmp/af-agents/defect-hunt/scripts/differential.py:3207: DeprecationWarning: decorating class methods with @cachedmethod is deprecated
-  sys.exit(main())
-/tmp/af-agents/defect-hunt/scripts/differential.py:2409: DeprecationWarning: decorating class methods with @cachedmethod is deprecated
-  got = fn(*args)
-/tmp/af-agents/defect-hunt/scripts/differential.py:2409: DeprecationWarning: 19
-  got = fn(*args)
-/tmp/af-agents/defect-hunt/scripts/differential.py:3207: DeprecationWarning: -16
-  sys.exit(main())
-/tmp/af-agents/defect-hunt/scripts/differential.py:3207: DeprecationWarning: -12
-  sys.exit(main())
-/tmp/af-agents/defect-hunt/scripts/differential.py:3207: DeprecationWarning: -18
-  sys.exit(main())
 cases constructed for methods the suite never called: 3900 (39 functions)
 case cap: 4823 recorded, 600 kept (suite-traced first), dropped 3832 constructed, 391 random
 oracle cache (--no-cache: not consulted): 0 functions / 0 cases reported from cache, 50 functions / 600 cases to compare now (--no-cache: 50)
+  DIVERGENCE cachetools/__init__.py:<module>.Cache.__setitem__(int 4, int 7): cpython=unit lean=unit; heap graph=some false [test-suite]
 
 module DefectCachetools (/Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.7-sdist-with-tests, cpython)
-measurement basis: python-class-slots-v6+class-values-v1+trace-returns-v1+heap-graph-v1
-functions: 499 total, 416 hole-free, 50 exercised, 29 COMPARED (6% of all, 7% of hole-free)
-conformance: 440/440 agree (100%) vs cpython, 0 divergences, 160 INCONCLUSIVE (hole / outOfFuel / unrepresentable)
-oracle cache: 50 functions stored under /tmp/af-agents/defect-hunt/.autoform-work/oracle/DefectCachetools
-  INCONCLUSIVE x91  cachetools/__init__.py:<module>.Cache.__setitem__: class-attribute:unmodeled-value
-  INCONCLUSIVE x16  cachetools/__init__.py:<module>.Cache.__delitem__: class-attribute:unmodeled-value
-  INCONCLUSIVE x6   cachetools/__init__.py:<module>.Cache.__setitem__: class-attribute:external-base:<external>collections.abc.MutableMapping:popitem
-  INCONCLUSIVE x6   cachetools/__init__.py:<module>.Cache.__init__: class-attribute:unmodeled-value
+measurement basis: python-class-slots-v6+class-values-v1+trace-returns-v1+closure-captures-v1+heap-graph-v1
+functions: 499 total, 416 hole-free, 50 exercised, 33 COMPARED (7% of all, 8% of hole-free)
+conformance: 563/564 agree (99%) vs cpython, 1 divergences, 36 INCONCLUSIVE (hole / outOfFuel / unrepresentable) [4223 cases dropped by the case cap, not compared: see conformance.json case_cap]
+oracle cache: 50 functions stored under /tmp/af-agents/core-batch/.autoform-work/oracle/DefectCachetools
   INCONCLUSIVE x4   cachetools/_cached.py:<module>._locked.cache_clear: field:__enter__:non-object
-  INCONCLUSIVE x3   cachetools/__init__.py:<module>.Cache.clear: class-attribute:unmodeled-value
   INCONCLUSIVE x3   cachetools/__init__.py:<module>.RRCache.__setitem__: call:value:not-callable
   INCONCLUSIVE x3   cachetools/_cached.py:<module>._condition_info.cache_clear: field:__enter__:non-object
   INCONCLUSIVE x3   cachetools/_cached.py:<module>._unlocked_info.cache_info: call:value:not-callable
   INCONCLUSIVE x3   tests/test_tlru.py:<module>.default_ttu: field:inf:non-object
-  by origin constructed agree 38, diverge 0, inconclusive 30
+  INCONCLUSIVE x2   cachetools/__init__.py:<module>.Cache.setdefault: binop:<
+  INCONCLUSIVE x2   cachetools/_cachedmethod.py:<module>._warn_classmethod: mcall:<absent:external>warnings.warn:not-a-class-method
+  INCONCLUSIVE x2   cachetools/_cachedmethod.py:<module>._warn_instance_dict: mcall:<absent:external>warnings.warn:not-a-class-method
+  INCONCLUSIVE x2   cachetools/_cached.py:<module>._locked_info.cache_clear: field:__enter__:non-object
+  INCONCLUSIVE x2   cachetools/__init__.py:<module>.RRCache.popitem: call:value:not-callable
+  by origin constructed agree 40, diverge 0, inconclusive 28
   by origin random      agree 2, diverge 0, inconclusive 7
-  by origin test-suite  agree 400, diverge 0, inconclusive 123
+  by origin test-suite  agree 521, diverge 1, inconclusive 1
   skipped 245 hole-free methods: no instance reached by the test suite
   skipped skip_unencodable_args: 4179
   skipped skip_unencodable_ret: 2721
   skipped skip_no_instance: 245
-exit 0

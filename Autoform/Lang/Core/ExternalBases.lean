@@ -89,4 +89,13 @@ match on the marker, so the kernel decides it without any prefix test. -/
 def externalContract (name : String) : Option ExternalBase :=
   (externalBaseContracts.find? (·.1 == name)).map Prod.snd
 
+/-- Contracted names whose CODE is modelled (`ExternalMethods.lean`): `(base, name)`.
+Lookup through the base answers these with the method
+`externalMethodName base name` instead of an opaque member. -/
+def externalModelled : List (String × String) :=
+  [("<external>collections.abc.MutableMapping", "popitem")]
+
+/-- The reserved function name of a modelled external method. -/
+def externalMethodName (base attr : String) : String := base ++ "." ++ attr
+
 end Autoform.Core

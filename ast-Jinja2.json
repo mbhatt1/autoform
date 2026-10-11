@@ -56504,11 +56504,11 @@
           "args": [
            {
             "k": "fnref",
-            "v": "__builtin.str.new_context"
+            "v": "jinja2/environment.py:<module>.Environment.lexer.get.new_context"
            },
            {
             "k": "fnref",
-            "v": "jinja2/environment.py:<module>.Environment.lexer.get.new_context"
+            "v": "__builtin.str.new_context"
            },
            {
             "k": "fnref",

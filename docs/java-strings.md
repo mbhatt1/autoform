@@ -1,10 +1,26 @@
 # Java String model: analysis and cost (2026-10-10)
 
-Status: **not implemented.** A Java `String`/`CharSequence` model cannot be added without
-editing `Autoform/Lang/Core`, so by the rule for this work it stops here. Nothing under
-`Autoform/Lang/Core` was touched. Numbers below are from `evidence-CommonsLang3.json`
-(`inconclusive_by_label`: `call:length` 299 cases / 102 functions, `call:charAt` 7,
-`call:toString` 8, `str:reference-equality` 25 / 8 functions).
+Status: **implemented (2026-10-10), batched with the other Core edits.** The analysis below
+is kept as written before the change; this paragraph says what was done and measured.
+
+* Exporter: a Java `DYNAMIC_DISPATCH` call to a method outside the corpus keeps its
+  receiver (argument index 0) and becomes an `mcall` (`SourceCompiler.javaReceiver`).
+  Static calls, `super.m()`, constructors and corpus methods are unchanged.
+* Core: `Stdlib.javaStringMethod` answers `length`, `isEmpty`, `toString`, `charAt`,
+  `substring` (1 and 2 arguments), `equals` (value), `indexOf(String)`, `indexOf(int)`,
+  `startsWith`, `endsWith` on a `.str` receiver, with UTF-16 code-unit semantics on BMP
+  strings. A receiver or string argument with a supplementary character answers `none`
+  (the caller's `mcall:` hole), never a code-point answer. Java `==` on strings is still the
+  `str:reference-equality` hole.
+* Proof and test: 28 `java_str_*` theorems closed by `rfl` in `Stdlib.lean`, plus
+  `javaStringMethod_nonBmp`/`_length` for all strings; `tests/test_java_strings.py` runs
+  every theorem and a 1278-case grid on the JVM: 962 BMP cases agree, 0 disagree, 316
+  non-BMP cases hole (OpenJDK 17.0.15 and 21.0.7).
+* commons-lang3 re-land (`evidence-CommonsLang3.json`): compared functions 32 -> 83, agreeing
+  cases 87 -> 196, inconclusive 513 -> 404, divergences 0 -> 0; `call:length` 299 cases
+  -> 0, `call:charAt` 7 -> 0, `call:toString` 8 -> 3, `str:reference-equality` 25 -> 25.
+  The intermediate run's 2 divergences were a pre-existing Java `switch` lowering bug
+  (docs/languages.md, "Java at scale"), fixed before the recorded run.
 
 ## 1. What the model must touch
 

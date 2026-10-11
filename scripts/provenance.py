@@ -299,6 +299,11 @@ def cmd_record(args) -> int:
         "command": args.command,
         "recorded_by": "scripts/provenance.py record",
     }
+    # A free-text statement about the regeneration that the digests cannot carry --
+    # e.g. that the export is NOT byte-stable and this artifact is one of the observed
+    # outputs. Omitted when not given, so existing records stay byte-identical.
+    if getattr(args, "note", None):
+        rec["note"] = args.note
     PROV_DIR.mkdir(exist_ok=True)
     out = record_path(artifact)
     out.write_text(json.dumps(rec, indent=1, sort_keys=True) + "\n")
@@ -354,6 +359,8 @@ def main() -> int:
     rc.add_argument("--source", required=True, help="source tree the CPG was built from")
     rc.add_argument("--exporter", required=True, help="the .sc script that produced it")
     rc.add_argument("--command", required=True, help="the exact command line used")
+    rc.add_argument("--note", help="free-text statement recorded with the artifact "
+                    "(e.g. that the export is not byte-stable)")
     rc.set_defaults(fn=cmd_record)
 
     sh = sub.add_parser("show", help="print an artifact's provenance record")
