@@ -855,8 +855,10 @@ functions (`StringUtils.join(boolean[],char)`, `join(double[],char)` and the thr
 are "hole-free, no case built") and none of the 83 specification theorems mentions them,
 so the oracle figures above do not depend on the choice; the tracked AST carries one of the
 two resolutions, and a fresh export may carry the other. The same happens on Jinja2: the
-first export of a fresh CPG reorders two `fnref` arguments in `TemplateModule.__init__`,
-and later exports of that CPG match the tracked file (and the HEAD exporter reproduces the
+first export of a fresh CPG reorders two `fnref` arguments in `TemplateModule.__init__`
+(seen again in the 2026-10-10 re-land: two exports gave `f01eacec…`, the third, which is
+the tracked artifact and the one the oracle and specs ran on, gave `5524fe8e…`; its
+provenance record carries a `note` saying so), and later exports of that CPG match the tracked file (and the HEAD exporter reproduces the
 first-run output, so the cause is upstream of the exporter change). The provenance records
 name the command; they do not promise a byte-identical regeneration, and that is an open
 item (the fix belongs in the frontend pass that orders overload candidates, not in the
