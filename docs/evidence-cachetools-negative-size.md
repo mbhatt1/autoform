@@ -85,7 +85,7 @@ Exported 473 functions + 19 module initializers; rendered 493 functions.
 
 ## The divergence
 
-`artifacts/defect/DefectCachetoolsNeg/cross-revision/conformance.json` (tracked), model 7.1.4
+`tests/fixtures/defect/getsizeof_negative/recorded-cross-revision.json` (tracked: the divergence rows and counts extracted from the run's gitignored `conformance.json`), model 7.1.4
 against the 7.1.5 runtime, `divergence_detail`, the one row on the buggy function:
 
 ```

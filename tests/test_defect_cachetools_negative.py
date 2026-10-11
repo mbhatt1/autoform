@@ -4,7 +4,7 @@ Three layers, each skipped by NAME when what it needs is absent (a skip is not a
 
 * the witness test (tracked fixture) fails on 7.1.4 and passes on 7.1.5 -- needs the two
   digest-pinned corpora under ~/.cache/autoform/corpora;
-* the tracked oracle evidence (artifacts/defect/DefectCachetoolsNeg) holds one
+* the tracked oracle evidence (tests/fixtures/defect/getsizeof_negative/recorded-*.json, extracted from the runs' gitignored conformance.json) holds one
   `Cache.__setitem__` divergence whose expected value is the fixed runtime's `ValueError`,
   and none on the same-revision control -- needs nothing;
 * the full replay regenerates the 7.1.4 AST (Joern + `cartographer/plain_class_values.py`),
@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "cartographer"))
 import plain_class_values  # noqa: E402
 
 WITNESS = ROOT / "tests" / "fixtures" / "defect" / "getsizeof_negative"
-EVIDENCE = ROOT / "artifacts" / "defect" / "DefectCachetoolsNeg"
+EVIDENCE = ROOT / "tests" / "fixtures" / "defect" / "getsizeof_negative"
 CORPORA = Path(os.path.expanduser("~/.cache/autoform/corpora"))
 OLD = CORPORA / "cachetools-7.1.4-lib-7.1.5-tests"   # src/cachetools of 7.1.4, tests of 7.1.5
 NEW = CORPORA / "cachetools-7.1.5-sdist-with-tests"  # 7.1.5 sdist, tests included
@@ -61,7 +61,7 @@ def test_negative_size_witness_passes_on_7_1_5():
 
 
 def _evidence(run):
-    return json.loads((EVIDENCE / run / "conformance.json").read_text())
+    return json.loads((EVIDENCE / ("recorded-%s.json" % run)).read_text())
 
 
 def test_tracked_evidence_has_the_setitem_divergence_on_the_buggy_revision():
