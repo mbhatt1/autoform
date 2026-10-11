@@ -49,7 +49,10 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
-      - uses: mbhatt1/autoform@<full commit SHA of the release you reviewed>
+      # Pin to a full commit SHA you have reviewed; this one is main on 2026-10-11, the
+      # commit whose CI passed all four required workflows and that release_check.sh
+      # reports as READY.
+      - uses: mbhatt1/autoform@becfe15f513aa52a7906772657b32dc411b6a4e4
         with:
           module: PullRequest
           # base defaults to the pull request's base commit

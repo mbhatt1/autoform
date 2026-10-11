@@ -26,9 +26,14 @@ and the runtime of each source language you want compared (CPython, `cc`, Java, 
 Node, Kotlin). `autoform doctor` names every missing one and how to install it.
 
 ```sh
+git clone https://github.com/mbhatt1/autoform && cd autoform
 python -m pip install '.[machine]'      # omit [machine] for source code only
 autoform doctor
 ```
+
+autoform is not on PyPI yet: install from a checkout as above. Once the first release is
+published, `pip install autoform-lean` will install the same package
+([releasing](docs/releasing.md)).
 
 The distribution is `autoform-lean`; the command and import name are `autoform`. Pip
 installs the Python package with a bundled runtime (the Lean library, the Joern exporter,
