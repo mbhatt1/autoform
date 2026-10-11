@@ -125,12 +125,34 @@ Git URL acceptance test for both proved and false requested security properties.
 For PyPI releases, configure a [trusted publisher](https://docs.pypi.org/trusted-publishers/)
 for project `autoform-lean`, owner `mbhatt1`, repository `autoform`, workflow
 `package.yml`, environment `pypi`. Create that GitHub environment as well. Bump both
-`pyproject.toml` and `src/autoform/__init__.py`, then publish a GitHub release tagged
+`pyproject.toml` and `src/autoform/__init__.py`, add the version's section to
+[`CHANGELOG.md`](../CHANGELOG.md), then publish a GitHub release tagged
 `v<version>`. The publishing job waits for package installation, installed machine
 proofs, the source-runtime workflow using that same wheel, the machine workflow, and the repository's
 full build, trust audit, tooling and integrity checks. It rejects a release tag
 that disagrees with the metadata. A missing historical corpus or failed audit
 blocks publication; a successful package build alone is insufficient.
+Before publishing, run `scripts/release_check.sh`. It fails unless the working tree is
+clean, `pyproject.toml`, `src/autoform/__init__.py` and the top `CHANGELOG.md` section
+agree on one version, the tag `v<version>` does not exist, every required workflow
+(`ci.yml`, `package.yml`, `source.yml`, `machine.yml`) has a successful run on exactly
+`HEAD` (`gh run list`), and the version is not already on PyPI. When it passes it prints
+the `git tag`, `git push` and `gh release create` commands and runs none of them;
+publishing is irreversible, so that step is a person's decision.
+
+Supply-chain evidence is produced by the publish path, in the `evidence` job that runs
+before `publish`: a CycloneDX SBOM of the installed wheel's dependency closure
+(`cyclonedx-bom==7.5.0`, version-pinned, not hash-pinned) uploaded as a release asset,
+and a build-provenance attestation for the wheel and sdist
+(`actions/attest-build-provenance`, signed with the workflow's OIDC identity). Verify
+a downloaded wheel with `gh attestation verify <file> --repo mbhatt1/autoform`.
+Every third-party action in every workflow is pinned to a full commit SHA with its tag
+in a comment, and every job declares `permissions:`; only `evidence` (contents,
+id-token, attestations: write) and `publish` (id-token: write) exceed read. These jobs
+and pins were validated as YAML and the SHAs resolved with `gh api`, but GitHub Actions
+cannot be run before a release exists, so they have not been exercised. Bump pinned SHAs
+deliberately (Dependabot's `github-actions` ecosystem can propose them).
+
 This follows the [PyPA publishing workflow](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/).
 
 ### Reproducible builds
