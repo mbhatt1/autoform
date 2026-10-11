@@ -126,3 +126,29 @@ def test_missing_lean_project_is_a_named_error(tmp_path):
                         "--out", str(out)], capture_output=True, text=True, timeout=600)
     assert p.returncode == 2
     assert json.load(open(out / "rust-error.json"))["error"] == "lean-project-missing"
+
+
+GCD = os.environ.get("AUTOFORM_RUST_GCD_CRATE")
+
+
+def test_real_crate_reproduces_the_tracked_evidence(tmp_path):
+    """gcd 2.3.0 from crates.io (digest-verified by the caller), rerun from scratch: every figure
+    in the tracked evidence-RustGcd.json -- the ones docs bind -- must come out identical."""
+    if not GCD:
+        if REQUIRED:
+            pytest.fail("AUTOFORM_RUST_REQUIRED=1 but AUTOFORM_RUST_GCD_CRATE (unpacked gcd-2.3.0.crate) is not set")
+        pytest.skip("AUTOFORM_RUST_GCD_CRATE not set (unpacked, sha256-verified gcd-2.3.0.crate)")
+    tracked = json.load(open(os.path.join(ROOT, "evidence-RustGcd.json")))
+    out, ev = tmp_path / "out", tmp_path / "evidence.json"
+    p = subprocess.run([sys.executable, SCRIPT, "--crate", GCD, "--module", "RustGcd", "--lean-project", LP,
+                        "--out", str(out), "--evidence", str(ev),
+                        "--crate-sha256", tracked["crate"]["crate_sha256"]],
+                       capture_output=True, text=True, timeout=5400)
+    evidence = os.environ.get("AUTOFORM_RUST_EVIDENCE_DIR")
+    if evidence and out.exists():
+        shutil.rmtree(os.path.join(evidence, "gcd-2.3.0"), ignore_errors=True)
+        shutil.copytree(out, os.path.join(evidence, "gcd-2.3.0"))
+    assert p.returncode == 0, p.stdout[-2000:] + p.stderr[-2000:]
+    fresh = json.load(open(ev))
+    for key in ("crate", "pins", "ledger", "oracle", "kernel_checked", "assumptions"):
+        assert fresh[key] == tracked[key], key

@@ -45,7 +45,9 @@ autoform doctor [--strict] [--json]
 Required: Python 3.10+, git, `lake`, `lean`, `leanchecker`, `joern` — each checked
 against `lean-toolchain` and `joern-version`, because the neutral AST is a function of
 the frontend build. Optional: the language runtimes (`python3`, `cc`, `clang`, `java`,
-`javac`, `go`, `node`, `kotlinc`) and the `[machine]` extra. A missing runtime only
+`javac`, `go`, `node`, `kotlinc`), the Rust path (`cargo`, `rust-toolchain`, `charon`,
+`aeneas`, `aeneas-lean-project`, each checked against `rust-pins.json`) and the `[machine]`
+extra. A missing runtime only
 disables that language's differential oracle; `--strict` makes it fatal too. `--json`
 prints a `schema_version: 1` document, one entry per tool with `path`, `found_version`,
 `expected_version`, `status`, `required`, an install `hint`, and the languages a missing
@@ -56,8 +58,10 @@ not run.
 
 ```
 autoform source SRC [Module] [--ref REF] [--subdir PATH] [--keep-checkout]
+                [--lang auto|rust|joern] [--rust-lean-project DIR]
                 [--shard-functions N] [--timeout SECONDS]
 autoform assure SRC [Module] [--ref REF] [--subdir PATH] [--keep-checkout]
+                [--lang auto|rust|joern] [--rust-lean-project DIR]
                 [--shard-functions N] [--stage-timeout SECONDS] [--properties FILE]
 ```
 
@@ -77,6 +81,17 @@ report; see `docs/repository-analysis.md`.
   guarantee.
 * `--properties FILE` supplies independent Lean security properties (default
   `autoform.properties.json` in the selected source directory); see `docs/security.md`.
+* `--lang` picks the route. `auto` (default) takes the **Rust path** when the selected
+  directory is a Cargo package with a library target, and the Joern pipeline otherwise;
+  `rust` forces the Rust path, `joern` refuses it. The Rust path (`scripts/rust_aeneas.py`,
+  `docs/rust.md`) runs rustdoc, Charon and Aeneas instead of the eight Joern stages and
+  writes `ledger-<Module>.json`, `conformance.json`, `rust-provenance.json`, the case
+  theorems and `summary.md` (with `assure`, also `run.json` and `guarantee.json`; exit `1`
+  on any hole, inconclusive case, divergence or unproved case theorem). `--properties` is
+  not supported there. A missing tool or scratch project is a named error in
+  `rust-error.json`, exit `2`.
+* `--rust-lean-project DIR` names the scratch Lake project holding Aeneas' Lean library
+  (default `$AUTOFORM_RUST_LEAN_PROJECT`; `scripts/rust_setup.sh` creates one).
 
 Exit `1` from `assure` is not a crash: the workflow finished with unresolved gaps
 (`run.json`: `completed_with_gaps`). A scoped certificate in `guarantee.json` can
@@ -193,6 +208,9 @@ seconds, log), the selected `ast-<Module>.json`, and the same `conformance.json`
 | `AUTOFORM_ALLOW_DIRTY` | checkout entry points | run over modified tracked artifacts (never over a live mutant) |
 | `AUTOFORM_SCRATCH`, `AUTOFORM_PYTHON` | scripts | scratch directory; the Python the stages run under |
 | `AUTOFORM_DIFF_KEEP`, `AUTOFORM_NO_REEXEC` | oracle debugging | keep the Lean file a case failed in; skip the `PYTHONHASHSEED=0` re-exec |
+| `AENEAS_HOME` | Rust path | the unpacked pinned Aeneas release (`aeneas`, `charon`, `charon-driver`, `rust-toolchain`); otherwise they are looked up on `PATH` |
+| `AUTOFORM_RUST_LEAN_PROJECT` | Rust path, `doctor` | the scratch Lake project with Aeneas' Lean library built (`--rust-lean-project` overrides) |
+| `AUTOFORM_RUST_REQUIRED`, `AUTOFORM_RUST_GCD_CRATE` | `tests/test_rust_aeneas.py` | `1` turns a missing Rust prerequisite into a failure instead of a skip (the Rust CI job); the unpacked gcd 2.3.0 crate for the real-crate reproduction test |
 | `AUTOFORM_SANDBOX` | oracle, native worker, nl runners | `on` (default: refuse without a mechanism), `off` (run the subject unconfined; recorded in every artifact), or `seatbelt`/`bwrap`/`unshare` to force one (`scripts/sandbox.py`) |
 
 ## Exit codes

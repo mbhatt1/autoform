@@ -32,6 +32,8 @@ jobs:
       AENEAS_LEAN_BUILD_ASSET: lean-build-aeneas-x86_64-unknown-linux-gnu.tar.gz
       AENEAS_LEAN_BUILD_SHA256: 5a0a33243602bc43368c601b65ae2c3ab8787b994a88108c7921dbbc2ac3b891
       RUST_TOOLCHAIN: nightly-2026-09-17
+      GCD_CRATE_URL: https://static.crates.io/crates/gcd/gcd-2.3.0.crate
+      GCD_CRATE_SHA256: 1d758ba1b47b00caf47f24925c0074ecb20d6dfcffe7f6d53395c0465674841a
     steps:
       - name: Free disk space (mathlib, rustc-dev and Aeneas need ~15 GB)
         run: |
@@ -99,6 +101,13 @@ jobs:
           tar xzf "$RUNNER_TEMP/lean-build.tgz" -C "$lp/.lake/build"
           bash scripts/rust_setup.sh "$AENEAS_HOME" "$lp"
           echo "AUTOFORM_RUST_LEAN_PROJECT=$lp" >> "$GITHUB_ENV"
+      - name: The real crate (gcd 2.3.0 from crates.io, verified by sha256)
+        run: |
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/gcd-2.3.0.crate" "$GCD_CRATE_URL"
+          echo "$GCD_CRATE_SHA256  $RUNNER_TEMP/gcd-2.3.0.crate" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gcd"
+          tar xzf "$RUNNER_TEMP/gcd-2.3.0.crate" -C "$RUNNER_TEMP/gcd"
+          echo "AUTOFORM_RUST_GCD_CRATE=$RUNNER_TEMP/gcd/gcd-2.3.0" >> "$GITHUB_ENV"
       - name: Test tools
         run: python -m pip install 'pytest>=8,<9'
       - name: Rust path tests (must run, not skip)
@@ -119,7 +128,7 @@ jobs:
           ran = [c for c in e2e if c.find("skipped") is None]
           print(f"end-to-end tests run: {len(ran)}")
           assert skipped == 0 and failures == 0 and errors == 0, "a Rust test skipped or failed"
-          assert len(ran) >= 6, "the end-to-end Rust tests did not run"
+          assert len(ran) >= 7, "the end-to-end Rust tests did not run"
           EOF
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

@@ -734,16 +734,45 @@ CATEGORY_RULES = [
 
 def categorize(labels_text, sig_hint=""):
     """A coarse category for a hole, for reading the ledger. The LABEL is the tool's words;
-    this is only our grouping of them (message first, then the function's signature)."""
-    for name, rx in CATEGORY_RULES:
-        if re.search(rx, labels_text or ""):
-            return name
-    if "external-axiom" in (labels_text or ""):
+    this is only our grouping: by the label's kind, then (for tool errors) by keywords in the
+    message, then in the function's rendered Rust signature."""
+    t = labels_text or ""
+    if "external-axiom" in t:
         return "external-std"
+    if "lean:rejected" in t or "lean:depends-on-rejected" in t:
+        return "lean-rejected-model"
+    if "calls-untranslated" in t:
+        return "calls-untranslated"
+    if re.search(r"aeneas:crash|charon:failed|lean:aeneas-output|lean:axioms-unreadable", t):
+        return "tool-failure"
+    for name, rx in CATEGORY_RULES:
+        if re.search(rx, t):
+            return name
     for name, rx in CATEGORY_RULES:
         if sig_hint and re.search(rx, sig_hint):
             return name
     return "other"
+
+
+def signature_hint(f, doc):
+    """The function's Rust signature as text (types only), for categorize()."""
+    parts = []
+    for _, t in f["sig"]["inputs"]:
+        try:
+            parts.append(render_rust_type(t, doc, f.get("self_ty")))
+        except ValueError:
+            parts.append("?")
+    try:
+        parts.append(render_rust_type(f["sig"].get("output"), doc, f.get("self_ty")))
+    except ValueError:
+        pass
+    if "raw_pointer" in json.dumps(f["sig"]):
+        parts.append("raw pointer")
+    if f["header"].get("is_unsafe"):
+        parts.append("unsafe")
+    if any("lifetime" not in g.get("kind", {}) for g in (f.get("generics") or {}).get("params", [])):
+        parts.append("generic")
+    return " ".join(parts)
 
 
 # --------------------------------------------------------------------------- axioms / ledger
@@ -788,7 +817,7 @@ def classify(funcs, mapping, decls, ns, axioms, alog, clog, doc, global_failure=
     for f in funcs:
         name = display_name(f, doc)
         d, why = mapping.get(f["id"], (None, "no Aeneas output"))
-        sig_hint = json.dumps(f["sig"]) + (" unsafe" if f["header"].get("is_unsafe") else "")
+        sig_hint = signature_hint(f, doc)
         rec = {"rust": name, "kind": f["kind"], "lean": None, "holes": [], "detail": None}
         if global_failure:
             rec["holes"] = [global_failure]
@@ -1270,6 +1299,10 @@ def main(argv=None):
     ap.add_argument("--fuel", type=int, default=4096, help="loop iterations the kernel unrolls (default 4096)")
     ap.add_argument("--assure", action="store_true", help="also write run.json/guarantee.json; exit 1 on any gap")
     ap.add_argument("--keep-work", action="store_true")
+    ap.add_argument("--evidence", help="also write a condensed, trackable evidence summary here "
+                    "(the figures docs may bind; see evidence_summary)")
+    ap.add_argument("--crate-sha256", help="sha256 of the .crate archive the source was unpacked from, "
+                    "recorded in the evidence summary")
     a = ap.parse_args(argv)
     out = os.path.abspath(a.out)
     os.makedirs(out, exist_ok=True)
@@ -1569,6 +1602,10 @@ def run_stages(a, out, pins, env, toolchain, lp, crate_src, meta, module, work):
     with open(os.path.join(out, "conformance.json"), "w") as fh:
         json.dump(conformance, fh, indent=1)
     write_summary(out, module, meta, led, conformance)
+    if a.evidence:
+        with open(a.evidence, "w") as fh:
+            json.dump(evidence_summary(module, meta, led, conformance, prov, a), fh, indent=1, sort_keys=True)
+            fh.write("\n")
     if a.assure:
         write_assure(out, module, led, conformance, theorems)
     for d in detail[:10]:
@@ -1707,6 +1744,31 @@ def prove_cases(a, lp, env, mod_import, module, unfold, plan, rust_res, lean_res
                        "class": None if s[0] else failure_class(s[1], classes[owner[n]]["lean"] in partial)}
                    for n, s in statuses.items()}, fh, indent=1)
     return result
+
+
+def evidence_summary(module, meta, led, conf, prov, a):
+    """The run's figures, without paths, timings or host details, so that a rerun of the same
+    crate with the same pins on any 64-bit host reproduces the file byte for byte (the Rust CI
+    job does exactly that and compares)."""
+    kc = conf["kernel_checked"]
+    return {
+        "producer": "scripts/rust_aeneas.py --evidence",
+        "module": module,
+        "crate": {"name": meta["name"], "version": meta["version"], "crate_sha256": a.crate_sha256,
+                  "source_tree_sha256": prov["crate"]["source_tree_sha256"]},
+        "pins": prov["pins"],
+        "profile": a.profile, "seed": a.seed, "cases_cap": a.cases, "random": a.random,
+        "fuel": a.fuel, "theorems_per_function": a.theorems_per_function,
+        "ledger": {k: led[k] for k in ("functions", "holeFree", "verifiableCore", "holes", "holesByLabel",
+                                       "holeFunctionsByCategory", "traitMethodDeclarations")},
+        "oracle": {"compared": conf["functions_covered"], "agree": conf["agree"], "total": conf["total"],
+                   "divergences": conf["divergences"], "inconclusive_cases": conf["inconclusive"],
+                   "inconclusive_functions": conf["inconclusive_functions"],
+                   "divergence_detail": conf["divergence_detail"]},
+        "kernel_checked": {"emitted": kc["emitted"], "proved": kc["proved"], "failed": kc["failed"],
+                           "failure_reasons": kc["failure_reasons"]},
+        "assumptions": conf["assumptions"],
+    }
 
 
 def write_summary(out, module, meta, led, conf):

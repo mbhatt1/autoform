@@ -67,7 +67,7 @@ def test_holes_are_named_from_the_tools_own_messages(recorded):
     }
     cats = {n: c["category"] for n, (f, c) in by_name(recorded).items() if c["holes"]}
     assert cats == {"proto::halve": "float", "proto::read_raw": "raw-pointer/unsafe",
-                    "proto::first_byte": "string", "proto::count_ones_u32": "external-std"}
+                    "proto::first_byte": "external-std", "proto::count_ones_u32": "external-std"}
 
 
 def test_a_hole_in_a_callee_is_a_hole_in_the_caller():
@@ -324,6 +324,8 @@ def test_pins_file_and_workflow_agree():
     assert "releases/download/${AENEAS_RELEASE}" in wf and "sha256sum -c" in wf
     assert pins["rust_toolchain"] in wf
     assert "AUTOFORM_RUST_REQUIRED" in wf
+    evidence = json.loads((ROOT / "evidence-RustGcd.json").read_text())
+    assert "GCD_CRATE_SHA256: " + evidence["crate"]["crate_sha256"] in wf
     # every third-party action pinned by full commit SHA
     for use in re.findall(r"uses:\s*(\S+)", wf):
         assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", use), use
