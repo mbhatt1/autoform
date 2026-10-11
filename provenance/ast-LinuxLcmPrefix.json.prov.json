@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-LinuxLcmPrefix.json",
+ "artifact_bytes": 4998,
+ "artifact_sha256": "06d9b12419f47cc0b26cd45f37973d46dc0e4021545897f17746e38ad8806893",
+ "command": "pre-fix lib/gcd.c + lib/lcm.c from kernel commit 7b212edf86e28f4d0198f2152b2f0553f51a59a5 (parent of the fix 74a5fef7cb0839c6b595f90c7914a62ac9d0bcf9, 'lib/lcm.c: ensure correct result whenever it fits'), placed in lib/ of a copy of the linux-v7.2 sparse skeleton (Kbuild Kconfig Makefile include tools); joern-parse with scripts/source_context.py frontend args; export_ast.sc dataModel=lp64",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "26a141ceac8506a6885e4ee7c6013e53d2e6774dd90b9a6c0c3a95491dab1497",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/private/tmp/af-agents/linux-lcm-work/prefix/lib",
+ "source_revision": "tree-sha256:71767830a9f79467a2510f6419e835580c5fc079669806e36894927a982c7445:2files"
+}
