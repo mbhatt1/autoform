@@ -10,10 +10,10 @@ The version in `pyproject.toml` and `src/autoform/__init__.py` must equal the se
 heading of the release being cut, and the release tag is `v<version>`
 (see [docs/packaging.md](docs/packaging.md)).
 
-## [0.1.0] - not yet published
+## [0.0.0] - not yet published
 
 Nothing has been uploaded to PyPI or tagged. This section describes the tree at
-`ddcebff` (2026-10-10), the first candidate for 0.1.0.
+`ddcebff` (2026-10-10), the first candidate for 0.0.0.
 
 ### Pipeline and semantics
 - First commit and the first object, refinement and oracle tiers (`4e56c11`, `1c30a7e`).

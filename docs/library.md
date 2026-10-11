@@ -124,7 +124,7 @@ coverage accounting, and a rendered `Autoform.Generated.<Module>` exposes `progr
 
 ## Stability
 
-The package is an alpha (`0.1.0`). The CLI's flags and exit codes, the JSON artifact
+The package is an alpha (`0.0.0`). The CLI's flags and exit codes, the JSON artifact
 shapes listed in `docs/cli.md`, and the Lean names above are the interface; the
 harness and autoformalizer internals move with their stages. Numbers in these documents
 are reproduced by named commands, and `scripts/check_docs.py` fails when a documented
