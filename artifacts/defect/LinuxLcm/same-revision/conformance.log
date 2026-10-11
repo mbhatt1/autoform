@@ -3,11 +3,11 @@ language: c (.c x4) -> runtime cc
   native C: 2/2 translation units compiled; 2 entry points
 oracle cache (--no-cache: not consulted): 0 functions / 0 cases reported from cache, 2 functions / 200 cases to compare now (--no-cache: 2)
 
-module LinuxLcmPrefix (/tmp/af-agents/linux-lcm-work/prefix/lib, cc)
+module LinuxLcmPrefix (/private/tmp/af-agents/linux-lcm-work/prefix/lib, cc)
 measurement basis: c-native-typed-boundary-v4
 functions: 4 total, 4 hole-free, 2 exercised, 2 COMPARED (50% of all, 50% of hole-free)
 conformance: 99/99 agree (100%) vs cc, 0 divergences, 101 INCONCLUSIVE (hole / outOfFuel / unrepresentable)
-oracle cache: 2 functions stored under /tmp/af-agents/bug-linux/.autoform-work/oracle/LinuxLcmPrefix
+oracle cache: 2 functions stored under /tmp/af-agents/core-batch/.autoform-work/oracle/LinuxLcmPrefix
   INCONCLUSIVE x58  gcd: call:swap
   INCONCLUSIVE x43  lcm: call:swap
   by origin boundary-typed agree 49, diverge 0, inconclusive 49
