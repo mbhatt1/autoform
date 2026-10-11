@@ -188,7 +188,10 @@ export AUTOFORM_RUST_LEAN_PROJECT=~/.cache/autoform/aeneas-lean
 autoform source path/to/crate MyCrate
 ```
 
-`--rust-lean-project` overrides the environment variable. A missing piece is a named error
+`--rust-lean-project` overrides the environment variable. The path adds one
+`lean_lib «AutoformRust»` to the scratch project's lakefile and writes its modules under
+`AutoformRust/` there (`Eval`, `<Module>`, `<Module>Cases`); a lock file serializes runs that
+share the project. A missing piece is a named error
 (`tool-missing`, `rust-toolchain-missing`, `lean-project-missing`, `lean-project-unbuilt`,
 `not-a-library`, `not-a-package`, `sandbox-unavailable`, ...) written to `rust-error.json`,
 exit 2.
