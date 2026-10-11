@@ -1,0 +1,656 @@
+{
+ "schema_version": 1,
+ "tool_version": "0.1.0",
+ "generated_at": "2026-10-11T03:50:56.661767+00:00",
+ "module": "CachetoolsPR2",
+ "report_dir": "<workspace>/artifacts/pr/CachetoolsPR2",
+ "repository": {
+  "path": "<clone>",
+  "uri": "https://github.com/tkem/cachetools",
+  "subdir": "."
+ },
+ "base": {
+  "ref": "v7.1.5",
+  "commit": "0d2a6ea17b3627bcf334c7360a8abe5889dd6235"
+ },
+ "head": {
+  "ref": "v7.1.6",
+  "commit": "13bb86a55e36e501cf0b3e4c35db516ed9409fd7"
+ },
+ "detection": "python-ast for Python files; changed-file (every exported function of a changed file) for other languages",
+ "exporter": {
+  "status": "available",
+  "source": "joern",
+  "joern": "<joern>/joern-cli",
+  "sha256": "f6001ccb7a702c1919ab3adf091f46108d6bc28d65ad974e2ed7d7134a4d7923",
+  "reason": "",
+  "seconds": 36.96
+ },
+ "files": [
+  {
+   "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+   "status": "M",
+   "file": ".github/ISSUE_TEMPLATE/bug_report.md",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": ".readthedocs.yaml",
+   "status": "M",
+   "file": ".readthedocs.yaml",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": "CHANGELOG.rst",
+   "status": "M",
+   "file": "CHANGELOG.rst",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": "docs/conf.py",
+   "status": "M",
+   "file": "docs/conf.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "pyproject.toml",
+   "status": "M",
+   "file": "pyproject.toml",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": "src/cachetools/__init__.py",
+   "status": "M",
+   "file": "src/cachetools/__init__.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "src/cachetools/func.py",
+   "status": "M",
+   "file": "src/cachetools/func.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "src/cachetools/keys.pyi",
+   "status": "M",
+   "file": "src/cachetools/keys.pyi",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": "tests/test_cached.py",
+   "status": "M",
+   "file": "tests/test_cached.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tests/test_cachedmethod.py",
+   "status": "M",
+   "file": "tests/test_cachedmethod.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tests/test_func.py",
+   "status": "M",
+   "file": "tests/test_func.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tests/test_rr.py",
+   "status": "M",
+   "file": "tests/test_rr.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tests/test_threading.py",
+   "status": "M",
+   "file": "tests/test_threading.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tox.ini",
+   "status": "M",
+   "file": "tox.ini",
+   "language": "non-code",
+   "analysed": false
+  }
+ ],
+ "errors": [],
+ "selection": {
+  "changed": [
+   "src/cachetools/__init__.py:<module>.Cache.__init__",
+   "tests/test_cached.py:<module>.DictWrapperTest.cache",
+   "tests/test_cachedmethod.py:<module>.DictMethodTest.cache",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cached_stampede",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_stampede",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cached_locked",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_locked"
+  ],
+  "selected": [
+   "src/cachetools/__init__.py:<module>.Cache.__init__",
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__enter__",
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__exit__",
+   "src/cachetools/_cached.py:<module>._condition_info.cache_info",
+   "src/cachetools/_cached.py:<module>._locked_info.cache_info",
+   "src/cachetools/_cached.py:<module>._unlocked_info.cache_info",
+   "src/cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.cache_info",
+   "src/cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.cache_info",
+   "src/cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.cache_info",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertEqual",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertFalse",
+   "tests/__init__.py:<module>.CountedLock.__enter__",
+   "tests/__init__.py:<module>.CountedLock.__exit__",
+   "tests/test_cached.py:<module>.DictWrapperTest.cache",
+   "tests/test_cachedmethod.py:<module>.DictMethodTest.cache",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cached_stampede",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_stampede",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cached_locked",
+   "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_locked",
+   "<module-objects>:<module>",
+   "docs/conf.py:<module>",
+   "src/cachetools/_cached.py:<module>",
+   "src/cachetools/_cachedmethod.py:<module>",
+   "src/cachetools/__init__.py:<module>",
+   "src/cachetools/func.py:<module>",
+   "src/cachetools/keys.py:<module>",
+   "tests/__init__.py:<module>",
+   "tests/test_cache.py:<module>",
+   "tests/test_cached.py:<module>",
+   "tests/test_cachedmethod.py:<module>",
+   "tests/test_classmethod.py:<module>",
+   "tests/test_fifo.py:<module>",
+   "tests/test_func.py:<module>",
+   "tests/test_keys.py:<module>",
+   "tests/test_lfu.py:<module>",
+   "tests/test_lru.py:<module>",
+   "tests/test_rr.py:<module>",
+   "tests/test_threading.py:<module>",
+   "tests/test_tlru.py:<module>",
+   "tests/test_ttl.py:<module>"
+  ],
+  "closure": [
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__enter__",
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__exit__",
+   "src/cachetools/_cached.py:<module>._condition_info.cache_info",
+   "src/cachetools/_cached.py:<module>._locked_info.cache_info",
+   "src/cachetools/_cached.py:<module>._unlocked_info.cache_info",
+   "src/cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.cache_info",
+   "src/cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.cache_info",
+   "src/cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.cache_info",
+   "tests/__init__.py:<module>.CountedLock.__enter__",
+   "tests/__init__.py:<module>.CountedLock.__exit__",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertEqual",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertFalse"
+  ],
+  "missing": []
+ },
+ "stages": {
+  "export": {
+   "status": "passed",
+   "source": "joern",
+   "joern": "<joern>/joern-cli",
+   "sha256": "f6001ccb7a702c1919ab3adf091f46108d6bc28d65ad974e2ed7d7134a4d7923",
+   "reason": "",
+   "seconds": 36.96
+  },
+  "render": {
+   "status": "passed",
+   "command": [
+    "python",
+    "/private<repo>/cartographer/render_lean.py",
+    "<workspace>/artifacts/pr/CachetoolsPR2/ast-CachetoolsPR2.json",
+    "/private<repo>/Autoform/Generated/CachetoolsPR2.lean",
+    "CachetoolsPR2"
+   ],
+   "exit_code": 0,
+   "seconds": 0.07,
+   "log": "render.log"
+  },
+  "build": {
+   "status": "passed",
+   "command": [
+    "lake",
+    "build",
+    "Autoform.Runtime",
+    "Autoform.Generated.CachetoolsPR2"
+   ],
+   "exit_code": 0,
+   "seconds": 2.56,
+   "log": "build.log"
+  },
+  "oracle": {
+   "status": "passed",
+   "command": [
+    "python",
+    "/private<repo>/scripts/differential.py",
+    "<workspace>/artifacts/pr/CachetoolsPR2/ast-CachetoolsPR2.json",
+    "<tmp>",
+    "CachetoolsPR2",
+    "5"
+   ],
+   "exit_code": 0,
+   "seconds": 10.21,
+   "log": "conformance.log"
+  },
+  "ledger": {
+   "status": "passed",
+   "command": [
+    "lake",
+    "env",
+    "lean",
+    "<tmp>/Ledger.lean"
+   ],
+   "exit_code": 0,
+   "seconds": 1.68,
+   "log": "ledger.log"
+  },
+  "specs": {
+   "status": "passed",
+   "command": [
+    "python",
+    "-u",
+    "/private<repo>/scripts/synth_specs.py",
+    "<workspace>/artifacts/pr/CachetoolsPR2/ast-CachetoolsPR2.json",
+    "<tmp>",
+    "CachetoolsPR2",
+    "--conformance",
+    "<workspace>/artifacts/pr/CachetoolsPR2/conformance.json",
+    "--conformance-only",
+    "--domain",
+    "5",
+    "--sample-subjects",
+    "0",
+    "--json",
+    "<workspace>/artifacts/pr/CachetoolsPR2/specs.json"
+   ],
+   "exit_code": 0,
+   "seconds": 18.94,
+   "log": "specs.log"
+  },
+  "mutation": {
+   "status": "skipped",
+   "reason": "--mutants 0"
+  }
+ },
+ "ledger": {
+  "functions": 40,
+  "holes": 8,
+  "holeFree": 33,
+  "holesByLabel": [
+   {
+    "label": "class-construction:unresolved-lexical-identity:Thread",
+    "count": 4
+   },
+   {
+    "label": "lit:ellipsis",
+    "count": 2
+   },
+   {
+    "label": "class-construction:unresolved-lexical-identity:Condition",
+    "count": 1
+   },
+   {
+    "label": "class-construction:unresolved-lexical-identity:Lock",
+    "count": 1
+   }
+  ]
+ },
+ "functions": [
+  {
+   "name": "src/cachetools/__init__.py:<module>.Cache.__init__",
+   "path": "src/cachetools/__init__.py",
+   "file": "src/cachetools/__init__.py",
+   "change": "modified",
+   "line": 52,
+   "end_line": 59,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "translated",
+   "reason": "type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR2.json",
+     "function": "src/cachetools/__init__.py:<module>.Cache.__init__"
+    },
+    {
+     "kind": "render",
+     "path": "Autoform/Generated/CachetoolsPR2.lean",
+     "definition": "f_src_cachetools___init___py__module__Cache___init__"
+    }
+   ],
+   "holes": [],
+   "oracle": {
+    "status": "blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved",
+    "agree": 0,
+    "diverge": 0,
+    "inconclusive": 0
+   },
+   "theorems": [],
+   "mutation": null,
+   "behaviour": {
+    "compared": 0,
+    "agree": 0,
+    "inconclusive": 0,
+    "suppressed_as_model_noise": 100,
+    "status": "not-compared",
+    "counter_inputs": [],
+    "reason": "all 100 divergent case(s) also diverge in the same-base control (model noise), none was left to compare"
+   }
+  },
+  {
+   "name": "tests/test_cached.py:<module>.DictWrapperTest.cache",
+   "path": "tests/test_cached.py",
+   "file": "tests/test_cached.py",
+   "change": "modified",
+   "line": 347,
+   "end_line": 348,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "translated",
+   "reason": "type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: class-identity-unresolved:TestCase:external-base-uncontracted:unittest.case.TestCase",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR2.json",
+     "function": "tests/test_cached.py:<module>.DictWrapperTest.cache"
+    },
+    {
+     "kind": "render",
+     "path": "Autoform/Generated/CachetoolsPR2.lean",
+     "definition": "f_tests_test_cached_py__module__DictWrapperTest_cache"
+    }
+   ],
+   "holes": [],
+   "oracle": {
+    "status": "blocked (unexercised): unencodable receiver/arguments: class-identity-unresolved:TestCase:external-base-uncontracted:unittest.case.TestCase",
+    "agree": 0,
+    "diverge": 0,
+    "inconclusive": 0
+   },
+   "theorems": [],
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "test code: its model is the head's own file",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
+  },
+  {
+   "name": "tests/test_cachedmethod.py:<module>.DictMethodTest.cache",
+   "path": "tests/test_cachedmethod.py",
+   "file": "tests/test_cachedmethod.py",
+   "change": "modified",
+   "line": 637,
+   "end_line": 638,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "translated",
+   "reason": "type-checked; not adjudicated by the oracle: blocked (unexercised): varargs/keyword-only: cannot synthesize a faithful call",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR2.json",
+     "function": "tests/test_cachedmethod.py:<module>.DictMethodTest.cache"
+    },
+    {
+     "kind": "render",
+     "path": "Autoform/Generated/CachetoolsPR2.lean",
+     "definition": "f_tests_test_cachedmethod_py__module__DictMethodTest_cache"
+    }
+   ],
+   "holes": [],
+   "oracle": {
+    "status": "blocked (unexercised): varargs/keyword-only: cannot synthesize a faithful call",
+    "agree": 0,
+    "diverge": 0,
+    "inconclusive": 0
+   },
+   "theorems": [],
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "test code: its model is the head's own file",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
+  },
+  {
+   "name": "tests/test_threading.py:<module>.ThreadingTest.test_cached_stampede",
+   "path": "tests/test_threading.py",
+   "file": "tests/test_threading.py",
+   "change": "modified",
+   "line": 54,
+   "end_line": 68,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "hole",
+   "reason": "translation holes: class-construction:unresolved-lexical-identity:Thread",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR2.json",
+     "function": "tests/test_threading.py:<module>.ThreadingTest.test_cached_stampede"
+    }
+   ],
+   "holes": [
+    "class-construction:unresolved-lexical-identity:Thread"
+   ],
+   "oracle": null,
+   "theorems": [],
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "test code: its model is the head's own file",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
+  },
+  {
+   "name": "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_stampede",
+   "path": "tests/test_threading.py",
+   "file": "tests/test_threading.py",
+   "change": "modified",
+   "line": 70,
+   "end_line": 84,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "hole",
+   "reason": "translation holes: class-construction:unresolved-lexical-identity:Thread",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR2.json",
+     "function": "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_stampede"
+    }
+   ],
+   "holes": [
+    "class-construction:unresolved-lexical-identity:Thread"
+   ],
+   "oracle": null,
+   "theorems": [],
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "test code: its model is the head's own file",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
+  },
+  {
+   "name": "tests/test_threading.py:<module>.ThreadingTest.test_cached_locked",
+   "path": "tests/test_threading.py",
+   "file": "tests/test_threading.py",
+   "change": "modified",
+   "line": 86,
+   "end_line": 102,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "hole",
+   "reason": "translation holes: class-construction:unresolved-lexical-identity:Thread",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR2.json",
+     "function": "tests/test_threading.py:<module>.ThreadingTest.test_cached_locked"
+    }
+   ],
+   "holes": [
+    "class-construction:unresolved-lexical-identity:Thread"
+   ],
+   "oracle": null,
+   "theorems": [],
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "test code: its model is the head's own file",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
+  },
+  {
+   "name": "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_locked",
+   "path": "tests/test_threading.py",
+   "file": "tests/test_threading.py",
+   "change": "modified",
+   "line": 104,
+   "end_line": 122,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "hole",
+   "reason": "translation holes: class-construction:unresolved-lexical-identity:Thread",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR2.json",
+     "function": "tests/test_threading.py:<module>.ThreadingTest.test_cachedmethod_locked"
+    }
+   ],
+   "holes": [
+    "class-construction:unresolved-lexical-identity:Thread"
+   ],
+   "oracle": null,
+   "theorems": [],
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "test code: its model is the head's own file",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
+  }
+ ],
+ "removed": [],
+ "summary": {
+  "none": 0,
+  "hole": 4,
+  "translated": 3,
+  "oracle-agreed": 0,
+  "proved": 0,
+  "refuted": 0
+ },
+ "behaviour": {
+  "suppressed_as_model_noise": 100,
+  "languages": [
+   "python"
+  ],
+  "control": "run",
+  "model": "base 0d2a6ea17b36 + head tests",
+  "runtime": "head",
+  "cases_per_function": 100,
+  "stages": {
+   "behaviour-export": {
+    "status": "passed",
+    "seconds": 37.23,
+    "note": "base library + head tests (overlaid: tests); plain_class_values applied",
+    "sha256": "df802422b14118f2cb765142459ef5dd19295e9532acdd8789d87415b890949a"
+   },
+   "behaviour-render": {
+    "status": "passed",
+    "command": [
+     "python",
+     "/private<repo>/cartographer/render_lean.py",
+     "<workspace>/artifacts/pr/CachetoolsPR2/behaviour/ast-CachetoolsPR2Base.json",
+     "/private<repo>/Autoform/Generated/CachetoolsPR2Base.lean",
+     "CachetoolsPR2Base"
+    ],
+    "exit_code": 0,
+    "seconds": 0.33,
+    "log": "render.log"
+   },
+   "behaviour-build": {
+    "status": "passed",
+    "command": [
+     "lake",
+     "build",
+     "Autoform.Runtime",
+     "Autoform.Generated.CachetoolsPR2Base"
+    ],
+    "exit_code": 0,
+    "seconds": 6.83,
+    "log": "build.log"
+   },
+   "behaviour-oracle": {
+    "status": "passed",
+    "command": [
+     "python",
+     "/private<repo>/scripts/differential.py",
+     "<workspace>/artifacts/pr/CachetoolsPR2/behaviour/ast-CachetoolsPR2Base.json",
+     "<tmp>",
+     "CachetoolsPR2Base",
+     "100",
+     "--no-cache",
+     "--focus",
+     "<workspace>/artifacts/pr/CachetoolsPR2/behaviour/focus.json"
+    ],
+    "exit_code": 1,
+    "seconds": 62.04,
+    "log": "conformance.log"
+   },
+   "behaviour-control": {
+    "status": "passed",
+    "command": [
+     "python",
+     "/private<repo>/scripts/differential.py",
+     "<workspace>/artifacts/pr/CachetoolsPR2/behaviour/ast-CachetoolsPR2Base.json",
+     "<tmp>",
+     "CachetoolsPR2Base",
+     "100",
+     "--no-cache",
+     "--focus",
+     "<workspace>/artifacts/pr/CachetoolsPR2/behaviour/focus.json"
+    ],
+    "exit_code": 1,
+    "seconds": 61.3,
+    "log": "conformance.log"
+   },
+   "behaviour": {
+    "status": "passed",
+    "note": "494 function(s) in the base module; suppressed-as-model-noise: 100"
+   }
+  },
+  "summary": {
+   "changed": 0,
+   "unchanged-on-inputs": 0,
+   "not-compared": 7
+  }
+ }
+}

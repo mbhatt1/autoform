@@ -23,18 +23,32 @@ Levels never round up: a function is listed at the highest level its own artifac
 
 Removed at head (nothing to verify): `docs/conf.py:<module>.get_version`
 
+### Behaviour changes in this PR
+
+Base-revision model against head-revision runtime on the head tests' inputs (Python only). A behaviour change is reported, not failed. 1 changed, 0 unchanged-on-inputs, 4 not-compared; suppressed-as-model-noise: 0.
+
+* `src/cachetools/__init__.py:<module>.Cache.__setitem__` -- **behaviour: changed** (1 input(s))
+  * `Cache.__setitem__(int 1, int 1)` on `Cache{getsizeof=<lambda>2, size=dict, data=dict, currsize=int 0, maxsize=int 3}`: base model returns unit; head runtime raises ValueError
+
+| function | behaviour | detail |
+|---|---|---|
+| `src/cachetools/__init__.py:<module>.TLRUCache.__setitem__` | not-compared | no case was compared (0 inconclusive; oracle status: blocked (unexercised): parameter list disagrees with the AST) |
+| `tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative` | not-compared | added at head, no base behaviour |
+| `tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired` | not-compared | added at head, no base behaviour |
+| `tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu` | not-compared | added at head, no base behaviour |
+
 Changed files not analysed (outside `--subdir` or not source code): `.github/workflows/ci.yml`, `.readthedocs.yaml`, `CHANGELOG.rst`, `tox.ini`
 
 <details><summary>Stages</summary>
 
 | stage | status | seconds | note |
 |---|---|---|---|
-| export | passed | 37.72 |  |
+| export | passed | 37.04 |  |
 | render | passed | 0.08 |  |
-| build | passed | 2.69 |  |
+| build | passed | 0.66 |  |
 | oracle | passed | 10.14 |  |
-| ledger | passed | 1.65 |  |
-| specs | passed | 22.69 |  |
+| ledger | passed | 1.67 |  |
+| specs | passed | 19.34 |  |
 | mutation | skipped |  | --mutants 0 |
 
 </details>

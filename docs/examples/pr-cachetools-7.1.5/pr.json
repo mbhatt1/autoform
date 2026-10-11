@@ -1,7 +1,7 @@
 {
  "schema_version": 1,
  "tool_version": "0.1.0",
- "generated_at": "2026-10-11T03:28:24.919969+00:00",
+ "generated_at": "2026-10-11T03:46:36.432491+00:00",
  "module": "CachetoolsPR",
  "report_dir": "<workspace>/artifacts/pr/CachetoolsPR",
  "repository": {
@@ -21,10 +21,10 @@
  "exporter": {
   "status": "available",
   "source": "joern",
-  "joern": "<home>/joern/joern-cli",
+  "joern": "<joern>/joern-cli",
   "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
   "reason": "",
-  "seconds": 37.72
+  "seconds": 37.04
  },
  "files": [
   {
@@ -194,18 +194,18 @@
   "export": {
    "status": "passed",
    "source": "joern",
-   "joern": "<home>/joern/joern-cli",
+   "joern": "<joern>/joern-cli",
    "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
    "reason": "",
-   "seconds": 37.72
+   "seconds": 37.04
   },
   "render": {
    "status": "passed",
    "command": [
     "python",
-    "<repo>/cartographer/render_lean.py",
+    "/private<repo>/cartographer/render_lean.py",
     "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
-    "<repo>/Autoform/Generated/CachetoolsPR.lean",
+    "/private<repo>/Autoform/Generated/CachetoolsPR.lean",
     "CachetoolsPR"
    ],
    "exit_code": 0,
@@ -215,22 +215,22 @@
   "build": {
    "status": "passed",
    "command": [
-    "<home>/.elan/bin/lake",
+    "lake",
     "build",
     "Autoform.Runtime",
     "Autoform.Generated.CachetoolsPR"
    ],
    "exit_code": 0,
-   "seconds": 2.69,
+   "seconds": 0.66,
    "log": "build.log"
   },
   "oracle": {
    "status": "passed",
    "command": [
     "python",
-    "<repo>/scripts/differential.py",
+    "/private<repo>/scripts/differential.py",
     "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
-    "<tmp>/autoform-pr-head",
+    "<tmp>",
     "CachetoolsPR",
     "5"
    ],
@@ -241,13 +241,13 @@
   "ledger": {
    "status": "passed",
    "command": [
-    "<home>/.elan/bin/lake",
+    "lake",
     "env",
     "lean",
-    "<tmp>/autoform-pr-ledger/Ledger.lean"
+    "<tmp>/Ledger.lean"
    ],
    "exit_code": 0,
-   "seconds": 1.65,
+   "seconds": 1.67,
    "log": "ledger.log"
   },
   "specs": {
@@ -255,9 +255,9 @@
    "command": [
     "python",
     "-u",
-    "<repo>/scripts/synth_specs.py",
+    "/private<repo>/scripts/synth_specs.py",
     "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
-    "<tmp>/autoform-pr-head",
+    "<tmp>",
     "CachetoolsPR",
     "--conformance",
     "<workspace>/artifacts/pr/CachetoolsPR/conformance.json",
@@ -270,7 +270,7 @@
     "<workspace>/artifacts/pr/CachetoolsPR/specs.json"
    ],
    "exit_code": 0,
-   "seconds": 22.69,
+   "seconds": 19.34,
    "log": "specs.log"
   },
   "mutation": {
@@ -345,7 +345,26 @@
     "inconclusive": 0
    },
    "theorems": [],
-   "mutation": null
+   "mutation": null,
+   "behaviour": {
+    "compared": 93,
+    "agree": 92,
+    "inconclusive": 0,
+    "suppressed_as_model_noise": 0,
+    "status": "changed",
+    "counter_inputs": [
+     {
+      "call": "Cache.__setitem__(int 1, int 1)",
+      "receiver": "Cache{getsizeof=<lambda>2, size=dict, data=dict, currsize=int 0, maxsize=int 3}",
+      "base_model": "returns unit",
+      "head_runtime": "raises ValueError",
+      "detail": "cpython raised ValueError, lean returned unit; heap graph=some false",
+      "origin": "test-suite"
+     }
+    ],
+    "diverging": 1,
+    "reason": "1 input(s) where the base model and the head runtime disagree"
+   }
   },
   {
    "name": "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__",
@@ -378,7 +397,16 @@
     "inconclusive": 0
    },
    "theorems": [],
-   "mutation": null
+   "mutation": null,
+   "behaviour": {
+    "compared": 0,
+    "agree": 0,
+    "inconclusive": 0,
+    "suppressed_as_model_noise": 0,
+    "status": "not-compared",
+    "counter_inputs": [],
+    "reason": "no case was compared (0 inconclusive; oracle status: blocked (unexercised): parameter list disagrees with the AST)"
+   }
   },
   {
    "name": "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative",
@@ -403,7 +431,14 @@
    ],
    "oracle": null,
    "theorems": [],
-   "mutation": null
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "added at head, no base behaviour",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
   },
   {
    "name": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired",
@@ -436,7 +471,14 @@
     "inconclusive": 0
    },
    "theorems": [],
-   "mutation": null
+   "mutation": null,
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "added at head, no base behaviour",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
+   }
   },
   {
    "name": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu",
@@ -495,6 +537,13 @@
    ],
    "mutation": {
     "skipped": "--mutants 0"
+   },
+   "behaviour": {
+    "status": "not-compared",
+    "reason": "added at head, no base behaviour",
+    "compared": 0,
+    "counter_inputs": [],
+    "suppressed_as_model_noise": 0
    }
   }
  ],
@@ -515,5 +564,91 @@
   "oracle-agreed": 0,
   "proved": 1,
   "refuted": 0
+ },
+ "behaviour": {
+  "suppressed_as_model_noise": 0,
+  "languages": [
+   "python"
+  ],
+  "control": "run",
+  "model": "base 48284d73d0a8 + head tests",
+  "runtime": "head",
+  "cases_per_function": 100,
+  "stages": {
+   "behaviour-export": {
+    "status": "passed",
+    "seconds": 37.52,
+    "note": "base library + head tests (overlaid: tests); plain_class_values applied",
+    "sha256": "2624063221a9b7c99cdc64a242c7b8c9b89a91615c0edfd2ae21214459771b06"
+   },
+   "behaviour-render": {
+    "status": "passed",
+    "command": [
+     "python",
+     "/private<repo>/cartographer/render_lean.py",
+     "<workspace>/artifacts/pr/CachetoolsPR/behaviour/ast-CachetoolsPRBase.json",
+     "/private<repo>/Autoform/Generated/CachetoolsPRBase.lean",
+     "CachetoolsPRBase"
+    ],
+    "exit_code": 0,
+    "seconds": 0.34,
+    "log": "render.log"
+   },
+   "behaviour-build": {
+    "status": "passed",
+    "command": [
+     "lake",
+     "build",
+     "Autoform.Runtime",
+     "Autoform.Generated.CachetoolsPRBase"
+    ],
+    "exit_code": 0,
+    "seconds": 0.74,
+    "log": "build.log"
+   },
+   "behaviour-oracle": {
+    "status": "passed",
+    "command": [
+     "python",
+     "/private<repo>/scripts/differential.py",
+     "<workspace>/artifacts/pr/CachetoolsPR/behaviour/ast-CachetoolsPRBase.json",
+     "<tmp>",
+     "CachetoolsPRBase",
+     "100",
+     "--no-cache",
+     "--focus",
+     "<workspace>/artifacts/pr/CachetoolsPR/behaviour/focus.json"
+    ],
+    "exit_code": 1,
+    "seconds": 63.23,
+    "log": "conformance.log"
+   },
+   "behaviour-control": {
+    "status": "passed",
+    "command": [
+     "python",
+     "/private<repo>/scripts/differential.py",
+     "<workspace>/artifacts/pr/CachetoolsPR/behaviour/ast-CachetoolsPRBase.json",
+     "<tmp>",
+     "CachetoolsPRBase",
+     "100",
+     "--no-cache",
+     "--focus",
+     "<workspace>/artifacts/pr/CachetoolsPR/behaviour/focus.json"
+    ],
+    "exit_code": 0,
+    "seconds": 64.04,
+    "log": "conformance.log"
+   },
+   "behaviour": {
+    "status": "passed",
+    "note": "495 function(s) in the base module; suppressed-as-model-noise: 0"
+   }
+  },
+  "summary": {
+   "changed": 1,
+   "unchanged-on-inputs": 0,
+   "not-compared": 4
+  }
  }
 }

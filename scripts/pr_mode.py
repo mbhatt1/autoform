@@ -109,6 +109,15 @@ RULES = {
 }
 
 
+BEHAVIOUR_RULE = ("autoform/behaviour-changed", "Behaviour changed",
+                  "The model of the base revision and the runtime of the head revision disagree on "
+                  "a concrete input from the head's tests: the change altered what this function "
+                  "does on that input. A behaviour change is not a failure.")
+BEHAVIOURS = ("changed", "unchanged-on-inputs", "not-compared")
+MAX_COUNTER_INPUTS = 3
+TEST_TOPLEVEL_DIRS = ("tests", "test")
+
+
 class PrError(ValueError):
     """The run cannot start (exit 2)."""
 
@@ -432,6 +441,7 @@ class Chain:
                    self.module, str(cases)]
         if tests:
             command += ["--tests", tests]
+        command += getattr(self, "oracle_extra", [])
         self.run("oracle", command, cwd=self.report, log_name="conformance.log", ok=(0, 1))
         path = self.report / "conformance.json"
         return deep_json.load(path) if path.is_file() else None
@@ -612,6 +622,278 @@ def evidence(changed, selected, conformance, specs, mutation, stages, module, ex
     return results
 
 
+
+# ------------------------------------------------------ behaviour (cross-revision)
+
+def _show(value, heap, depth=0):
+    """A recorded oracle value as short text."""
+    if not isinstance(value, list) or not value:
+        return repr(value)
+    tag = value[0]
+    if tag == "ref" and len(value) > 1 and isinstance(value[1], int) and depth < 2 \
+            and 0 <= value[1] < len(heap or []):
+        entry = heap[value[1]]
+        if isinstance(entry, list) and len(entry) >= 2 and isinstance(entry[1], list) and entry[1] \
+                and all(isinstance(f, list) and f and isinstance(f[0], str) for f in entry[1]):
+            cls = str(entry[0]).rsplit(".", 1)[-1]
+            fields = ", ".join(f"{re.sub(r'^_[A-Za-z0-9]+__', '', f[0]).lstrip('_')}={_show(f[1], heap, depth + 1)}"
+                               for f in entry[1] if len(f) > 1)
+            return f"{cls}{{{fields}}}"
+        return f"{entry[0] if isinstance(entry, list) and entry else 'object'}"
+    if tag == "fn":
+        return str(value[1]).rsplit(".", 1)[-1] if len(value) > 1 else "fn"
+    if tag == "unit":
+        return "unit"
+    return f"{tag} {', '.join(_show(v, heap, depth + 1) for v in value[1:])}".strip()
+
+
+def _model_result(text):
+    """`Autoform.Core.EResult.val (Autoform.Core.Val.unit)` as 'returns unit'."""
+    text = re.sub(r"Autoform\.Core\.", "", str(text or ""))
+    match = re.fullmatch(r"EResult\.val \(?Val\.(.*?)\)?", text)
+    if match:
+        inner = match.group(1)
+        return "returns " + (inner if inner else "a value")
+    match = re.fullmatch(r"EResult\.exn \(?(.*?)\)?", text)
+    if match:
+        return "raises " + match.group(1)
+    return text or "unknown"
+
+
+def _runtime_result(outcome):
+    if isinstance(outcome, list) and outcome and outcome[0] == "exn":
+        return "raises " + str(outcome[1] if len(outcome) > 1 else "?")
+    if isinstance(outcome, list) and outcome and outcome[0] == "val":
+        return "returns " + _show(outcome[1] if len(outcome) > 1 else ["unit"], [])
+    return "unknown"
+
+
+def _row_key(row):
+    return (row.get("function"), row.get("args"), row.get("detail"), row.get("lean_repr"),
+            json.dumps((row.get("observation") or {}).get("outcome")))
+
+
+def _counter_input(row):
+    observation = row.get("observation") or {}
+    heap = observation.get("heap") or (row.get("case") or {}).get("heap") or []
+    receiver = observation.get("self") or (row.get("case") or {}).get("self")
+    short = str(row.get("function", "")).split(":<module>.")[-1]
+    return {"call": f"{short}{row.get('args', '()')}",
+            "receiver": _show(receiver, heap) if receiver else None,
+            "base_model": _model_result(row.get("lean_repr")),
+            "head_runtime": _runtime_result(observation.get("outcome")),
+            "detail": row.get("detail"), "origin": row.get("origin")}
+
+
+def behaviour_results(changed, cross, control, notes):
+    """`behaviour` per changed function from the cross-revision `conformance.json`
+    (`cross`: base model, head runtime) and, when there were divergences, the same-base
+    control (`control`: base model, base runtime, the same inputs).
+
+    A divergence that the control also records (same function, inputs, detail, both
+    results) is model noise, not a revision difference: it is removed from `changed` and
+    counted in `suppressed_as_model_noise`, per function and in total. Nothing else is
+    dropped. `notes` maps a function name to a reason it was not compared at all."""
+    out, suppressed_total = {}, 0
+    cases = {}
+    for case in (cross or {}).get("runtime_cases") or []:
+        bucket = cases.setdefault(case.get("name"), {"agree": 0, "diverge": 0, "inconclusive": 0})
+        comparison = case.get("comparison")
+        bucket["agree" if comparison == "agree" else "diverge" if comparison == "diverge"
+               else "inconclusive"] += 1
+    control_rows = {}
+    for row in (control or {}).get("divergence_detail") or []:
+        control_rows[_row_key(row)] = control_rows.get(_row_key(row), 0) + 1
+    rows = {}
+    for row in (cross or {}).get("divergence_detail") or []:
+        rows.setdefault(row.get("function"), []).append(row)
+    status = ((cross or {}).get("coverage") or {}).get("by_status") or {}
+    for function in changed:
+        name = function["name"]
+        if name in notes:
+            out[name] = {"status": "not-compared", "reason": notes[name], "compared": 0,
+                         "counter_inputs": [], "suppressed_as_model_noise": 0}
+            continue
+        count = cases.get(name, {"agree": 0, "diverge": 0, "inconclusive": 0})
+        real, noise = [], 0
+        for row in rows.get(name, []):
+            key = _row_key(row)
+            if control_rows.get(key, 0) > 0:
+                control_rows[key] -= 1
+                noise += 1
+            else:
+                real.append(row)
+        suppressed_total += noise
+        base = {"compared": count["agree"] + len(real), "agree": count["agree"],
+                "inconclusive": count["inconclusive"], "suppressed_as_model_noise": noise}
+        if real:
+            out[name] = dict(base, status="changed", counter_inputs=[
+                _counter_input(r) for r in real[:MAX_COUNTER_INPUTS]], diverging=len(real),
+                reason=f"{len(real)} input(s) where the base model and the head runtime disagree")
+        elif count["agree"]:
+            out[name] = dict(base, status="unchanged-on-inputs", counter_inputs=[],
+                             reason=f"{count['agree']} case(s) compared, all agreed; this is not a proof "
+                                    "of equivalence on other inputs"
+                                    + (f"; {noise} divergent case(s) suppressed as model noise" if noise else ""))
+        else:
+            why = (f"all {noise} divergent case(s) also diverge in the same-base control "
+                   "(model noise), none was left to compare" if noise else
+                   f"no case was compared ({count['inconclusive']} inconclusive; oracle status: "
+                   f"{status.get(name) or 'function not exercised'})")
+            out[name] = dict(base, status="not-compared", counter_inputs=[], reason=why)
+    return out, suppressed_total
+
+
+def behaviour_unavailable(changed, reason):
+    return {f["name"]: {"status": "not-compared", "reason": reason, "compared": 0,
+                        "counter_inputs": [], "suppressed_as_model_noise": 0} for f in changed}
+
+
+def _is_test_path(rel):
+    top = PurePosixPath(rel).parts
+    return bool(top) and (top[0] in TEST_TOPLEVEL_DIRS or
+                          (len(top) == 1 and (top[0].startswith("test_") or top[0] == "conftest.py")))
+
+
+def build_hybrid(base_source, head_source):
+    """Base library with the head's tests overlaid: the tests (top-level `tests/`,
+    `test/`, `test_*.py`, `conftest.py`) are replaced by the head's, so inputs and the
+    callables they build (a test's `lambda`) exist in the model. Returns the overlaid
+    relative paths."""
+    base_source, head_source = Path(base_source), Path(head_source)
+    overlaid = []
+    for entry in sorted(base_source.iterdir()):
+        if _is_test_path(entry.name):
+            shutil.rmtree(entry) if entry.is_dir() else entry.unlink()
+    for entry in sorted(head_source.iterdir()):
+        if _is_test_path(entry.name) and entry.name != ".git":
+            if entry.is_dir():
+                shutil.copytree(entry, base_source / entry.name,
+                                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+            else:
+                shutil.copy2(entry, base_source / entry.name)
+            overlaid.append(entry.name)
+    return overlaid
+
+
+def run_behaviour(repo, base, head_source, subdir, changed, module, report_dir, cases,
+                  tests, python, timeout, log):
+    """The cross-revision oracle. Returns `(behaviour, stages, summary)`; never raises
+    for a failed stage (the reason becomes `not-compared`)."""
+    stages = {}
+    python_changed = [f for f in changed if f.get("language") == "python"]
+    if not python_changed:
+        return (behaviour_unavailable(changed, "cross-revision comparison covers Python only; "
+                                               "no Python function changed"),
+                {"behaviour": {"status": "skipped", "reason": "no changed Python function"}},
+                {"suppressed_as_model_noise": 0, "languages": ["python"]})
+    notes = {f["name"]: "non-Python function: the cross-revision comparison covers Python only"
+             for f in changed if f.get("language") != "python"}
+    work = Path(tempfile.mkdtemp(prefix="autoform-pr-base-"))
+    behaviour_dir = Path(report_dir) / "behaviour"
+    (behaviour_dir / "cross").mkdir(parents=True, exist_ok=True)
+    (behaviour_dir / "control").mkdir(parents=True, exist_ok=True)
+    base_module = module + "Base"
+
+    def finish(reason):
+        stages["behaviour"] = {"status": "failed", "reason": reason}
+        log(f"   !! behaviour: {reason}")
+        merged = dict(notes)
+        for f in changed:
+            merged.setdefault(f["name"], reason)
+        return behaviour_results(changed, None, None, merged)[0], stages, \
+            {"suppressed_as_model_noise": 0, "languages": ["python"]}
+
+    try:
+        archive = git(repo, "archive", "--format=tar", base, binary=True)
+        subprocess.run(["tar", "-x", "-C", str(work)], input=archive.stdout, check=True)
+        base_source = work / subdir if subdir else work
+        overlaid = build_hybrid(base_source, head_source)
+        start = time.monotonic()
+        raw, ast_full = behaviour_dir / "raw.json", behaviour_dir / f"ast-{base_module}.full.json"
+        try:
+            export_ast(base_source, raw, behaviour_dir, timeout)
+        except (PrError, subprocess.TimeoutExpired) as exc:
+            return finish(f"base export unavailable: {exc}")
+        result = subprocess.run([python, str(ROOT / "cartographer/plain_class_values.py"),
+                                 str(raw), str(base_source), str(ast_full)],
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            return finish("plain_class_values.py failed: " + (result.stderr.strip()[-300:] or "?"))
+        stages["behaviour-export"] = {"status": "passed", "seconds": round(time.monotonic() - start, 2),
+                                      "note": "base library + head tests (overlaid: "
+                                              + ", ".join(overlaid or ["none"]) + "); plain_class_values applied",
+                                      "sha256": hashlib.sha256(ast_full.read_bytes()).hexdigest()}
+        functions = deep_json.load(ast_full)
+        if isinstance(functions, dict):
+            functions = functions.get("functions", [])
+        wanted = [f["name"] for f in python_changed]
+        selected, closure, missing = select_functions(functions, wanted)
+        for name in missing:
+            notes.setdefault(name, "added at head: it has no base model to compare"
+                             if next((f for f in changed if f["name"] == name), {}).get("change") == "added"
+                             else "the exporter did not export it from the base tree")
+        for f in python_changed:
+            if f["change"] == "added" or _is_test_path(f["file"]):
+                notes.setdefault(f["name"], "added at head, no base behaviour" if f["change"] == "added"
+                                 else "test code: its model is the head's own file")
+        if not selected:
+            return finish("no changed function is in the base export")
+        # The model is the WHOLE base export, not the cut `select_functions` makes for the
+        # head chain: a receiver the oracle records holds callables (a test's
+        # `getsizeof=lambda ...`) that must exist in the model to be encoded, and with the
+        # cut every such case was refused (measured on cachetools: 0 cases for
+        # `Cache.__setitem__`). The report is still restricted to the changed functions.
+        ast_path = behaviour_dir / f"ast-{base_module}.json"
+        shutil.copy(ast_full, ast_path)
+        cross = Chain(ROOT, behaviour_dir / "cross", base_module, head_source, python, timeout, log)
+        ok = cross.render(ast_path) and cross.build()
+        stages.update({f"behaviour-{k}": v for k, v in cross.stages.items()})
+        if not ok:
+            return finish("the base model did not render/type-check: " +
+                          "; ".join(v.get("reason", "") for v in cross.stages.values() if v.get("reason")))
+        # Cross-revision: base model, head runtime, head tests; --no-cache so a cached
+        # verdict of another revision is never replayed.
+        focus_file = behaviour_dir / "focus.json"
+        focus_file.write_text(json.dumps(sorted(f["name"] for f in python_changed
+                                                if f["name"] not in notes)))
+        extra = ["--no-cache", "--focus", str(focus_file)]
+        if (Path(head_source) / "src").is_dir():
+            # `src/` layout: put it first on the import path so the runtime under test is
+            # the head checkout, not a copy of the package installed in this interpreter.
+            cross.env["PYTHONPATH"] = os.pathsep.join(
+                [str(Path(head_source) / "src")] + ([cross.env["PYTHONPATH"]] if cross.env.get("PYTHONPATH") else []))
+        cross.oracle_extra = extra
+        cross_conf = cross.oracle(ast_path, cases, tests)
+        stages["behaviour-oracle"] = cross.stages.get("oracle", {})
+        if cross_conf is None:
+            return finish("the cross-revision oracle produced no conformance.json")
+        control_conf = None
+        if cross_conf.get("divergences"):
+            control = Chain(ROOT, behaviour_dir / "control", base_module, base_source, python, timeout, log)
+            control.oracle_extra = extra
+            if (base_source / "src").is_dir():
+                control.env["PYTHONPATH"] = str(base_source / "src")
+            control_conf = control.oracle(ast_path, cases, tests)
+            stages["behaviour-control"] = control.stages.get("oracle", {})
+            if control_conf is None:
+                stages["behaviour-control"]["note"] = "no control: divergences are NOT filtered"
+        results, suppressed = behaviour_results(changed, cross_conf, control_conf, notes)
+        stages["behaviour"] = {"status": "passed", "note":
+                               f"{len(functions)} function(s) in the base module; "
+                               f"suppressed-as-model-noise: {suppressed}"}
+        return results, stages, {"suppressed_as_model_noise": suppressed, "languages": ["python"],
+                                 "control": "run" if control_conf is not None else
+                                            ("not needed: no divergence" if not cross_conf.get("divergences")
+                                             else "unavailable"),
+                                 "model": f"base {base[:12]} + head tests", "runtime": "head",
+                                 "cases_per_function": cases}
+    except (subprocess.CalledProcessError, OSError, PrError) as exc:
+        return finish(f"{type(exc).__name__}: {exc}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 # ------------------------------------------------------------------ outputs
 
 def sarif_document(report):
@@ -621,6 +903,12 @@ def sarif_document(report):
               "help": {"text": RULES[level][1] + " See docs/evidence-levels.md."},
               "defaultConfiguration": {"level": SARIF_LEVEL[level]},
               "properties": {"tags": ["autoform", "evidence-level"]}} for level in LEVELS]
+    rules.append({"id": BEHAVIOUR_RULE[0], "name": "BehaviourChanged",
+                  "shortDescription": {"text": BEHAVIOUR_RULE[1]},
+                  "fullDescription": {"text": BEHAVIOUR_RULE[2]},
+                  "help": {"text": BEHAVIOUR_RULE[2] + " See docs/evidence-levels.md."},
+                  "defaultConfiguration": {"level": "warning"},
+                  "properties": {"tags": ["autoform", "behaviour"]}})
     index = {rule["id"]: i for i, rule in enumerate(rules)}
     results = []
     for function in report["functions"]:
@@ -639,6 +927,22 @@ def sarif_document(report):
             "properties": {"function": function["name"], "level": level,
                            "change": function["change"], "detection": function["detection"],
                            "artifacts": function["artifacts"]}})
+    for function in report["functions"]:
+        behaviour = function.get("behaviour") or {}
+        if behaviour.get("status") != "changed":
+            continue
+        shown = "; ".join(f"{c['call']}" + (f" on {c['receiver']}" if c.get("receiver") else "") +
+                          f": base model {c['base_model']}, head runtime {c['head_runtime']}"
+                          for c in behaviour["counter_inputs"])
+        results.append({
+            "ruleId": BEHAVIOUR_RULE[0], "ruleIndex": index[BEHAVIOUR_RULE[0]], "level": "warning",
+            "message": {"text": f"{function['name']}: behaviour changed -- {shown}"},
+            "locations": [{"physicalLocation": {
+                "artifactLocation": {"uri": function["path"], "uriBaseId": "%SRCROOT%"},
+                "region": {"startLine": max(1, int(function.get("line") or 1))}}}],
+            "partialFingerprints": {"autoform/function": function["name"],
+                                    "autoform/behaviour": "changed"},
+            "properties": {"function": function["name"], "behaviour": behaviour}})
     return {
         "$schema": SARIF_SCHEMA, "version": "2.1.0",
         "runs": [{
@@ -706,6 +1010,40 @@ def validate_sarif(document):
     return problems
 
 
+def behaviour_markdown(report):
+    summary = report.get("behaviour")
+    rows = [(f, f["behaviour"]) for f in report["functions"] if f.get("behaviour")]
+    if not rows:
+        return []
+    lines = ["### Behaviour changes in this PR", ""]
+    counts = {b: sum(1 for _, r in rows if r["status"] == b) for b in BEHAVIOURS}
+    lines += ["Base-revision model against head-revision runtime on the head tests' inputs "
+              "(Python only). A behaviour change is reported, not failed. "
+              + ", ".join(f"{n} {b}" for b, n in counts.items())
+              + (f"; suppressed-as-model-noise: {summary['suppressed_as_model_noise']}" if summary else "")
+              + ".", ""]
+    for function, record in rows:
+        if record["status"] != "changed":
+            continue
+        lines.append(f"* `{function['name']}` -- **behaviour: changed** ({record['diverging']} input(s))")
+        for item in record["counter_inputs"]:
+            lines.append(f"  * `{item['call']}`" + (f" on `{item['receiver']}`" if item.get("receiver") else "")
+                         + f": base model {item['base_model']}; head runtime {item['head_runtime']}")
+    quiet = [(f, r) for f, r in rows if r["status"] != "changed"]
+    if quiet:
+        lines += ["", "| function | behaviour | detail |", "|---|---|---|"]
+        lines += [f"| `{f['name']}` | {r['status']} | {r['reason']} |" for f, r in quiet]
+    failed = [f"{n}: {v.get('reason') or v.get('status')}" for n, v in ((summary or {}).get("stages") or {}).items()
+              if v.get("status") in ("failed", "skipped")]
+    if failed:
+        lines += ["", "Behaviour stages that did not run: " + "; ".join(failed) + "."]
+    if summary and summary.get("suppressed_as_model_noise"):
+        lines += ["", f"suppressed-as-model-noise: {summary['suppressed_as_model_noise']} divergent case(s) "
+                      "also diverge when the base model runs against the base runtime on the same "
+                      "inputs (same-base control), so they are not attributed to the change."]
+    return lines + [""]
+
+
 def markdown_comment(report):
     counts = {level: 0 for level in LEVELS}
     for function in report["functions"]:
@@ -743,6 +1081,7 @@ def markdown_comment(report):
     if report["removed"]:
         lines += ["Removed at head (nothing to verify): " +
                   ", ".join(f"`{f['name']}`" for f in report["removed"]), ""]
+    lines += behaviour_markdown(report)
     skipped_files = [f for f in report["files"] if f.get("analysed") is False]
     if skipped_files:
         lines += ["Changed files not analysed (outside `--subdir` or not source code): " +
@@ -896,6 +1235,16 @@ def run(args, log=print):
 
         results = evidence(changed, selected, conformance, specs, mutation, chain.stages,
                            args.module, exporter)
+        behaviour_summary = None
+        if args.behaviour and changed:
+            behaviours, extra_stages, behaviour_summary = run_behaviour(
+                repo, base, source, subdir, changed, args.module, report_dir,
+                args.behaviour_cases, args.tests, python, args.stage_timeout, log)
+            behaviour_summary = dict(behaviour_summary, stages=extra_stages)
+            for record in results:
+                record["behaviour"] = behaviours.get(record["name"])
+        elif not args.behaviour:
+            log("==> behaviour: skipped: --no-behaviour")
         report = {
             "schema_version": SCHEMA_VERSION, "tool_version": _tool_version(),
             "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -913,6 +1262,10 @@ def run(args, log=print):
             "functions": results, "removed": detected["removed"],
             "summary": {level: sum(1 for f in results if f["level"] == level) for level in LEVELS},
         }
+        if behaviour_summary is not None:
+            counts = {b: sum(1 for f in results if (f.get("behaviour") or {}).get("status") == b)
+                      for b in BEHAVIOURS}
+            report["behaviour"] = dict(behaviour_summary, summary=counts)
         _write_json(report_dir / "pr.json", report)
         if args.sarif:
             document = sarif_document(report)
@@ -927,6 +1280,9 @@ def run(args, log=print):
         log(f"==> {len(results)} changed function(s): " +
             ", ".join(f"{level} {n}" for level, n in report["summary"].items() if n) +
             (f"; removed {len(detected['removed'])}" if detected["removed"] else ""))
+        if report.get("behaviour"):
+            log("==> behaviour: " + ", ".join(f"{n} {b}" for b, n in report["behaviour"]["summary"].items() if n)
+                + f"; suppressed-as-model-noise: {report['behaviour']['suppressed_as_model_noise']}")
         for function in results:
             log(f"   {function['level']:<14} {function['name']}: {function['reason']}")
         log(f"==> report: {report_dir / 'pr.json'}")
@@ -967,6 +1323,10 @@ def main(argv=None):
     parser.add_argument("--tests", help="a test suite outside the source tree for the oracle (differential.py --tests)")
     parser.add_argument("--cases", type=int, default=int(os.environ.get("AUTOFORM_CASES", "5")),
                         help="random cases per function for the oracle (default: 5)")
+    parser.add_argument("--no-behaviour", dest="behaviour", action="store_false",
+                        help="skip the cross-revision behaviour comparison (base model vs head runtime)")
+    parser.add_argument("--behaviour-cases", type=int, default=100,
+                        help="oracle cases per function for the behaviour comparison (default: 100)")
     parser.add_argument("--mutants", type=int, default=0,
                         help="mutants for the mutation gate over the proved theorems (default: 0 = skip)")
     parser.add_argument("--stage-timeout", type=float, default=1800,

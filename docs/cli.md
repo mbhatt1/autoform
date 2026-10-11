@@ -108,6 +108,7 @@ and each divergence is kernel-checked. Exit `1` on a regression or a divergence.
 ```
 autoform pr SRC [Module] --base REF [--head REF] [--subdir PATH] [--ast FILE] [--tests DIR]
             [--cases N] [--mutants N] [--sarif FILE] [--markdown FILE]
+            [--no-behaviour]
             [--stage-timeout SECONDS] [--timeout SECONDS] [--keep-checkout]
 ```
 
@@ -128,6 +129,16 @@ the stage logs); `--sarif` writes SARIF 2.1.0 with one result per function, vali
 for GitHub code scanning before it is written, and `--markdown` the review comment.
 Exit `1` only when a function is refuted; a stage that cannot run leaves its functions
 at the level below and is named in the report.
+
+Besides the level, each changed Python function gets a **behaviour** result
+(`changed`, `unchanged-on-inputs` or `not-compared`): the base revision's model run
+against the head runtime on the head tests' inputs, so a change of behaviour that the
+single-revision levels cannot see is flagged with up to three counter-inputs (SARIF rule
+`autoform/behaviour-changed`, comment section "Behaviour changes in this PR"). It does not
+affect the exit code. Divergences the same base model shows against the base runtime are
+reported as `suppressed-as-model-noise: n`. It needs Joern for the base export; without
+it every function is `not-compared` with that reason. `--no-behaviour` skips it. See
+`docs/evidence-levels.md`.
 
 ### `autoformalize`, `formalize`, `machine`
 

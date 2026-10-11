@@ -587,6 +587,8 @@ def _pr(args, workspace, env):
                    '--base', args.base, '--module', args.module, '--out', str(out),
                    '--cases', str(args.cases), '--mutants', str(args.mutants),
                    '--stage-timeout', str(args.stage_timeout)]
+        if not getattr(args, 'behaviour', True):
+            command.append('--no-behaviour')
         for flag in ('head', 'subdir'):
             if getattr(args, flag):
                 command += ['--' + flag, getattr(args, flag)]
@@ -719,6 +721,8 @@ def main(argv=None):
     pr.add_argument("--cases", type=int, default=5, help="random oracle cases per function (default: 5)")
     pr.add_argument("--mutants", type=int, default=0,
                     help="mutants for the mutation gate over the proved theorems (default: 0 = skip)")
+    pr.add_argument("--no-behaviour", dest="behaviour", action="store_false",
+                    help="skip the cross-revision behaviour comparison (base model vs head runtime)")
     pr.add_argument("--sarif", type=Path, help="write SARIF 2.1.0 here, one result per changed function")
     pr.add_argument("--markdown", type=Path, help="write the review comment here")
     pr.add_argument("--stage-timeout", type=float, default=1800,
