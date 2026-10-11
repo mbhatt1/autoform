@@ -338,3 +338,24 @@ def test_cli_detects_cargo_libraries(tmp_path):
     (tmp_path / "Cargo.toml").write_text("[workspace]\nmembers = []\n")
     assert not is_cargo_library(tmp_path)
     assert not is_cargo_library(ROOT)
+
+
+def test_doctor_reports_the_rust_runtime_as_optional(tmp_path):
+    import subprocess
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "home").mkdir()
+    env = dict(os.environ, PATH=str(tmp_path / "bin"), HOME=str(tmp_path / "home"),
+               JOERN_HOME=str(tmp_path / "nojoern"), PYTHONPATH=str(ROOT / "src"))
+    env.pop("AENEAS_HOME", None)
+    env.pop("AUTOFORM_RUST_LEAN_PROJECT", None)
+    r = subprocess.run([sys.executable, "-m", "autoform", "doctor", "--json"], cwd=ROOT, env=env,
+                       capture_output=True, text=True, timeout=180)
+    report = json.loads(r.stdout)
+    pins = json.loads((ROOT / "rust-pins.json").read_text())
+    assert report["pins"]["rust"]["aeneas_release"] == pins["aeneas_release"]
+    for name in ("cargo", "rust-toolchain", "charon", "aeneas", "aeneas-lean-project"):
+        entry = report["tools"][name]
+        assert entry["required"] is False and entry["status"] == "missing", (name, entry)
+        assert entry["disables"] == ["Rust"] and entry["hint"]
+    assert pins["aeneas_release"] in report["tools"]["aeneas"]["hint"]
+    assert pins["rust_toolchain"] in report["tools"]["rust-toolchain"]["hint"]
