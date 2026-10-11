@@ -93,6 +93,12 @@ The last command prints the levels; the workflow fails if they are not the fixtu
 is a runtime hole the oracle cannot adjudicate; `raw` a hole, `lit:bytes`). `add` and
 `fraction` are unchanged between the commits and are not reported at all.
 
+## A real run
+
+[`examples/pr-cachetools-7.1.5/`](examples/pr-cachetools-7.1.5/README.md) is the output of `pr` on a real
+cachetools change (v7.1.4 to v7.1.5), with a plain reading of each level and of what the
+report does and does not say about the fix.
+
 ## What none of this says
 
 The chain is the one `docs/trust-model.md` describes, cut down to a few functions.
