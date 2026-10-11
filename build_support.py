@@ -20,7 +20,7 @@ def runtime_files(root=ROOT):
                                   content.decode(), re.MULTILINE))
     files["Autoform.lean"] = b"import Autoform.Runtime\n"
     for name in ("autoform.sh", "assure.sh", "lakefile.toml", "lake-manifest.json",
-                 "lean-toolchain", "joern-version", "requirements.txt", "requirements-machine.txt",
+                 "lean-toolchain", "joern-version", "rust-pins.json", "requirements.txt", "requirements-machine.txt",
                  "LICENSE", "NOTICE", "THIRD_PARTY.md", "SUPPORT.md", "SECURITY.md"):
         files[name] = (root / name).read_bytes()
     for path in sorted((root / "licenses").glob("*.txt")):

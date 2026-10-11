@@ -1,0 +1,15 @@
+{
+ "comment": "Pinned Rust-path toolchain (docs/rust.md). Read by scripts/rust_aeneas.py, `autoform doctor` and .github/workflows/rust.yml (tests/test_rust_unit.py holds the workflow to these values).",
+ "aeneas_release": "nightly-2026.10.10-d119a47",
+ "aeneas_version": "nightly-2026.10.10-d119a47",
+ "charon_version": "0.1.281",
+ "charon_commit": "798016509139eb51f0d764645f76d068d34ba5f6",
+ "rust_toolchain": "nightly-2026-09-17",
+ "lean_toolchain": "leanprover/lean4:v4.31.0",
+ "mathlib_rev": "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f",
+ "assets": {
+  "aeneas-linux-x86_64.tar.gz": "152a5747b0f90f4e110034af6c533ba85e3367a4693a9720f9f67baa63da3ea4",
+  "aeneas-linux-aarch64.tar.gz": "c6aa6d5dbd49f61efe33b08723d7e73d6deee087add82fd83d127033d2c24308",
+  "aeneas-macos-aarch64.tar.gz": "615696996ebeb32d55ac04aec30458813809309a47368bbb3a3821337bb51f15"
+ }
+}
