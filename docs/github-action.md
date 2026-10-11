@@ -66,6 +66,25 @@ move. Inputs: `base`, `module`, `subdir`, `sarif-path` (default `autoform-pr.sar
 `install-toolchain`, `cache`, `fail-on-refuted`. Outputs: `sarif`, `markdown` (absolute
 paths).
 
+## A real run
+
+[Pull request #14](https://github.com/mbhatt1/autoform/pull/14) changes
+`unit_price(total, count)` in `examples/demo/pricing.py` to return 0 when `count == 0`
+instead of raising, and runs this Action pinned to `becfe15`
+([run 38149891759](https://github.com/mbhatt1/autoform/actions/runs/38149891759), 2026-10-11).
+The run took 6 minutes 27 seconds from job start to finish, on a warm workspace cache. It
+reported:
+
+* 2 changed functions, both `proved` in the kernel over their recorded cases
+  (`unit_price` and the test function `test_unit_price`).
+* Behaviour: 1 `changed`, 1 `not-compared` (the test function); suppressed as model noise: 0.
+* The code-scanning alert `autoform/behaviour-changed` on `examples/demo/pricing.py:4`:
+  `unit_price(int 11, int 0): base model raises Val.str "ZeroDivisionError", head runtime
+  returns int 0`, with further inputs of the same shape.
+
+The change was deliberate, so the alert is the intended result: the Action reports a
+behaviour change, and deciding whether it is a bug is the reviewer's call.
+
 ## Permissions
 
 | permission | why | if you do not grant it |
