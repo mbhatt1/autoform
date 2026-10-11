@@ -51,7 +51,7 @@ table. "Real corpus" means a measured open-source repository, not a fixture.
 | Kotlin | yes on a toy; runs as `.java` dialect | JVM through a `@JvmStatic` thunk; **no** corpus run | the matrix row for a real Kotlin repository records the front end as failing (historical); the toy row has 3 functions |
 | TypeScript | yes; `.javascript` dialect | Node backend; fixture run covers `.js` only, not `.ts` | matrix row: 86 functions, 44 hole-free, 18 in the verifiable core (historical) |
 | JavaScript | yes; `.javascript` dialect | Node backend; fixture only | small corpus: 14 functions, 5 hole-free. A 693-function `lodash.js` run did **not** translate (historical renderer failure) |
-| **Rust** | **not supported** | none | `languages.md` lists Rust among front ends "not tested"; there is no Rust dialect or oracle |
+| **Rust** | **experimental** | integer-only prototype, not in CI | Charon and Aeneas emit the Lean; a differential oracle compares real Rust with it on integer functions only (`docs/rust.md`). No ledger, named holes or kernel-checked statements for Rust yet |
 | **Hack** | **not supported** | none | not mentioned in `languages.md`; no front end, dialect or oracle |
 
 The percentages and function counts that are not marked "bound" are quoted from a
@@ -64,7 +64,7 @@ Machine code (ELF, PE, Mach-O, assembly) is a separate path
 
 For a typical stack this means: Python and Java have the deepest evidence;
 Go, C, C++, Kotlin, TypeScript and JavaScript translate and type-check but have little or
-no oracle evidence on real code; Rust and Hack get nothing. A hole-free function is
+no oracle evidence on real code; Rust is an integer-only prototype and Hack gets nothing. A hole-free function is
 far from a verified function (Java: 32 compared of 422 hole-free).
 
 ## 3. Security posture
@@ -176,7 +176,7 @@ bound"):
   an overload resolution on commons-lang3 and in an argument order on Jinja2
   ([languages.md](languages.md)). Provenance records name the command, not a promise of
   identical bytes.
-* **No Rust, Hack, Bazel or Buck support.** C#, PHP, Ruby and Swift were not tested.
+* **No Hack, Bazel or Buck support, and Rust only as an experimental integer-only prototype.** C#, PHP, Ruby and Swift were not tested.
 * **The GitHub Action and the release supply-chain jobs have not run.**
 
 ## 7. A first-week evaluation plan

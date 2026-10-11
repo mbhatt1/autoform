@@ -39,7 +39,7 @@ pipeline; where a document and an artifact disagree, the artifact wins.
 
 Joern 4.0.606, `joern-cli/frontends/` has `c2cpg`, `javasrc2cpg`, `jimple2cpg`,
 `jssrc2cpg`, `gosrc2cpg`, `kotlin2cpg`, `pysrc2cpg`, `ghidra2cpg`, and others.
-Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
+Binaries (`ghidra2cpg`), C#, PHP, Ruby and Swift were **not tested**. Rust has no Joern frontend here; an experimental route through Charon and Aeneas is in `docs/rust.md`.
 
 ## Support matrix
 
