@@ -1,0 +1,28 @@
+sandbox: seatbelt
+language: c (.c x4) -> runtime cc
+  native C: 2/2 translation units compiled; 2 entry points
+oracle cache (--no-cache: not consulted): 0 functions / 0 cases reported from cache, 2 functions / 200 cases to compare now (--no-cache: 2)
+  DIVERGENCE lcm(int 9223372036854775808, int 2): cc=int 9223372036854775808 lean=int 0 [boundary-typed]
+  DIVERGENCE lcm(int 18446744073709551614, int 18446744073709551600): cc=int 15811494920322472816 lean=int 2 [random]
+  DIVERGENCE lcm(int 1099511627776, int 1099511627776): cc=int 1099511627776 lean=int 0 [boundary-typed]
+  DIVERGENCE lcm(int 18446744073709551612, int 18446744073709551603): cc=int 12297829382473034428 lean=int 17 [random]
+  DIVERGENCE lcm(int 18446744073709551598, int 14): cc=int 18446744073709551490 lean=int 9223372036854775682 [random]
+  DIVERGENCE lcm(int 9223372036854775807, int 281474976710655): cc=int 9223331826143817143 lean=int 1317584365982580736 [boundary-typed]
+  DIVERGENCE lcm(int 9223372036854775808, int 65536): cc=int 9223372036854775808 lean=int 0 [boundary-typed]
+  DIVERGENCE lcm(int 18446744073709551609, int 15): cc=int 18446744073709551581 lean=int 6148914691236517170 [random]
+  DIVERGENCE lcm(int 18446744073709551615, int 281474976710655): cc=int 18446744069414518783 lean=int 281474976710656 [boundary-typed]
+  DIVERGENCE lcm(int 18446744073709551598, int 16): cc=int 18446744073709551472 lean=int 9223372036854775664 [random]
+  DIVERGENCE lcm(int 18446744073709551614, int 256): cc=int 18446744073709551360 lean=int 9223372036854775552 [boundary-typed]
+  DIVERGENCE lcm(int 4611686018427387904, int 2147483648): cc=int 4611686018427387904 lean=int 0 [boundary-typed]
+  DIVERGENCE lcm(int 18446744073709551602, int 10): cc=int 18446744073709551546 lean=int 9223372036854775738 [random]
+
+module LinuxLcmPrefix (/tmp/af-agents/linux-lcm-work/postfix/lib, cc)
+measurement basis: c-native-typed-boundary-v4
+functions: 4 total, 4 hole-free, 2 exercised, 2 COMPARED (50% of all, 50% of hole-free)
+conformance: 86/99 agree (86%) vs cc, 13 divergences, 101 INCONCLUSIVE (hole / outOfFuel / unrepresentable)
+oracle cache: 2 functions stored under /tmp/af-agents/bug-linux/.autoform-work/oracle/LinuxLcmPrefix
+  INCONCLUSIVE x58  gcd: call:swap
+  INCONCLUSIVE x43  lcm: call:swap
+  by origin boundary-typed agree 42, diverge 7, inconclusive 49
+  by origin boundary-zero agree 2, diverge 0, inconclusive 0
+  by origin random      agree 42, diverge 6, inconclusive 52
