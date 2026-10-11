@@ -25,7 +25,7 @@ REC = ROOT / "tests" / "fixtures" / "rust_proto" / "recorded"
 def recorded():
     doc = json.loads((REC / "rustdoc.json").read_text())
     funcs, decls_listing = R.public_functions(doc)
-    ns, decls = R.parse_aeneas((REC / "Proto.lean").read_text())
+    ns, decls = R.parse_aeneas((REC / "Proto.aeneas-output.txt").read_text())
     alog = R.parse_aeneas_log((REC / "aeneas.log").read_text())
     axioms = R.parse_print_axioms((REC / "axioms.txt").read_text())
     mapping = R.map_functions(funcs, decls, doc)
@@ -71,7 +71,7 @@ def test_holes_are_named_from_the_tools_own_messages(recorded):
 
 
 def test_a_hole_in_a_callee_is_a_hole_in_the_caller():
-    text = (REC / "Proto.lean").read_text() + "\n"
+    text = (REC / "Proto.aeneas-output.txt").read_text() + "\n"
     ns, decls = R.parse_aeneas(text)
     # A synthetic caller of `halve` (whose body is `sorry`): `#print axioms` says sorryAx.
     decls.append(dict(path="proto::uses_halve", suffix="", lean="uses_halve", keyword="def", attrs="",
