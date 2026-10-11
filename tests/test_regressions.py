@@ -175,6 +175,15 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
                  "45 in the verifiable core, 7 holes in 5 functions (table above).\n" % n)
         fh.write("**1 functions compared, 1/1 cases agree, 0 divergences, "
                  "2 cases inconclusive**\n")
+    # docs/adoption.md quotes both corpora for adopters; its rows are bound the same way.
+    with open(os.path.join(d, "docs", "adoption.md"), "w") as fh:
+        fh.write("`cachetools`: %d functions, 100 hole-free, 45 in the verifiable core\n"
+                 % doc_functions)
+        fh.write("commons-lang3 3.17.0 subset: %d functions, 100 hole-free, 45 in the "
+                 "verifiable core; oracle compared **1** functions, 1/1 cases agree, "
+                 "2 cases inconclusive (all bound by check_docs)\n"
+                 "**1** functions, 1/1 cases agree\n"
+                 "(Java: 1 compared of 100 hole-free)\n" % n)
     return d
 
 

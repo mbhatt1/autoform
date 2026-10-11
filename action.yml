@@ -1,0 +1,181 @@
+name: autoform pull-request evidence
+description: >-
+  Run `autoform pr` on a pull request: the evidence level (none, hole, translated,
+  oracle-agreed, proved, refuted) of every function the change touched, as SARIF for
+  code scanning and Markdown for the job summary. It reports evidence about recorded
+  cases under the tool's semantics; it is not a correctness proof of the changed code.
+author: autoform
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  base:
+    description: Commit the change is measured against.
+    default: ${{ github.event.pull_request.base.sha }}
+  module:
+    description: Lean module name the changed functions are rendered under.
+    default: PullRequest
+  subdir:
+    description: 'Directory inside the checkout to analyse (default: the whole checkout).'
+    default: ''
+  sarif-path:
+    description: Where the SARIF 2.1.0 file is written (relative to the workspace).
+    default: autoform-pr.sarif
+  markdown-path:
+    description: Where the Markdown report is written (appended to the job summary only).
+    default: autoform-pr.md
+  upload-sarif:
+    description: 'Upload the SARIF to code scanning (needs security-events: write).'
+    default: 'true'
+  sarif-category:
+    description: Code-scanning category for the upload.
+    default: autoform-pr
+  mutants:
+    description: Mutants for the mutation gate over the proved theorems (0 skips it).
+    default: '0'
+  install-toolchain:
+    description: >-
+      Install the pinned Lean (via elan) and Joern, and bubblewrap on Linux. Set to
+      `false` if an earlier step already provides them; the run then fails at the
+      `autoform doctor` step if any is missing.
+    default: 'true'
+  cache:
+    description: Cache the autoform workspace (built Lean project) between runs.
+    default: 'true'
+  fail-on-refuted:
+    description: 'Fail the step when a function is refuted (autoform exit 1).'
+    default: 'true'
+
+outputs:
+  sarif:
+    description: Absolute path of the SARIF file.
+    value: ${{ steps.run.outputs.sarif }}
+  markdown:
+    description: Absolute path of the Markdown report.
+    value: ${{ steps.run.outputs.markdown }}
+
+runs:
+  using: composite
+  steps:
+    - name: Linux sandbox prerequisites (bubblewrap; unprivileged user namespaces)
+      if: inputs.install-toolchain == 'true' && runner.os == 'Linux'
+      shell: bash
+      # Needs passwordless sudo, as on GitHub-hosted runners. AppArmor on Ubuntu 24.04
+      # restricts unprivileged user namespaces, which bubblewrap needs to confine the
+      # code under test. This relaxes the setting for the whole runner VM.
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y -q bubblewrap
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        bwrap --unshare-net --ro-bind / / true
+
+    - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+      if: inputs.install-toolchain == 'true'
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Install autoform from this action's own checkout
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m pip install --quiet "$GITHUB_ACTION_PATH"
+        echo "AUTOFORM_WORKSPACE=$RUNNER_TEMP/autoform-work" >> "$GITHUB_ENV"
+
+    - name: Install pinned Lean (elan)
+      if: inputs.install-toolchain == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        toolchain="$(cat "$GITHUB_ACTION_PATH/lean-toolchain")"
+        curl -sSfL --retry 5 --retry-all-errors https://elan.lean-lang.org/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+        sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain "$toolchain"
+        echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+        for attempt in 1 2 3 4 5; do
+          "$HOME/.elan/bin/elan" run "$toolchain" lean --version && break
+          [ "$attempt" = 5 ] && exit 1
+          sleep $((attempt * 30))
+        done
+
+    - name: Install pinned Joern (sha512 verified)
+      if: inputs.install-toolchain == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) asset=joern-cli-linux-x86_64.zip ;;
+          *) echo "::error::install-toolchain supports Linux x64 only; install Joern yourself and set install-toolchain: false" >&2; exit 1 ;;
+        esac
+        version="$(cat "$GITHUB_ACTION_PATH/joern-version")"
+        dl="$RUNNER_TEMP/joern-dl"
+        mkdir -p "$dl/target" "$HOME/joern"
+        base="https://github.com/joernio/joern/releases/download/v${version}"
+        curl -fL "$base/$asset" -o "$dl/target/$asset"
+        curl -fL "$base/$asset.sha512" -o "$dl/$asset.sha512"
+        (cd "$dl" && sha512sum -c "$asset.sha512")
+        unzip -q "$dl/target/$asset" -d "$HOME/joern"
+
+    - name: Cache key (content of the bundled Lean project)
+      id: key
+      shell: bash
+      # The workspace refuses to be reused when it differs from the package's bundled
+      # resources, so the key is exact (no restore-keys): a stale workspace would fail.
+      run: |
+        set -euo pipefail
+        cd "$GITHUB_ACTION_PATH"
+        digest=$( (find Autoform src/autoform -type f ! -name '*.pyc' -print0 | sort -z | xargs -0 sha256sum;
+                   sha256sum lakefile.toml lake-manifest.json lean-toolchain joern-version) | sha256sum | cut -d' ' -f1)
+        echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      if: inputs.cache == 'true'
+      with:
+        path: ${{ runner.temp }}/autoform-work
+        key: autoform-workspace-${{ runner.os }}-${{ runner.arch }}-${{ steps.key.outputs.digest }}
+
+    - name: Every prerequisite is present (fail fast, before the long stages)
+      shell: bash
+      run: |
+        set -euo pipefail
+        autoform --workspace "$AUTOFORM_WORKSPACE" doctor
+
+    - name: autoform pr (changed functions only)
+      id: run
+      shell: bash
+      env:
+        AUTOFORM_PROBE_JOBS: '1'
+        BASE: ${{ inputs.base }}
+        MODULE: ${{ inputs.module }}
+        SUBDIR: ${{ inputs.subdir }}
+        SARIF: ${{ inputs.sarif-path }}
+        MARKDOWN: ${{ inputs.markdown-path }}
+        MUTANTS: ${{ inputs.mutants }}
+        FAIL_ON_REFUTED: ${{ inputs.fail-on-refuted }}
+      run: |
+        set -uo pipefail
+        if [ -z "$BASE" ]; then
+          echo "::error::no base commit: pass the 'base' input (this event has no pull_request.base.sha)" >&2
+          exit 2
+        fi
+        # A shallow checkout may not hold the base commit; fetch only that commit.
+        git cat-file -e "${BASE}^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$BASE"
+        args=(pr . "$MODULE" --base "$BASE" --mutants "$MUTANTS" --sarif "$SARIF" --markdown "$MARKDOWN")
+        [ -n "$SUBDIR" ] && args+=(--subdir "$SUBDIR")
+        autoform --workspace "$AUTOFORM_WORKSPACE" "${args[@]}"
+        code=$?
+        echo "sarif=$(realpath -m "$SARIF")" >> "$GITHUB_OUTPUT"
+        echo "markdown=$(realpath -m "$MARKDOWN")" >> "$GITHUB_OUTPUT"
+        # Job summary only: no PR comment, so no pull-requests: write permission.
+        [ -f "$MARKDOWN" ] && cat "$MARKDOWN" >> "$GITHUB_STEP_SUMMARY"
+        # 1 = a function was refuted; 2 = the run could not complete. The SARIF upload
+        # below still runs for 0 and 1; a run that could not complete is always a failure.
+        if [ "$code" = 1 ] && [ "$FAIL_ON_REFUTED" != "true" ]; then code=0; fi
+        exit "$code"
+
+    - name: Upload SARIF to code scanning
+      if: always() && inputs.upload-sarif == 'true' && hashFiles(inputs.sarif-path) != ''
+      uses: github/codeql-action/upload-sarif@9f759ee644a3e7c15c1390abf49868036c00067b # v3
+      with:
+        sarif_file: ${{ inputs.sarif-path }}
+        category: ${{ inputs.sarif-category }}

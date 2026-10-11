@@ -31,6 +31,9 @@ that was skipped because a tool was missing is an unmet gate, not a pass, and
       installed environment.
 - [ ] Bump `pyproject.toml` **and** `src/autoform/__init__.py`; the release tag is
       `v<version>` (the package workflow rejects a mismatch).
+- [ ] `CHANGELOG.md` has a `## [<version>]` section as its first entry, and
+      `scripts/release_check.sh` exits `0` (clean tree, one version everywhere, CI green on
+      `HEAD`, version not on PyPI); it prints the tag and release commands without running them.
 - [ ] Third-party notices re-checked against their pinned upstream revisions
       (`THIRD_PARTY.md`); the Cachetools notice byte-compared as CI does.
 - [ ] Retain: distribution hashes, `autoform --version` output, toolchain versions,

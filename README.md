@@ -157,6 +157,11 @@ jinja2 3.1.6 — 662/817, core 438, 167 / 0, 70 specs, 0 over the proof budget.
 | JavaScript, TypeScript | yes | Node | |
 | machine code | SLEIGH p-code | native execution where the host can | ELF, PE, Mach-O, raw bytes, `.s` via clang |
 
+Evaluating autoform for a team? [docs/adoption.md](docs/adoption.md) is the brief for an
+engineering manager or security reviewer (what it proves and does not, language coverage,
+security posture, integration, a first-week plan); the pull-request check is
+[docs/github-action.md](docs/github-action.md).
+
 Per-language coverage, with what each front end does and does not provide, is in
 [docs/languages.md](docs/languages.md). Whole-repository formalization is not the goal:
 the output is a verified core plus declared assumptions for everything else, and

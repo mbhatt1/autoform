@@ -8,6 +8,8 @@ is the design record, which carries the reasoning behind everything here.
 | [`cli.md`](cli.md) | The `autoform` command: every subcommand and flag, what a run leaves behind and what each artifact means, environment variables, exit codes. |
 | [`library.md`](library.md) | Using autoform from Python: the installed package, reading `guarantee.json` and the other artifacts, the oracle and gate scripts as modules, the Lean library. |
 | [`evidence-levels.md`](evidence-levels.md) | The evidence levels `autoform pr` reports per changed function (`none`, `hole`, `translated`, `oracle-agreed`, `proved`, `refuted`): what each claims, what it does not, which artifact proves it. One page. |
+| [`adoption.md`](adoption.md) | For an engineering manager or security reviewer: what is and is not proved, language coverage, security posture, integration, scale, named gaps and a first-week evaluation plan. |
+| [`github-action.md`](github-action.md) | The composite GitHub Action (`action.yml`) that runs `autoform pr` on a pull request: workflow, permissions, requirements and cold-start cost. |
 | [`architecture.md`](architecture.md) | How the pieces fit: the approach, why the CPG is treated as a universal AST, the pipeline stage by stage, and what every module and script is for. Start here. |
 | [`core-language.md`](core-language.md) | Reference for the Core language: every `Val`/`Expr`/`Stmt` constructor, the heap/env/context model, the four evaluation outcomes, dialects, and the hole taxonomy. |
 | [`trust-model.md`](trust-model.md) | What is claimed and on what basis: the four independent oracles, the G1–G5 assurance goals, the status lattice, and an explicit list of what the system does *not* establish. |
