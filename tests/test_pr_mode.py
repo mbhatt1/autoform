@@ -290,6 +290,151 @@ def test_markdown_names_every_function_level_and_skipped_stage():
     assert 'Levels never round up' in text
 
 
+# ------------------------------------------------------------------ behaviour
+
+SET = 'm.py:<module>.C.__setitem__'
+ROW = {'function': SET, 'args': '(int 1, int 1)', 'detail': 'cpython raised ValueError, lean returned unit',
+       'lean_repr': 'Autoform.Core.EResult.val (Autoform.Core.Val.unit)', 'origin': 'test-suite',
+       'observation': {'outcome': ['exn', 'ValueError'], 'self': ['ref', 0],
+                       'heap': [['m.py:<module>.C', [['getsizeof', ['fn', 't.py:<module>.t.<lambda>2']],
+                                                     ['_C__maxsize', ['int', 3]]], None]]}}
+NOISE = {'function': 'm.py:<module>.C.__init__', 'args': '(int 2, unit)',
+         'detail': 'cpython=unit lean=unit; heap graph=some false',
+         'lean_repr': 'Autoform.Core.EResult.val (Autoform.Core.Val.unit)',
+         'observation': {'outcome': ['val', ['unit']]}}
+
+
+def cases(name, agree=0, diverge=0, inconclusive=0):
+    return ([{'name': name, 'comparison': 'agree'}] * agree + [{'name': name, 'comparison': 'diverge'}] * diverge
+            + [{'name': name, 'comparison': 'inconclusive'}] * inconclusive)
+
+
+def behave(rows, control=None, extra_cases=(), changed_names=(SET, 'm.py:<module>.C.__init__', 'm.py:<module>.C.get'),
+           notes=None):
+    cross = {'runtime_cases': list(extra_cases), 'divergence_detail': rows,
+             'coverage': {'by_status': {}}}
+    out, suppressed = pr_mode.behaviour_results(
+        [changed(n) for n in changed_names], cross, control, notes or {})
+    return out, suppressed
+
+
+def test_a_changed_input_is_reported_with_the_call_and_both_results():
+    out, suppressed = behave([ROW], extra_cases=cases(SET, agree=4, diverge=1))
+    row = out[SET]
+    assert row['status'] == 'changed' and suppressed == 0
+    item, = row['counter_inputs']
+    assert item['call'] == 'C.__setitem__(int 1, int 1)'
+    assert item['base_model'] == 'returns unit'
+    assert item['head_runtime'] == 'raises ValueError'
+    assert 'getsizeof=<lambda>2' in item['receiver'] and 'C{' in item['receiver']
+
+
+def test_at_most_three_counter_inputs_are_kept_and_all_are_counted():
+    rows = [dict(ROW, args=f'(int {n}, int 1)') for n in range(5)]
+    out, _ = behave(rows, extra_cases=cases(SET, diverge=5))
+    assert len(out[SET]['counter_inputs']) == 3 and out[SET]['diverging'] == 5
+
+
+def test_unchanged_states_the_number_of_cases_and_is_not_a_proof():
+    out, _ = behave([], extra_cases=cases(SET, agree=7))
+    row = out[SET]
+    assert row['status'] == 'unchanged-on-inputs' and row['compared'] == 7
+    assert '7 case(s) compared' in row['reason'] and 'not a proof' in row['reason']
+
+
+def test_all_inconclusive_is_not_compared_with_the_reason_never_unchanged():
+    out, _ = behave([], extra_cases=cases(SET, inconclusive=9))
+    row = out[SET]
+    assert row['status'] == 'not-compared' and row['compared'] == 0
+    assert '9 inconclusive' in row['reason']
+    assert out['m.py:<module>.C.get']['status'] == 'not-compared'
+
+
+def test_a_function_without_a_base_model_is_not_compared_with_its_note():
+    out, _ = behave([], extra_cases=cases(SET, agree=2), notes={SET: 'added at head, no base behaviour'})
+    assert out[SET] == {'status': 'not-compared', 'reason': 'added at head, no base behaviour', 'compared': 0,
+                        'counter_inputs': [], 'suppressed_as_model_noise': 0}
+
+
+def test_divergences_the_same_base_control_also_has_are_suppressed_and_counted():
+    init = 'm.py:<module>.C.__init__'
+    out, suppressed = behave([NOISE, NOISE, ROW], control={'divergence_detail': [NOISE, NOISE]},
+                             extra_cases=cases(init, diverge=2) + cases(SET, diverge=1))
+    assert suppressed == 2
+    assert out[init]['status'] == 'not-compared' and out[init]['suppressed_as_model_noise'] == 2
+    assert 'model noise' in out[init]['reason']
+    assert out[SET]['status'] == 'changed'
+    # one control row cancels one cross row, not all of them
+    out, suppressed = behave([NOISE, NOISE], control={'divergence_detail': [NOISE]},
+                             extra_cases=cases(init, diverge=2))
+    assert suppressed == 1 and out[init]['status'] == 'changed' and out[init]['diverging'] == 1
+    # no control run: nothing is filtered
+    out, suppressed = behave([NOISE], control=None, extra_cases=cases(init, diverge=1))
+    assert suppressed == 0 and out[init]['status'] == 'changed'
+
+
+def with_behaviour(_unused=None):
+    results = [dict(r) for r in levels().values()][:2]
+    first, second = results[0]['name'], results[1]['name']
+    results[0]['behaviour'] = pr_mode.behaviour_results(
+        [changed(first)], {'runtime_cases': cases(first, diverge=1),
+                           'divergence_detail': [dict(ROW, function=first)]}, None, {})[0][first]
+    results[1]['behaviour'] = pr_mode.behaviour_results(
+        [changed(second)], {'runtime_cases': cases(second, inconclusive=3)}, None, {})[0][second]
+    report = report_for(results)
+    report['behaviour'] = {'suppressed_as_model_noise': 4,
+                           'summary': {'changed': 1, 'unchanged-on-inputs': 0, 'not-compared': 1}}
+    return report, results
+
+
+def test_sarif_carries_the_behaviour_rule_with_the_input_and_both_results():
+    report, results = with_behaviour(None)
+    document = pr_mode.sarif_document(report)
+    assert pr_mode.validate_sarif(document) == []
+    run = document['runs'][0]
+    assert 'autoform/behaviour-changed' in [r['id'] for r in run['tool']['driver']['rules']]
+    found = [r for r in run['results'] if r['ruleId'] == 'autoform/behaviour-changed']
+    assert len(found) == 1 and found[0]['level'] == 'warning'
+    text = found[0]['message']['text']
+    assert 'proved(int 1, int 1)' in text and 'getsizeof=<lambda>2' in text
+    assert 'base model returns unit' in text and 'head runtime raises ValueError' in text
+    assert len(run['results']) == len(results) + 1
+
+
+def test_markdown_has_the_behaviour_section_and_names_the_suppression():
+    report, results = with_behaviour(None)
+    text = pr_mode.markdown_comment(report)
+    assert '### Behaviour changes in this PR' in text
+    assert 'behaviour: changed' in text and 'head runtime raises ValueError' in text
+    assert 'suppressed-as-model-noise: 4' in text
+    assert '| not-compared |' in text and '3 inconclusive' in text
+
+
+def test_a_report_without_behaviour_has_no_behaviour_section_or_result():
+    report = report_for(list(levels().values()))
+    assert 'Behaviour changes' not in pr_mode.markdown_comment(report)
+    assert all(r['ruleId'] != 'autoform/behaviour-changed'
+               for r in pr_mode.sarif_document(report)['runs'][0]['results'])
+
+
+def test_the_exit_code_ignores_behaviour_changes():
+    source = (ROOT / 'scripts/pr_mode.py').read_text()
+    assert 'return 1 if report["summary"]["refuted"] else 0' in source
+
+
+def test_the_test_overlay_replaces_the_base_tests_with_the_heads(tmp_path):
+    base, head = tmp_path / 'base', tmp_path / 'head'
+    for tree, mark in ((base, 'old'), (head, 'new')):
+        (tree / 'src').mkdir(parents=True)
+        (tree / 'src/lib.py').write_text(mark)
+        (tree / 'tests').mkdir()
+        (tree / 'tests/test_a.py').write_text(mark)
+    (base / 'tests/test_gone.py').write_text('old')
+    assert pr_mode.build_hybrid(base, head) == ['tests']
+    assert (base / 'src/lib.py').read_text() == 'old'
+    assert (base / 'tests/test_a.py').read_text() == 'new' and not (base / 'tests/test_gone.py').exists()
+
+
 # --------------------------------------------------------- the script, offline
 
 def bare_env(tmp_path):
@@ -453,3 +598,41 @@ def test_the_real_chain_proves_the_changed_functions_it_can(tmp_path):
     assert 'mutant(s) run' in report['stages']['mutation']['note']
     assert all(s['status'] == 'passed' for s in report['stages'].values()), report['stages']
     assert pr_mode.validate_sarif(json.loads((out / 'pr.sarif').read_text())) == []
+
+
+@pytest.mark.skipif(os.environ.get('AUTOFORM_TEST_JOERN') != '1',
+                    reason='set AUTOFORM_TEST_JOERN=1 to run the real cross-revision chain')
+@needs_git
+def test_the_real_chain_flags_a_behaviour_change_and_not_an_unchanged_function(tmp_path):
+    repo = tmp_path / 'repo'
+    (repo / 'tests').mkdir(parents=True)
+    git = lambda *a: subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', *a], cwd=repo,
+                                    check=True, capture_output=True)
+    git('init', '-q')
+    lib = ('def clamp(x):\n    if x > {top}:\n        return {top}\n    return x\n\n'
+           'def same(x):\n    return {one}\n')
+    (repo / 'tests/test_lib.py').write_text(
+        'import sys, os\nsys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))\n'
+        'import lib\n\ndef test_all():\n    for n in (-1, 0, 5, 9, 10, 11, 20):\n'
+        '        lib.clamp(n)\n        lib.same(n)\n\nif __name__ == "__main__":\n    test_all()\n')
+    (repo / 'lib.py').write_text(lib.format(top=10, one='x + 1'))
+    git('add', '-A'); git('commit', '-qm', 'base'); git('tag', 'base')
+    (repo / 'lib.py').write_text(lib.format(top=9, one='1 + x'))
+    git('add', '-A'); git('commit', '-qm', 'head'); git('tag', 'head')
+    out = tmp_path / 'out'
+    env = dict(os.environ, PATH=str(Path.home() / '.elan/bin') + os.pathsep + os.environ['PATH'])
+    result = run_script([repo, '--base', 'base', '--head', 'head', '--module', 'PullRequestTestBehaviour',
+                         '--out', out, '--sarif', out / 'pr.sarif', '--markdown', out / 'pr.md'], env)
+    assert result.returncode == 0, result.stdout + result.stderr   # a behaviour change is not a failure
+    report = json.loads((out / 'pr.json').read_text())
+    by_name = {f['name'].rsplit('.', 1)[-1]: f['behaviour'] for f in report['functions']}
+    assert by_name['clamp']['status'] == 'changed'
+    item = by_name['clamp']['counter_inputs'][0]
+    assert item['call'].startswith('clamp(') and 'returns' in item['base_model'] and 'returns' in item['head_runtime']
+    assert item['base_model'] != item['head_runtime']
+    assert by_name['same']['status'] == 'unchanged-on-inputs' and by_name['same']['compared'] >= 1
+    sarif = json.loads((out / 'pr.sarif').read_text())
+    assert pr_mode.validate_sarif(sarif) == []
+    assert [r['properties']['function'].rsplit('.', 1)[-1] for r in sarif['runs'][0]['results']
+            if r['ruleId'] == 'autoform/behaviour-changed'] == ['clamp']
+    assert '### Behaviour changes in this PR' in (out / 'pr.md').read_text()

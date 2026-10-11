@@ -2017,6 +2017,16 @@ def main():
     tests_override = None
     if "--tests" in argv:
         i = argv.index("--tests"); tests_override = argv[i + 1]; del argv[i:i + 2]
+    # `--focus FILE` (JSON list of function names) keeps only the recorded/constructed/random
+    # cases of those functions, BEFORE the case cap, so a change's functions are not
+    # crowded out of the cap by the rest of the suite (the cap draws at random within an
+    # origin). Recorded in conformance.json (`focus`); without it nothing changes.
+    focus = None
+    if "--focus" in argv:
+        i = argv.index("--focus")
+        with open(argv[i + 1], encoding="utf-8") as handle:
+            focus = set(json.load(handle))
+        del argv[i:i + 2]
     # `--wasm` turns on the sandboxed second C implementation. It is OPT-IN, and
     # deliberately so: it changes which cases are attempted and which are withheld from
     # the Lean comparison, so it changes the denominator. A flag that silently altered
@@ -2510,6 +2520,13 @@ def main():
         stats["skip_no_instance"] = sum(1 for f, _, _ in methods
                                         if f["name"] not in reached)
 
+    focus_record = None
+    if focus is not None:
+        kept = [c for c in cases if c["name"] in focus]
+        focus_record = {"functions": sorted(focus), "cases_before": len(cases), "cases_kept": len(kept)}
+        print("focus: %d of %d recorded cases belong to the %d named function(s)"
+              % (len(kept), len(cases), len(focus)))
+        cases = kept
     case_cap = {"limit": MAX_TOTAL_CASES, "recorded": len(cases), "dropped": 0}
     if len(cases) > MAX_TOTAL_CASES:
         # The cap used to be a silent random sample over everything recorded: on the
@@ -2582,7 +2599,7 @@ def main():
               "corpus_commit": _corpus_commit(src_root),
               "functions_total": len(funcs), "functions_hole_free": len(holefree),
               "functions_covered": len(set(c["name"] for c in cases)),
-              "cases": len(cases), "case_cap": case_cap,
+              "cases": len(cases), "case_cap": case_cap, "focus": focus_record,
               "agree": 0, "total": 0, "divergences": 0,
               "inconclusive": 0, "rate": "n/a", "by_origin": {},
               "skipped": {k: v for k, v in stats.items() if k.startswith("skip")},

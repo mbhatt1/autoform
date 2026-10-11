@@ -140,6 +140,28 @@
          "evidence-level"
         ]
        }
+      },
+      {
+       "id": "autoform/behaviour-changed",
+       "name": "BehaviourChanged",
+       "shortDescription": {
+        "text": "Behaviour changed"
+       },
+       "fullDescription": {
+        "text": "The model of the base revision and the runtime of the head revision disagree on a concrete input from the head's tests: the change altered what this function does on that input. A behaviour change is not a failure."
+       },
+       "help": {
+        "text": "The model of the base revision and the runtime of the head revision disagree on a concrete input from the head's tests: the change altered what this function does on that input. A behaviour change is not a failure. See docs/evidence-levels.md."
+       },
+       "defaultConfiguration": {
+        "level": "warning"
+       },
+       "properties": {
+        "tags": [
+         "autoform",
+         "behaviour"
+        ]
+       }
       }
      ]
     }
@@ -375,6 +397,53 @@
        }
       ]
      }
+    },
+    {
+     "ruleId": "autoform/behaviour-changed",
+     "ruleIndex": 6,
+     "level": "warning",
+     "message": {
+      "text": "src/cachetools/__init__.py:<module>.Cache.__setitem__: behaviour changed -- Cache.__setitem__(int 1, int 1) on Cache{getsizeof=<lambda>2, size=dict, data=dict, currsize=int 0, maxsize=int 3}: base model returns unit, head runtime raises ValueError"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "src/cachetools/__init__.py",
+         "uriBaseId": "%SRCROOT%"
+        },
+        "region": {
+         "startLine": 75
+        }
+       }
+      }
+     ],
+     "partialFingerprints": {
+      "autoform/function": "src/cachetools/__init__.py:<module>.Cache.__setitem__",
+      "autoform/behaviour": "changed"
+     },
+     "properties": {
+      "function": "src/cachetools/__init__.py:<module>.Cache.__setitem__",
+      "behaviour": {
+       "compared": 93,
+       "agree": 92,
+       "inconclusive": 0,
+       "suppressed_as_model_noise": 0,
+       "status": "changed",
+       "counter_inputs": [
+        {
+         "call": "Cache.__setitem__(int 1, int 1)",
+         "receiver": "Cache{getsizeof=<lambda>2, size=dict, data=dict, currsize=int 0, maxsize=int 3}",
+         "base_model": "returns unit",
+         "head_runtime": "raises ValueError",
+         "detail": "cpython raised ValueError, lean returned unit; heap graph=some false",
+         "origin": "test-suite"
+        }
+       ],
+       "diverging": 1,
+       "reason": "1 input(s) where the base model and the head runtime disagree"
+      }
+     }
     }
    ],
    "properties": {
@@ -390,18 +459,18 @@
      "export": {
       "status": "passed",
       "source": "joern",
-      "joern": "<home>/joern/joern-cli",
+      "joern": "<joern>/joern-cli",
       "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
       "reason": "",
-      "seconds": 37.72
+      "seconds": 37.04
      },
      "render": {
       "status": "passed",
       "command": [
        "python",
-       "<repo>/cartographer/render_lean.py",
+       "/private<repo>/cartographer/render_lean.py",
        "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
-       "<repo>/Autoform/Generated/CachetoolsPR.lean",
+       "/private<repo>/Autoform/Generated/CachetoolsPR.lean",
        "CachetoolsPR"
       ],
       "exit_code": 0,
@@ -411,22 +480,22 @@
      "build": {
       "status": "passed",
       "command": [
-       "<home>/.elan/bin/lake",
+       "lake",
        "build",
        "Autoform.Runtime",
        "Autoform.Generated.CachetoolsPR"
       ],
       "exit_code": 0,
-      "seconds": 2.69,
+      "seconds": 0.66,
       "log": "build.log"
      },
      "oracle": {
       "status": "passed",
       "command": [
        "python",
-       "<repo>/scripts/differential.py",
+       "/private<repo>/scripts/differential.py",
        "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
-       "<tmp>/autoform-pr-head",
+       "<tmp>",
        "CachetoolsPR",
        "5"
       ],
@@ -437,13 +506,13 @@
      "ledger": {
       "status": "passed",
       "command": [
-       "<home>/.elan/bin/lake",
+       "lake",
        "env",
        "lean",
-       "<tmp>/autoform-pr-ledger/Ledger.lean"
+       "<tmp>/Ledger.lean"
       ],
       "exit_code": 0,
-      "seconds": 1.65,
+      "seconds": 1.67,
       "log": "ledger.log"
      },
      "specs": {
@@ -451,9 +520,9 @@
       "command": [
        "python",
        "-u",
-       "<repo>/scripts/synth_specs.py",
+       "/private<repo>/scripts/synth_specs.py",
        "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
-       "<tmp>/autoform-pr-head",
+       "<tmp>",
        "CachetoolsPR",
        "--conformance",
        "<workspace>/artifacts/pr/CachetoolsPR/conformance.json",
@@ -466,7 +535,7 @@
        "<workspace>/artifacts/pr/CachetoolsPR/specs.json"
       ],
       "exit_code": 0,
-      "seconds": 22.69,
+      "seconds": 19.34,
       "log": "specs.log"
      },
      "mutation": {
@@ -477,10 +546,10 @@
     "exporter": {
      "status": "available",
      "source": "joern",
-     "joern": "<home>/joern/joern-cli",
+     "joern": "<joern>/joern-cli",
      "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
      "reason": "",
-     "seconds": 37.72
+     "seconds": 37.04
     }
    }
   }

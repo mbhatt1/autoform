@@ -106,3 +106,37 @@ The chain is the one `docs/trust-model.md` describes, cut down to a few function
 semantics; it is not a correctness proof of the function, and no level here is. A
 clean report on a pull request means the changed functions reached the levels listed,
 with the artifacts to show it -- and that the unchanged ones were not looked at.
+
+## Behaviour: did the change alter what the function does
+
+The levels above compare one revision's model with that revision's runtime, so they cannot
+see that a change altered behaviour. `pr` therefore adds a second, separate result per
+changed function, `behaviour`, which is never a level and never a failure (a pull request
+may change behaviour on purpose; the exit code is unchanged):
+
+* the model is the AST of the **base** revision (a second Joern export of the base checkout,
+  with the head's `tests/` overlaid so the inputs a test builds exist in the model, and
+  `cartographer/plain_class_values.py` applied as in
+  `docs/evidence-cachetools-negative-size.md`), rendered as its own module `<Module>Base`;
+* the runtime is the **head** source, with inputs from the head's tests and the oracle's
+  random cases (`--behaviour-cases`, default 100).
+
+| `behaviour` | meaning | not meant |
+|---|---|---|
+| `changed` | on at least one input the base model and the head runtime disagree; up to 3 counter-inputs are listed (call, receiver, what the base model returns, what the head runtime returns) | that the change is wrong |
+| `unchanged-on-inputs` | N compared cases all agreed; N is stated | equivalence on other inputs |
+| `not-compared` | no case was compared; the reason is stated (added at head, test code, all cases inconclusive, no Joern, non-Python, a stage failed) | that the behaviour is unchanged |
+
+A function whose cases were all inconclusive is `not-compared`, never `unchanged-on-inputs`.
+A divergence that also appears in a same-base control run (the base model against the
+base runtime on the same inputs) is a model infidelity, not a revision difference; it is
+removed from `changed` and counted, in the report and the comment, as
+`suppressed-as-model-noise: n`. The control is only run when the cross-revision run has
+divergences. `pr.json` has `functions[].behaviour` and a top-level `behaviour` block
+(model, runtime, control, suppression count, stages); SARIF has rule
+`autoform/behaviour-changed` (level `warning`, message with the input and both results);
+the comment has a section "Behaviour changes in this PR". Covered: Python functions that
+exist at base and were modified. Not covered: other languages (`not-compared`), functions
+added at head, callers of a changed function unless the oracle happened to exercise them
+through it, and anything the model cannot represent (inconclusive cases).
+`--no-behaviour` skips it. The worked example is `docs/examples/pr-cachetools-7.1.5/`.
