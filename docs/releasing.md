@@ -57,7 +57,7 @@ python cartographer/render_lean.py ast-V8Base.json Autoform/Generated/V8Base.lea
 python -m build --outdir dist/candidate
 python -m twine check --strict dist/candidate/*
 python scripts/check_distribution.py dist/candidate
-AUTOFORM_TEST_WHEEL=dist/candidate/autoform_lean-0.0.0-py3-none-any.whl python -m pytest tests/test_package.py -q
+AUTOFORM_TEST_WHEEL=dist/candidate/autoform_lean-0.0.1-py3-none-any.whl python -m pytest tests/test_package.py -q
 python -m pytest tests -q
 lake build
 python scripts/audit_all.py --strict
@@ -67,7 +67,7 @@ python scripts/check_specs_fresh.py
 AUTOFORM_TEST_JOERN=1 AUTOFORM_REQUIRE_LEAN=1 python -m pytest tests/test_source_pipeline.py tests/test_source_numeric.py tests/test_python_binding.py tests/test_python_signatures.py tests/test_python_receivers.py tests/test_python_callable_shapes.py tests/test_control_flow.py tests/test_python_handlers.py tests/test_python_raises.py tests/test_spec_synthesis.py tests/test_linux_pipeline.py -q
 AUTOFORM_REQUIRE_LEAN=1 python -m pytest tests/test_machine_frontend.py -q
 lake env leanchecker --fresh Autoform.Lang.PCode.Properties
-python -m pip install --force-reinstall 'dist/candidate/autoform_lean-0.0.0-py3-none-any.whl[machine]'
+python -m pip install --force-reinstall 'dist/candidate/autoform_lean-0.0.1-py3-none-any.whl[machine]'
 AUTOFORM_TEST_INSTALLED_E2E=1 python -m pytest tests/test_installed_assurance.py -q
 ```
 

@@ -10,10 +10,18 @@ The version in `pyproject.toml` and `src/autoform/__init__.py` must equal the se
 heading of the release being cut, and the release tag is `v<version>`
 (see [docs/packaging.md](docs/packaging.md)).
 
-## [0.0.0] - not yet published
+## [0.0.1] - not yet published
 
-Nothing has been uploaded to PyPI or tagged. This section describes the tree at
-`ddcebff` (2026-10-10), the first candidate for 0.0.0.
+Changes since `v0.0.0` (`8aabb2e`):
+
+### Documentation
+- The GitHub Action's first real run on a pull request: PR #14 changes `unit_price` to return 0
+  for a zero count, and the run flags it as a behaviour change (`630c3f5`).
+
+## [0.0.0] - 2026-10-11
+
+Tagged `v0.0.0` at `8aabb2e`. This section describes the tree at `ddcebff` (2026-10-10), the
+first release candidate, plus the commits up to the tag.
 
 ### Pipeline and semantics
 - First commit and the first object, refinement and oracle tiers (`4e56c11`, `1c30a7e`).

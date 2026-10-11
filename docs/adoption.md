@@ -6,7 +6,7 @@ bound by `scripts/check_docs.py` (it fails if the figure and its artifact disagr
 text says so; every other figure is quoted from the document named and is only as
 current as that document.
 
-Status: version 0.0.0, alpha (`Development Status :: 3 - Alpha`), not yet published on
+Status: version 0.0.1, alpha (`Development Status :: 3 - Alpha`), not yet published on
 PyPI. The project is an open-source CLI; `docs/releasing.md` describes it as having paid
 engineering support, and `SUPPORT.md` is the support scope.
 

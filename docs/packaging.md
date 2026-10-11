@@ -183,7 +183,7 @@ python -m pip install '.[test]'
 python -m build
 python -m twine check --strict dist/*
 python scripts/check_distribution.py dist
-AUTOFORM_TEST_WHEEL=dist/autoform_lean-0.0.0-py3-none-any.whl python -m pytest tests/test_package.py -q
+AUTOFORM_TEST_WHEEL=dist/autoform_lean-0.0.1-py3-none-any.whl python -m pytest tests/test_package.py -q
 AUTOFORM_TEST_JOERN=1 python -m pytest tests/test_source_pipeline.py -q
 ```
 
