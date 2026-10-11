@@ -1,0 +1,519 @@
+{
+ "schema_version": 1,
+ "tool_version": "0.1.0",
+ "generated_at": "2026-10-11T03:28:24.919969+00:00",
+ "module": "CachetoolsPR",
+ "report_dir": "<workspace>/artifacts/pr/CachetoolsPR",
+ "repository": {
+  "path": "<clone>",
+  "uri": "https://github.com/tkem/cachetools",
+  "subdir": "."
+ },
+ "base": {
+  "ref": "v7.1.4",
+  "commit": "48284d73d0a8834c9c50f8d41bb99e6f93b2dfed"
+ },
+ "head": {
+  "ref": "v7.1.5",
+  "commit": "0d2a6ea17b3627bcf334c7360a8abe5889dd6235"
+ },
+ "detection": "python-ast for Python files; changed-file (every exported function of a changed file) for other languages",
+ "exporter": {
+  "status": "available",
+  "source": "joern",
+  "joern": "<home>/joern/joern-cli",
+  "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
+  "reason": "",
+  "seconds": 37.72
+ },
+ "files": [
+  {
+   "path": ".github/workflows/ci.yml",
+   "status": "M",
+   "file": ".github/workflows/ci.yml",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": ".readthedocs.yaml",
+   "status": "M",
+   "file": ".readthedocs.yaml",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": "CHANGELOG.rst",
+   "status": "M",
+   "file": "CHANGELOG.rst",
+   "language": "non-code",
+   "analysed": false
+  },
+  {
+   "path": "docs/conf.py",
+   "status": "M",
+   "file": "docs/conf.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "src/cachetools/__init__.py",
+   "status": "M",
+   "file": "src/cachetools/__init__.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tests/__init__.py",
+   "status": "M",
+   "file": "tests/__init__.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tests/test_tlru.py",
+   "status": "M",
+   "file": "tests/test_tlru.py",
+   "language": "python",
+   "analysed": "python-ast"
+  },
+  {
+   "path": "tox.ini",
+   "status": "M",
+   "file": "tox.ini",
+   "language": "non-code",
+   "analysed": false
+  }
+ ],
+ "errors": [],
+ "selection": {
+  "changed": [
+   "src/cachetools/__init__.py:<module>.Cache.__setitem__",
+   "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+   "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative",
+   "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired",
+   "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu"
+  ],
+  "selected": [
+   "src/cachetools/__init__.py:<module>._DefaultSize.pop",
+   "src/cachetools/__init__.py:<module>.Cache.__setitem__",
+   "src/cachetools/__init__.py:<module>.Cache.get",
+   "src/cachetools/__init__.py:<module>.Cache.pop",
+   "src/cachetools/__init__.py:<module>.Cache.getsizeof",
+   "src/cachetools/__init__.py:<module>.FIFOCache.popitem",
+   "src/cachetools/__init__.py:<module>.LFUCache._Link.unlink",
+   "src/cachetools/__init__.py:<module>.LFUCache.popitem",
+   "src/cachetools/__init__.py:<module>.LRUCache.popitem",
+   "src/cachetools/__init__.py:<module>.RRCache.popitem",
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__enter__",
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__exit__",
+   "src/cachetools/__init__.py:<module>._TimedCache.timer",
+   "src/cachetools/__init__.py:<module>._TimedCache.get",
+   "src/cachetools/__init__.py:<module>._TimedCache.pop",
+   "src/cachetools/__init__.py:<module>._TimedCache.expire",
+   "src/cachetools/__init__.py:<module>.TTLCache._Link.unlink",
+   "src/cachetools/__init__.py:<module>.TTLCache.expire",
+   "src/cachetools/__init__.py:<module>.TTLCache.popitem",
+   "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+   "src/cachetools/__init__.py:<module>.TLRUCache.expire",
+   "src/cachetools/__init__.py:<module>.TLRUCache.popitem",
+   "src/cachetools/__init__.py:<module>.TLRUCache._TLRUCache__getitem",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertEqual",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertIsNone",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertNotIn",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertRaises",
+   "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative",
+   "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative.<lambda>2",
+   "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_subclass.Cache.getsizeof",
+   "tests/__init__.py:<module>.CountedLock.__enter__",
+   "tests/__init__.py:<module>.CountedLock.__exit__",
+   "tests/test_cachedmethod.py:<module>.Cached.get",
+   "tests/test_cachedmethod.py:<module>.MethodDecoratorTestMixin.test_decorator_slots.Slots.get",
+   "tests/test_cachedmethod.py:<module>.MethodDecoratorTestMixin.test_decorator_immutable_dict.Immutable.get",
+   "tests/test_classmethod.py:<module>.Cached.get",
+   "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired",
+   "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu",
+   "<module-objects>:<module>",
+   "docs/conf.py:<module>",
+   "src/cachetools/_cached.py:<module>",
+   "src/cachetools/_cachedmethod.py:<module>",
+   "src/cachetools/__init__.py:<module>",
+   "src/cachetools/func.py:<module>",
+   "src/cachetools/keys.py:<module>",
+   "tests/__init__.py:<module>",
+   "tests/test_cache.py:<module>",
+   "tests/test_cached.py:<module>",
+   "tests/test_cachedmethod.py:<module>",
+   "tests/test_classmethod.py:<module>",
+   "tests/test_fifo.py:<module>",
+   "tests/test_func.py:<module>",
+   "tests/test_keys.py:<module>",
+   "tests/test_lfu.py:<module>",
+   "tests/test_lru.py:<module>",
+   "tests/test_rr.py:<module>",
+   "tests/test_threading.py:<module>",
+   "tests/test_tlru.py:<module>",
+   "tests/test_ttl.py:<module>"
+  ],
+  "closure": [
+   "src/cachetools/__init__.py:<module>.Cache.get",
+   "src/cachetools/__init__.py:<module>.Cache.getsizeof",
+   "src/cachetools/__init__.py:<module>.Cache.pop",
+   "src/cachetools/__init__.py:<module>.FIFOCache.popitem",
+   "src/cachetools/__init__.py:<module>.LFUCache._Link.unlink",
+   "src/cachetools/__init__.py:<module>.LFUCache.popitem",
+   "src/cachetools/__init__.py:<module>.LRUCache.popitem",
+   "src/cachetools/__init__.py:<module>.RRCache.popitem",
+   "src/cachetools/__init__.py:<module>.TLRUCache._TLRUCache__getitem",
+   "src/cachetools/__init__.py:<module>.TLRUCache.expire",
+   "src/cachetools/__init__.py:<module>.TLRUCache.popitem",
+   "src/cachetools/__init__.py:<module>.TTLCache._Link.unlink",
+   "src/cachetools/__init__.py:<module>.TTLCache.expire",
+   "src/cachetools/__init__.py:<module>.TTLCache.popitem",
+   "src/cachetools/__init__.py:<module>._DefaultSize.pop",
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__enter__",
+   "src/cachetools/__init__.py:<module>._TimedCache._Timer.__exit__",
+   "src/cachetools/__init__.py:<module>._TimedCache.expire",
+   "src/cachetools/__init__.py:<module>._TimedCache.get",
+   "src/cachetools/__init__.py:<module>._TimedCache.pop",
+   "src/cachetools/__init__.py:<module>._TimedCache.timer",
+   "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_subclass.Cache.getsizeof",
+   "tests/__init__.py:<module>.CountedLock.__enter__",
+   "tests/__init__.py:<module>.CountedLock.__exit__",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertEqual",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertIsNone",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertNotIn",
+   "tests/__init__.py:<module>._TestCaseProtocol.assertRaises",
+   "tests/test_cachedmethod.py:<module>.Cached.get",
+   "tests/test_cachedmethod.py:<module>.MethodDecoratorTestMixin.test_decorator_immutable_dict.Immutable.get",
+   "tests/test_cachedmethod.py:<module>.MethodDecoratorTestMixin.test_decorator_slots.Slots.get",
+   "tests/test_classmethod.py:<module>.Cached.get"
+  ],
+  "missing": []
+ },
+ "stages": {
+  "export": {
+   "status": "passed",
+   "source": "joern",
+   "joern": "<home>/joern/joern-cli",
+   "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
+   "reason": "",
+   "seconds": 37.72
+  },
+  "render": {
+   "status": "passed",
+   "command": [
+    "python",
+    "<repo>/cartographer/render_lean.py",
+    "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
+    "<repo>/Autoform/Generated/CachetoolsPR.lean",
+    "CachetoolsPR"
+   ],
+   "exit_code": 0,
+   "seconds": 0.08,
+   "log": "render.log"
+  },
+  "build": {
+   "status": "passed",
+   "command": [
+    "<home>/.elan/bin/lake",
+    "build",
+    "Autoform.Runtime",
+    "Autoform.Generated.CachetoolsPR"
+   ],
+   "exit_code": 0,
+   "seconds": 2.69,
+   "log": "build.log"
+  },
+  "oracle": {
+   "status": "passed",
+   "command": [
+    "python",
+    "<repo>/scripts/differential.py",
+    "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
+    "<tmp>/autoform-pr-head",
+    "CachetoolsPR",
+    "5"
+   ],
+   "exit_code": 0,
+   "seconds": 10.14,
+   "log": "conformance.log"
+  },
+  "ledger": {
+   "status": "passed",
+   "command": [
+    "<home>/.elan/bin/lake",
+    "env",
+    "lean",
+    "<tmp>/autoform-pr-ledger/Ledger.lean"
+   ],
+   "exit_code": 0,
+   "seconds": 1.65,
+   "log": "ledger.log"
+  },
+  "specs": {
+   "status": "passed",
+   "command": [
+    "python",
+    "-u",
+    "<repo>/scripts/synth_specs.py",
+    "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
+    "<tmp>/autoform-pr-head",
+    "CachetoolsPR",
+    "--conformance",
+    "<workspace>/artifacts/pr/CachetoolsPR/conformance.json",
+    "--conformance-only",
+    "--domain",
+    "5",
+    "--sample-subjects",
+    "0",
+    "--json",
+    "<workspace>/artifacts/pr/CachetoolsPR/specs.json"
+   ],
+   "exit_code": 0,
+   "seconds": 22.69,
+   "log": "specs.log"
+  },
+  "mutation": {
+   "status": "skipped",
+   "reason": "--mutants 0"
+  }
+ },
+ "ledger": {
+  "functions": 59,
+  "holes": 11,
+  "holeFree": 49,
+  "holesByLabel": [
+   {
+    "label": "lit:ellipsis",
+    "count": 4
+   },
+   {
+    "label": "decorator:class-body:nested-class",
+    "count": 2
+   },
+   {
+    "label": "class-construction:unresolved-lexical-identity:Cache",
+    "count": 1
+   },
+   {
+    "label": "decorator:class-body:expression-shape",
+    "count": 1
+   },
+   {
+    "label": "class-construction:unresolved-lexical-identity:Condition",
+    "count": 1
+   },
+   {
+    "label": "decorator:external:classmethod",
+    "count": 1
+   },
+   {
+    "label": "class-construction:unresolved-lexical-identity:Lock",
+    "count": 1
+   }
+  ]
+ },
+ "functions": [
+  {
+   "name": "src/cachetools/__init__.py:<module>.Cache.__setitem__",
+   "path": "src/cachetools/__init__.py",
+   "file": "src/cachetools/__init__.py",
+   "change": "modified",
+   "line": 75,
+   "end_line": 91,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "translated",
+   "reason": "type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR.json",
+     "function": "src/cachetools/__init__.py:<module>.Cache.__setitem__"
+    },
+    {
+     "kind": "render",
+     "path": "Autoform/Generated/CachetoolsPR.lean",
+     "definition": "f_src_cachetools___init___py__module__Cache___setitem__"
+    }
+   ],
+   "holes": [],
+   "oracle": {
+    "status": "blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved",
+    "agree": 0,
+    "diverge": 0,
+    "inconclusive": 0
+   },
+   "theorems": [],
+   "mutation": null
+  },
+  {
+   "name": "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+   "path": "src/cachetools/__init__.py",
+   "file": "src/cachetools/__init__.py",
+   "change": "modified",
+   "line": 630,
+   "end_line": 660,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "translated",
+   "reason": "type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR.json",
+     "function": "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__"
+    },
+    {
+     "kind": "render",
+     "path": "Autoform/Generated/CachetoolsPR.lean",
+     "definition": "f_src_cachetools___init___py__module__TLRUCache___setitem__"
+    }
+   ],
+   "holes": [],
+   "oracle": {
+    "status": "blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved",
+    "agree": 0,
+    "diverge": 0,
+    "inconclusive": 0
+   },
+   "theorems": [],
+   "mutation": null
+  },
+  {
+   "name": "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative",
+   "path": "tests/__init__.py",
+   "file": "tests/__init__.py",
+   "change": "added",
+   "line": 287,
+   "end_line": 294,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "hole",
+   "reason": "translation holes: class-construction:unresolved-lexical-identity:Cache",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR.json",
+     "function": "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative"
+    }
+   ],
+   "holes": [
+    "class-construction:unresolved-lexical-identity:Cache"
+   ],
+   "oracle": null,
+   "theorems": [],
+   "mutation": null
+  },
+  {
+   "name": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired",
+   "path": "tests/test_tlru.py",
+   "file": "tests/test_tlru.py",
+   "change": "added",
+   "line": 147,
+   "end_line": 165,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "translated",
+   "reason": "type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: class-identity-unresolved:TestCase:external-base-uncontracted:unittest.case.TestCase",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR.json",
+     "function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired"
+    },
+    {
+     "kind": "render",
+     "path": "Autoform/Generated/CachetoolsPR.lean",
+     "definition": "f_tests_test_tlru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired"
+    }
+   ],
+   "holes": [],
+   "oracle": {
+    "status": "blocked (unexercised): unencodable receiver/arguments: class-identity-unresolved:TestCase:external-base-uncontracted:unittest.case.TestCase",
+    "agree": 0,
+    "diverge": 0,
+    "inconclusive": 0
+   },
+   "theorems": [],
+   "mutation": null
+  },
+  {
+   "name": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu",
+   "path": "tests/test_tlru.py",
+   "file": "tests/test_tlru.py",
+   "change": "added",
+   "line": 151,
+   "end_line": 152,
+   "detection": "python-ast",
+   "language": "python",
+   "level": "proved",
+   "reason": "proved in the kernel: conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu (2 recorded case(s))",
+   "artifacts": [
+    {
+     "kind": "ast",
+     "path": "ast-CachetoolsPR.json",
+     "function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu"
+    },
+    {
+     "kind": "render",
+     "path": "Autoform/Generated/CachetoolsPR.lean",
+     "definition": "f_tests_test_tlru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu"
+    },
+    {
+     "kind": "conformance",
+     "path": "conformance.json",
+     "runtime_cases": 2
+    },
+    {
+     "kind": "theorem",
+     "path": "Autoform/SpecsGen/CachetoolsPR.lean",
+     "theorem": "conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu"
+    },
+    {
+     "kind": "specs",
+     "path": "specs.json",
+     "theorems": [
+      "conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu"
+     ]
+    }
+   ],
+   "holes": [],
+   "oracle": {
+    "status": "compared",
+    "agree": 2,
+    "diverge": 0,
+    "inconclusive": 0
+   },
+   "theorems": [
+    {
+     "id": "conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu",
+     "status": "proved",
+     "proved": true,
+     "reason": ""
+    }
+   ],
+   "mutation": {
+    "skipped": "--mutants 0"
+   }
+  }
+ ],
+ "removed": [
+  {
+   "name": "docs/conf.py:<module>.get_version",
+   "path": "docs/conf.py",
+   "file": "docs/conf.py",
+   "change": "removed",
+   "detection": "python-ast",
+   "language": "python"
+  }
+ ],
+ "summary": {
+  "none": 0,
+  "hole": 1,
+  "translated": 3,
+  "oracle-agreed": 0,
+  "proved": 1,
+  "refuted": 0
+ }
+}

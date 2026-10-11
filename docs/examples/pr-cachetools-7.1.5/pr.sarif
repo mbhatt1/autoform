@@ -1,0 +1,488 @@
+{
+ "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+ "version": "2.1.0",
+ "runs": [
+  {
+   "tool": {
+    "driver": {
+     "name": "autoform",
+     "semanticVersion": "0.1.0",
+     "informationUri": "https://github.com/b1oo/autoform",
+     "rules": [
+      {
+       "id": "autoform/none",
+       "name": "Noevidence",
+       "shortDescription": {
+        "text": "No evidence"
+       },
+       "fullDescription": {
+        "text": "The frontend exported nothing for this function, or there was no exporter output; nothing about it is established."
+       },
+       "help": {
+        "text": "The frontend exported nothing for this function, or there was no exporter output; nothing about it is established. See docs/evidence-levels.md."
+       },
+       "defaultConfiguration": {
+        "level": "warning"
+       },
+       "properties": {
+        "tags": [
+         "autoform",
+         "evidence-level"
+        ]
+       }
+      },
+      {
+       "id": "autoform/hole",
+       "name": "Translationhole",
+       "shortDescription": {
+        "text": "Translation hole"
+       },
+       "fullDescription": {
+        "text": "The translation contains a hole: the model does not cover the construct named by the label, so nothing about the function's behaviour is established."
+       },
+       "help": {
+        "text": "The translation contains a hole: the model does not cover the construct named by the label, so nothing about the function's behaviour is established. See docs/evidence-levels.md."
+       },
+       "defaultConfiguration": {
+        "level": "warning"
+       },
+       "properties": {
+        "tags": [
+         "autoform",
+         "evidence-level"
+        ]
+       }
+      },
+      {
+       "id": "autoform/translated",
+       "name": "Translated",
+       "shortDescription": {
+        "text": "Translated"
+       },
+       "fullDescription": {
+        "text": "Hole-free and type-checked as Lean; the runtime oracle did not adjudicate any case, so the model is unconfirmed."
+       },
+       "help": {
+        "text": "Hole-free and type-checked as Lean; the runtime oracle did not adjudicate any case, so the model is unconfirmed. See docs/evidence-levels.md."
+       },
+       "defaultConfiguration": {
+        "level": "note"
+       },
+       "properties": {
+        "tags": [
+         "autoform",
+         "evidence-level"
+        ]
+       }
+      },
+      {
+       "id": "autoform/oracle-agreed",
+       "name": "Oracleagreed",
+       "shortDescription": {
+        "text": "Oracle agreed"
+       },
+       "fullDescription": {
+        "text": "Every recorded runtime case agreed with the model; no theorem about the function was proved."
+       },
+       "help": {
+        "text": "Every recorded runtime case agreed with the model; no theorem about the function was proved. See docs/evidence-levels.md."
+       },
+       "defaultConfiguration": {
+        "level": "note"
+       },
+       "properties": {
+        "tags": [
+         "autoform",
+         "evidence-level"
+        ]
+       }
+      },
+      {
+       "id": "autoform/proved",
+       "name": "Proved",
+       "shortDescription": {
+        "text": "Proved"
+       },
+       "fullDescription": {
+        "text": "A theorem about the recorded runtime cases is proved in the Lean kernel. The claim is about those cases, not all inputs."
+       },
+       "help": {
+        "text": "A theorem about the recorded runtime cases is proved in the Lean kernel. The claim is about those cases, not all inputs. See docs/evidence-levels.md."
+       },
+       "defaultConfiguration": {
+        "level": "note"
+       },
+       "properties": {
+        "tags": [
+         "autoform",
+         "evidence-level"
+        ]
+       }
+      },
+      {
+       "id": "autoform/refuted",
+       "name": "Refuted",
+       "shortDescription": {
+        "text": "Refuted"
+       },
+       "fullDescription": {
+        "text": "The model and the runtime disagree on a recorded input, or a candidate theorem about the function was refuted. A witness is recorded."
+       },
+       "help": {
+        "text": "The model and the runtime disagree on a recorded input, or a candidate theorem about the function was refuted. A witness is recorded. See docs/evidence-levels.md."
+       },
+       "defaultConfiguration": {
+        "level": "error"
+       },
+       "properties": {
+        "tags": [
+         "autoform",
+         "evidence-level"
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "automationDetails": {
+    "id": "autoform/pr/CachetoolsPR"
+   },
+   "versionControlProvenance": [
+    {
+     "repositoryUri": "https://github.com/tkem/cachetools",
+     "revisionId": "0d2a6ea17b3627bcf334c7360a8abe5889dd6235"
+    }
+   ],
+   "results": [
+    {
+     "ruleId": "autoform/translated",
+     "ruleIndex": 2,
+     "level": "note",
+     "message": {
+      "text": "src/cachetools/__init__.py:<module>.Cache.__setitem__: translated -- type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved [artifacts: ast-CachetoolsPR.json; Autoform/Generated/CachetoolsPR.lean]"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "src/cachetools/__init__.py",
+         "uriBaseId": "%SRCROOT%"
+        },
+        "region": {
+         "startLine": 75
+        }
+       }
+      }
+     ],
+     "partialFingerprints": {
+      "autoform/function": "src/cachetools/__init__.py:<module>.Cache.__setitem__"
+     },
+     "properties": {
+      "function": "src/cachetools/__init__.py:<module>.Cache.__setitem__",
+      "level": "translated",
+      "change": "modified",
+      "detection": "python-ast",
+      "artifacts": [
+       {
+        "kind": "ast",
+        "path": "ast-CachetoolsPR.json",
+        "function": "src/cachetools/__init__.py:<module>.Cache.__setitem__"
+       },
+       {
+        "kind": "render",
+        "path": "Autoform/Generated/CachetoolsPR.lean",
+        "definition": "f_src_cachetools___init___py__module__Cache___setitem__"
+       }
+      ]
+     }
+    },
+    {
+     "ruleId": "autoform/translated",
+     "ruleIndex": 2,
+     "level": "note",
+     "message": {
+      "text": "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__: translated -- type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: callable-source-identity-unresolved [artifacts: ast-CachetoolsPR.json; Autoform/Generated/CachetoolsPR.lean]"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "src/cachetools/__init__.py",
+         "uriBaseId": "%SRCROOT%"
+        },
+        "region": {
+         "startLine": 630
+        }
+       }
+      }
+     ],
+     "partialFingerprints": {
+      "autoform/function": "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__"
+     },
+     "properties": {
+      "function": "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+      "level": "translated",
+      "change": "modified",
+      "detection": "python-ast",
+      "artifacts": [
+       {
+        "kind": "ast",
+        "path": "ast-CachetoolsPR.json",
+        "function": "src/cachetools/__init__.py:<module>.TLRUCache.__setitem__"
+       },
+       {
+        "kind": "render",
+        "path": "Autoform/Generated/CachetoolsPR.lean",
+        "definition": "f_src_cachetools___init___py__module__TLRUCache___setitem__"
+       }
+      ]
+     }
+    },
+    {
+     "ruleId": "autoform/hole",
+     "ruleIndex": 1,
+     "level": "warning",
+     "message": {
+      "text": "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative: hole -- translation holes: class-construction:unresolved-lexical-identity:Cache [artifacts: ast-CachetoolsPR.json]"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "tests/__init__.py",
+         "uriBaseId": "%SRCROOT%"
+        },
+        "region": {
+         "startLine": 287
+        }
+       }
+      }
+     ],
+     "partialFingerprints": {
+      "autoform/function": "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative"
+     },
+     "properties": {
+      "function": "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative",
+      "level": "hole",
+      "change": "added",
+      "detection": "python-ast",
+      "artifacts": [
+       {
+        "kind": "ast",
+        "path": "ast-CachetoolsPR.json",
+        "function": "tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative"
+       }
+      ]
+     }
+    },
+    {
+     "ruleId": "autoform/translated",
+     "ruleIndex": 2,
+     "level": "note",
+     "message": {
+      "text": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired: translated -- type-checked; not adjudicated by the oracle: blocked (unexercised): unencodable receiver/arguments: class-identity-unresolved:TestCase:external-base-uncontracted:unittest.case.TestCase [artifacts: ast-CachetoolsPR.json; Autoform/Generated/CachetoolsPR.lean]"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "tests/test_tlru.py",
+         "uriBaseId": "%SRCROOT%"
+        },
+        "region": {
+         "startLine": 147
+        }
+       }
+      }
+     ],
+     "partialFingerprints": {
+      "autoform/function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired"
+     },
+     "properties": {
+      "function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired",
+      "level": "translated",
+      "change": "added",
+      "detection": "python-ast",
+      "artifacts": [
+       {
+        "kind": "ast",
+        "path": "ast-CachetoolsPR.json",
+        "function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired"
+       },
+       {
+        "kind": "render",
+        "path": "Autoform/Generated/CachetoolsPR.lean",
+        "definition": "f_tests_test_tlru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired"
+       }
+      ]
+     }
+    },
+    {
+     "ruleId": "autoform/proved",
+     "ruleIndex": 4,
+     "level": "note",
+     "message": {
+      "text": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu: proved -- proved in the kernel: conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu (2 recorded case(s)) [artifacts: ast-CachetoolsPR.json; Autoform/Generated/CachetoolsPR.lean; conformance.json; conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu; specs.json]"
+     },
+     "locations": [
+      {
+       "physicalLocation": {
+        "artifactLocation": {
+         "uri": "tests/test_tlru.py",
+         "uriBaseId": "%SRCROOT%"
+        },
+        "region": {
+         "startLine": 151
+        }
+       }
+      }
+     ],
+     "partialFingerprints": {
+      "autoform/function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu"
+     },
+     "properties": {
+      "function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu",
+      "level": "proved",
+      "change": "added",
+      "detection": "python-ast",
+      "artifacts": [
+       {
+        "kind": "ast",
+        "path": "ast-CachetoolsPR.json",
+        "function": "tests/test_tlru.py:<module>.TLRUCacheTest.test_overwrite_existing_with_expired.ttu"
+       },
+       {
+        "kind": "render",
+        "path": "Autoform/Generated/CachetoolsPR.lean",
+        "definition": "f_tests_test_tlru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu"
+       },
+       {
+        "kind": "conformance",
+        "path": "conformance.json",
+        "runtime_cases": 2
+       },
+       {
+        "kind": "theorem",
+        "path": "Autoform/SpecsGen/CachetoolsPR.lean",
+        "theorem": "conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu"
+       },
+       {
+        "kind": "specs",
+        "path": "specs.json",
+        "theorems": [
+         "conform_lru_py__module__TLRUCacheTest_test_overwrite_existing_with_expired_ttu"
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "properties": {
+    "base": {
+     "ref": "v7.1.4",
+     "commit": "48284d73d0a8834c9c50f8d41bb99e6f93b2dfed"
+    },
+    "head": {
+     "ref": "v7.1.5",
+     "commit": "0d2a6ea17b3627bcf334c7360a8abe5889dd6235"
+    },
+    "stages": {
+     "export": {
+      "status": "passed",
+      "source": "joern",
+      "joern": "<home>/joern/joern-cli",
+      "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
+      "reason": "",
+      "seconds": 37.72
+     },
+     "render": {
+      "status": "passed",
+      "command": [
+       "python",
+       "<repo>/cartographer/render_lean.py",
+       "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
+       "<repo>/Autoform/Generated/CachetoolsPR.lean",
+       "CachetoolsPR"
+      ],
+      "exit_code": 0,
+      "seconds": 0.08,
+      "log": "render.log"
+     },
+     "build": {
+      "status": "passed",
+      "command": [
+       "<home>/.elan/bin/lake",
+       "build",
+       "Autoform.Runtime",
+       "Autoform.Generated.CachetoolsPR"
+      ],
+      "exit_code": 0,
+      "seconds": 2.69,
+      "log": "build.log"
+     },
+     "oracle": {
+      "status": "passed",
+      "command": [
+       "python",
+       "<repo>/scripts/differential.py",
+       "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
+       "<tmp>/autoform-pr-head",
+       "CachetoolsPR",
+       "5"
+      ],
+      "exit_code": 0,
+      "seconds": 10.14,
+      "log": "conformance.log"
+     },
+     "ledger": {
+      "status": "passed",
+      "command": [
+       "<home>/.elan/bin/lake",
+       "env",
+       "lean",
+       "<tmp>/autoform-pr-ledger/Ledger.lean"
+      ],
+      "exit_code": 0,
+      "seconds": 1.65,
+      "log": "ledger.log"
+     },
+     "specs": {
+      "status": "passed",
+      "command": [
+       "python",
+       "-u",
+       "<repo>/scripts/synth_specs.py",
+       "<workspace>/artifacts/pr/CachetoolsPR/ast-CachetoolsPR.json",
+       "<tmp>/autoform-pr-head",
+       "CachetoolsPR",
+       "--conformance",
+       "<workspace>/artifacts/pr/CachetoolsPR/conformance.json",
+       "--conformance-only",
+       "--domain",
+       "5",
+       "--sample-subjects",
+       "0",
+       "--json",
+       "<workspace>/artifacts/pr/CachetoolsPR/specs.json"
+      ],
+      "exit_code": 0,
+      "seconds": 22.69,
+      "log": "specs.log"
+     },
+     "mutation": {
+      "status": "skipped",
+      "reason": "--mutants 0"
+     }
+    },
+    "exporter": {
+     "status": "available",
+     "source": "joern",
+     "joern": "<home>/joern/joern-cli",
+     "sha256": "28db6f2ebee5b07f61e3386f68b3adb9200e402a2178e23e34585997197999c5",
+     "reason": "",
+     "seconds": 37.72
+    }
+   }
+  }
+ ]
+}
