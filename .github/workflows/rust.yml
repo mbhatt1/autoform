@@ -1,0 +1,140 @@
+name: Rust path (Charon + Aeneas)
+
+# The Rust path end to end (docs/rust.md): the pinned Aeneas release (which ships Charon),
+# the pinned Rust nightly, the scratch Lake project with Aeneas' Lean library, and
+# tests/test_rust_aeneas.py with AUTOFORM_RUST_REQUIRED=1, so a missing prerequisite FAILS
+# the job instead of skipping it. The pins below are held equal to rust-pins.json by
+# tests/test_rust_unit.py::test_pins_file_and_workflow_agree.
+
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/rust_*', 'scripts/sandbox.py', 'tests/test_rust_*.py', 'tests/fixtures/rust_proto/**',
+            'rust-pins.json', 'src/autoform/cli.py', '.github/workflows/rust.yml']
+  pull_request:
+    paths: ['scripts/rust_*', 'scripts/sandbox.py', 'tests/test_rust_*.py', 'tests/fixtures/rust_proto/**',
+            'rust-pins.json', 'src/autoform/cli.py', '.github/workflows/rust.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      AENEAS_RELEASE: nightly-2026.10.10-d119a47
+      AENEAS_ASSET: aeneas-linux-x86_64.tar.gz
+      AENEAS_SHA256: 152a5747b0f90f4e110034af6c533ba85e3367a4693a9720f9f67baa63da3ea4
+      AENEAS_LEAN_BUILD_ASSET: lean-build-aeneas-x86_64-unknown-linux-gnu.tar.gz
+      AENEAS_LEAN_BUILD_SHA256: 5a0a33243602bc43368c601b65ae2c3ab8787b994a88108c7921dbbc2ac3b891
+      RUST_TOOLCHAIN: nightly-2026-09-17
+      GCD_CRATE_URL: https://static.crates.io/crates/gcd/gcd-2.3.0.crate
+      GCD_CRATE_SHA256: 1d758ba1b47b00caf47f24925c0074ecb20d6dfcffe7f6d53395c0465674841a
+    steps:
+      - name: Free disk space (mathlib, rustc-dev and Aeneas need ~15 GB)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Linux sandbox prerequisites (bubblewrap; unprivileged user namespaces)
+        # Ephemeral VM for this job alone; the native harness and the crate's build run
+        # under bubblewrap with no network, as every native run does (scripts/sandbox.py).
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --unshare-net --ro-bind / / true
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Workflow pins equal rust-pins.json
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          p = json.load(open("rust-pins.json"))
+          assert p["aeneas_release"] == os.environ["AENEAS_RELEASE"], "AENEAS_RELEASE"
+          assert p["assets"][os.environ["AENEAS_ASSET"]] == os.environ["AENEAS_SHA256"], "AENEAS_SHA256"
+          assert p["rust_toolchain"] == os.environ["RUST_TOOLCHAIN"], "RUST_TOOLCHAIN"
+          print("pins agree:", p["aeneas_release"], p["rust_toolchain"])
+          EOF
+      - name: Download the pinned Aeneas release (verified by sha256; ships Charon)
+        run: |
+          base="https://github.com/AeneasVerif/aeneas/releases/download/${AENEAS_RELEASE}"
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/aeneas.tgz" "$base/$AENEAS_ASSET"
+          echo "$AENEAS_SHA256  $RUNNER_TEMP/aeneas.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/aeneas"
+          tar xzf "$RUNNER_TEMP/aeneas.tgz" -C "$RUNNER_TEMP/aeneas"
+          echo "AENEAS_HOME=$RUNNER_TEMP/aeneas" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/aeneas/aeneas" -version
+          "$RUNNER_TEMP/aeneas/charon" version
+          cat "$RUNNER_TEMP/aeneas/rust-toolchain"
+      - name: Install the pinned Rust nightly (rustc-dev for Charon)
+        run: |
+          if ! command -v rustup >/dev/null; then
+            curl -sSf --retry 5 https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal -c rustc-dev -c llvm-tools -c rust-src
+          rustc "+$RUST_TOOLCHAIN" -vV
+      - name: Install elan (the scratch project's Lean comes from its own lean-toolchain)
+        run: |
+          curl -sSfL --retry 5 --retry-all-errors https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/mathlib
+          key: mathlib-ltar-${{ hashFiles('rust-pins.json') }}
+      - name: Scratch Lake project (mathlib cache, Aeneas' prebuilt library, verified)
+        run: |
+          lp="$RUNNER_TEMP/aeneas-lean"
+          cp -R "$AENEAS_HOME/backends/lean" "$lp"
+          base="https://github.com/AeneasVerif/aeneas/releases/download/${AENEAS_RELEASE}"
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/lean-build.tgz" "$base/$AENEAS_LEAN_BUILD_ASSET"
+          echo "$AENEAS_LEAN_BUILD_SHA256  $RUNNER_TEMP/lean-build.tgz" | sha256sum -c -
+          mkdir -p "$lp/.lake/build"
+          tar xzf "$RUNNER_TEMP/lean-build.tgz" -C "$lp/.lake/build"
+          bash scripts/rust_setup.sh "$AENEAS_HOME" "$lp"
+          echo "AUTOFORM_RUST_LEAN_PROJECT=$lp" >> "$GITHUB_ENV"
+      - name: The real crate (gcd 2.3.0 from crates.io, verified by sha256)
+        run: |
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/gcd-2.3.0.crate" "$GCD_CRATE_URL"
+          echo "$GCD_CRATE_SHA256  $RUNNER_TEMP/gcd-2.3.0.crate" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gcd"
+          tar xzf "$RUNNER_TEMP/gcd-2.3.0.crate" -C "$RUNNER_TEMP/gcd"
+          echo "AUTOFORM_RUST_GCD_CRATE=$RUNNER_TEMP/gcd/gcd-2.3.0" >> "$GITHUB_ENV"
+      - name: Test tools
+        run: python -m pip install 'pytest>=8,<9'
+      - name: Rust path tests (must run, not skip)
+        env:
+          AUTOFORM_RUST_REQUIRED: '1'
+          AUTOFORM_RUST_EVIDENCE_DIR: ${{ runner.temp }}/rust-evidence
+        run: |
+          mkdir -p "$AUTOFORM_RUST_EVIDENCE_DIR"
+          python -m pytest tests/test_rust_unit.py tests/test_rust_aeneas.py -v -rA --junitxml=rust-junit.xml
+          python3 - <<'EOF'
+          import xml.etree.ElementTree as ET
+          s = ET.parse("rust-junit.xml").getroot()
+          s = s if s.tag == "testsuite" else s.find("testsuite")
+          tests, skipped = int(s.get("tests")), int(s.get("skipped"))
+          failures, errors = int(s.get("failures")), int(s.get("errors"))
+          print(f"tests={tests} skipped={skipped} failures={failures} errors={errors}")
+          e2e = [c for c in s.iter("testcase") if c.get("classname", "").endswith("test_rust_aeneas")]
+          ran = [c for c in e2e if c.find("skipped") is None]
+          print(f"end-to-end tests run: {len(ran)}")
+          assert skipped == 0 and failures == 0 and errors == 0, "a Rust test skipped or failed"
+          assert len(ran) >= 7, "the end-to-end Rust tests did not run"
+          EOF
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: rust-evidence
+          path: |
+            ${{ runner.temp }}/rust-evidence
+            rust-junit.xml
+          if-no-files-found: warn

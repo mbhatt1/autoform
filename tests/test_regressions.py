@@ -184,6 +184,24 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
                  "2 cases inconclusive (all bound by check_docs)\n"
                  "**1** functions, 1/1 cases agree\n"
                  "(Java: 1 compared of 100 hole-free)\n" % n)
+    # The Rust rows (gcd 2.3.0) are bound to the tracked evidence-RustGcd.json by nested key.
+    with open(os.path.join(d, "evidence-RustGcd.json"), "w") as fh:
+        json.dump({"ledger": {"functions": 6, "holeFree": 2, "verifiableCore": 2, "holes": 4},
+                   "oracle": {"compared": 2, "agree": 9, "total": 9, "divergences": 0,
+                              "inconclusive_cases": 0},
+                   "kernel_checked": {"proved": 3, "emitted": 4}}, fh)
+    with open(os.path.join(d, "docs", "languages.md"), "a") as fh:
+        fh.write("| Rust (gcd 2.3.0, `evidence-RustGcd.json`) | a | b | c | d | 6 | 2 (33%) | 2 (33%) "
+                 "| 4 holes under 2 labels | **yes**: 2 functions compared, 9/9 cases agree, "
+                 "0 divergences; 3/4 case theorems kernel-checked |\n")
+    with open(os.path.join(d, "docs", "rust.md"), "w") as fh:
+        fh.write("| public functions (rustdoc) | 6 |\n| translated (closed Aeneas model) | 2 |\n"
+                 "| hole occurrences | 4 under 2 labels |\n| compared by the oracle | 2 |\n"
+                 "| cases agree | 9/9 |\n| divergences | 0 |\n| inconclusive cases | 0 |\n"
+                 "| case theorems proved by the kernel | 3/4 |\n")
+    with open(os.path.join(d, "docs", "adoption.md"), "a") as fh:
+        fh.write("| **Rust** | x | y | gcd 2.3.0: 6 public functions, 2 translated, 2 compared, "
+                 "9/9 cases agree, 0 divergences, 3/4 case theorems kernel-checked |\n")
     return d
 
 

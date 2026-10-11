@@ -216,6 +216,8 @@ _DISABLES = {
     'ld.lld': ('autoform regress --machine',),
     'pypcode': ('the machine-code frontend',), 'pyelftools': ('the machine-code frontend',),
     'macholib': ('the machine-code frontend',), 'pefile': ('the machine-code frontend',),
+    'cargo': ('Rust',), 'rust-toolchain': ('Rust',), 'charon': ('Rust',), 'aeneas': ('Rust',),
+    'aeneas-lean-project': ('Rust',),
 }
 
 
@@ -255,7 +257,84 @@ def install_hint(name, lean_toolchain=None, joern_pin=None):
     }
     if name in ('pypcode', 'pyelftools', 'macholib', 'pefile'):
         return "python -m pip install 'autoform-lean[machine]'"
+    if name in _RUST_TOOLS:
+        return rust_install_hint(name)
     return hints.get(name, 'see docs/running.md §1')
+
+
+_RUST_TOOLS = ('cargo', 'rust-toolchain', 'charon', 'aeneas', 'aeneas-lean-project')
+
+
+def rust_pins():
+    try:
+        return json.loads(packaged_pin('rust-pins.json') or '{}')
+    except ValueError:
+        return {}
+
+
+def rust_install_hint(name):
+    pins = rust_pins()
+    release = pins.get('aeneas_release', '<pinned release in rust-pins.json>')
+    toolchain = pins.get('rust_toolchain', '<pinned toolchain in rust-pins.json>')
+    machine = os.uname().machine if hasattr(os, 'uname') else ''
+    arch = 'aarch64' if machine in ('arm64', 'aarch64') else 'x86_64'
+    asset = f"aeneas-{'macos' if sys.platform == 'darwin' else 'linux'}-{arch}.tar.gz"
+    aeneas = (f"mkdir -p ~/.aeneas && curl -sSfL https://github.com/AeneasVerif/aeneas/releases/download/"
+              f"{release}/{asset} | tar xz -C ~/.aeneas && export AENEAS_HOME=~/.aeneas   "
+              f"# sha256 in rust-pins.json; ships charon too (docs/rust.md)")
+    return {
+        'cargo': 'curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal',
+        'rust-toolchain': f'rustup toolchain install {toolchain} --profile minimal -c rustc-dev -c llvm-tools -c rust-src',
+        'charon': aeneas, 'aeneas': aeneas,
+        'aeneas-lean-project': 'bash scripts/rust_setup.sh "$AENEAS_HOME" ~/.cache/autoform/aeneas-lean '
+                               '&& export AUTOFORM_RUST_LEAN_PROJECT=~/.cache/autoform/aeneas-lean',
+    }[name]
+
+
+def rust_tool(name, env):
+    home = env.get('AENEAS_HOME')
+    if home and os.access(os.path.join(home, name), os.X_OK):
+        return os.path.join(home, name)
+    return shutil.which(name, path=env['PATH'])
+
+
+def rust_report(env, record):
+    """The Rust path's optional runtime: cargo, the pinned nightly, Charon and Aeneas (one
+    pinned release ships both), and the scratch Lake project holding Aeneas' Lean library."""
+    pins = rust_pins()
+    cargo = shutil.which('cargo', path=env['PATH'])
+    record('cargo', cargo, note=None if cargo else 'only needed for Rust crates')
+    toolchain = pins.get('rust_toolchain')
+    found = None
+    if cargo and toolchain:
+        banner = tool_version(['rustc', '+' + toolchain, '-V'], env)
+        found = toolchain if banner and banner.startswith('rustc ') else None
+    record('rust-toolchain', toolchain if found else None, found=found, expected=toolchain,
+           note=None if found else f'rustc {toolchain} with rustc-dev (what Charon is built against)')
+    charon = rust_tool('charon', env)
+    banner = tool_version([charon, 'version'], env) if charon else None
+    want = pins.get('charon_version')
+    got = banner.split()[0] if banner else None
+    record('charon', charon, found=got, expected=want,
+           note=None if charon else 'set AENEAS_HOME to the unpacked pinned Aeneas release')
+    aeneas = rust_tool('aeneas', env)
+    banner = tool_version([aeneas, '-version'], env) if aeneas else None
+    want = pins.get('aeneas_version')
+    got = banner.split()[-1] if banner else None
+    record('aeneas', aeneas, found=got, expected=want,
+           note=None if aeneas else 'set AENEAS_HOME to the unpacked pinned Aeneas release')
+    lp = env.get('AUTOFORM_RUST_LEAN_PROJECT')
+    built = bool(lp) and (Path(lp) / '.lake' / 'build' / 'lib' / 'lean' / 'Aeneas').is_dir()
+    lean_tc = None
+    if built:
+        try:
+            lean_tc = (Path(lp) / 'lean-toolchain').read_text().strip()
+        except OSError:
+            lean_tc = None
+    record('aeneas-lean-project', lp if built else None, found=lean_tc if built else None,
+           expected=pins.get('lean_toolchain') if built else None,
+           note=None if built else ('AUTOFORM_RUST_LEAN_PROJECT is not set' if not lp else
+                                    f'{lp} has no built Aeneas library'))
 
 
 def packaged_pin(name):
@@ -395,6 +474,9 @@ def doctor_report(env):
         (p for p in ('/opt/homebrew/bin/ld.lld', '/usr/local/opt/lld/bin/ld.lld') if Path(p).is_file()), None)
     record('ld.lld', lld, note=None if lld else 'only needed for autoform regress --machine')
 
+    # Optional: the Rust path (docs/rust.md), pinned in rust-pins.json.
+    rust_report(env, record)
+
     # Optional: the machine-code frontend, pinned in pyproject's [machine] extra.
     for dist, pin in (('pypcode', '3.3.3'), ('pyelftools', '0.33'),
                       ('macholib', '1.16.4'), ('pefile', '2024.8.26')):
@@ -407,7 +489,8 @@ def doctor_report(env):
                note=None if installed else "install with: pip install 'autoform-lean[machine]'")
 
     return dict(schema_version=1, autoform=__version__, platform=sys.platform,
-                pins=dict(lean_toolchain=toolchain, joern=joern_pin),
+                pins=dict(lean_toolchain=toolchain, joern=joern_pin,
+                          rust={k: v for k, v in rust_pins().items() if k not in ('comment', 'assets')}),
                 tools=tools, problems=problems, warnings=warnings)
 
 
@@ -448,7 +531,7 @@ def doctor(env, strict=False, as_json=False):
             expected = entry.get('expected_version')
             if expected and entry.get('found_version') != expected:
                 detail += f"  (pin {expected})"
-            print(f"  {mark} {name:<12s} {detail}")
+            print(f"  {mark} {name:<19s} {detail}")
             if status != 'ok':
                 kind = 'required' if entry['required'] else 'optional'
                 extra = kind
@@ -471,6 +554,18 @@ def doctor(env, strict=False, as_json=False):
         for line in warnings:
             print('  - ' + line, file=sys.stderr)
     return code
+
+
+def is_cargo_library(source):
+    """A Cargo package (not a bare workspace root) with a library target."""
+    manifest = Path(source) / 'Cargo.toml'
+    try:
+        text = manifest.read_text(errors='replace')
+    except OSError:
+        return False
+    if not re.search(r'^\s*\[package\]', text, re.M):
+        return False
+    return (Path(source) / 'src' / 'lib.rs').is_file() or bool(re.search(r'^\s*\[lib\]', text, re.M))
 
 
 def discard_checkout(repository, keep=False):
@@ -667,6 +762,13 @@ def main(argv=None):
         command.add_argument("--keep-checkout", action="store_true",
                              help="keep the cloned source tree under <workspace>/sources "
                                   "after the run instead of deleting it")
+        command.add_argument("--lang", choices=("auto", "rust", "joern"), default="auto",
+                             help="source language route: `rust` runs the Charon+Aeneas path "
+                                  "(docs/rust.md), `joern` the Joern pipeline; `auto` (default) "
+                                  "takes the Rust path for a Cargo package with a library target")
+        command.add_argument("--rust-lean-project", type=Path,
+                             help="scratch Lake project with Aeneas' Lean library built "
+                                  "(default: $AUTOFORM_RUST_LEAN_PROJECT; scripts/rust_setup.sh makes one)")
         command.add_argument("--shard-functions", type=int, default=SHARD_FUNCTIONS,
                              help="render the model in parts of at most N functions that "
                                   "Lean elaborates in parallel, bounding each process's "
@@ -856,6 +958,23 @@ def main(argv=None):
                                                  '\n\nNo proof or guarantee was produced for this invocation.\n')
                 raise
             env['AUTOFORM_REPOSITORY_REPORT'] = str(report / 'repository.json')
+            if args.lang == 'rust' or (args.lang == 'auto' and is_cargo_library(source)):
+                if args.command == 'assure' and args.properties is not None:
+                    raise ValueError('--properties is not supported on the Rust path (docs/rust.md)')
+                print(f"autoform: {source} is a Cargo library crate; taking the Rust path "
+                      f"(Charon + Aeneas, docs/rust.md). Pass --lang joern to override.", file=sys.stderr)
+                command = [sys.executable, str(workspace / 'scripts' / 'rust_aeneas.py'),
+                           '--crate', str(source), '--module', args.module, '--out', str(report)]
+                lean_project = args.rust_lean_project or env.get('AUTOFORM_RUST_LEAN_PROJECT')
+                if lean_project:
+                    command += ['--lean-project', str(Path(lean_project).expanduser().resolve())]
+                if args.command == 'assure':
+                    command.append('--assure')
+                timeout = args.stage_timeout if args.command == 'assure' else args.timeout
+                try:
+                    return _run_command(command, env=env, timeout=timeout)
+                finally:
+                    discard_checkout(repository, keep=getattr(args, 'keep_checkout', False))
             script = "assure.sh" if args.command == "assure" else "autoform.sh"
             command = ["bash", str(workspace / script), str(source), args.module]
             if args.command == "assure" and args.properties is not None:

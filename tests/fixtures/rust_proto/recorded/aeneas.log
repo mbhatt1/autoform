@@ -1,0 +1,58 @@
+[Info ] Imported: /private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/rust_aeneas__k7w6w3c/proto.llbc
+[Error] Improperly typed constant value
+Source: 'src/lib.rs', lines 113:4-113:11
+[Warn ] Could not translate the body of function 'proto::halve because of previous error
+Name pattern: 'proto::halve'
+Definition span: 'src/lib.rs', lines 112:0-114:1
+Source: 'src/lib.rs', lines 113:4-113:11
+Compiler source: interp/Interp.ml, line 617
+
+[Error] Aeneas does not yet support dereferencing raw pointers.
+Source: 'src/lib.rs', lines 123:13-123:15
+[Warn ] Could not translate the body of function 'proto::read_raw because of previous error
+Name pattern: 'proto::read_raw'
+Definition span: 'src/lib.rs', lines 122:0-124:1
+Source: 'src/lib.rs', lines 123:13-123:15
+Compiler source: interp/Interp.ml, line 617
+
+[Info ] Generated the partial file (because of 2 errors, including 2 unique errors): /private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/rust_aeneas__k7w6w3c/lean/Proto.lean
+[Warn ] The crate contains extracted external, unknown definitions: we advise using the option -split-files to allow manually providing these definitions in separate files.
+[Info ] Total execution time: 0.844400 seconds
+Applied prepasses:  [--------------------------------------------------]  0/47 ⠋
+
+Applied prepasses:  [#-------------------------------------------------]  1/47 ⠋
+
+Applied prepasses:  [#####################-----------------------------] 20/47 ⠙
+Applied prepasses:  [##################################################] 47/47 ✔️
+Translated globals:  [---------------------------------------------------] 0/0 ⠋
+Translated globals:  [---------------------------------------------------] 0/0 ✔️
+Translated opaque functions:  [----------------------------------------]  0/13 ⠋
+Translated opaque functions:  [########################################] 13/13 ✔️
+Translated transparent functions:  [-----------------------------------]  0/23 ⠋
+
+Translated transparent functions:  [#----------------------------------]  1/23 ⠙
+
+Translated transparent functions:  [##########-------------------------]  7/23 ⠙
+
+Translated transparent functions:  [############-----------------------]  8/23 ⠙
+
+Translated transparent functions:  [###############--------------------] 10/23 ⠹
+
+Translated transparent functions:  [#####################--------------] 14/23 ⠹
+
+Translated transparent functions:  [#################################--] 22/23 ⠹
+Translated transparent functions:  [###################################] 23/23 ✔️
+Translated trait declarations:  [----------------------------------------] 0/8 ⠋
+Translated trait declarations:  [###################################-----] 7/8 ✔️
+Translated trait impls:  [-----------------------------------------------] 0/7 ⠋
+Translated trait impls:  [####################---------------------------] 3/7 ✔️
+Post-processed translated opaque functions:  [-------------------------]  0/13 ⠋
+
+Post-processed translated opaque functions:  [#------------------------]  1/13 ⠙
+Post-processed translated opaque functions:  [#########################] 13/13 ✔️
+Post-processed translated transparent functions:  [--------------------]  0/23 ⠋
+
+Post-processed translated transparent functions:  [--------------------]  1/23 ⠙
+
+Post-processed translated transparent functions:  [###################-] 22/23 ⠙
+Post-processed translated transparent functions:  [####################] 23/23 ✔️

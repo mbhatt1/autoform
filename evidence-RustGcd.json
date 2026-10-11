@@ -1,0 +1,95 @@
+{
+ "assumptions": [
+  "debug profile: overflow checks and debug assertions on (what Aeneas models); release wraps and is expected to diverge on overflowing arithmetic",
+  "Rust panic <-> Aeneas `fail` of any kind (the kind is stated in the case theorem, not compared with the panic)",
+  "Aeneas `div` is inconclusive, never agreement",
+  "usize/isize are 64-bit (the harness host)",
+  "encoded values: integers, bool, tuples and fixed-size arrays of them, and shared references to them as arguments; anything else is inconclusive with a reason",
+  "inputs: boundary-value product (cap 60) plus 40 seeded random per function"
+ ],
+ "cases_cap": 60,
+ "crate": {
+  "crate_sha256": "1d758ba1b47b00caf47f24925c0074ecb20d6dfcffe7f6d53395c0465674841a",
+  "name": "gcd",
+  "source_tree_sha256": "da3d62bec6c396ec0996ad532441d55df49feefeeec742e38a7eec9f15395217",
+  "version": "2.3.0"
+ },
+ "fuel": 4096,
+ "kernel_checked": {
+  "emitted": 144,
+  "failed": 23,
+  "failure_reasons": {
+   "usize/isize: System.Platform.numBits is opaque to the kernel": 23
+  },
+  "proved": 121
+ },
+ "ledger": {
+  "functions": 60,
+  "holeFree": 12,
+  "holeFunctionsByCategory": {
+   "external-std": 18,
+   "lean-rejected-model": 30
+  },
+  "holes": 48,
+  "holesByLabel": [
+   {
+    "count": 30,
+    "label": "lean:depends-on-rejected:core::num::nonzero::ZeroablePrimitive: Field `markerCopyInst` has already been declared"
+   },
+   {
+    "count": 3,
+    "label": "aeneas:external-axiom:core::num::{u128}::trailing_zeros"
+   },
+   {
+    "count": 3,
+    "label": "aeneas:external-axiom:core::num::{u16}::trailing_zeros"
+   },
+   {
+    "count": 3,
+    "label": "aeneas:external-axiom:core::num::{u32}::trailing_zeros"
+   },
+   {
+    "count": 3,
+    "label": "aeneas:external-axiom:core::num::{u64}::trailing_zeros"
+   },
+   {
+    "count": 3,
+    "label": "aeneas:external-axiom:core::num::{u8}::trailing_zeros"
+   },
+   {
+    "count": 3,
+    "label": "aeneas:external-axiom:core::num::{usize}::trailing_zeros"
+   }
+  ],
+  "traitMethodDeclarations": [
+   "gcd::Gcd::gcd",
+   "gcd::Gcd::gcd_binary",
+   "gcd::Gcd::gcd_euclid"
+  ],
+  "verifiableCore": 12
+ },
+ "module": "RustGcd",
+ "oracle": {
+  "agree": 1178,
+  "compared": 12,
+  "divergence_detail": [],
+  "divergences": 0,
+  "inconclusive_cases": 0,
+  "inconclusive_functions": {},
+  "total": 1178
+ },
+ "pins": {
+  "aeneas_release": "nightly-2026.10.10-d119a47",
+  "aeneas_version": "nightly-2026.10.10-d119a47",
+  "charon_commit": "798016509139eb51f0d764645f76d068d34ba5f6",
+  "charon_version": "0.1.281",
+  "lean_toolchain": "leanprover/lean4:v4.31.0",
+  "mathlib_rev": "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f",
+  "rust_toolchain": "nightly-2026-09-17"
+ },
+ "producer": "scripts/rust_aeneas.py --evidence",
+ "profile": "debug",
+ "random": 40,
+ "seed": 20261010,
+ "theorems_per_function": 12
+}

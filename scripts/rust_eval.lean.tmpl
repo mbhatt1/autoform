@@ -1,0 +1,72 @@
+/-
+AutoformRust.Eval -- written into the scratch Aeneas Lake project by scripts/rust_aeneas.py.
+
+Two things live here, and nothing else:
+
+* `rs`, the stringifier the differential oracle `#eval`s an Aeneas `Result` through.
+  It prints `ok <value>`, `fail <error kind>` or `div`; the value printer is generated per
+  function from the Rust type, in Rust's `{:?}` format, by rust_aeneas.py.
+
+* `bindK` / `loopK` and their two equations, so that a recorded input/output case can be
+  proved by the KERNEL (`rfl`) against the Aeneas model. Aeneas defines `bind` and `loop`
+  with `partial_fixpoint`, which the kernel does not unfold to a value. The equations below
+  are theorems (proved here, no axiom): `bind x f = bindK x f` is one case split because
+  Aeneas' only effect is `fail` (continuation out of `PEmpty`), and
+  `loop body x = loopK body n x` unrolls `n` iterations and falls back to `loop` itself,
+  so it holds for every `n`. A case that needs more than `n` iterations is simply not
+  proved; it is never assumed.
+-/
+import Aeneas
+open Aeneas Aeneas.Std Result
+
+namespace AutoformRust
+
+def errName : Error → String
+  | .assertionFailure => "assertionFailure"
+  | .integerOverflow => "integerOverflow"
+  | .divisionByZero => "divisionByZero"
+  | .arrayOutOfBounds => "arrayOutOfBounds"
+  | .maximumSizeExceeded => "maximumSizeExceeded"
+  | .panic => "panic"
+  | .undef => "undef"
+
+def rs {α : Type} (f : α → String) (r : Result α) : String :=
+  match r.match with
+  | .ok v => "ok " ++ f v
+  | .div => "div"
+  | .vis (.fail e) _ => "fail " ++ errName e
+
+def bindK {α : Type u} {β : Type v} (x : Result α) (f : α → Result β) : Result β :=
+  match x.match with
+  | .ok a => f a
+  | .div => div
+  | .vis (.fail e) _ => fail e
+
+theorem bind_eq_bindK {α : Type u} {β : Type v} (x : Result α) (f : α → Result β) :
+    bind x f = bindK x f := by
+  cases x with
+  | ret a => simp [bindK]
+  | div => simp [bindK]
+  | vis i k =>
+    cases i with
+    | fail e =>
+      simp only [bindK, Result.match.vis, bind_vis]
+      rw [Result.fail_eq_vis]; congr; funext o; exact o.elim
+
+theorem bindOp_eq_bindK {α β : Type u} (x : Result α) (f : α → Result β) :
+    x >>= f = bindK x f := bind_eq_bindK x f
+
+def loopK {α : Type u} {β : Type v} (body : α → Result (ControlFlow α β)) : Nat → α → Result β
+  | 0, x => loop body x
+  | n+1, x => bindK (body x) fun r => match r with
+    | ControlFlow.cont x' => loopK body n x'
+    | ControlFlow.done y => ok y
+
+theorem loop_eq_loopK {α : Type u} {β : Type v} (body : α → Result (ControlFlow α β)) :
+    ∀ (n : Nat) (x : α), loop body x = loopK body n x
+  | 0, x => rfl
+  | n+1, x => by
+    rw [loop.eq_1, loopK, bind_eq_bindK]
+    congr 1; funext r; cases r <;> simp [loop_eq_loopK body n]
+
+end AutoformRust

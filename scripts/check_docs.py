@@ -102,6 +102,45 @@ CHECKS = [
      "ledger-CommonsLang3.json", "verifiableCore", int),
     ("docs/languages.md", r"(\d+) holes in \d+ functions \(table above\)",
      "ledger-CommonsLang3.json", "holes", int),
+    # Rust (gcd 2.3.0 from crates.io). `evidence-RustGcd.json` is TRACKED and the Rust CI job
+    # (.github/workflows/rust.yml) re-derives it from the digest-verified crate and fails on
+    # any difference (tests/test_rust_aeneas.py::test_real_crate_reproduces_the_tracked_evidence).
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\)[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|\s*(\d+)\s*\|",
+     "evidence-RustGcd.json", "ledger.functions", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\)(?:[^|]*\|){6}\s*(\d+) \(",
+     "evidence-RustGcd.json", "ledger.holeFree", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\)(?:[^|]*\|){7}\s*(\d+) \(",
+     "evidence-RustGcd.json", "ledger.verifiableCore", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\)(?:[^|]*\|){8}\s*(\d+) holes",
+     "evidence-RustGcd.json", "ledger.holes", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\).*?(\d+) functions compared",
+     "evidence-RustGcd.json", "oracle.compared", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\).*?functions compared, (\d+)/\d+ cases agree",
+     "evidence-RustGcd.json", "oracle.agree", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\).*?functions compared, \d+/(\d+) cases agree",
+     "evidence-RustGcd.json", "oracle.total", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\).*?cases agree, (\d+) divergences",
+     "evidence-RustGcd.json", "oracle.divergences", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\).*?divergences; (\d+)/\d+ case theorems",
+     "evidence-RustGcd.json", "kernel_checked.proved", int),
+    ("docs/languages.md", r"Rust \(gcd 2\.3\.0, `evidence-RustGcd\.json`\).*?divergences; \d+/(\d+) case theorems",
+     "evidence-RustGcd.json", "kernel_checked.emitted", int),
+    ("docs/rust.md", r"\| public functions \(rustdoc\) \| (\d+) \|", "evidence-RustGcd.json", "ledger.functions", int),
+    ("docs/rust.md", r"\| translated \(closed Aeneas model\) \| (\d+) \|", "evidence-RustGcd.json", "ledger.holeFree", int),
+    ("docs/rust.md", r"\| hole occurrences \| (\d+) under", "evidence-RustGcd.json", "ledger.holes", int),
+    ("docs/rust.md", r"\| compared by the oracle \| (\d+) \|", "evidence-RustGcd.json", "oracle.compared", int),
+    ("docs/rust.md", r"\| cases agree \| (\d+)/\d+ \|", "evidence-RustGcd.json", "oracle.agree", int),
+    ("docs/rust.md", r"\| cases agree \| \d+/(\d+) \|", "evidence-RustGcd.json", "oracle.total", int),
+    ("docs/rust.md", r"\| divergences \| (\d+) \|", "evidence-RustGcd.json", "oracle.divergences", int),
+    ("docs/rust.md", r"\| inconclusive cases \| (\d+) \|", "evidence-RustGcd.json", "oracle.inconclusive_cases", int),
+    ("docs/rust.md", r"\| case theorems proved by the kernel \| (\d+)/\d+ \|", "evidence-RustGcd.json", "kernel_checked.proved", int),
+    ("docs/rust.md", r"\| case theorems proved by the kernel \| \d+/(\d+) \|", "evidence-RustGcd.json", "kernel_checked.emitted", int),
+    ("docs/adoption.md", r"\*\*Rust\*\*.*?gcd 2\.3\.0: (\d+) public functions", "evidence-RustGcd.json", "ledger.functions", int),
+    ("docs/adoption.md", r"\*\*Rust\*\*.*?gcd 2\.3\.0: \d+ public functions, (\d+) translated", "evidence-RustGcd.json", "ledger.holeFree", int),
+    ("docs/adoption.md", r"\*\*Rust\*\*.*?translated, (\d+) compared", "evidence-RustGcd.json", "oracle.compared", int),
+    ("docs/adoption.md", r"\*\*Rust\*\*.*?compared, (\d+)/\d+ cases agree", "evidence-RustGcd.json", "oracle.agree", int),
+    ("docs/adoption.md", r"\*\*Rust\*\*.*?cases agree, (\d+) divergences", "evidence-RustGcd.json", "oracle.divergences", int),
+    ("docs/adoption.md", r"\*\*Rust\*\*.*?divergences, (\d+)/\d+ case theorems", "evidence-RustGcd.json", "kernel_checked.proved", int),
 ]
 
 
@@ -182,6 +221,13 @@ COUNTED = [
 ]
 
 
+def dig(data, key):
+    """`a.b.c` looks up nested fields (evidence summaries nest their figures)."""
+    for part in key.split("."):
+        data = data.get(part) if isinstance(data, dict) else None
+    return data
+
+
 def ast_hole_count(path):
     """Holes in a neutral AST, counted from the label field the exporter emits."""
     return len(re.findall(r'"(?:label|hole)"\s*:\s*"[^"]+"', open(path).read()))
@@ -252,7 +298,7 @@ def main():
         if not os.path.exists(dp) or not os.path.exists(ap_):
             missing.append(f"{doc} or {art}")
             continue
-        want = json.load(open(ap_)).get(key)
+        want = dig(json.load(open(ap_)), key)
         m = re.search(rx, open(dp).read(), re.S)
         if not m:
             stale.append(f"{doc}: pattern for {art}:{key} no longer matches — the doc was "

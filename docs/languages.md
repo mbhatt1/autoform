@@ -39,7 +39,7 @@ pipeline; where a document and an artifact disagree, the artifact wins.
 
 Joern 4.0.606, `joern-cli/frontends/` has `c2cpg`, `javasrc2cpg`, `jimple2cpg`,
 `jssrc2cpg`, `gosrc2cpg`, `kotlin2cpg`, `pysrc2cpg`, `ghidra2cpg`, and others.
-Binaries (`ghidra2cpg`), C#, PHP, Ruby and Swift were **not tested**. Rust has no Joern frontend here; an experimental route through Charon and Aeneas is in `docs/rust.md`.
+Binaries (`ghidra2cpg`), C#, PHP, Ruby and Swift were **not tested**. Rust has no Joern frontend; it goes through rustdoc, Charon and Aeneas instead (`docs/rust.md`, row below).
 
 ## Support matrix
 
@@ -48,7 +48,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby and Swift were **not tested**. Rust has n
 | Python | yes | yes | yes | `.python` ✅ | 209 | 97% | 150 (71%) | 0.08% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
-| Rust (EXPERIMENTAL) | no parser: Charon + Aeneas emit the Lean | n/a (Aeneas) | yes, in a separate Lake project on Lean v4.31.0 (not Autoform's v4.30.0-rc1) | n/a | 6 (prototype crate) | n/a | n/a | n/a | prototype: native Rust vs Aeneas `#eval`; figures unbound (see [rust.md](rust.md)) |
+| Rust (gcd 2.3.0, `evidence-RustGcd.json`) | no Joern frontend: rustdoc JSON gives the public API, Charon + Aeneas emit the Lean | yes (Aeneas) | yes, in a separate Lake project on Lean v4.31.0 (Aeneas' pin, not Autoform's v4.30.0-rc1) | n/a (Aeneas' own `Result` monad) | 60 | 12 (20%) | 12 (20%) | 48 holes under 7 labels, all named from Charon/Aeneas/Lean | **yes** (native cargo harness, debug profile, sandboxed): 12 functions compared, 1178/1178 cases agree, 0 divergences; 121/144 case theorems kernel-checked (the 23 unproved all usize: the kernel cannot evaluate `System.Platform.numBits`). Re-derived by the Rust CI job from the digest-verified crate; see [rust.md](rust.md) |
 | Java (commons-lang3 3.17.0, tracked `ast-CommonsLang3.json`) | yes | yes | yes | `.java` ✅ | 488 | 422 (86%) | 196 (40%) | 0.7% | **yes** (JVM, `jvm-primitive-static-v2`, 2026-10-10): 32 functions compared, 87/87 cases agree, 0 divergences, 513 inconclusive on named dynamic holes (`evidence-CommonsLang3.json`) |
 | Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | TypeScript | yes | yes | yes | `.javascript` ✅ | 86 | 44 (51%) | 18 (20%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
