@@ -63,14 +63,14 @@ Counts for this run are in `Autoform/SpecsGen/report.json`.
 
 One Lean process retains every by-computation proof term it elaborates (commit e36b8f1,
 `Autoform/SpecsGen/V8Base`), so the single-file form of this module was predicted to peak
-at 19.75 GB -- base 1.00 GB (imports, `h0`, the domains) plus the
+at 19.25 GB -- base 1.00 GB (imports, `h0`, the domains) plus the
 probe-measured cost of every theorem -- against a `--split-gb 4` threshold.
 `scripts/synth_specs.py` therefore emitted it as `Cachetools/Base.lean` (context and domains,
 elaborated once) and `Cachetools/Part1.lean` .. `Part8.lean` (theorems only, packed
 next-fit under the threshold), all in this namespace, and this umbrella imports them.
 No statement was weakened: the parts are a partition of the same theorems.
 
-Per-part prediction (GB): Part1 3.50 (2 theorems), Part2 2.50 (1 theorem), Part3 3.75 (2 theorems), Part4 3.75 (3 theorems), Part5 3.50 (2 theorems), Part6 3.75 (2 theorems), Part7 3.50 (2 theorems), Part8 2.50 (6 theorems).
+Per-part prediction (GB): Part1 3.50 (2 theorems), Part2 2.25 (1 theorem), Part3 3.50 (2 theorems), Part4 3.50 (3 theorems), Part5 3.50 (2 theorems), Part6 4.00 (2 theorems), Part7 3.50 (2 theorems), Part8 2.50 (6 theorems).
 
 The `#audit_depends` / `#audit_axioms` gates are at the end of each part, for the theorems
 that part states; `obligations`, `excludedSubjects` and `budgetExcluded` are declared

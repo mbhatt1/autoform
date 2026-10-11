@@ -8,7 +8,7 @@ import Autoform.SpecsGen.Cachetools.Base
 Part 2 of 8 of `Autoform/SpecsGen/Cachetools.lean`: theorems only. The context, the
 frozen globals heap and every domain are in `Autoform/SpecsGen/Cachetools/Base.lean`; the
 parts share one namespace, so every name is the one the unsplit module would have had.
-Predicted peak of this part alone: 2.50 GB (base 1.00 GB + the
+Predicted peak of this part alone: 2.25 GB (base 1.00 GB + the
 probe-measured cost of each theorem), under the 4 GB split threshold. -/
 namespace Autoform.SpecsGen.Cachetools
 
