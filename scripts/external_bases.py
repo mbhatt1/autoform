@@ -31,6 +31,7 @@ hierarchy has its own representation in Core; none of those is a namespace contr
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -103,6 +104,26 @@ CONTRACTS = {
         ["__len__"]),
 }
 
+# Methods of a contracted base whose CODE is modelled, not just named. Only what a measured
+# need required: `MutableMapping.popitem`, which `cachetools.Cache.__setitem__` calls to
+# make room (the 7.1.6 replace-grow path, docs/evidence-cachetools.md). Each entry is the
+# CPython source text of the method (`source`, verbatim from `Lib/_collections_abc.py` of
+# the pinned version, the file `verify` re-reads) and its Core translation (`core`), which
+# is what `cartographer/export_ast.sc` emits for that exact text inside a class of the same
+# name -- produced by running the exporter, not written by hand, and re-checked by
+# `tests/test_external_bases.py` against a fresh export when Joern is available. The
+# method is emitted into `Autoform/Lang/Core/ExternalMethods.lean` under the reserved name
+# `<external>module.qualname.method`, which no source language can spell; every other
+# contracted name stays an opaque member.
+METHODS = {
+    "collections.abc.MutableMapping": {
+        "popitem": {
+            "source": "    def popitem(self):\n        '''D.popitem() -> (k, v), remove and return some (key, value) pair\n           as a 2-tuple; but raise KeyError if D is empty.\n        '''\n        try:\n            key = next(iter(self))\n        except StopIteration:\n            raise KeyError from None\n        value = self[key]\n        del self[key]\n        return key, value\n",
+            "core": json.loads('{"k": "seq", "a": {"k": "exprS", "e": {"k": "str", "v": "D.popitem() -> (k, v), remove and return some (key, value) pair\\n           as a 2-tuple; but raise KeyError if D is empty.\\n        "}}, "b": {"k": "seq", "a": {"k": "skip"}, "b": {"k": "seq", "a": {"k": "tryCatch", "body": {"k": "assign", "x": "key", "e": {"k": "call", "f": "next", "args": [{"k": "call", "f": "iter", "args": [{"k": "name", "v": "self"}]}]}}, "x": "$exprV$2", "handler": {"k": "ifte", "c": {"k": "inOp", "neg": false, "a": {"k": "name", "v": "$exprV$2"}, "b": {"k": "tupleE", "items": [{"k": "str", "v": "StopIteration"}]}}, "t": {"k": "raise", "e": {"k": "unop", "op": "py:exception:KeyError", "a": {"k": "tupleE", "items": []}}}, "e": {"k": "raise", "e": {"k": "name", "v": "$exprV$2"}}}}, "b": {"k": "seq", "a": {"k": "skip"}, "b": {"k": "seq", "a": {"k": "assign", "x": "value", "e": {"k": "index", "a": {"k": "name", "v": "self"}, "b": {"k": "name", "v": "key"}}}, "b": {"k": "seq", "a": {"k": "skip"}, "b": {"k": "seq", "a": {"k": "delIndex", "a": {"k": "name", "v": "self"}, "i": {"k": "name", "v": "key"}}, "b": {"k": "seq", "a": {"k": "skip"}, "b": {"k": "seq", "a": {"k": "ret", "e": {"k": "tupleE", "items": [{"k": "name", "v": "key"}, {"k": "name", "v": "value"}]}}, "b": {"k": "skip"}}}}}}}}}}'),
+        },
+    },
+}
+
 PREFIX = "<external>"
 
 
@@ -131,9 +152,37 @@ def has_storage(cls):
     return any(vars(c).get("__slots__", None) != () for c in chain(cls))
 
 
+def live_method_source(cls, method):
+    """The source text of `cls.method` as the running interpreter's stdlib file spells it,
+    or None if it cannot be read. `collections.abc` is frozen in CPython 3.11, so
+    `inspect.getsource` refuses; the module's `.py` is still shipped in the stdlib
+    directory, and the method is located in it with `ast` (exact line span)."""
+    import ast
+    import sysconfig
+    code = getattr(getattr(cls, method, None), "__code__", None)
+    if code is None:
+        return None
+    path = code.co_filename
+    if path.startswith("<frozen ") and path.endswith(">"):
+        path = os.path.join(sysconfig.get_paths()["stdlib"], path[len("<frozen "):-1] + ".py")
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    lines = text.splitlines(keepends=True)
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.ClassDef) and node.name == cls.__qualname__:
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and item.name == method:
+                    return "".join(lines[item.lineno - 1:item.end_lineno])
+    return None
+
+
 def verify(cls):
     """`None` if `cls` is contracted and the live class matches the pinned contract,
-    else the reason it cannot be used as a contracted external base."""
+    else the reason it cannot be used as a contracted external base. A base with modelled
+    methods (`METHODS`) additionally needs each method's live source to be the pinned
+    text, since the model IS a translation of that text."""
     name = external_name(cls)
     pinned = CONTRACTS.get(name)
     if pinned is None:
@@ -142,6 +191,9 @@ def verify(cls):
         return "external-base-storage:" + name
     if live_contract(cls) != tuple(pinned):
         return "external-base-contract-mismatch:" + name
+    for method, entry in sorted(METHODS.get(name, {}).items()):
+        if live_method_source(cls, method) != entry["source"]:
+            return "external-base-method-source-mismatch:%s.%s" % (name, method)
     return None
 
 
@@ -176,6 +228,46 @@ def lean_text():
             "match on the marker, so the kernel decides it without any prefix test. -/",
             "def externalContract (name : String) : Option ExternalBase :=",
             "  (externalBaseContracts.find? (·.1 == name)).map Prod.snd", "",
+            "/-- Contracted names whose CODE is modelled (`ExternalMethods.lean`): `(base, name)`.",
+            "Lookup through the base answers these with the method",
+            "`externalMethodName base name` instead of an opaque member. -/",
+            "def externalModelled : List (String × String) :=",
+            "  [" + ", ".join("(%s, %s)" % (json.dumps(PREFIX + b), json.dumps(m))
+                            for b in sorted(METHODS) for m in sorted(METHODS[b])) + "]", "",
+            "/-- The reserved function name of a modelled external method. -/",
+            "def externalMethodName (base attr : String) : String := base ++ \".\" ++ attr", "",
+            "end Autoform.Core", ""]
+    return "\n".join(out)
+
+
+def methods_lean_text():
+    """`Autoform/Lang/Core/ExternalMethods.lean`: the modelled methods as Core functions,
+    rendered by the corpus renderer (`cartographer/render_lean.py`) from `METHODS`."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cartographer"))
+    import render_lean
+    out = ["import Autoform.Lang.Core.Syntax", "",
+           "/-! Generated by `scripts/external_bases.py --emit-lean`. Do not edit by hand.",
+           "The methods of contracted external bases whose code is modelled: each is the",
+           "exporter's translation of the pinned CPython %s source text recorded in" % PINNED_PYTHON,
+           "`scripts/external_bases.py` (`METHODS`), which `verify` compares with the live",
+           "stdlib before the oracle encodes a receiver through the base. -/", "",
+           "namespace Autoform.Core", "namespace ExternalMethods", ""]
+    names = []
+    for base in sorted(METHODS):
+        for method in sorted(METHODS[base]):
+            ident = "m_" + "".join(c if c.isalnum() else "_" for c in base + "_" + method)
+            names.append(ident)
+            func = {"name": PREFIX + base + "." + method, "file": "<external>",
+                    "params": [], "body": METHODS[base][method]["core"],
+                    "pythonSignature": {"positionalOnly": [], "keywordOnly": [],
+                                        "required": [], "isMethod": True}}
+            out += render_lean.render_func(func, ident)
+    out += ["/-- Every modelled external method. -/",
+            "def all : List Func := [%s]" % ", ".join(names), "",
+            "end ExternalMethods", "",
+            "/-- The modelled external method of this reserved name, if any. -/",
+            "def externalMethod (name : String) : Option Func :=",
+            "  ExternalMethods.all.find? (·.name == name)", "",
             "end Autoform.Core", ""]
     return "\n".join(out)
 
@@ -202,6 +294,10 @@ def main(argv=None):
     if args.emit_lean:
         Path(args.emit_lean).write_text(lean_text(), encoding="utf-8")
         print("wrote", args.emit_lean, "(%d contracts)" % len(CONTRACTS))
+        methods_path = Path(args.emit_lean).with_name("ExternalMethods.lean")
+        methods_path.write_text(methods_lean_text(), encoding="utf-8")
+        print("wrote", methods_path, "(%d modelled methods)"
+              % sum(len(m) for m in METHODS.values()))
     if args.check:
         import importlib
         bad = []

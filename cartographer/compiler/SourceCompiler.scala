@@ -6604,6 +6604,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * hole, honestly, until this is checked; `switchStmt` is applied everywhere else. */
   def goFile: Boolean = currentFile.toLowerCase.endsWith(".go")
   def javaFile: Boolean = currentFile.toLowerCase.endsWith(".java")
+  /** C source and headers (`.c`, `.h`). Gates C-only lowerings whose rule is cited from
+    * C11 rather than shared with another frontend. */
+  def cFile: Boolean = List(".c", ".h").exists(currentFile.toLowerCase.endsWith)
 
   /** The Core operator for a binary call. JavaScript equality is the one place the CPG
     * operator name is not enough: `===` and `==` are both `<operator>.equals`, and they
@@ -8673,6 +8676,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       else if (classBody.isDefined) typeValue(classBody.get + "<meta>")
       else ctor match {
         case Some(cls) => ujson.Obj("k" -> "alloc", "cls" -> cls, "args" -> argExprs(args, kwArgs))
+        case None if javaReceiver(c).isDefined =>
+          ujson.Obj("k" -> "mcall", "recv" -> expr(javaReceiver(c).get), "m" -> c.name,
+                    "args" -> argExprs(args, kwArgs))
         case None =>
           callee.flatMap(asField) match {
             case Some((recv, m)) =>
@@ -9134,12 +9140,51 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true), "body" -> stmt(ks(0)))
       }
     else if (goFile && ks.size != 4) holeS("control:FOR:range")
+    else if (cFile && ks.size >= 2 && ks.size < 4) cForElided(cs, ks)
     else if (ks.size != 4) holeS("control:FOR:elided-clause")
     else outsideLoopScope {
       val (condPrelude, cond) = exprV(ks(1))
       val step = stmt(ks(2))
       val body = pushStep(stmt(ks(3)), step)
       seqOf(List(stmt(ks(0)),
+                 conditionedLoop(condPrelude, cond,
+                   ujson.Obj("k" -> "seq", "a" -> body, "b" -> step))))
+    }
+  }
+
+  /** C `for` with an elided clause (C11 6.8.5.3): "Both clause-1 and expression-3 can be
+    * omitted. An omitted expression-2 is replaced by a nonzero constant." -- so `for (;;)`
+    * is an infinite loop left only by `break`/`return`, exactly Go's `for { }`.
+    *
+    * c2cpg keeps the clause SLOT in each child's `order`: clause-1 is always present (an
+    * empty `BLOCK` when elided, after any `LOCAL`s it declares), then expression-2 at +1,
+    * expression-3 at +2 and the body at +3, with an elided expression simply absent.
+    * Measured on Joern 4.0.606 for every elision pattern (`for(;;)`, `for(i=0;;i++)`,
+    * `for(;i<n;)`, `for(i=0;i<n;)`, `for(;;i++)`, `for(i=0;;)`, declarations in clause-1,
+    * comma clauses). An elided clause-1 is an empty `BLOCK` and lowers to `skip`. The
+    * slots are read from the raw children; anything that does not fit
+    * exactly that layout (a slot outside 0..3, a repeated slot, no clause-1, or the body
+    * not last) keeps the `control:FOR:elided-clause` hole. */
+  def cForElided(cs: ControlStructure, ks: List[AstNode]): ujson.Obj = {
+    val raw = cs.astChildren.collect { case a: AstNode => a }.l.filterNot(_.isInstanceOf[Local])
+    val ok0 = raw.size == ks.size && raw.nonEmpty
+    val base = if (ok0) raw.head.order else 0
+    val slots = if (ok0) raw.map(_.order - base) else Nil
+    val layoutOk = ok0 && slots.distinct.size == slots.size && slots.forall(s => s >= 0 && s <= 3) &&
+      slots.head == 0 && slots.last == 3 && slots == slots.sorted
+    if (!layoutOk) holeS("control:FOR:elided-clause")
+    else outsideLoopScope {
+      val bySlot: Map[Int, AstNode] = slots.zip(ks).toMap
+      val (condPrelude, cond) = bySlot.get(1).map(exprV)
+        .getOrElse((Nil, ujson.Obj("k" -> "bool", "v" -> true)))
+      val step = bySlot.get(2).map(stmt).getOrElse(skip)
+      val body = pushStep(stmt(bySlot(3)), step)
+      // An elided clause-1 is an empty `BLOCK` with no children: nothing to evaluate.
+      val init = bySlot(0) match {
+        case b: Block if kidsOf(b).isEmpty => skip
+        case n                            => stmt(n)
+      }
+      seqOf(List(init,
                  conditionedLoop(condPrelude, cond,
                    ujson.Obj("k" -> "seq", "a" -> body, "b" -> step))))
     }
@@ -9893,6 +9938,24 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       kidsOf(c).find(aidx(_) == 0)
     else None
 
+  /** The receiver of a Java INSTANCE call to a method outside the corpus
+    * (`s.length()`, `cs.charAt(i)`, `xs.add(x)`): javasrc2cpg puts the receiver at
+    * argument index 0 and marks the call `DYNAMIC_DISPATCH` (JLS §15.12.4.4, the method is
+    * looked up in the receiver's run-time class). The generic call branch used to keep only
+    * `argumentIndex >= 1`, so `s.length()` became `call "length" []` with no receiver at
+    * all, and a receiver that was itself a field read (`this.name.length()`) was misread
+    * by `asField` as a call of a method NAMED `name` on `this`. Such a call is now an
+    * `mcall` on the receiver, which Core dispatches on the receiver's value: a `.str`
+    * reaches the `java.lang.String` table (`Stdlib.javaStringMethod`), an object its class.
+    * Static calls (`Integer.parseInt(s)`: index 0 is the class name, `STATIC_DISPATCH`),
+    * `super.m()` (also `STATIC_DISPATCH`), constructors and calls that resolve to a corpus
+    * method (`methodByName`, emitted by their exact signature as before) are unchanged. */
+  def javaReceiver(c: Call): Option[AstNode] =
+    if (javaFile && c.dispatchType == "DYNAMIC_DISPATCH" && c.name.nonEmpty &&
+        !c.name.startsWith("<") && !methodByName.contains(c.methodFullName))
+      kidsOf(c).find(aidx(_) == 0)
+    else None
+
   /** FR-005/FR-008: an assignment (plain or augmented) reached in expression
     * position. On a provably pure target, the write is `assignTo` verbatim and the
     * value is a fresh READ of the target after the write -- deliberately NOT a
@@ -10199,7 +10262,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       val kwArgs = kids.filter(isKeywordArg)
       val calleeNode = kids.filterNot(isKeywordArg).find(aidx(_) == -1).orElse(kids.headOption)
       val recvNode: Option[AstNode] =
-        if (kind == "mcall") calleeNode.flatMap(asField).map(_._1)
+        if (kind == "mcall") javaReceiver(c).orElse(calleeNode.flatMap(asField).map(_._1))
         else None
       val valueCalleeNode = if (kind == "callV") calleeNode else None
       val argsArr = baseline.value.get("args").flatMap(_.arrOpt).map(_.toList).getOrElse(Nil)

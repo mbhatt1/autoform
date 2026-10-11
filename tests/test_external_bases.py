@@ -29,6 +29,62 @@ def test_lean_mirror_is_in_sync():
         'Autoform/Lang/Core/ExternalBases.lean')
 
 
+def test_lean_methods_mirror_is_in_sync():
+    lean = (ROOT / 'Autoform/Lang/Core/ExternalMethods.lean').read_text(encoding='utf-8')
+    assert lean == external_bases.methods_lean_text(), (
+        'Autoform/Lang/Core/ExternalMethods.lean differs from scripts/external_bases.py; '
+        'regenerate both with: python scripts/external_bases.py --emit-lean '
+        'Autoform/Lang/Core/ExternalBases.lean')
+
+
+def test_modelled_methods_are_contracted_names():
+    """A modelled method must be one of its base's contracted names, and the Lean mirror
+    must list exactly the modelled pairs."""
+    for base, methods in external_bases.METHODS.items():
+        provides, _ = external_bases.CONTRACTS[base]
+        assert set(methods) <= set(provides), (base, sorted(set(methods) - set(provides)))
+    lean = (ROOT / 'Autoform/Lang/Core/ExternalBases.lean').read_text(encoding='utf-8')
+    for base, methods in external_bases.METHODS.items():
+        for m in methods:
+            assert '("%s%s", "%s")' % (external_bases.PREFIX, base, m) in lean
+
+
+def test_modelled_method_source_is_the_live_stdlib():
+    """`verify` refuses a base whose modelled method's live source differs from the pinned
+    text; on the pinned interpreter it matches."""
+    import collections.abc
+    pinned = tuple(int(x) for x in external_bases.PINNED_PYTHON.split('.'))
+    live = external_bases.live_method_source(collections.abc.MutableMapping, 'popitem')
+    entry = external_bases.METHODS['collections.abc.MutableMapping']['popitem']
+    if sys.version_info[:2] == pinned:
+        assert live == entry['source']
+
+
+def test_modelled_method_core_is_a_fresh_export(tmp_path, numeric_env):
+    """The `core` translation recorded for each modelled method is what the exporter in
+    the tree emits for the pinned source text, inside a class of the same name."""
+    if os.environ.get('AUTOFORM_TEST_JOERN') != '1':
+        pytest.skip('set AUTOFORM_TEST_JOERN=1 to re-export the modelled methods')
+    joern = Path(os.environ.get('JOERN_HOME', Path.home() / 'joern'))
+    if (joern / 'joern-cli').is_dir():
+        joern /= 'joern-cli'
+    for base, methods in sorted(external_bases.METHODS.items()):
+        cls = base.rpartition('.')[2]
+        for method, entry in sorted(methods.items()):
+            work = tmp_path / method
+            src = work / 'src'
+            src.mkdir(parents=True)
+            (src / 'mm.py').write_text('class %s:\n%s' % (cls, entry['source']))
+            run([joern / 'joern-parse', src, '--output', 'cpg.bin'], work, numeric_env, timeout=600)
+            run([joern / 'joern', '--script', ROOT / 'cartographer/export_ast.sc',
+                 '--param', 'cpgPath=cpg.bin', '--param', 'out=ast.json'], work, numeric_env,
+                timeout=600)
+            funcs = json.loads((work / 'ast.json').read_text())
+            got = [f for f in funcs if f['name'] == 'mm.py:<module>.%s.%s' % (cls, method)]
+            assert len(got) == 1, [f['name'] for f in funcs]
+            assert got[0]['body'] == entry['core'], (base, method)
+
+
 def test_contracts_against_the_running_interpreter():
     """On the pinned interpreter every contract matches. On another version the ones
     that drifted must be REFUSED by `verify` -- the oracle then declines to encode a

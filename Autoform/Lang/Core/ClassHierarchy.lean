@@ -202,12 +202,15 @@ def ownAttribute (declarations : List ClassDecl) (owner attr : String) :
     match declarations.find? (·.name == owner) with
     | some declaration => (declaration.attributes.find? (·.1 == attr)).map Prod.snd
     | none =>
-      -- A contracted external base provides exactly its contract's names; their code is
-      -- not translated, so each is an opaque member (a hole when it is reached).
+      -- A contracted external base provides exactly its contract's names. A name whose
+      -- code is modelled (`externalModelled`, `ExternalMethods.lean`) is that method;
+      -- every other one is an opaque member (a hole when it is reached).
       match externalContract owner with
       | some contract =>
-          if contract.provides.contains attr
-          then some (.opaque ("class-attribute:external-base:" ++ owner ++ ":" ++ attr))
+          if contract.provides.contains attr then
+            if externalModelled.contains (owner, attr)
+            then some (.method (externalMethodName owner attr))
+            else some (.opaque ("class-attribute:external-base:" ++ owner ++ ":" ++ attr))
           else none
       | none => none
 

@@ -3,6 +3,7 @@ import Autoform.Lang.Core.Numeric
 import Autoform.Lang.Core.TypedNumeric
 import Autoform.Lang.Core.Stdlib
 import Autoform.Lang.Core.Iteration
+import Autoform.Lang.Core.ExternalMethods
 
 /-!
 # Core — semantics
@@ -1157,6 +1158,10 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
   | some (_, f) => some f
   | none        =>
     if strStartsWith n "<bound-method>." then resolveBoundMethod n else
+    -- A modelled method of a contracted external base (`ExternalMethods.lean`). The
+    -- `<external>` prefix cannot be spelled by any source language, so this never
+    -- shadows a program function.
+    if strStartsWith n externalBasePrefix then externalMethod n else
     if strStartsWith n "<class-bound>." then resolveClassBound ctx.table n else
     -- Scan for a *unique* suffix match, stopping as soon as a second one is seen.
     -- The previous form built the full match list with `filter`, so every miss
@@ -1171,6 +1176,13 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
       | (k, f) :: ps, none     => if strEndsWith k suffix then go ps (some f) else go ps none
       | (k, _) :: ps, some f   => if strEndsWith k suffix then none else go ps (some f)
     go ctx.table none
+
+/-- The function a class-namespace `.method name` entry names: a program function, or a
+modelled external-base method (`<external>…`, `ExternalMethods.lean`). -/
+def Ctx.methodFunc (ctx : Ctx) (name : String) : Option Func :=
+  match ctx.table.find? (·.1 == name) with
+  | some (_, f) => some f
+  | none => if strStartsWith name externalBasePrefix then externalMethod name else none
 
 /-- The callee of a by-name call `f(args)`.
 
@@ -1481,7 +1493,7 @@ def Ctx.classLookupGap (ctx : Ctx) (cls attr : String) : Option String :=
     match ctx.classLookup cls attr with
     | .blocked reason | .found _ (.opaque reason) => some reason
     | .found _ (.method name) | .found _ (.property name) =>
-        if (ctx.table.find? (·.1 == name)).isSome then none
+        if (ctx.methodFunc name).isSome then none
         else some ("class-attribute:unresolved-function:" ++ name)
     | _ => none
   else none
@@ -1717,9 +1729,9 @@ def Ctx.readClassAttribute (ctx : Ctx) (heap : Heap) (owner : String)
               else .val value
           | none => .hole s!"class-attribute:{attr}:uninitialized-storage"
       | .found _ (.method name) =>
-          match ctx.table.find? (·.1 == name) with
+          match ctx.methodFunc name with
           | none => .hole s!"class-attribute:{attr}:unresolved-function"
-          | some (_, fn) =>
+          | some fn =>
               if fn.isClassMethod then classMethodValue fn receiver captured
               else if captured.isEmpty then .val (.fn fn.name)
               else if fn.isMethod then .hole s!"class-attribute:{attr}:captured-unbound-method"
@@ -1737,6 +1749,46 @@ def Ctx.readClassAttribute (ctx : Ctx) (heap : Heap) (owner : String)
             .hole s!"class-attribute:{attr}:captured-unbound-method"
           else .val (.clos fn.name captured)
       | none => .hole s!"class-attribute:{attr}:unresolved"
+
+/-- `dict(...)` creates a NEW dictionary object (Library § Built-in Types, "Mapping Types
+— dict": "Return a new dictionary initialized from an optional positional argument"),
+exactly as the display `{}` does, so under a dialect whose containers are boxed its result
+allocates the same heap object `Expr.dictE` allocates (`cls := "dict"`, the entries as
+payload). `Stdlib.builtin` stays heap-free (`builtin_heap_unchanged`) and answers the
+VALUE; the allocation is done here, at the one call site. Before this, `dict()` returned a
+bare `.dict` value while `{}` returned a reference, so `self.d = dict()` and
+`self.d = {}` gave different post-heaps: about twenty false divergences on cachetools
+7.1.4 `Cache.__init__` (docs/evidence-cachetools-negative-size.md). Every other builtin
+result is passed through unchanged. -/
+def boxBuiltinResult (d : Dialect) (f : String) (h : Heap) : EResult → Heap × EResult
+  | .val (.dict kvs) =>
+      if f == "dict" && d.boxesContainers then
+        let (h₂, r) := h.alloc { cls := "dict", fields := [], payload := .dict kvs }
+        (h₂, .val (.ref r))
+      else (h, .val (.dict kvs))
+  | r => (h, r)
+
+@[simp] theorem boxBuiltinResult_exn (d : Dialect) (f : String) (h : Heap) (v : Val) :
+    boxBuiltinResult d f h (.exn v) = (h, .exn v) := rfl
+
+/-- An exception out of `boxBuiltinResult` is the builtin's own, on the builtin's heap. -/
+theorem boxBuiltinResult_exn_inv {d : Dialect} {f : String} {h h' : Heap} {r : EResult} {v : Val}
+    (hy : boxBuiltinResult d f h r = (h', .exn v)) : r = .exn v ∧ h' = h := by
+  cases r with
+  | val x =>
+      unfold boxBuiltinResult at hy
+      split at hy
+      · split at hy <;> simp at hy
+      · simp at hy
+  | exn x => simp [boxBuiltinResult] at hy; exact ⟨by rw [hy.2], hy.1.symm⟩
+  | hole _ => simp [boxBuiltinResult] at hy
+  | outOfFuel => simp [boxBuiltinResult] at hy
+
+theorem boxBuiltinResult_not_val (d : Dialect) (f : String) (h : Heap) (r : EResult)
+    (hr : ∀ v, r ≠ .val v) : boxBuiltinResult d f h r = (h, r) := by
+  cases r with
+  | val v => exact absurd rfl (hr v)
+  | _ => rfl
 
 /-- A Java method's qualified name carries its erased signature --
 `pkg.Cls.<init>:void(java.util.Map,boolean)` -- because the JVM overloads on it
@@ -1765,8 +1817,7 @@ def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
   | none =>
   if ctx.usesClassMetadata cls then
     match ctx.classLookup cls meth with
-    | .found _ (.method name) | .found _ (.property name) =>
-        (ctx.table.find? (·.1 == name)).map Prod.snd
+    | .found _ (.method name) | .found _ (.property name) => ctx.methodFunc name
     | _ => none
   else
   match ctx.table.filter (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth)) with
@@ -2818,7 +2869,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               -- result would have to allocate to keep the identity model honest.
               let vs' := if Stdlib.unboxesArgs f then vs.map (·.unbox h₁) else vs
               match Stdlib.builtin ctx.dialect h₁ f vs' with
-              | some (h₂, r) => (h₂, r)
+              | some (h₂, r) => boxBuiltinResult ctx.dialect f h₂ r
               | none         =>
                   match Iteration.builtin ctx.dialect h₁ f vs with
                   | some result => result
@@ -5517,6 +5568,102 @@ private def externalBaseProg : Program :=
        | .hole "class-construction:abstract-method:__delitem__" => true | _ => false
 #guard match runFunc externalBaseProg 200 "m.py:<module>.odd" [] with
        | .hole "class-hierarchy:unresolved-base:<external>foo.Bar" => true | _ => false
+
+/-- `MutableMapping.popitem` is MODELLED (`ExternalMethods.lean`, the exporter's
+translation of CPython 3.11's `_collections_abc.py` text): `next(iter(self))`, then
+`self[key]`, `del self[key]`, the pair -- all through the subclass's own dunders -- and
+`KeyError` when the mapping is empty. `D` stores into a dict display, so iteration order
+is insertion order and `popitem` takes the FIRST key, as CPython's ABC does. -/
+private def popitemProg : Program :=
+  { dialect := .python
+  , classDecls :=
+      [ { name := "m.py:<module>.D", shortName := "D"
+        , bases := ["<external>collections.abc.MutableMapping"]
+        , attributes := [("__init__", .method "m.py:<module>.D.__init__"),
+                         ("__getitem__", .method "m.py:<module>.D.__getitem__"),
+                         ("__setitem__", .method "m.py:<module>.D.__setitem__"),
+                         ("__delitem__", .method "m.py:<module>.D.__delitem__"),
+                         ("__iter__", .method "m.py:<module>.D.__iter__"),
+                         ("__len__", .method "m.py:<module>.D.__len__")] } ]
+  , funcs :=
+    [ { name := "m.py:<module>.D.__init__", params := []
+      , body := .setField (.name "self") "d" (.dictE []) }
+    , { name := "m.py:<module>.D.__getitem__", params := ["k"]
+      , body := .ret (.index (.field (.name "self") "d") (.name "k")) }
+    , { name := "m.py:<module>.D.__setitem__", params := ["k", "v"]
+      , body := .setIndex (.field (.name "self") "d") (.name "k") (.name "v") }
+    , { name := "m.py:<module>.D.__delitem__", params := ["k"]
+      , body := .delIndex (.field (.name "self") "d") (.name "k") }
+    , { name := "m.py:<module>.D.__iter__", params := []
+      , body := .ret (.call "iter" [.field (.name "self") "d"]) }
+    , { name := "m.py:<module>.D.__len__", params := []
+      , body := .ret (.call "len" [.field (.name "self") "d"]) }
+    -- `c = D(); c[1] = 10; c[2] = 20; return c.popitem()`  -- CPython: (1, 10)
+    , { name := "m.py:<module>.pop2", params := []
+      , body := .seq (.assign "c" (.alloc "D" []))
+                (.seq (.setIndex (.name "c") (.lit (.int 1)) (.lit (.int 10)))
+                (.seq (.setIndex (.name "c") (.lit (.int 2)) (.lit (.int 20)))
+                      (.ret (.mcall (.name "c") "popitem" [])))) }
+    -- `... c.popitem(); return len(c)`  -- CPython: 1 (the popped key is gone)
+    , { name := "m.py:<module>.popLen", params := []
+      , body := .seq (.assign "c" (.alloc "D" []))
+                (.seq (.setIndex (.name "c") (.lit (.int 1)) (.lit (.int 10)))
+                (.seq (.setIndex (.name "c") (.lit (.int 2)) (.lit (.int 20)))
+                (.seq (.expr (.mcall (.name "c") "popitem" []))
+                      (.ret (.call "len" [.name "c"]))))) }
+    -- `D().popitem()`  -- CPython: KeyError
+    , { name := "m.py:<module>.popEmpty", params := []
+      , body := .seq (.assign "c" (.alloc "D" []))
+                     (.ret (.mcall (.name "c") "popitem" [])) }
+    -- `D().pop(1)`  -- still an opaque member: only `popitem` is modelled
+    , { name := "m.py:<module>.popOther", params := []
+      , body := .seq (.assign "c" (.alloc "D" []))
+                     (.ret (.mcall (.name "c") "pop" [.lit (.int 1)])) } ] }
+
+#guard match runFunc popitemProg 400 "m.py:<module>.pop2" [] with
+       | .val (.tuple [.int 1, .int 10]) => true | _ => false
+#guard match runFunc popitemProg 400 "m.py:<module>.popLen" [] with
+       | .val (.int 1) => true | _ => false
+#guard match runFunc popitemProg 400 "m.py:<module>.popEmpty" [] with
+       | .exn (.str "KeyError") => true | _ => false
+#guard match runFunc popitemProg 400 "m.py:<module>.popOther" [] with
+       | .hole "class-attribute:external-base:<external>collections.abc.MutableMapping:pop" => true
+       | _ => false
+
+/-- `dict()` allocates exactly as `{}` does (`boxBuiltinResult`): the same heap object,
+so identity and aliasing behave the same. `a = dict(); b = a; b[1] = 2; return a[1]` is
+`2` in CPython; with the old bare-value `dict()` the write through `b` was invisible. -/
+private def dictCallProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.alias", params := []
+      , body := .seq (.assign "a" (.call "dict" []))
+                (.seq (.assign "b" (.name "a"))
+                (.seq (.setIndex (.name "b") (.lit (.int 1)) (.lit (.int 2)))
+                      (.ret (.index (.name "a") (.lit (.int 1)))))) }
+    , { name := "m.py:<module>.isRef", params := []
+      , body := .ret (.call "dict" []) }
+    , { name := "m.py:<module>.display", params := []
+      , body := .ret (.dictE []) } ] }
+
+#guard match runFunc dictCallProg 100 "m.py:<module>.alias" [] with
+       | .val (.int 2) => true | _ => false
+#guard match runFunc dictCallProg 100 "m.py:<module>.isRef" [] with
+       | .val (.ref _) => true | _ => false
+#guard match runFunc dictCallProg 100 "m.py:<module>.display" [] with
+       | .val (.ref _) => true | _ => false
+/-- The heap a no-argument entry point leaves behind. -/
+private def dictCallHeap (name : String) : Heap :=
+  let ctx : Ctx := { dialect := dictCallProg.dialect, table := dictCallProg.table }
+  match ctx.resolve name with
+  | some fn => (applyFunc ctx 100 [] fn none [] []).1
+  | none    => []
+
+-- The two allocate the same object: one heap cell, class `dict`, empty entries payload.
+#guard match dictCallHeap "m.py:<module>.isRef", dictCallHeap "m.py:<module>.display" with
+       | [o₁], [o₂] => o₁.cls == "dict" && o₂.cls == "dict" &&
+           (match o₁.payload, o₂.payload with | .dict [], .dict [] => true | _, _ => false)
+       | _, _ => false
 
 /-- `__getattr__` runs only on a MISS (§3.3.2): a present instance attribute reads and
 writes as usual, and the miss is a named gap rather than `AttributeError`. -/
