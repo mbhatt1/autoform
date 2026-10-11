@@ -65,17 +65,40 @@ whose subject a mutation gate can attack.
 
 **Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
 stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
-computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
-transport needs two side conditions, both discharged rather than assumed — the context is
-covered by the unrestricted fuel theorem (including finalizers) and the run did not
-end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
-either fails, the theorem stays at `FUEL` and its generalization is recorded in
-`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono_all`. The
+transport assumes nothing about the context or about any body, reached or not (the
+unrestricted fuel theorem covers finalizers); its one side condition is that the run did
+not end in `outOfFuel`. For `conform_*` that condition is a consequence of the law — the
+recorded outcome is a value or an exception, and the law says the interpreter reproduced
+it (`lawConform_defined`) — so it is checked on the recorded literal and each case is
+evaluated once. For every other family it is the `g…` guard, evaluated over the same
+domain as the law. Where it fails, the theorem stays at `FUEL` and its generalization is
+recorded in `obligations` below as a `Prop`-valued `def` — a statement, not an admission.
 
 There is no `sorry` in this file.
 
 Counts for this run are in `Autoform/SpecsGen/report.json`.
 -/
+
+def dom_conform_gcd : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (0)] }, expected := EResult.val (Val.int (0)), post := none }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at fuel 16 by computation, then transported by `applyFunc_fuel_mono_all`.
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
+theorem conform_gcd : ∀ fuel, FUEL ≤ fuel → ((dom_conform_gcd).all (lawConform C fuel f_gcd)) = true := by
+  intro fuel hf
+  have hk : 16 ≤ fuel := Nat.le_trans (by decide : 16 ≤ FUEL) hf
+  have hchecked : (dom_conform_gcd).all (lawConform C 16 f_gcd) = true := by
+    first | decide +kernel | fail "kernel computation did not establish the claim"
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 16 f_gcd) (lawConform C fuel f_gcd)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
+    (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 def dom_conform_lcm : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (0)] }, expected := EResult.val (Val.int (0)), post := none }]
@@ -83,17 +106,18 @@ def dom_conform_lcm : List Obs :=
 /-- Holds at **every** fuel budget at or above `FUEL`.
 
 Checked at fuel 8 by computation, then transported by `applyFunc_fuel_mono_all`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
+The `≠ outOfFuel` side condition is derived, not re-evaluated: the recorded outcome of
+every case is `defined` (checked on the literal), and `lawConform_defined` turns the law
+into the guard, so the kernel runs each case once (`FuelMono.lean`, "Reachability form
+of the side condition"). -/
 theorem conform_lcm : ∀ fuel, FUEL ≤ fuel → ((dom_conform_lcm).all (lawConform C fuel f_lcm)) = true := by
   intro fuel hf
   have hk : 8 ≤ fuel := Nat.le_trans (by decide : 8 ≤ FUEL) hf
   have hchecked : (dom_conform_lcm).all (lawConform C 8 f_lcm) = true := by
     first | decide +kernel | fail "kernel computation did not establish the claim"
-  exact all_transfer _ (gRunObs C 8 f_lcm) (lawConform C 8 f_lcm) (lawConform C fuel f_lcm)
+  exact all_transfer _ (fun o => defined o.expected) (lawConform C 8 f_lcm) (lawConform C fuel f_lcm)
     (fun c hgc hlc =>
-      lawConform_fuel_mono_all (hk := hk) (hg := hgc) (h := hlc))
+      lawConform_fuel_mono_of_expected (hk := hk) (hd := hgc) (h := hlc))
     (by first | decide +kernel | fail "kernel computation did not establish the claim") (hchecked)
 
 /-- Everything this module states but does not prove. A `Prop`-valued `def` asserts nothing, so nothing here is admitted. -/
@@ -106,12 +130,14 @@ def obligations : List OpenObligation :=
 
 `#audit_depends` fails the build if a theorem's proof term never mentions the generated definition it claims to be about — the necessary half of the gate. The sufficient half is `scripts/mutate.py`, run against this file. -/
 
+#audit_depends conform_gcd on f_gcd
 #audit_depends conform_lcm on f_lcm
 
 /-! ## Axiom basis
 
 `#audit_axioms` fails the build on `sorryAx`, `ofReduceBool` or `ofReduceNat`, so "no admitted step, no `native_decide`" is checked here rather than asserted in prose. -/
 
+#audit_axioms conform_gcd
 #audit_axioms conform_lcm
 
 end Autoform.SpecsGen.LinuxLcm

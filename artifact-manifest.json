@@ -78,11 +78,11 @@
    "render_sha256": "90861a61a8281e335f62d08f15731c7f0aafa6a37d06db107ee3cd15c270d4b6"
   },
   "LinuxLcm": {
-   "ast_bytes": 9697,
-   "ast_sha256": "fa1ccfd0c96f7b359b5dbf0c1df68ddf1c88f3181d1dc296fc312d7f26b11f38",
+   "ast_bytes": 21445,
+   "ast_sha256": "bfd9bfee894920e3ef165a7e90729f3247191b9a9caa0815e95709762f785496",
    "ast_tracked": true,
-   "render_bytes": 6830,
-   "render_sha256": "843dbe94ab3cb361f64d83f079c8684a69fcf998a3f858cb0cf1f445f82955b8"
+   "render_bytes": 11766,
+   "render_sha256": "176d504ce19d4c4181abd15299ef75262e550ffc3162d23034650710ae8ee468"
   },
   "LinuxLcmPrefix": {
    "ast_bytes": 4998,
@@ -177,7 +177,7 @@
   },
   "SpecsGen/LinuxLcm": {
    "corpus": "LinuxLcm",
-   "corpus_ast_sha256": "fa1ccfd0c96f7b359b5dbf0c1df68ddf1c88f3181d1dc296fc312d7f26b11f38",
+   "corpus_ast_sha256": "bfd9bfee894920e3ef165a7e90729f3247191b9a9caa0815e95709762f785496",
    "source": "ast-LinuxLcm.json"
   },
   "SpecsGen/LinuxLib": {
