@@ -27,6 +27,9 @@ def function(name, file='native.c', args=(), result='i32'):
 
 
 def test_worker_descriptor_failure_is_reported(native, monkeypatch):
+    # The sandbox probe is a subprocess and needs a pipe. Run it before the patch below, or
+    # a fresh process reports the patched pipe failure as 'no sandbox mechanism'.
+    native.sandbox.report()
     def unavailable():
         raise OSError('file descriptor limit reached')
     monkeypatch.setattr(native.os, 'pipe', unavailable)

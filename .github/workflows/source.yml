@@ -17,14 +17,6 @@ on:
 permissions:
   contents: read
 
-# AUTOFORM_SANDBOX=off on these Linux runners: the sandbox is on by default and fails closed
-# when no mechanism works, and GitHub's runners have neither bubblewrap nor unprivileged user
-# namespaces (unshare --map-user fails). Every artifact this job writes records the opt-out
-# (`sandbox: {enforced: false}`). Linux confinement is NOT verified; enabling it on the runner
-# is a follow-up that needs a Linux host to test.
-env:
-  AUTOFORM_SANDBOX: off
-
 jobs:
   source:
     runs-on: ubuntu-latest
@@ -32,6 +24,14 @@ jobs:
     # addition to toolchain setup and the source regression suite.
     timeout-minutes: 120
     steps:
+      - name: Linux sandbox prerequisites (bubblewrap; unprivileged user namespaces)
+        # This runner is an ephemeral VM for this job alone. AppArmor restricts unprivileged
+        # user namespaces on Ubuntu 24.04; bubblewrap needs them to confine the code under test.
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --unshare-net --ro-bind / / true
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:

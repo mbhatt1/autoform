@@ -62,10 +62,17 @@ def worker(request, timeout=None, work=None):
             proc.communicate(json.dumps(request).encode(), timeout=timeout)
         except subprocess.TimeoutExpired:
             return dict(status='timeout', timeout_seconds=timeout)
-        if proc.returncode < 0:
-            return dict(status='signal', signal=-proc.returncode)
-        if proc.returncode:
-            return dict(status='exit', exit_code=proc.returncode)
+        code = proc.returncode
+        if code < 0:
+            return dict(status='signal', signal=-code)
+        # bubblewrap and unshare exit with 128+n when their child dies from signal n, so a
+        # confined crash arrives as an exit code. Report it as the signal it was. A native
+        # library that calls exit(129..159) itself is indistinguishable here and is
+        # reported as a signal; the artifacts record the mechanism that did the mapping.
+        if (launch.record or {}).get('mechanism') in ('bwrap', 'unshare') and 128 < code < 160:
+            return dict(status='signal', signal=code - 128, mapped_from_exit_code=code)
+        if code:
+            return dict(status='exit', exit_code=code)
         # Never wait for EOF: a native descendant may retain the pipe after its
         # parent exits. The worker response is bounded and written before exit.
         os.set_blocking(read_fd, False)
