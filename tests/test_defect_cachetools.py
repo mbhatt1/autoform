@@ -44,3 +44,33 @@ def test_replace_grow_witness_passes_on_7_1_7():
     r = _run_witness(NEW)
     assert r.returncode == 0, (r.stdout + r.stderr)[-800:]
     assert "3 passed" in r.stdout, r.stdout[-800:]
+
+
+TRACKED = ROOT / "artifacts" / "defect" / "DefectCachetools"
+SETITEM = "cachetools/__init__.py:<module>.Cache.__setitem__"
+
+
+def test_tracked_cross_revision_run_catches_the_replace_grow_call():
+    """The tracked 7.1.6-model / 7.1.7-runtime run has exactly one divergence, on the
+    replace-grow call (4, 7), and the 7.1.7 post-state keeps key 3 (docs/evidence-cachetools.md,
+    "The catch")."""
+    import json
+    cross = json.loads((TRACKED / "cross-revision" / "conformance.json").read_text())
+    assert cross["divergences"] == 1
+    (row,) = cross["divergence_detail"]
+    assert row["function"] == SETITEM
+    assert row["case"]["args"] == [["int", 4], ["int", 7]]
+    assert row["origin"] == "test-suite"
+    post = row["observation"]["post_heap"]
+    fields = dict((k, v) for k, v in post[0][1])
+    assert fields["_Cache__currsize"] == ["int", 10]
+    assert [["int", 3], ["int", 3]] in post[2][2][1]          # 7.1.7 keeps key 3
+
+
+def test_tracked_same_revision_control_agrees_on_the_replace_grow_call():
+    import json
+    same = json.loads((TRACKED / "same-revision" / "conformance.json").read_text())
+    assert same["divergences"] == 0
+    rows = [r for r in same["runtime_cases"] if r.get("name") == SETITEM
+            and r["args"] == [["int", 4], ["int", 7]]]
+    assert rows and all(r["comparison"] == "agree" for r in rows)

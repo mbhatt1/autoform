@@ -1,3 +1,15 @@
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: decorating class methods with @cachedmethod is deprecated
+  sys.exit(main())
+/tmp/af-agents/core-batch/scripts/differential.py:2488: DeprecationWarning: decorating class methods with @cachedmethod is deprecated
+  got = fn(*args)
+/tmp/af-agents/core-batch/scripts/differential.py:2488: DeprecationWarning: 19
+  got = fn(*args)
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: -16
+  sys.exit(main())
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: -12
+  sys.exit(main())
+/tmp/af-agents/core-batch/scripts/differential.py:3298: DeprecationWarning: -18
+  sys.exit(main())
 sandbox: seatbelt
 language: python (.py x492) -> runtime cpython
 test suite: /Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.4-lib-7.1.5-tests/tests/test_cache.py
@@ -5,33 +17,12 @@ cases recorded from the test suite: 506
 cases constructed for methods the suite never called: 3900 (39 functions)
 case cap: 4806 recorded, 600 kept (suite-traced first), dropped 3808 constructed, 398 random
 oracle cache (--no-cache: not consulted): 0 functions / 0 cases reported from cache, 53 functions / 600 cases to compare now (--no-cache: 53)
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 1, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2000, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 0, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 10, fn 'tests/__init__.py:<module>.CacheTestMixin.test_clear_getsizeof.<lambda>3'): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 1, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 3, fn 'tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_negative.<lambda>2'): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 2, unit): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.Cache.__init__(int 3, fn 'tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_param.<lambda>1'): cpython=unit lean=unit; heap graph=some false [test-suite]
-  DIVERGENCE cachetools/__init__.py:<module>.RRCache.__init__(int 10, int -3, fn 'tests/__init__.py:<module>.CacheTestMixin.test_getsizeof_param.<lambda>1'): cpython=unit lean=unit; heap graph=some false [constructed]
-  DIVERGENCE cachetools/__init__.py:<module>.RRCache.__init__(int 3, int -6, fn 'tests/__init__.py:<module>.CacheTestMixin.test_clear_getsizeof.<lambda>3'): cpython=unit lean=unit; heap graph=some false [constructed]
-  DIVERGENCE cachetools/__init__.py:<module>.RRCache.__init__(int 1, int 3, unit): cpython=unit lean=unit; heap graph=some false [constructed]
-  DIVERGENCE cachetools/__init__.py:<module>.RRCache.__init__(int 2, int 5, unit): cpython=unit lean=unit; heap graph=some false [constructed]
 
 module DefectCachetoolsNeg (/Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.4-lib-7.1.5-tests, cpython)
-measurement basis: python-class-slots-v6+class-values-v1+trace-returns-v1+heap-graph-v1
+measurement basis: python-class-slots-v6+class-values-v1+trace-returns-v1+closure-captures-v1+heap-graph-v1
 functions: 493 total, 413 hole-free, 53 exercised, 35 COMPARED (7% of all, 8% of hole-free)
-conformance: 526/546 agree (96%) vs cpython, 20 divergences, 54 INCONCLUSIVE (hole / outOfFuel / unrepresentable) [4206 cases dropped by the case cap, not compared: see conformance.json case_cap]
-oracle cache: 53 functions stored under /private/tmp/af-agents/bug-python/.autoform-work/oracle/DefectCachetoolsNeg
-  INCONCLUSIVE x7   cachetools/__init__.py:<module>.Cache.__setitem__: class-attribute:external-base:<external>collections.abc.MutableMapping:popitem
+conformance: 553/553 agree (100%) vs cpython, 0 divergences, 47 INCONCLUSIVE (hole / outOfFuel / unrepresentable) [4206 cases dropped by the case cap, not compared: see conformance.json case_cap]
+oracle cache: 53 functions stored under /tmp/af-agents/core-batch/.autoform-work/oracle/DefectCachetoolsNeg
   INCONCLUSIVE x7   cachetools/_cached.py:<module>._unlocked_info.cache_info: call:value:not-callable
   INCONCLUSIVE x5   cachetools/__init__.py:<module>.TLRUCache._Item.__init__: class-definition:decorator-or-metaclass
   INCONCLUSIVE x4   cachetools/_cached.py:<module>._condition_info.cache_clear: field:__enter__:non-object
@@ -41,9 +32,10 @@ oracle cache: 53 functions stored under /private/tmp/af-agents/bug-python/.autof
   INCONCLUSIVE x3   tests/__init__.py:<module>.CountedCondition.wait_for: call:value:not-callable
   INCONCLUSIVE x2   tests/test_tlru.py:<module>.default_ttu: field:inf:non-object
   INCONCLUSIVE x2   tests/test_cachedmethod.py:<module>.Cached.__init__: call:super
-  by origin constructed agree 44, diverge 4, inconclusive 44
+  INCONCLUSIVE x2   tests/__init__.py:<module>.CountedCondition.__init__: call:super
+  by origin constructed agree 48, diverge 0, inconclusive 44
   by origin random      agree 0, diverge 0, inconclusive 2
-  by origin test-suite  agree 482, diverge 16, inconclusive 8
+  by origin test-suite  agree 505, diverge 0, inconclusive 1
   skipped 245 hole-free methods: no instance reached by the test suite
   skipped skip_unencodable_args: 4179
   skipped skip_unencodable_ret: 2721

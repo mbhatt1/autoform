@@ -1,9 +1,53 @@
-# Evidence — cachetools 7.1.6: a fixed defect the chain did not catch (negative result)
+# Evidence — cachetools 7.1.6: a fixed defect the chain now catches
 
 Roadmap 2.3 asks for a refuted law or divergence that names a fixed bug. This document is
-the attempt on cachetools, with the fix commit taken from the changelog. **The chain does
-not catch the bug.** The reasons are measured below, and the witness that does catch it is
-an ordinary unit test run under CPython.
+the attempt on cachetools, with the fix commit taken from the changelog. It was first a
+negative result (the sections from "Where the chain stood" on are kept as measured then).
+**Since 2026-10-10 the cross-revision oracle catches it**: one divergence, on the buggy
+call itself. See "The catch" directly below; what changed is listed there.
+
+## The catch (2026-10-10)
+
+Model = the 7.1.6 AST (Joern export + `cartographer/plain_class_values.py`, sha256
+`7d8193b5…81b0eb`, 3,248,494 bytes, gitignored), runtime = the 7.1.7 sdist, inputs traced
+from the 7.1.7 suite (`tests/test_cache.py`), 100 cases per function, `--no-cache`.
+Run products tracked in `artifacts/defect/DefectCachetools/{cross,same}-revision/`.
+
+| run | model | runtime | functions | hole-free | compared functions | agree | divergences | inconclusive |
+|---|---|---|---|---|---|---|---|---|
+| cross revision | 7.1.6 | 7.1.7 | 499 | 416 | 33 | 563/564 | **1** | 36 |
+| same revision (control) | 7.1.6 | 7.1.6 | 499 | 416 | 34 | 560/560 | **0** | 40 |
+
+The one divergence (`conformance.json`, `divergence_detail[0]`):
+
+```
+DIVERGENCE cachetools/__init__.py:<module>.Cache.__setitem__(int 4, int 7):
+  cpython=unit lean=unit; heap graph=some false [test-suite]
+receiver  Cache{getsizeof = test_getsizeof_replace_grow.<lambda>2, maxsize = 10,
+                currsize = 7, data = {3: 3, 4: 4}}
+7.1.7 runtime post-state:  currsize 10, data {3: 3, 4: 7}
+```
+
+It is the replace-grow call itself (call 22 of the suite, `key=4, value=7`). In the
+same-revision control the same call AGREES with the 7.1.6 runtime, whose post-state is
+`currsize 7, data {4: 7}`: the model of 7.1.6 evicts key 3 exactly as 7.1.6 does, and the
+7.1.7 fix keeps it. So the divergence is the fix, not the harness.
+
+What made the call comparable, each a separate, tested change:
+
+1. `cartographer/plain_class_values.py` (docs/evidence-cachetools-negative-size.md): the
+   `_Cache__size = _DefaultSize()` class attribute is modelled, so `self.__size[key]`
+   evaluates (this corpus's export now goes through the pass, as the 7.1.4 one does).
+2. `collections.abc.MutableMapping.popitem` is modelled (`scripts/external_bases.py`
+   `METHODS` -> `Autoform/Lang/Core/ExternalMethods.lean`): the eviction loop's
+   `self.popitem()` runs CPython 3.11's own `next(iter(self))` / `self[key]` /
+   `del self[key]` through `Cache`'s dunders instead of stopping at
+   `class-attribute:external-base:…MutableMapping:popitem`.
+3. `dict()` allocates the same boxed object as `{}` (not needed by 7.1.6, which writes
+   `{}`, but part of the same Core change).
+
+Replay: `tests/test_defect_cachetools.py` checks the tracked row (needs nothing) and the
+witness on both corpora; the oracle commands are under "Model" below with the pass added.
 
 ## The defect
 
@@ -33,7 +77,7 @@ The fix is identified by the 7.1.6 → 7.1.7 sdist diff of `src/cachetools/__ini
 commit hash was **not** retrieved: no git clone of the upstream repository was made, so the
 evidence for the fix is the released sdist pair, not a commit.
 
-## Where the chain stands — measured
+## Where the chain stood before the catch — measured
 
 Corpora (digest-pinned, under `~/.cache/autoform/corpora`, see `reference-corpus-sources`):
 
@@ -51,6 +95,7 @@ exporter `cartographer/export_ast.sc` sha256 `6551e9e9…5426e4`.
 ```
 joern-parse <corpus> --output cpg.bin
 joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=ast.json --param dataModel=lp64
+python3 cartographer/plain_class_values.py ast.json <corpus> ast-DefectCachetools.json   # since 2026-10-10
 scripts/provenance.py record --artifact ast-DefectCachetools.json --source <corpus> --exporter cartographer/export_ast.sc --command "..."
 cartographer/render_lean.py ast-DefectCachetools.json Autoform/Generated/DefectCachetools.lean DefectCachetools --shard-functions 0
 lake build Autoform.Generated.DefectCachetools          # ✔ Build completed successfully (57 jobs)

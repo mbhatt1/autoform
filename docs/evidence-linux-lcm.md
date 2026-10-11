@@ -92,4 +92,7 @@ divergence from the tracked AST. The native and Lean tests skip with a named rea
 * The kernel include skeleton comes from v7.2, not from the 2014 revisions' own headers;
   only the two `.c` files are 2014. `swap` is therefore not modelled (the 101 inconclusive).
 * `lcm(n, 0)` was fixed separately (69c953c85c6c) and is not covered here.
-* The exporter's `for (;;)` hole was not touched.
+* The exporter's `for (;;)` hole is closed since 2026-10-10 (`SourceCompiler.cForElided`). It
+  did not affect this corpus (the 2014 `gcd` has no `for (;;)`); on the v7.2 `LinuxLcm`
+  corpus it makes `gcd`/`binary_gcd` statically hole-free, and `gcd` is compared on its
+  `(0, 0)` case only, the rest reaching the unexpanded `static_branch_likely` macro.

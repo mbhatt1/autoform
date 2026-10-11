@@ -2,7 +2,8 @@
 
 Roadmap 2.3 asks for a divergence that names a fixed bug in a real library.
 [`evidence-cachetools.md`](evidence-cachetools.md) is the previous attempt (the 7.1.7
-replace-with-larger-value fix) and is a negative result. This document is a different fix in
+replace-with-larger-value fix); it was a negative result and has since become a catch too
+(its "The catch" section). This document is a different fix in
 the same library, and **the chain catches it**: the cross-revision oracle run records one
 divergence on `Cache.__setitem__`, the buggy function, whose expected value is the fixed
 runtime's `ValueError`.
@@ -102,29 +103,33 @@ It is the call `cache[1] = 1` of `test_getsizeof_negative` (`getsizeof=lambda x:
 log line is `DIVERGENCE cachetools/__init__.py:<module>.Cache.__setitem__(int 1, int 1):
 cpython raised ValueError, lean returned unit`.
 
-| run | model | runtime | functions | compared | agree | divergences | `Cache.__setitem__` divergences | inconclusive |
+| run | model | runtime | functions | compared (cases) | agree | divergences | `Cache.__setitem__` divergences | inconclusive |
 |---|---|---|---|---|---|---|---|---|
-| cross revision | 7.1.4 | 7.1.5 | 493 | 548 | 526 | 22 | **1** | 52 |
-| same revision (control) | 7.1.4 | 7.1.4 | 493 | 546 | 526 | 20 | **0** | 54 |
+| cross revision | 7.1.4 | 7.1.5 | 493 | 557 | 556 | 1 | **1** | 43 |
+| same revision (control) | 7.1.4 | 7.1.4 | 493 | 553 | 553 | 0 | **0** | 47 |
+
+Re-run 2026-10-10 after the batched Core change (`dict()` boxing, Java strings, C `for`,
+`MutableMapping.popitem`), basis `…+closure-captures-v1+heap-graph-v1`; the AST is
+byte-identical to the one the first run used (sha256 `557473f4…0f5e5a`). The first run's
+figures were cross 548 / 526 / 22 / 1 / 52 and control 546 / 526 / 20 / 0 / 54; the
+difference is the twenty `__init__` rows described next, now gone.
 
 The control shows the divergence is the revision difference and not the harness: with the 7.1.4
 runtime the same suite's `Cache.__setitem__` cases agree, with the 7.1.5 runtime the
 `(1, 1)` case does not.
 
-## The other divergences in these runs are NOT the defect
+## The other divergences of the first run were not the defect -- and are fixed
 
-Both runs also record 20 divergences on `Cache.__init__` (15 or 16) and `RRCache.__init__`
-(4 or 5) with `cpython=unit lean=unit; heap graph=some false`: same return value,
-different post-state. They are present in the same-revision control, so they are not the
-bug. Cause, measured from `conformance.json`: the 7.1.4 source writes `self.__data = dict()`
-where 7.1.6 writes `{}`; Core evaluates the call `dict()` to a bare dictionary value
-(`Stdlib.lean`, `| "dict", [] => v (.dict [])`) while the literal `{}` allocates a boxed
-heap object, so the post-heap graphs differ. This is a model infidelity of `dict()` that
-the new modelling exposes (before it, `Cache.__init__` stopped on the class-attribute hole
-and was inconclusive). It is **not fixed here**: it is a Core semantics change. The previous
-document's 7.1.6 corpus uses `{}`, which is why it had no such rows. These rows are why the
-claim is "a divergence names the buggy function", with this caveat attached, not "the model
-is exact".
+The first run also recorded 20 divergences on `Cache.__init__` (15 or 16) and
+`RRCache.__init__` (4 or 5) with `cpython=unit lean=unit; heap graph=some false`: same
+return value, different post-state, present in the control as well. Cause, measured from
+`conformance.json`: the 7.1.4 source writes `self.__data = dict()` where 7.1.6 writes `{}`;
+Core evaluated the call `dict()` to a bare dictionary value (`Stdlib.lean`,
+`| "dict", [] => v (.dict [])`) while the literal `{}` allocates a boxed heap object, so the
+post-heap graphs differed. Core now allocates the same boxed object for `dict(...)` as for
+`{}` (`Semantics.boxBuiltinResult`, `#guard`s in `Semantics.lean`), and the re-run above
+has **0** `__init__` divergences in either run: the cross-revision run's single divergence
+is the defect.
 
 ## Tests
 
@@ -145,11 +150,7 @@ python -m pytest tests/test_defect_cachetools_negative.py   # 13 passed in 90.85
 
 ## Not done
 
-* The 7.1.7 replace-with-larger-value fix ([`evidence-cachetools.md`](evidence-cachetools.md))
-  is still not caught: after this change its call is comparable up to
-  `self.popitem()`, whose `collections.abc.MutableMapping` code is not translated
-  (`class-attribute:external-base:…MutableMapping:popitem`, 7 `Cache.__setitem__` cases
-  inconclusive in the cross-revision run).
-* The `dict()` boxing infidelity above.
+* (Done since: the 7.1.7 replace-with-larger-value fix is now caught -- `MutableMapping.popitem`
+  is modelled; [`evidence-cachetools.md`](evidence-cachetools.md), "The catch".)
 * The upstream fix commit was not retrieved; the sdist pair and changelog are the reference.
 * No synthesized-spec (kernel-refuted law) route was run.
