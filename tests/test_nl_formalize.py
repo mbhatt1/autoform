@@ -14,12 +14,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 
 from autoform.nl import formalize as F, llm, schema  # noqa: E402
+from conftest import rebase_paths  # noqa: E402
 
 FIX = ROOT / 'tests' / 'fixtures' / 'nl'
 
 
 def translation(module='PipelinePython'):
-    tr = schema.load(FIX / f'translation-{module}.json')
+    tr = rebase_paths(schema.load(FIX / f'translation-{module}.json'))
     tr['lean_root'] = os.environ.get('AUTOFORM_NL_LEAN_ROOT', tr['lean_root'])
     return tr
 
@@ -175,7 +176,8 @@ def test_formalize_gives_up(tmp_path, monkeypatch):
     # unknown constructor
     (dict(DIV0, post='r matches .raise (.str "ZeroDivisionError")'), False),
 ])
-def test_lean_elaboration(tmp_path, cand, expect):
+def test_lean_elaboration(tmp_path, pipeline_model, cand, expect):
+    pipeline_model('PipelinePython', ROOT / 'examples' / 'source' / 'python')
     tr = translation()
     f = fn(tr, '.add')
     c = F.parse_candidate(cand)

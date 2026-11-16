@@ -36,360 +36,1173 @@ domain the parts quantify over, elaborated once here rather than once per
 part. No theorem lives in this file. -/
 
 def dom_conform_org_apache_commons_lang3_BooleanUtils_compare_int_boolean_boolean : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.bool false] }, expected := EResult.val (Val.int (1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.bool false] }, expected := EResult.val (Val.int (0)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.bool false] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.bool false] }, expected := EResult.val (Val.int (1)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.bool true] }, expected := EResult.val (Val.int (-1)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.bool true] }, expected := EResult.val (Val.int (0)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_BooleanUtils_toBoolean_boolean_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648)] }, expected := EResult.val (Val.bool true), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2147483647)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648)] }, expected := EResult.val (Val.bool true), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2)] }, expected := EResult.val (Val.bool true), post := none }]
 
 def dom_conform_org_apache_commons_lang3_BooleanUtils_toBoolean_boolean_int_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (2147483647), Val.int (-2147483648), Val.int (31)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (2147483647)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2147483647), Val.int (-2147483648), Val.int (31)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648), Val.int (31), Val.int (32)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648), Val.int (31), Val.int (32)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (3)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (3), Val.int (4)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
+
+def dom_conform_ache_commons_lang3_BooleanUtils_toBooleanObject_java_lang_Boolean_int : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (2147483647)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (-2147483648)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (-1)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (2)] }, expected := EResult.val (Val.bool true), post := none }]
+
+def dom_conform_lang3_BooleanUtils_toBooleanObject_java_lang_Boolean_int_int_int_int : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (0), Val.int (1), Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (1), Val.int (2147483647), Val.int (-2147483648), Val.int (31)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (2147483647), Val.int (-2147483648), Val.int (31), Val.int (32)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (-2147483648), Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (31), Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (32), Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (63), Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (64), Val.int (-1), Val.int (2), Val.int (3)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (-1), Val.int (2), Val.int (3), Val.int (4)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.int (2), Val.int (3), Val.int (4), Val.int (5)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
+
+def dom_conform_n_java_lang_String_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "", Val.str "aarray", Val.str "aarrayb", Val.str "java.lang.String"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "1.8.0_281", Val.str "com.example.Foo", Val.str "arrayIllegalArgumentException", Val.unit] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.str "0", Val.str "11", Val.str "aIllegalArgumentException"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.str "IllegalArgumentExceptiona", Val.unit, Val.str "1.8.0_281"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "aIllegalArgumentExceptionb", Val.str "", Val.str "android.os.Bundle", Val.str "com.example.Foo"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "arrayarray", Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.str "aarrayb", Val.str "0"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "arrayarray", Val.str "IllegalArgumentExceptionarray", Val.str ""] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "java.lang.String", Val.str "java.lang.String", Val.str "IllegalArgumentExceptionarray", Val.str "arrayIllegalArgumentException"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Boolean", fields := [("FALSE", Val.bool false), ("TRUE", Val.bool true)] }]) gref "<static>java.lang.Boolean" (Val.ref (base + 0))) gref "Boolean" (Val.ref (base + 0)), self := none, args := [Val.str "aIllegalArgumentExceptionb", Val.str "array", Val.str "aarray", Val.str "IllegalArgumentExceptionIllegalArgumentException"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
 
 def dom_conform_org_apache_commons_lang3_BooleanUtils_toInteger_int_boolean : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool true] }, expected := EResult.val (Val.int (1)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool false] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true] }, expected := EResult.val (Val.int (1)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_BooleanUtils_toInteger_int_boolean_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.int (2147483647)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (32)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.int (2147483647)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (2)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (2), Val.int (3)] }, expected := EResult.val (Val.int (2)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (3), Val.int (4)] }, expected := EResult.val (Val.int (4)), post := none }]
+
+def dom_conform_commons_lang3_BooleanUtils_toIntegerObject_java_lang_Integer_boolean : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.math.NumberUtils", fields := [("INTEGER_ONE", Val.int (1)), ("INTEGER_ZERO", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.math.NumberUtils" (Val.ref (base + 0))) gref "NumberUtils" (Val.ref (base + 0)), self := none, args := [Val.bool true] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.math.NumberUtils", fields := [("INTEGER_ONE", Val.int (1)), ("INTEGER_ZERO", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.math.NumberUtils" (Val.ref (base + 0))) gref "NumberUtils" (Val.ref (base + 0)), self := none, args := [Val.bool false] }, expected := EResult.val (Val.int (0)), post := none }]
+
+def dom_conform_rObject_java_lang_Integer_boolean_java_lang_Integer_java_lang_Integer : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (1), Val.int (-1)] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (-1), Val.int (127)] }, expected := EResult.val (Val.int (127)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (127), Val.int (-128)] }, expected := EResult.val (Val.int (127)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (-128), Val.int (31)] }, expected := EResult.val (Val.int (31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (63)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.int (64), Val.int (0)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (1)), post := none }]
 
 def dom_conform_s_toString_java_lang_String_boolean_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "1.8.0_281", Val.str ""] }, expected := EResult.val (Val.str ""), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "android.os.Bundle", Val.str "com.example.Foo"] }, expected := EResult.val (Val.str "android.os.Bundle"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "0", Val.str "java.lang.String"] }, expected := EResult.val (Val.str "java.lang.String"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "x", Val.str "array"] }, expected := EResult.val (Val.str "array"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "arrayIllegalArgumentExceptiona", Val.str "array"] }, expected := EResult.val (Val.str "arrayIllegalArgumentExceptiona"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "11", Val.str "IllegalArgumentExceptiona"] }, expected := EResult.val (Val.str "IllegalArgumentExceptiona"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "0", Val.str "aIllegalArgumentException"] }, expected := EResult.val (Val.str "0"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "1.8.0_281", Val.str "arrayIllegalArgumentException"] }, expected := EResult.val (Val.str "arrayIllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "aIllegalArgumentException", Val.str "java.lang.String"] }, expected := EResult.val (Val.str "java.lang.String"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.str "IllegalArgumentExceptiona"] }, expected := EResult.val (Val.str "IllegalArgumentExceptiona"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "arraya", Val.str "aarrayb"] }, expected := EResult.val (Val.str "aarrayb"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "IllegalArgumentExceptionarray", Val.str "aarrayb"] }, expected := EResult.val (Val.str "aarrayb"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool false, Val.str "arrayIllegalArgumentExceptiona", Val.str "IllegalArgumentExceptionarraya"] }, expected := EResult.val (Val.str "IllegalArgumentExceptionarraya"), post := none }]
+
+def dom_conform_che_commons_lang3_BooleanUtils_toStringOnOff_java_lang_String_boolean : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.BooleanUtils", fields := [("OFF", Val.str "off"), ("ON", Val.str "on")] }]) gref "<static>org.apache.commons.lang3.BooleanUtils" (Val.ref (base + 0)), self := none, args := [Val.bool true] }, expected := EResult.val (Val.str "on"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.BooleanUtils", fields := [("OFF", Val.str "off"), ("ON", Val.str "on")] }]) gref "<static>org.apache.commons.lang3.BooleanUtils" (Val.ref (base + 0)), self := none, args := [Val.bool false] }, expected := EResult.val (Val.str "off"), post := none }]
+
+def dom_conform_commons_lang3_BooleanUtils_toStringTrueFalse_java_lang_String_boolean : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.BooleanUtils", fields := [("FALSE", Val.str "false"), ("TRUE", Val.str "true")] }]) gref "<static>org.apache.commons.lang3.BooleanUtils" (Val.ref (base + 0)), self := none, args := [Val.bool true] }, expected := EResult.val (Val.str "true"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.BooleanUtils", fields := [("FALSE", Val.str "false"), ("TRUE", Val.str "true")] }]) gref "<static>org.apache.commons.lang3.BooleanUtils" (Val.ref (base + 0)), self := none, args := [Val.bool false] }, expected := EResult.val (Val.str "false"), post := none }]
+
+def dom_conform_che_commons_lang3_BooleanUtils_toStringYesNo_java_lang_String_boolean : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.BooleanUtils", fields := [("NO", Val.str "no"), ("YES", Val.str "yes")] }]) gref "<static>org.apache.commons.lang3.BooleanUtils" (Val.ref (base + 0)), self := none, args := [Val.bool true] }, expected := EResult.val (Val.str "yes"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.BooleanUtils", fields := [("NO", Val.str "no"), ("YES", Val.str "yes")] }]) gref "<static>org.apache.commons.lang3.BooleanUtils" (Val.ref (base + 0)), self := none, args := [Val.bool false] }, expected := EResult.val (Val.str "no"), post := none }]
 
 def dom_conform_erThan1_boolean_java_lang_CharSequence_java_lang_CharSequence_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "17.0.1", Val.int (63), Val.int (64)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "java.lang.String", Val.int (-2147483648), Val.int (31)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "11", Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.str "", Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "x", Val.int (-2147483648), Val.int (31)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.str "x", Val.int (31), Val.int (32)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "x", Val.str "x", Val.int (32), Val.int (63)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "android.os.Bundle", Val.int (63), Val.int (64)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "x", Val.str "android.os.Bundle", Val.int (-1), Val.int (0)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "x", Val.str "android.os.Bundle", Val.int (0), Val.int (1)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.unit, Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.bool true), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_compare_int_char_char : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (65535)] }, expected := EResult.val (Val.int (-65534)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535), Val.int (0)] }, expected := EResult.val (Val.int (65535)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (31)] }, expected := EResult.val (Val.int (-31)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (31)] }, expected := EResult.val (Val.int (-31)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (-31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (128)] }, expected := EResult.val (Val.int (-64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (128), Val.int (127)] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127), Val.int (129)] }, expected := EResult.val (Val.int (-2)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAscii_boolean_char : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool true), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool true), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (128)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127)] }, expected := EResult.val (Val.bool true), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAsciiAlpha_boolean_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (128)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127)] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAsciiAlphaLower_boolean_char : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (97)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (96)] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAsciiAlphaUpper_boolean_char : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (66)] }, expected := EResult.val (Val.bool true), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAsciiAlphanumeric_boolean_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (128)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127)] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAsciiControl_boolean_char : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool true), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (33)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127)] }, expected := EResult.val (Val.bool true), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAsciiNumeric_boolean_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (48)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (47)] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_isAsciiPrintable_boolean_char : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.bool false), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (65535)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (33)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127)] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_toChar_char_java_lang_String_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (1)] }, expected := EResult.val (Val.int (106)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (32)] }, expected := EResult.val (Val.int (106)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.int (65535)] }, expected := EResult.val (Val.int (49)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a is not in the range '0' - '9'", Val.int (1)] }, expected := EResult.val (Val.int (97)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "The character a", Val.int (65535)] }, expected := EResult.val (Val.int (84)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "The String must not be emptya", Val.int (0)] }, expected := EResult.val (Val.int (84)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "The String must not be empty is not in the range '0' - '9'a", Val.int (31)] }, expected := EResult.val (Val.int (84)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a is not in the range '0' - '9'b", Val.int (32)] }, expected := EResult.val (Val.int (97)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "cha", Val.int (63)] }, expected := EResult.val (Val.int (99)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str " is not in the range '0' - '9'a", Val.int (64)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "The String must not be emptyThe String must not be empty", Val.int (128)] }, expected := EResult.val (Val.int (84)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\\\u\\\\u", Val.int (127)] }, expected := EResult.val (Val.int (92)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.int (129)] }, expected := EResult.val (Val.int (73)), post := none }]
+
+def dom_conform_org_apache_commons_lang3_CharUtils_toIntValue_int_char : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (48)] }, expected := EResult.val (Val.int (0)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_CharUtils_toIntValue_int_char_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.int (2147483647)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (65535), Val.int (-2147483648)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (31)] }, expected := EResult.val (Val.int (31)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (1)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (48)] }, expected := EResult.val (Val.int (48)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (48), Val.int (47)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (47), Val.int (49)] }, expected := EResult.val (Val.int (49)), post := none }]
+
+def dom_conform_t_java_lang_String_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.str "17.0.1", Val.unit] }, expected := EResult.val (Val.str "1.8.0_281"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.unit, Val.str "com.example.Foo"] }, expected := EResult.val (Val.str "0"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.str "com.example.Foo", Val.unit] }, expected := EResult.val (Val.str "11"), post := none }]
+
+def dom_conform_ommons_lang3_StringUtils_center_java_lang_String_java_lang_String_int : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA7", Val.int (1)] }, expected := EResult.val (Val.str "\\u1DA7"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "1.8.0_281", Val.int (-2147483648)] }, expected := EResult.val (Val.str "1.8.0_281"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d", Val.int (63)] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0142b", Val.int (-1)] }, expected := EResult.val (Val.str "a\\u0142b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1D7B", Val.int (2)] }, expected := EResult.val (Val.str "a\\u1D7B"), post := none }]
 
 def dom_conform_s_lang3_StringUtils_center_java_lang_String_java_lang_String_int_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.str "com.example.Foo"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (1), Val.int (65535)] }, expected := EResult.val (Val.str "java.lang.String"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111a", Val.int (1), Val.int (65535)] }, expected := EResult.val (Val.str "\\u0111a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "......", Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.str "......"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.int (31), Val.int (32)] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %da"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA7b", Val.int (-1), Val.int (3)] }, expected := EResult.val (Val.str "a\\u1DA7b"), post := none }]
 
 def dom_conform_ngUtils_center_java_lang_String_java_lang_String_int_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.int (-2147483648), Val.str ""] }, expected := EResult.val (Val.str "17.0.1"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "android.os.Bundle", Val.int (1), Val.str "com.example.Foo"] }, expected := EResult.val (Val.str "android.os.Bundle"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7Ba", Val.int (1), Val.str "a...b"] }, expected := EResult.val (Val.str "\\u1D7Ba"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "......", Val.int (-2147483648), Val.str "x"] }, expected := EResult.val (Val.str "......"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B", Val.int (-1), Val.str "\\u0197a"] }, expected := EResult.val (Val.str "\\u1D7B"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA7b", Val.int (2), Val.str "IllegalArgumentException"] }, expected := EResult.val (Val.str "a\\u1DA7b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d", Val.int (3), Val.str "\\u0141"] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d"), post := none }]
+
+def dom_conform_che_commons_lang3_StringUtils_chomp_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B"] }, expected := EResult.val (Val.str "\\u1D7B"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0197"] }, expected := EResult.val (Val.str "a\\u0197"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4\\u1DA4"] }, expected := EResult.val (Val.str "\\u1DA4\\u1DA4"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0141"] }, expected := EResult.val (Val.str "a\\u0141"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142a"] }, expected := EResult.val (Val.str "\\u0142a"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "..."] }, expected := EResult.val (Val.str "..."), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %d"] }, expected := EResult.val (Val.str "aMinimum abbreviation width is %d"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "......"] }, expected := EResult.val (Val.str "......"), post := none }]
 
 def dom_conform_StringUtils_chomp_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.str "com.example.Foo"] }, expected := EResult.val (Val.str ""), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.str "0"] }, expected := EResult.val (Val.str "java.lang.String"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0111b", Val.str "\\u0110a"] }, expected := EResult.val (Val.str "a\\u0111b"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142\\u0142", Val.str "a\\u0110b"] }, expected := EResult.val (Val.str "\\u0142\\u0142"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142", Val.str "a\\u1DA7b"] }, expected := EResult.val (Val.str "\\u0142"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.str "a\\u0110b"] }, expected := EResult.val (Val.str "1.8.0_281"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.str "\\u0142"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1DA4a", Val.str "a\\u0142b"] }, expected := EResult.val (Val.str "\\u1DA4a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1DA7", Val.str "\\u0110"] }, expected := EResult.val (Val.str "\\u1DA7"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "......", Val.str "aIllegalArgumentExceptionb"] }, expected := EResult.val (Val.str "......"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.str "a\\u0141b"] }, expected := EResult.val (Val.str "com.example.Foo"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0142", Val.str "\\u0141"] }, expected := EResult.val (Val.str "a\\u0142"), post := none }]
+
+def dom_conform_ache_commons_lang3_StringUtils_chop_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException"] }, expected := EResult.val (Val.str "IllegalArgumentExceptionIllegalArgumentExceptio"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142a"] }, expected := EResult.val (Val.str "\\u0142"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142"] }, expected := EResult.val (Val.str "\\u014"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0111"] }, expected := EResult.val (Val.str "a\\u011"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA7"] }, expected := EResult.val (Val.str "\\u1DA"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111"] }, expected := EResult.val (Val.str "\\u011"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0197b"] }, expected := EResult.val (Val.str "a\\u0197"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str ""] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA4"] }, expected := EResult.val (Val.str "a\\u1DA"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("CR", Val.int (13)), ("LF", Val.int (10))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA4b"] }, expected := EResult.val (Val.str "a\\u1DA4"), post := none }]
+
+def dom_conform_mmons_lang3_StringUtils_compare_int_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "aIllegalArgumentException", Val.unit] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "a\\u0268b"] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_ng3_StringUtils_compare_int_java_lang_String_java_lang_String_boolean : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0110", Val.unit, Val.bool true] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "java.lang.String", Val.bool false] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "a\\u0141", Val.bool true] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.unit, Val.bool false] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_3_StringUtils_compareIgnoreCase_int_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0142", Val.unit] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "...a", Val.unit] }, expected := EResult.val (Val.int (1)), post := none }]
+
+def dom_conform_Utils_compareIgnoreCase_int_java_lang_String_java_lang_String_boolean : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.unit, Val.bool false] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197", Val.unit, Val.bool true] }, expected := EResult.val (Val.int (1)), post := none }]
+
+def dom_conform_commons_lang3_StringUtils_contains_boolean_java_lang_CharSequence_int : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Character", fields := [("MAX_CODE_POINT", Val.int (1114111)), ("MIN_SUPPLEMENTARY_CODE_POINT", Val.int (65536))] }, { cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1))] }]) gref "<static>java.lang.Character" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 1))) gref "Character" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.int (31)] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Character", fields := [("MAX_CODE_POINT", Val.int (1114111)), ("MIN_SUPPLEMENTARY_CODE_POINT", Val.int (65536))] }, { cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1))] }]) gref "<static>java.lang.Character" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 1))) gref "Character" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.int (3)] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_ils_containsAny_boolean_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197\\u0197", Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_tainsIgnoreCase_boolean_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0268\\u0268", Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "...a", Val.str "\\u1D7Ba"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1DA4a", Val.str "a\\u0197b"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "17.0.1"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "..."] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "...", Val.str "\\u0111"] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_ingUtils_containsNone_boolean_java_lang_CharSequence_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.unit] }, expected := EResult.val (Val.bool true), post := none }]
 
 def dom_conform_s_lang3_StringUtils_containsWhitespace_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_ommons_lang3_StringUtils_countMatches_int_java_lang_CharSequence_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.int (65535)] }, expected := EResult.val (Val.int (0)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (31)] }, expected := EResult.val (Val.int (0)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "android.os.Bundle", Val.int (0)] }, expected := EResult.val (Val.int (0)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.int (1)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aMinimum abbreviation width is %d", Val.int (65535)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0141", Val.int (0)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142a", Val.int (31)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width is %d", Val.int (32)] }, expected := EResult.val (Val.int (4)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.int (63)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142", Val.int (64)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0268", Val.int (2)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.int (3)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142", Val.int (33)] }, expected := EResult.val (Val.int (0)), post := none }]
+
+def dom_conform_java_lang_CharSequence_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "\\u1D7Ba"] }, expected := EResult.val (Val.str "\\u1D7Ba"), post := none }]
+
+def dom_conform_java_lang_CharSequence_java_lang_CharSequence_java_lang_CharSequence_1 : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0141", Val.str "com.example.Foo"] }, expected := EResult.val (Val.str "\\u0141"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1D7Ba", Val.str ""] }, expected := EResult.val (Val.str "\\u1D7Ba"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.str "IllegalArgumentExceptiona"] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %da"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0197", Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d"] }, expected := EResult.val (Val.str "a\\u0197"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0142", Val.str "a\\u0110b"] }, expected := EResult.val (Val.str "a\\u0142"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "aIllegalArgumentException"] }, expected := EResult.val (Val.str "aIllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width with offset is %d", Val.str "a...b"] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "...", Val.str ""] }, expected := EResult.val (Val.str "..."), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0111", Val.str "a...b"] }, expected := EResult.val (Val.str "a\\u0111"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "a\\u0197b"] }, expected := EResult.val (Val.str "a\\u0197b"), post := none }]
+
+def dom_conform_ngUtils_difference_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "a\\u0268"] }, expected := EResult.val (Val.str "a\\u0268"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width is %d", Val.unit] }, expected := EResult.val (Val.str "Minimum abbreviation width is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "1.8.0_281", Val.unit] }, expected := EResult.val (Val.str "1.8.0_281"), post := none }]
 
 def dom_conform_gUtils_endsWith_boolean_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "17.0.1"] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "aIllegalArgumentExceptionb"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "\\u1DA4\\u1DA4"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "......"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197", Val.str "a\\u1D7B"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.unit] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "\\u0111"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "Minimum abbreviation width is %dMinimum abbreviation width is %d"] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_ndsWith_boolean_java_lang_CharSequence_java_lang_CharSequence_boolean : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "java.lang.String", Val.bool false] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "android.os.Bundle", Val.bool true] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "1.8.0_281", Val.bool false] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0141a", Val.str "IllegalArgumentExceptiona", Val.bool false] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.bool true] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.str "aMinimum abbreviation width is %db", Val.bool false] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_sWithIgnoreCase_boolean_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.str "java.lang.String"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.str "1.8.0_281"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "1.8.0_281"] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0111", Val.str "aMinimum abbreviation width is %d"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1DA4b", Val.str "\\u0141\\u0141"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "\\u0268"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "aIllegalArgumentExceptionb"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1DA4b", Val.str "Minimum abbreviation width with offset is %da"] }, expected := EResult.val (Val.bool false), post := none }]
 
-def dom_conform_mmons_lang3_StringUtils_isAllLowerCase_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.bool false), post := none }]
+def dom_conform_qualsIgnoreCase_boolean_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "...a"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "Minimum abbreviation width is %dMinimum abbreviation width is %d"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "\\u1D7B\\u1D7B"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0268\\u0268", Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
 
-def dom_conform_commons_lang3_StringUtils_isAlphaSpace_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.bool true), post := none }]
+def dom_conform_ache_commons_lang3_StringUtils_indexOf_int_java_lang_CharSequence_int : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Character", fields := [("MAX_CODE_POINT", Val.int (1114111)), ("MIN_SUPPLEMENTARY_CODE_POINT", Val.int (65536))] }, { cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>java.lang.Character" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 1))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 2))) gref "Character" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.int (2147483647)] }, expected := EResult.val (Val.int (-1)), post := none }]
 
-def dom_conform_lang3_StringUtils_isAlphanumericSpace_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.bool true), post := none }]
+def dom_conform_StringUtils_indexOf_int_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.unit] }, expected := EResult.val (Val.int (-1)), post := none }]
 
-def dom_conform_ons_lang3_StringUtils_isAsciiPrintable_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0"] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281"] }, expected := EResult.val (Val.bool true), post := none }]
+def dom_conform_g3_StringUtils_indexOfAny_int_java_lang_CharSequence_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "\\u0268a"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "a\\u1DA7b"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "a\\u0111"] }, expected := EResult.val (Val.int (-1)), post := none }]
 
-def dom_conform_ache_commons_lang3_StringUtils_isEmpty_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "android.os.Bundle"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String"] }, expected := EResult.val (Val.bool false), post := none }]
+def dom_conform_Utils_indexOfAnyBut_int_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Character", fields := [("MAX_CODE_POINT", Val.int (1114111)), ("MIN_SUPPLEMENTARY_CODE_POINT", Val.int (65536))] }, { cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>java.lang.Character" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 1))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 2))) gref "Character" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "a\\u0142"] }, expected := EResult.val (Val.int (-1)), post := none }]
 
-def dom_conform_commons_lang3_StringUtils_isMixedCase_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.bool false), post := none }]
-
-def dom_conform_e_commons_lang3_StringUtils_isNotEmpty_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1"] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "0"] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo"] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String"] }, expected := EResult.val (Val.bool true), post := none }]
-
-def dom_conform_mmons_lang3_StringUtils_isNumericSpace_boolean_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.bool true), post := none }]
+def dom_conform_s_indexOfIgnoreCase_int_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4", Val.str "\\u0111\\u0111"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.unit] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA4b", Val.unit] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "11", Val.unit] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.unit] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0111b", Val.str "\\u0197\\u0197"] }, expected := EResult.val (Val.int (-1)), post := none }]
 
 def dom_conform_dexOfIgnoreCase_int_java_lang_CharSequence_java_lang_CharSequence_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "android.os.Bundle", Val.str "", Val.int (31)] }, expected := EResult.val (Val.int (17)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "", Val.int (2147483647)] }, expected := EResult.val (Val.int (6)), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d", Val.str "\\u1D7B\\u1D7B", Val.int (2147483647)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141a", Val.unit, Val.int (-2147483648)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.str "1.8.0_281", Val.int (31)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "a\\u0268b", Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "...", Val.str "a...b", Val.int (63)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %d", Val.str "a\\u0141b", Val.int (64)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110a", Val.str "a\\u0110b", Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110", Val.unit, Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0142", Val.str "a\\u0268", Val.int (3)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142", Val.unit, Val.int (33)] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_mmons_lang3_StringUtils_isAllLowerCase_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_ache_commons_lang3_StringUtils_isAlpha_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_commons_lang3_StringUtils_isAlphaSpace_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_mmons_lang3_StringUtils_isAlphanumeric_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_lang3_StringUtils_isAlphanumericSpace_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_ons_lang3_StringUtils_isAsciiPrintable_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1DA4"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0141\\u0141"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "..."] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0110"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "x"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0110a"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1D7B\\u1D7B"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0141"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException"] }, expected := EResult.val (Val.bool true), post := none }]
+
+def dom_conform_ache_commons_lang3_StringUtils_isBlank_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool true), post := none }]
+
+def dom_conform_ache_commons_lang3_StringUtils_isEmpty_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "IllegalArgumentException"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0268"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0268\\u0268"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aMinimum abbreviation width is %db"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aIllegalArgumentException"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1D7B"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a..."] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197a"] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_commons_lang3_StringUtils_isMixedCase_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_e_commons_lang3_StringUtils_isNotBlank_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_e_commons_lang3_StringUtils_isNotEmpty_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0197"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aMinimum abbreviation width with offset is %db"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197a"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aMinimum abbreviation width is %d"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0268"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "11"] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0111a"] }, expected := EResult.val (Val.bool true), post := none }]
+
+def dom_conform_he_commons_lang3_StringUtils_isNumeric_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_mmons_lang3_StringUtils_isNumericSpace_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_commons_lang3_StringUtils_isWhitespace_boolean_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_commons_lang3_StringUtils_lastIndexOf_int_java_lang_CharSequence_int : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Character", fields := [("MAX_CODE_POINT", Val.int (1114111)), ("MIN_SUPPLEMENTARY_CODE_POINT", Val.int (65536))] }, { cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>java.lang.Character" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 1))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 2))) gref "Character" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.int (3)] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_mons_lang3_StringUtils_lastIndexOf_int_java_lang_CharSequence_int_int : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Character", fields := [("MAX_CODE_POINT", Val.int (1114111)), ("MIN_SUPPLEMENTARY_CODE_POINT", Val.int (65536))] }, { cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>java.lang.Character" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 1))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 2))) gref "Character" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_ngUtils_lastIndexOf_int_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "a\\u0142b", Val.unit] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "a\\u1DA4", Val.unit] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_ils_lastIndexOf_int_java_lang_CharSequence_java_lang_CharSequence_int : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA7", Val.unit, Val.int (2147483647)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "x", Val.int (63)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA7", Val.unit, Val.int (3)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.unit, Val.int (33)] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_stIndexOfIgnoreCase_int_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "11", Val.str "\\u0111a"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0197b", Val.unit] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197", Val.str "\\u1D7B\\u1D7B"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.str "aMinimum abbreviation width with offset is %db"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "a\\u0110b"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "aMinimum abbreviation width is %db"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "java.lang.String", Val.str "IllegalArgumentExceptiona"] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "aMinimum abbreviation width with offset is %db"] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_dexOfIgnoreCase_int_java_lang_CharSequence_java_lang_CharSequence_int_1 : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111", Val.str "java.lang.String", Val.int (2147483647)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a...", Val.str "Minimum abbreviation width with offset is %da", Val.int (-2147483648)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "...a", Val.str "Minimum abbreviation width with offset is %da", Val.int (31)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.str "x", Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B", Val.unit, Val.int (63)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "...a", Val.str "......", Val.int (64)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "11", Val.str "android.os.Bundle", Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "com.example.Foo", Val.unit, Val.int (33)] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_tOrdinalIndexOf_int_java_lang_CharSequence_java_lang_CharSequence_int : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "\\u1D7B", Val.str "\\u1D7B", Val.int (-2147483648)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "......", Val.unit, Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "\\u0197a", Val.str "a\\u0111b", Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none }]
 
 def dom_conform_commons_lang3_StringUtils_left_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.int (32)] }, expected := EResult.val (Val.str "11"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.int (2147483647)] }, expected := EResult.val (Val.str "com.example.Foo"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (31)] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "x", Val.int (1)] }, expected := EResult.val (Val.str "x"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268", Val.int (-2147483648)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111", Val.int (31)] }, expected := EResult.val (Val.str "\\u0111"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentException", Val.int (32)] }, expected := EResult.val (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197", Val.int (63)] }, expected := EResult.val (Val.str "\\u0197"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0268a", Val.int (64)] }, expected := EResult.val (Val.str "\\u0268a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111a", Val.int (-1)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA4", Val.int (3)] }, expected := EResult.val (Val.str "a\\u"), post := none }]
 
 def dom_conform_mmons_lang3_StringUtils_leftPad_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.int (1)] }, expected := EResult.val (Val.str "17.0.1"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0268", Val.int (1)] }, expected := EResult.val (Val.str "\\u0268"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0197", Val.int (-1)] }, expected := EResult.val (Val.str "a\\u0197"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141a", Val.int (2)] }, expected := EResult.val (Val.str "\\u0141a"), post := none }]
 
 def dom_conform_lang3_StringUtils_leftPad_java_lang_String_java_lang_String_int_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (1), Val.int (65535)] }, expected := EResult.val (Val.str "java.lang.String"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B\\u1D7B", Val.int (1), Val.int (65535)] }, expected := EResult.val (Val.str "\\u1D7B\\u1D7B"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "android.os.Bundle", Val.int (3), Val.int (76)] }, expected := EResult.val (Val.str "android.os.Bundle"), post := none }]
 
 def dom_conform_rg_apache_commons_lang3_StringUtils_length_int_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo"] }, expected := EResult.val (Val.int (15)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1DA7b"] }, expected := EResult.val (Val.int (8)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142\\u0142"] }, expected := EResult.val (Val.int (12)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aIllegalArgumentException"] }, expected := EResult.val (Val.int (25)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0268b"] }, expected := EResult.val (Val.int (8)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width is %d"] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1D7B\\u1D7B"] }, expected := EResult.val (Val.int (12)), post := none }]
 
 def dom_conform_mmons_lang3_StringUtils_mid_java_lang_String_java_lang_String_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.int (1), Val.int (2147483647)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B\\u1D7B", Val.int (1), Val.int (2147483647)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141a", Val.int (31), Val.int (32)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111a", Val.int (32), Val.int (63)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "java.lang.String", Val.int (63), Val.int (64)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0268a", Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197a", Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.str "\\u"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d", Val.int (2), Val.int (3)] }, expected := EResult.val (Val.str "nim"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aIllegalArgumentExceptionb", Val.int (3), Val.int (33)] }, expected := EResult.val (Val.str "legalArgumentExceptionb"), post := none }]
 
 def dom_conform_ordinalIndexOf_int_java_lang_CharSequence_java_lang_CharSequence_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "android.os.Bundle", Val.str "", Val.int (31)] }, expected := EResult.val (Val.int (0)), post := none }]
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "aMinimum abbreviation width with offset is %db", Val.str "a\\u0110", Val.int (-2147483648)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.unit, Val.str "aIllegalArgumentException", Val.int (31)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "\\u0268a", Val.unit, Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "aMinimum abbreviation width with offset is %db", Val.str "\\u0197a", Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none }]
+
+def dom_conform_IndexOf_int_java_lang_CharSequence_java_lang_CharSequence_int_boolean : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "a\\u0197", Val.str "android.os.Bundle", Val.int (-2147483648), Val.bool true] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.unit, Val.str "\\u0142a", Val.int (63), Val.bool false] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.str "\\u1D7B", Val.str "aIllegalArgumentException", Val.int (-1), Val.bool true] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1)), ("TO_STRING_LIMIT", Val.int (16))] }, { cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 1)), self := none, args := [Val.unit, Val.str "\\u0197a", Val.int (2), Val.bool true] }, expected := EResult.val (Val.int (-1)), post := none }]
 
 def dom_conform_ls_overlay_java_lang_String_java_lang_String_java_lang_String_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "11", Val.int (31), Val.int (32)] }, expected := EResult.val (Val.str "17.0.111"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "17.0.1", Val.int (32), Val.int (63)] }, expected := EResult.val (Val.str "17.0.117.0.1"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a...b", Val.str "\\u1D7B", Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.str "\\u1D7B"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268b", Val.str "com.example.Foo", Val.int (31), Val.int (32)] }, expected := EResult.val (Val.str "a\\u0268bcom.example.Foo"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0142b", Val.unit, Val.int (63), Val.int (64)] }, expected := EResult.val (Val.str "a\\u0142b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a...", Val.str "a\\u0142b", Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.str "a\\u0142b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %d", Val.str "aIllegalArgumentExceptionb", Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.str "aIllegalArgumentExceptionbinimum abbreviation width is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA7b", Val.str "\\u0141\\u0141", Val.int (2), Val.int (3)] }, expected := EResult.val (Val.str "a\\\\u0141\\u01411DA7b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268", Val.str "a...", Val.int (3), Val.int (33)] }, expected := EResult.val (Val.str "a\\ua..."), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.str "a\\u0197b", Val.int (33), Val.int (76)] }, expected := EResult.val (Val.str "17.0.1a\\u0197b"), post := none }]
+
+def dom_conform_StringUtils_remove_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.str ""] }, expected := EResult.val (Val.str "\\u0110\\u0110"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "android.os.Bundle", Val.unit] }, expected := EResult.val (Val.str "android.os.Bundle"), post := none }]
 
 def dom_conform_ingUtils_removeEnd_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "11"] }, expected := EResult.val (Val.str ""), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.str "17.0.1"] }, expected := EResult.val (Val.str "1.8.0_281"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0268", Val.str "a\\u0110b"] }, expected := EResult.val (Val.str "\\u0268"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width with offset is %d", Val.str "..."] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1DA7b", Val.str "Minimum abbreviation width is %da"] }, expected := EResult.val (Val.str "a\\u1DA7b"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0110\\u0110", Val.unit] }, expected := EResult.val (Val.str "\\u0110\\u0110"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "\\u0268a"] }, expected := EResult.val (Val.str "17.0.1"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aMinimum abbreviation width with offset is %d", Val.str ""] }, expected := EResult.val (Val.str "aMinimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197", Val.str "Minimum abbreviation width is %d"] }, expected := EResult.val (Val.str "\\u0197"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width with offset is %d", Val.str "a\\u0142"] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width is %dMinimum abbreviation width is %d", Val.str "..."] }, expected := EResult.val (Val.str "Minimum abbreviation width is %dMinimum abbreviation width is %d"), post := none }]
 
 def dom_conform_emoveEndIgnoreCase_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "11"] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0110", Val.str "a\\u0142b"] }, expected := EResult.val (Val.str "a\\u0110"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0142", Val.str "aMinimum abbreviation width is %d"] }, expected := EResult.val (Val.str "a\\u0142"), post := none }]
+
+def dom_conform_gUtils_removeFirst_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197a", Val.unit] }, expected := EResult.val (Val.str "\\u0197a"), post := none }]
 
 def dom_conform_lang3_StringUtils_removeStart_java_lang_String_java_lang_String_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (0)] }, expected := EResult.val (Val.str "java.lang.String"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (32)] }, expected := EResult.val (Val.str "java.lang.String"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.int (1)] }, expected := EResult.val (Val.str "17.0.1"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (31)] }, expected := EResult.val (Val.str "java.lang.String"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "x", Val.int (1)] }, expected := EResult.val (Val.str "x"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0110", Val.int (65535)] }, expected := EResult.val (Val.str "a\\u0110"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0110a", Val.int (32)] }, expected := EResult.val (Val.str "\\u0110a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0142", Val.int (63)] }, expected := EResult.val (Val.str "a\\u0142"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (64)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.int (2)] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %da"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Minimum abbreviation width is %d", Val.int (3)] }, expected := EResult.val (Val.str "Minimum abbreviation width is %d"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0111a", Val.int (33)] }, expected := EResult.val (Val.str "\\u0111a"), post := none }]
 
 def dom_conform_gUtils_removeStart_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "11"] }, expected := EResult.val (Val.str "0"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "17.0.1"] }, expected := EResult.val (Val.str ""), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.str "17.0.1"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197a", Val.str "\\u0268"] }, expected := EResult.val (Val.str "\\u0197a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197", Val.unit] }, expected := EResult.val (Val.str "\\u0197"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0141a", Val.unit] }, expected := EResult.val (Val.str "\\u0141a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "...a", Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d"] }, expected := EResult.val (Val.str "...a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0142", Val.str "\\u1D7Ba"] }, expected := EResult.val (Val.str "a\\u0142"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0141", Val.str "0"] }, expected := EResult.val (Val.str "a\\u0141"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0111a", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.str "\\u0111a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aIllegalArgumentException", Val.str "......"] }, expected := EResult.val (Val.str "aIllegalArgumentException"), post := none }]
 
 def dom_conform_oveStartIgnoreCase_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.str "java.lang.String"] }, expected := EResult.val (Val.str "com.example.Foo"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142a", Val.str "java.lang.String"] }, expected := EResult.val (Val.str "\\u0142a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0110a", Val.unit] }, expected := EResult.val (Val.str "\\u0110a"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0268", Val.str "Minimum abbreviation width is %dMinimum abbreviation width is %d"] }, expected := EResult.val (Val.str "\\u0268"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1D7B", Val.unit] }, expected := EResult.val (Val.str "a\\u1D7B"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u1D7B", Val.str "\\u0197a"] }, expected := EResult.val (Val.str "\\u1D7B"), post := none }]
+
+def dom_conform_ngUtils_repeat_java_lang_String_java_lang_String_java_lang_String_int : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0268", Val.str "a\\u0268", Val.int (-2147483648)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142\\u0142", Val.str "\\u1D7B\\u1D7B", Val.int (-1)] }, expected := EResult.val (Val.str ""), post := none }]
 
 def dom_conform_e_java_lang_String_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "", Val.str "1.8.0_281"] }, expected := EResult.val (Val.str "0"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "android.os.Bundle", Val.str "", Val.str "11"] }, expected := EResult.val (Val.str "android.os.Bundle"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4a", Val.unit, Val.str "aIllegalArgumentExceptionb"] }, expected := EResult.val (Val.str "\\u1DA4a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA7", Val.str "\\u0142", Val.unit] }, expected := EResult.val (Val.str "\\u1DA7"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.unit, Val.str ""] }, expected := EResult.val (Val.str "17.0.1"), post := none }]
 
 def dom_conform_va_lang_String_java_lang_String_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "", Val.str "1.8.0_281", Val.int (64)] }, expected := EResult.val (Val.str "17.0.1"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1D7Bb", Val.str "a\\u1DA4", Val.unit, Val.int (31)] }, expected := EResult.val (Val.str "a\\u1D7Bb"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110", Val.str "Minimum abbreviation width with offset is %da", Val.unit, Val.int (2)] }, expected := EResult.val (Val.str "\\u0110"), post := none }]
 
 def dom_conform_e_java_lang_String_java_lang_String_java_lang_String_java_lang_String_1 : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "17.0.1", Val.str "com.example.Foo"] }, expected := EResult.val (Val.str ""), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "com.example.Foo", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142", Val.unit, Val.str "11"] }, expected := EResult.val (Val.str "\\u0142"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.unit, Val.unit] }, expected := EResult.val (Val.str "17.0.1"), post := none }]
+
+def dom_conform_e_java_lang_String_java_lang_String_java_lang_String_java_lang_String_2 : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "1.8.0_281", Val.unit, Val.str "\\u0110\\u0110"] }, expected := EResult.val (Val.str "1.8.0_281"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA4b", Val.unit, Val.str "IllegalArgumentException"] }, expected := EResult.val (Val.str "a\\u1DA4b"), post := none }]
+
+def dom_conform_e_java_lang_String_java_lang_String_java_lang_String_java_lang_String_3 : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width is %da", Val.unit, Val.str "Minimum abbreviation width with offset is %da"] }, expected := EResult.val (Val.str "Minimum abbreviation width is %da"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B\\u1D7B", Val.unit, Val.str "a\\u0268b"] }, expected := EResult.val (Val.str "\\u1D7B\\u1D7B"), post := none }]
 
 def dom_conform_commons_lang3_StringUtils_right_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.int (2147483647)] }, expected := EResult.val (Val.str "11"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.int (31)] }, expected := EResult.val (Val.str "1.8.0_281"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "android.os.Bundle", Val.int (1)] }, expected := EResult.val (Val.str "e"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.int (32)] }, expected := EResult.val (Val.str "1.8.0_281"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.int (1)] }, expected := EResult.val (Val.str "0"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0111b", Val.int (2147483647)] }, expected := EResult.val (Val.str "a\\u0111b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width is %d", Val.int (-2147483648)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111a", Val.int (32)] }, expected := EResult.val (Val.str "\\u0111a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141a", Val.int (63)] }, expected := EResult.val (Val.str "\\u0141a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268", Val.int (64)] }, expected := EResult.val (Val.str "a\\u0268"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0141", Val.int (-1)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1D7B", Val.int (2)] }, expected := EResult.val (Val.str "7B"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0111", Val.int (3)] }, expected := EResult.val (Val.str "111"), post := none }]
+
+def dom_conform_mons_lang3_StringUtils_rightPad_java_lang_String_java_lang_String_int : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110a", Val.int (1)] }, expected := EResult.val (Val.str "\\u0110a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "java.lang.String", Val.int (-1)] }, expected := EResult.val (Val.str "java.lang.String"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width with offset is %db", Val.int (2)] }, expected := EResult.val (Val.str "aMinimum abbreviation width with offset is %db"), post := none }]
+
+def dom_conform_lang3_StringUtils_rightPad_java_lang_String_java_lang_String_int_char : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %d", Val.int (1), Val.int (65535)] }, expected := EResult.val (Val.str "aMinimum abbreviation width is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %d", Val.int (-1), Val.int (3)] }, expected := EResult.val (Val.str "aMinimum abbreviation width is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d", Val.int (2), Val.int (33)] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("PAD_LIMIT", Val.int (8192)), ("SPACE", Val.str " ")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142\\u0142", Val.int (3), Val.int (76)] }, expected := EResult.val (Val.str "\\u0142\\u0142"), post := none }]
 
 def dom_conform_tils_startsWith_boolean_java_lang_CharSequence_java_lang_CharSequence : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "11"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "java.lang.String"] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197\\u0197", Val.str "Minimum abbreviation width with offset is %da"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "\\u0142\\u0142"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.str "\\u1DA7"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1DA7b", Val.str "IllegalArgumentException"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "IllegalArgumentExceptiona", Val.str "aMinimum abbreviation width is %db"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "aIllegalArgumentExceptionb"] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_rtsWith_boolean_java_lang_CharSequence_java_lang_CharSequence_boolean : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "com.example.Foo", Val.bool false] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0142a", Val.str "a\\u1D7Bb", Val.bool true] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.str "\\u0197\\u0197", Val.bool true] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1D7Bb", Val.str "1.8.0_281", Val.bool true] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0110", Val.str "\\u0141a", Val.bool false] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_sWithIgnoreCase_boolean_java_lang_CharSequence_java_lang_CharSequence_1 : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0111a", Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0110\\u0110", Val.str "aIllegalArgumentExceptionb"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a...b", Val.str "a\\u0268b"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0111a", Val.str "com.example.Foo"] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_StringUtils_strip_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "17.0.1"] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4\\u1DA4", Val.str "\\u0141"] }, expected := EResult.val (Val.str "DA4\\u1DA"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "...", Val.str "\\u1DA4\\u1DA4"] }, expected := EResult.val (Val.str "..."), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentException", Val.str "0"] }, expected := EResult.val (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %d", Val.str "\\u0141\\u0141"] }, expected := EResult.val (Val.str "aMinimum abbreviation width is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142\\u0142", Val.str "aMinimum abbreviation width with offset is %db"] }, expected := EResult.val (Val.str "\\u0142\\u0142"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111a", Val.str "a\\u0110"] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110", Val.str "Minimum abbreviation width with offset is %da"] }, expected := EResult.val (Val.str "\\u0110"), post := none }]
+
+def dom_conform_ringUtils_stripEnd_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "java.lang.String", Val.str "\\u0142\\u0142"] }, expected := EResult.val (Val.str "java.lang.String"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA7b", Val.str "a\\u0197b"] }, expected := EResult.val (Val.str "a\\u1DA"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268b", Val.str "\\u1D7B\\u1D7B"] }, expected := EResult.val (Val.str "a\\u0268b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d", Val.str ""] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.str "\\u0110a"] }, expected := EResult.val (Val.str "17.0."), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "0", Val.str "\\u1D7Ba"] }, expected := EResult.val (Val.str "0"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268b", Val.str "11"] }, expected := EResult.val (Val.str "a\\u0268b"), post := none }]
 
 def dom_conform_ngUtils_stripStart_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.str ""] }, expected := EResult.val (Val.str "1.8.0_281"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA7b", Val.str "aMinimum abbreviation width is %db"] }, expected := EResult.val (Val.str "\\u1DA7b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141", Val.str "x"] }, expected := EResult.val (Val.str "\\u0141"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1D7B", Val.str "a\\u0141"] }, expected := EResult.val (Val.str "D7B"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141\\u0141", Val.str "Minimum abbreviation width with offset is %da"] }, expected := EResult.val (Val.str "\\u0141\\u0141"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141", Val.str ""] }, expected := EResult.val (Val.str "\\u0141"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142a", Val.str "a\\u0110b"] }, expected := EResult.val (Val.str "42a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110", Val.str "x"] }, expected := EResult.val (Val.str "\\u0110"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197a", Val.str "17.0.1"] }, expected := EResult.val (Val.str "\\u0197a"), post := none }]
+
+def dom_conform_mons_lang3_StringUtils_stripToEmpty_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit] }, expected := EResult.val (Val.str ""), post := none }]
 
 def dom_conform_ons_lang3_StringUtils_substring_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "11", Val.int (-2147483648)] }, expected := EResult.val (Val.str "11"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4", Val.int (1)] }, expected := EResult.val (Val.str "u1DA4"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7Ba", Val.int (2147483647)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110a", Val.int (-2147483648)] }, expected := EResult.val (Val.str "\\u0110a"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111", Val.int (31)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.int (32)] }, expected := EResult.val (Val.str "offset is %da"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0268", Val.int (63)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4a", Val.int (64)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268", Val.int (2)] }, expected := EResult.val (Val.str "u0268"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %d", Val.int (3)] }, expected := EResult.val (Val.str "nimum abbreviation width is %d"), post := none }]
 
 def dom_conform_lang3_StringUtils_substring_java_lang_String_java_lang_String_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "17.0.1", Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.str "7.0.1"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4a", Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA7", Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.str "\\u1DA7"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %d", Val.int (31), Val.int (32)] }, expected := EResult.val (Val.str " "), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "com.example.Foo", Val.int (32), Val.int (63)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0110", Val.int (63), Val.int (64)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "x", Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width with offset is %db", Val.int (2), Val.int (3)] }, expected := EResult.val (Val.str "i"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "11", Val.int (3), Val.int (33)] }, expected := EResult.val (Val.str ""), post := none }]
+
+def dom_conform_ang3_StringUtils_substringAfter_java_lang_String_java_lang_String_int : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4\\u1DA4", Val.int (1)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197a", Val.int (2147483647)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptiona", Val.int (-2147483648)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "android.os.Bundle", Val.int (31)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4\\u1DA4", Val.int (32)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111\\u0111", Val.int (63)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.int (2)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0110", Val.int (-1)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "...", Val.int (3)] }, expected := EResult.val (Val.str ""), post := none }]
 
 def dom_conform_ils_substringAfter_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "java.lang.String"] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentException", Val.str "\\u0111"] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "0", Val.str "..."] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.str "Minimum abbreviation width is %dMinimum abbreviation width is %d"] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %d", Val.str "\\u1DA4"] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "1.8.0_281", Val.unit] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110a", Val.str "\\u0141\\u0141"] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0142b", Val.str "a\\u1DA4"] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0197b", Val.unit] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111", Val.str "com.example.Foo"] }, expected := EResult.val (Val.str ""), post := none }]
 
-def dom_conform_StringUtils_substringAfterLast_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (2147483647)] }, expected := EResult.val (Val.str ""), post := none }]
+def dom_conform_substringAfterLast_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B", Val.unit] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "1.8.0_281", Val.unit] }, expected := EResult.val (Val.str ""), post := none }]
+
+def dom_conform_ng3_StringUtils_substringBefore_java_lang_String_java_lang_String_int : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "x", Val.int (1)] }, expected := EResult.val (Val.str "x"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width with offset is %d", Val.int (2147483647)] }, expected := EResult.val (Val.str "aMinimum abbreviation width with offset is %d"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA7b", Val.int (-2147483648)] }, expected := EResult.val (Val.str "a\\u1DA7b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268b", Val.int (31)] }, expected := EResult.val (Val.str "a\\u0268b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141", Val.int (32)] }, expected := EResult.val (Val.str "\\u0141"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA7b", Val.int (63)] }, expected := EResult.val (Val.str "a\\u1DA7b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268", Val.int (64)] }, expected := EResult.val (Val.str "a\\u0268"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "...", Val.int (-1)] }, expected := EResult.val (Val.str "..."), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0141", Val.int (2)] }, expected := EResult.val (Val.str "a\\u0141"), post := none }]
 
 def dom_conform_ls_substringBefore_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "java.lang.String"] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a...b", Val.str "a\\u0141b"] }, expected := EResult.val (Val.str "a...b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0141b", Val.str "a\\u0142b"] }, expected := EResult.val (Val.str "a\\u0141b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.str "1.8.0_281"] }, expected := EResult.val (Val.str "\\u0110\\u0110"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.str "IllegalArgumentException"] }, expected := EResult.val (Val.str "\\u0110\\u0110"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptionIllegalArgumentException", Val.str "a\\u0142b"] }, expected := EResult.val (Val.str "IllegalArgumentExceptionIllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268", Val.str "11"] }, expected := EResult.val (Val.str "a\\u0268"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0111\\u0111", Val.str "android.os.Bundle"] }, expected := EResult.val (Val.str "\\u0111\\u0111"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width is %db", Val.str "..."] }, expected := EResult.val (Val.str "aMinimum abbreviation width is %db"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str ""), ("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "...a", Val.str "\\u0142a"] }, expected := EResult.val (Val.str "...a"), post := none }]
+
+def dom_conform_ubstringBeforeLast_java_lang_String_java_lang_String_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width with offset is %da", Val.unit] }, expected := EResult.val (Val.str "Minimum abbreviation width with offset is %da"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA4\\u1DA4", Val.unit] }, expected := EResult.val (Val.str "\\u1DA4\\u1DA4"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("INDEX_NOT_FOUND", Val.int (-1))] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0268", Val.unit] }, expected := EResult.val (Val.str "a\\u0268"), post := none }]
 
 def dom_conform_mons_lang3_StringUtils_truncate_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (31)] }, expected := EResult.val (Val.str ""), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.int (2147483647)] }, expected := EResult.val (Val.str "17.0.1"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.int (32)] }, expected := EResult.val (Val.str "com.example.Foo"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.int (1)] }, expected := EResult.val (Val.str "0"), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142", Val.int (2147483647)] }, expected := EResult.val (Val.str "\\u0142"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0197b", Val.int (-2147483648)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.int (31)] }, expected := EResult.val (Val.str "\\u0110\\u0110"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1DA4b", Val.int (32)] }, expected := EResult.val (Val.str "a\\u1DA4b"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u1D7B", Val.int (64)] }, expected := EResult.val (Val.str "a\\u1D7B"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B\\u1D7B", Val.int (-1)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "11", Val.int (3)] }, expected := EResult.val (Val.str "11"), post := none }]
 
 def dom_conform_lang3_StringUtils_truncate_java_lang_String_java_lang_String_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "android.os.Bundle", Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "aMinimum abbreviation width with offset is %d", Val.int (-2147483648), Val.int (31)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110\\u0110", Val.int (31), Val.int (32)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0142\\u0142", Val.int (32), Val.int (63)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "android.os.Bundle", Val.int (63), Val.int (64)] }, expected := EResult.val (Val.str ""), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.str "a\\u0197b", Val.int (64), Val.int (-1)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.StringUtils", fields := [("EMPTY", Val.str "")] }]) gref "<static>org.apache.commons.lang3.StringUtils" (Val.ref (base + 0)), self := none, args := [Val.unit, Val.int (-1), Val.int (2)] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
 
 def dom_conform_mmons_lang3_StringUtils_unwrap_java_lang_String_java_lang_String_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (32)] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "Minimum abbreviation width is %d", Val.int (1)] }, expected := EResult.val (Val.str "Minimum abbreviation width is %d"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0110", Val.int (65535)] }, expected := EResult.val (Val.str "\\u0110"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197a", Val.int (0)] }, expected := EResult.val (Val.str "\\u0197a"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "java.lang.String", Val.int (31)] }, expected := EResult.val (Val.str "java.lang.String"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197", Val.int (32)] }, expected := EResult.val (Val.str "\\u0197"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0197\\u0197", Val.int (63)] }, expected := EResult.val (Val.str "\\u0197\\u0197"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "IllegalArgumentExceptiona", Val.int (64)] }, expected := EResult.val (Val.str "IllegalArgumentExceptiona"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7B", Val.int (2)] }, expected := EResult.val (Val.str "\\u1D7B"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1D7Ba", Val.int (3)] }, expected := EResult.val (Val.str "\\u1D7Ba"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u1DA7", Val.int (33)] }, expected := EResult.val (Val.str "\\u1DA7"), post := none }]
 
 def dom_conform_StringUtils_unwrap_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.str "11"] }, expected := EResult.val (Val.str "0"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0111", Val.str "aMinimum abbreviation width is %d"] }, expected := EResult.val (Val.str "a\\u0111"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0110b", Val.str "IllegalArgumentExceptionIllegalArgumentException"] }, expected := EResult.val (Val.str "a\\u0110b"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u1DA7b", Val.str "a...b"] }, expected := EResult.val (Val.str "a\\u1DA7b"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0142", Val.str "a\\u0110"] }, expected := EResult.val (Val.str "a\\u0142"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a\\u0141", Val.str "a\\u1DA4b"] }, expected := EResult.val (Val.str "a\\u0141"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0110a", Val.str "Minimum abbreviation width with offset is %dMinimum abbreviation width with offset is %d"] }, expected := EResult.val (Val.str "\\u0110a"), post := none }]
 
 def dom_conform_commons_lang3_StringUtils_wrap_java_lang_String_java_lang_String_char : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (1)] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "\\u0141", Val.int (0)] }, expected := EResult.val (Val.str "\\u0141"), post := none },
+   { case := { heap := Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.CharUtils", fields := [("NUL", Val.int (0))] }]) gref "<static>org.apache.commons.lang3.CharUtils" (Val.ref (base + 0))) gref "CharUtils" (Val.ref (base + 0)), self := none, args := [Val.str "", Val.int (64)] }, expected := EResult.val (Val.str ""), post := none }]
 
 def dom_conform_3_StringUtils_wrap_java_lang_String_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.str "com.example.Foo"] }, expected := EResult.val (Val.str ""), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "\\u0197", Val.unit] }, expected := EResult.val (Val.str "\\u0197"), post := none }]
+
+def dom_conform_Validate_exclusiveBetween_void_double_double_double_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.str "IllegalStateExceptionIllegalStateException"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.str "collectioncollection"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.unit] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.unit] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.str "null typenull type"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.str "null typeIllegalArgumentException"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.str "IllegalArgumentExceptionnull typea"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.str "IllegalArgumentExceptionnull type"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.str "IllegalArgumentExceptionarraya"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.str "charsa"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
+
+def dom_conform_rg_apache_commons_lang3_Validate_exclusiveBetween_void_long_long_long : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_EXCLUSIVE_BETWEEN_EX_MESSAGE", Val.str "The value %s is not in the specified exclusive range of %s to %s")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.int (-1), Val.int (2), Val.int (0)] }, expected := EResult.val (Val.unit), post := none }]
+
+def dom_conform_lang3_Validate_exclusiveBetween_void_long_long_long_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (9223372036854775807), Val.str "com.example.Foo"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (9223372036854775807), Val.int (-9223372036854775808), Val.str "IllegalStateException"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (9223372036854775807), Val.int (-9223372036854775808), Val.int (31), Val.str "acollection"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775808), Val.int (31), Val.int (32), Val.str "17.0.1"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63), Val.str "IllegalStateExceptiona"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64), Val.str "IllegalArgumentExceptioncollection"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1), Val.str "1.8.0_281"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2), Val.str "aIndexOutOfBoundsException"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (0), Val.str "IndexOutOfBoundsExceptiona"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (0), Val.int (1), Val.str "achars"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
+
+def dom_conform_che_commons_lang3_Validate_inclusiveBetween_void_double_double_double : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_INCLUSIVE_BETWEEN_EX_MESSAGE", Val.str "The value %s is not in the specified inclusive range of %s to %s")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_INCLUSIVE_BETWEEN_EX_MESSAGE", Val.str "The value %s is not in the specified inclusive range of %s to %s")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_INCLUSIVE_BETWEEN_EX_MESSAGE", Val.str "The value %s is not in the specified inclusive range of %s to %s")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_INCLUSIVE_BETWEEN_EX_MESSAGE", Val.str "The value %s is not in the specified inclusive range of %s to %s")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_INCLUSIVE_BETWEEN_EX_MESSAGE", Val.str "The value %s is not in the specified inclusive range of %s to %s")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808)] }, expected := EResult.val (Val.unit), post := none }]
+
+def dom_conform_Validate_inclusiveBetween_void_double_double_double_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.unit] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.unit] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.str "IllegalArgumentExceptionIllegalArgumentException"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.str "aarrayb"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.str "IllegalStateException"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.float (Fl.ofBits 0), Val.str "IndexOutOfBoundsException"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.float (Fl.ofBits 4609434218613702656), Val.str "null typenull"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.float (Fl.ofBits 13835621005235585024), Val.str "null typenull"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.float (Fl.ofBits 4715268809856909312), Val.str "com.example.Foo"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.float (Fl.ofBits 9223372036854775808), Val.str "arraya"] }, expected := EResult.val (Val.unit), post := none }]
+
+def dom_conform_rg_apache_commons_lang3_Validate_inclusiveBetween_void_long_long_long : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_INCLUSIVE_BETWEEN_EX_MESSAGE", Val.str "The value %s is not in the specified inclusive range of %s to %s")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.int (-1), Val.int (2), Val.int (0)] }, expected := EResult.val (Val.unit), post := none }]
+
+def dom_conform_lang3_Validate_inclusiveBetween_void_long_long_long_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (9223372036854775807), Val.unit] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (9223372036854775807), Val.int (-9223372036854775808), Val.str "IllegalArgumentExceptionnull type"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (9223372036854775807), Val.int (-9223372036854775808), Val.int (31), Val.str "collectiona"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775808), Val.int (31), Val.int (32), Val.str "IllegalArgumentExceptioniterablea"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63), Val.str "aIndexOutOfBoundsExceptionb"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64), Val.str "aIllegalStateException"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1), Val.str "11"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2), Val.str "iterablea"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (0), Val.str "IllegalArgumentExceptionarraya"] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (0), Val.int (1), Val.str "null typenulla"] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
+
+def dom_conform_org_apache_commons_lang3_Validate_isTrue_void_boolean : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_IS_TRUE_EX_MESSAGE", Val.str "The validated expression is false")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.bool true] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_IS_TRUE_EX_MESSAGE", Val.str "The validated expression is false")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.bool false] }, expected := EResult.exn (Val.str "IllegalArgumentException"), post := none }]
+
+def dom_conform_he_commons_lang3_Validate_isTrue_void_boolean_java_lang_String_double : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "anull typeb", Val.float (Fl.ofBits 4609434218613702656)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "aIndexOutOfBoundsException", Val.float (Fl.ofBits 9223372036854775808)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "com.example.Foo", Val.float (Fl.ofBits 0)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "collectiona", Val.float (Fl.ofBits 13835621005235585024)] }, expected := EResult.val (Val.unit), post := none }]
+
+def dom_conform_ache_commons_lang3_Validate_isTrue_void_boolean_java_lang_String_long : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "IllegalStateExceptionIllegalStateException", Val.int (9223372036854775807)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "charschars", Val.int (-9223372036854775808)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "IllegalArgumentExceptioniterable", Val.int (31)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "IndexOutOfBoundsException", Val.int (32)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "IllegalArgumentExceptionnull typea", Val.int (64)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "17.0.1", Val.int (0)] }, expected := EResult.val (Val.unit), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.bool true, Val.str "0", Val.int (1)] }, expected := EResult.val (Val.unit), post := none }]
+
+def dom_conform_org_apache_commons_lang3_Validate_validState_void_boolean : List Obs :=
+  [{ case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_VALID_STATE_EX_MESSAGE", Val.str "The validated state is false")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.bool false] }, expected := EResult.exn (Val.str "IllegalStateException"), post := none },
+   { case := { heap := Heap.setField (h0 ++ [{ cls := "<module>static:org.apache.commons.lang3.Validate", fields := [("DEFAULT_VALID_STATE_EX_MESSAGE", Val.str "The validated state is false")] }]) gref "<static>org.apache.commons.lang3.Validate" (Val.ref (base + 0)), self := none, args := [Val.bool true] }, expected := EResult.val (Val.unit), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_compare_int_byte_byte : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-128), Val.int (31)] }, expected := EResult.val (Val.int (-159)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (127)] }, expected := EResult.val (Val.int (-126)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (127), Val.int (-128)] }, expected := EResult.val (Val.int (255)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (127)] }, expected := EResult.val (Val.int (-126)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-128), Val.int (31)] }, expected := EResult.val (Val.int (-159)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (-31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (65)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-3)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-8)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_compare_int_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.int (1)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.int (1)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.int (-1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-1)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_compare_int_long_long : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (9223372036854775807)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (9223372036854775807), Val.int (-9223372036854775808)] }, expected := EResult.val (Val.int (1)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775808), Val.int (31)] }, expected := EResult.val (Val.int (-1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (9223372036854775807), Val.int (-9223372036854775808)] }, expected := EResult.val (Val.int (1)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-1)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_compare_int_short_short : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (32767), Val.int (-32768)] }, expected := EResult.val (Val.int (1)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (32767)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32767), Val.int (-32768)] }, expected := EResult.val (Val.int (1)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (-32768), Val.int (31)] }, expected := EResult.val (Val.int (-1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1)] }, expected := EResult.val (Val.int (-1)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-1)), post := none }]
 
 def dom_conform_g3_math_NumberUtils_getMantissa_java_lang_String_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.int (1)] }, expected := EResult.val (Val.str "1"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.int (-2147483648)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.int (32)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "com.example.Foo", Val.int (2147483647)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "array", Val.int (-2147483648)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.int (31)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aarrayb", Val.int (32)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0xa", Val.int (63)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException is not a valid number.a", Val.int (64)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "#a", Val.int (45)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException0x", Val.int (44)] }, expected := EResult.exn (Val.str "NumberFormatException"), post := none }]
 
 def dom_conform_he_commons_lang3_math_NumberUtils_isAllZeros_boolean_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "11"] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "#"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0X0X"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0x0x"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException is not a valid number.a"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException0a"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a is not a valid number."] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "#a"] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_ache_commons_lang3_math_NumberUtils_isDigits_boolean_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_ache_commons_lang3_math_NumberUtils_isNumber_boolean_java_lang_String : List Obs :=
+  [{ case := { heap := Heap.setField (Heap.setField (Heap.setField (h0 ++ [{ cls := "<module>static:java.lang.Character", fields := [("MAX_CODE_POINT", Val.int (1114111)), ("MIN_SUPPLEMENTARY_CODE_POINT", Val.int (65536))] }, { cls := "<module>static:org.apache.commons.lang3.CharSequenceUtils", fields := [("NOT_FOUND", Val.int (-1))] }]) gref "<static>java.lang.Character" (Val.ref (base + 0))) gref "<static>org.apache.commons.lang3.CharSequenceUtils" (Val.ref (base + 1))) gref "Character" (Val.ref (base + 0)), self := none, args := [Val.unit] }, expected := EResult.val (Val.bool false), post := none }]
+
+def dom_conform_he_commons_lang3_math_NumberUtils_isParsable_boolean_java_lang_String : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "Array cannot be empty."] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "a is not a valid number."] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Array cannot be empty.Array cannot be empty."] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aArray cannot be empty."] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_ng3_math_NumberUtils_isZero_boolean_java_lang_String_java_lang_String : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.str "java.lang.String"] }, expected := EResult.val (Val.bool false), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "1.8.0_281", Val.str "17.0.1"] }, expected := EResult.val (Val.bool false), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException#a", Val.str "#a"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.unit] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException0a", Val.str "NumberFormatException#"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Array cannot be empty.", Val.str "arraya"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0xNumberFormatExceptiona", Val.str "a0Xb"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0xNumberFormatExceptiona", Val.str "##"] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "Array cannot be empty.Array cannot be empty.", Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str " is not a valid number.", Val.unit] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException0a", Val.str "Array cannot be empty.Array cannot be empty."] }, expected := EResult.val (Val.bool false), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0x is not a valid number.", Val.str "x"] }, expected := EResult.val (Val.bool false), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_max_byte_byte_byte_byte : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (127), Val.int (-128)] }, expected := EResult.val (Val.int (127)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (127)] }, expected := EResult.val (Val.int (127)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (127), Val.int (-128), Val.int (31)] }, expected := EResult.val (Val.int (127)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (127)] }, expected := EResult.val (Val.int (127)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (127), Val.int (-128)] }, expected := EResult.val (Val.int (127)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127), Val.int (-128), Val.int (31)] }, expected := EResult.val (Val.int (127)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-128), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (10)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (10)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_max_int_int_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.int (2147483647)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.int (2147483647)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2147483647), Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.int (2147483647)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (10)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (10)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_max_long_long_long_long : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (9223372036854775807)] }, expected := EResult.val (Val.int (9223372036854775807)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (9223372036854775807), Val.int (-9223372036854775808)] }, expected := EResult.val (Val.int (9223372036854775807)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (9223372036854775807), Val.int (-9223372036854775808), Val.int (31)] }, expected := EResult.val (Val.int (9223372036854775807)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775808), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (10)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (10)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_max_short_short_short_short : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-32768), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (32767), Val.int (-32768), Val.int (31)] }, expected := EResult.val (Val.int (32767)), post := none },
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (32767)] }, expected := EResult.val (Val.int (32767)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (32767), Val.int (-32768)] }, expected := EResult.val (Val.int (32767)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32767), Val.int (-32768), Val.int (31)] }, expected := EResult.val (Val.int (32767)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-32768), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (63)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (64)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (10)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (10)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_min_byte_byte_byte_byte : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (127), Val.int (-128), Val.int (31)] }, expected := EResult.val (Val.int (-128)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (-128), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-128)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (127)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (127), Val.int (-128)] }, expected := EResult.val (Val.int (-128)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (127), Val.int (-128), Val.int (31)] }, expected := EResult.val (Val.int (-128)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-128), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-128)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (2)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_min_int_int_int_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (31)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (2147483647)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (2147483647), Val.int (-2147483648)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2147483647), Val.int (-2147483648), Val.int (31)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-2147483648), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-2147483648)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (2)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_min_long_long_long_long : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775808), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-9223372036854775808)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (9223372036854775807)] }, expected := EResult.val (Val.int (0)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (9223372036854775807), Val.int (-9223372036854775808)] }, expected := EResult.val (Val.int (-9223372036854775808)), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (9223372036854775807)] }, expected := EResult.val (Val.int (0)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (9223372036854775807), Val.int (-9223372036854775808)] }, expected := EResult.val (Val.int (-9223372036854775808)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (9223372036854775807), Val.int (-9223372036854775808), Val.int (31)] }, expected := EResult.val (Val.int (-9223372036854775808)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775808), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-9223372036854775808)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (2)), post := none }]
 
 def dom_conform_org_apache_commons_lang3_math_NumberUtils_min_short_short_short_short : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (0), Val.int (1), Val.int (32767)] }, expected := EResult.val (Val.int (0)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (-32768), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-32768)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (1), Val.int (32767), Val.int (-32768)] }, expected := EResult.val (Val.int (-32768)), post := none },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (32767), Val.int (-32768), Val.int (31)] }, expected := EResult.val (Val.int (-32768)), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (31)), post := none }]
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-32768), Val.int (31), Val.int (32)] }, expected := EResult.val (Val.int (-32768)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (31), Val.int (32), Val.int (63)] }, expected := EResult.val (Val.int (31)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (32), Val.int (63), Val.int (64)] }, expected := EResult.val (Val.int (32)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (63), Val.int (64), Val.int (-1)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (64), Val.int (-1), Val.int (2)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-1), Val.int (2), Val.int (10)] }, expected := EResult.val (Val.int (-1)), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (2), Val.int (10), Val.int (9)] }, expected := EResult.val (Val.int (2)), post := none }]
 
 def dom_conform_ng3_math_NumberUtils_withDecimalsParsing_boolean_java_lang_String_int : List Obs :=
-  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (1)] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "java.lang.String", Val.int (-2147483648)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "17.0.1", Val.int (2147483647)] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.int (31)] }, expected := EResult.val (Val.bool true), post := none },
-   { case := { heap := h0 ++ [], self := none, args := [Val.str "", Val.int (32)] }, expected := EResult.val (Val.bool true), post := none }]
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "a0Xb", Val.int (-2147483648)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aNumberFormatExceptionb", Val.int (31)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0X", Val.int (32)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "0", Val.int (64)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "aNumberFormatException", Val.int (-1)] }, expected := EResult.exn (Val.str "StringIndexOutOfBoundsException"), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException0Xa", Val.int (46)] }, expected := EResult.val (Val.bool true), post := none },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "NumberFormatException is not a valid number.", Val.int (45)] }, expected := EResult.val (Val.bool true), post := none }]
 
 
 end Autoform.SpecsGen.CommonsLang3

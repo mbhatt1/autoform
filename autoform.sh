@@ -68,6 +68,8 @@ REPORT="$ROOT/artifacts/pipeline/$MOD"
 mkdir -p "$REPORT"
 WORK="$(mktemp -d)"
 STAGE=setup
+# Set by the parse stage when it had to skip the dataflowOss overlay; kept in pipeline.json.
+OVERLAYS=""
 export PYTHONUNBUFFERED=1
 # Unconditional cleanup: `set -e` means any failing stage below (a `lake build`
 # hitting a heartbeat/recDepth limit, an unresolved codebase, ...) exits the
@@ -77,18 +79,27 @@ export PYTHONUNBUFFERED=1
 # leaked run) and Joern's own project cache under `$ROOT/workspace` forever.
 finish() {
   local status=$?
-  "$PYTHON" - "$REPORT" "$MOD" "$SRC" "$STAGE" "$status" <<'PY'
+  "$PYTHON" - "$REPORT" "$MOD" "$SRC" "$STAGE" "$status" "$OVERLAYS" <<'PY'
 import datetime, json, pathlib, sys
-report, module, source, stage, code = sys.argv[1:]
+report, module, source, stage, code, overlays = sys.argv[1:]
 path = pathlib.Path(report) / "pipeline.json"
 data = dict(module=module, source=source, stage=stage, exit_code=int(code),
             status="passed" if int(code) == 0 else "failed",
             finished_at=datetime.datetime.now(datetime.timezone.utc).isoformat())
+if int(code) > 128:
+    data["interrupted_by_signal"] = int(code) - 128
+if overlays:
+    data["overlays"] = overlays
 path.write_text(json.dumps(data, indent=2) + "\n")
 PY
   rm -rf "$WORK"
 }
 trap finish EXIT
+# Without these, a SIGTERM (`autoform source --timeout` expiring) or Ctrl-C ended the
+# script with status 0 inside the EXIT trap, so a run stopped mid-parse was recorded
+# as `"status": "passed"`. 128+N is the conventional status for death by signal N.
+trap 'exit 143' TERM
+trap 'exit 130' INT
 # Clear only reports produced by this pipeline, so an aborted run cannot leave
 # yesterday's passing evidence under today's output paths.
 "$PYTHON" - "$REPORT" "$MOD" "$SRC" <<'PY'
@@ -135,6 +146,16 @@ export PATH="$HOME/.elan/bin:$PATH"
 export LANG="${LANG:-C.UTF-8}"
 export LC_ALL="${LC_ALL:-C.UTF-8}"
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Dfile.encoding=UTF-8"
+# Joern's launchers honour JAVA_OPTS, and the JVM's default heap is a quarter of RAM,
+# which a large repository can exhaust (docs/scale.md, "Operating limits").
+# AUTOFORM_JOERN_XMX=8g appends -Xmx8g; a JAVA_OPTS the caller set is kept as is.
+if [ -n "${AUTOFORM_JOERN_XMX:-}" ]; then
+  if [[ ! "$AUTOFORM_JOERN_XMX" =~ ^[1-9][0-9]*[kKmMgGtT]?$ ]]; then
+    echo "autoform: AUTOFORM_JOERN_XMX must be a JVM heap size such as 8g, not '$AUTOFORM_JOERN_XMX'" >&2
+    exit 2
+  fi
+  export JAVA_OPTS="${JAVA_OPTS:-} -Xmx$AUTOFORM_JOERN_XMX"
+fi
 cd "$ROOT"
 
 # `009-reduce-remaining-holes-4`: `cartographer/run.sh`'s own `CPP_DEFINES`
@@ -169,8 +190,25 @@ echo "==> [1/8] parsing $SRC"
 # Bash 3.2 (macOS) treats an empty array as unset under `set -u`. Expand it only
 # when populated, without passing an empty argument to the frontend.
 if ! (cd "$WORK" && "$JOERN/joern-parse" "$SRC" --output "$WORK/cpg.bin" ${LANGUAGE_ARGS[@]+"${LANGUAGE_ARGS[@]}"} ${FRONTEND_ARGS[@]+"${FRONTEND_ARGS[@]}"}) >"$REPORT/parse.log" 2>&1; then
-  cat "$REPORT/parse.log" >&2
-  exit 1
+  # The one failure with a fallback: the frontend succeeded and the default dataflowOss
+  # overlay crashed after it (real Kotlin: ReachingDefPass, `key not found: MethodRef`).
+  # Parse again without overlays, apply the ones the exporter reads, and record that the
+  # dataflow overlay was skipped (cartographer/prepare_cpg.sc). Any other failure stops.
+  if ! grep -qE 'ReachingDefPass|dataflowengineoss' "$REPORT/parse.log"; then
+    cat "$REPORT/parse.log" >&2
+    exit 1
+  fi
+  OVERLAYS="dataflowOss skipped: the default joern-parse failed in the dataflow overlay; the exporter reads no dataflow"
+  echo "autoform: $OVERLAYS; re-parsing with --nooverlays + cartographer/prepare_cpg.sc" | tee -a "$REPORT/parse.log"
+  if ! (cd "$WORK" && "$JOERN/joern-parse" "$SRC" --nooverlays --output "$WORK/cpg-raw.bin" ${LANGUAGE_ARGS[@]+"${LANGUAGE_ARGS[@]}"} ${FRONTEND_ARGS[@]+"${FRONTEND_ARGS[@]}"}) >>"$REPORT/parse.log" 2>&1 \
+     || ! (cd "$WORK" && "$JOERN/joern" --script "$ROOT/cartographer/prepare_cpg.sc" \
+            --param cpgPath="$WORK/cpg-raw.bin" --param out="$WORK/cpg.bin") >>"$REPORT/parse.log" 2>&1 \
+     || ! grep -q '^prepared cpg without dataflowOss' "$REPORT/parse.log"; then
+    cat "$REPORT/parse.log" >&2
+    echo "==> [1/8] FAILED: the no-dataflow fallback failed too (see above)" >&2
+    exit 1
+  fi
+  rm -f "$WORK/cpg-raw.bin"
 fi
 
 STAGE=graph
@@ -194,9 +232,20 @@ if [ "$EXPORT_STATUS" -ne 0 ] || ! grep -qE "^exported" <<<"$EXPORT_OUT"; then
   exit 1
 fi
 grep -E "^exported" <<<"$EXPORT_OUT"
+# Joern can write a CPG with no method and exit 0 (a failed delombok, a frontend that
+# skipped every file); everything downstream would then "pass" on nothing.
+if grep -qE "^exported 0 functions \+ 0 module initializers" <<<"$EXPORT_OUT"; then
+  echo "==> [3/8] FAILED: the exporter produced an empty AST (0 functions); see $REPORT/parse.log" >&2
+  exit 1
+fi
 if [ -n "${AUTOFORM_LANGUAGE:-}" ]; then
   "$PYTHON" "$ROOT/scripts/repository_scope.py" "$WORK/ast.json" "$SRC" \
     "$AUTOFORM_LANGUAGE" "$REPORT/selection.json"
+else
+  # A Gradle/Maven root: drop build outputs, generated sources and test source sets
+  # the frontend parsed anyway, listed in selection.json. A no-op on other trees.
+  "$PYTHON" "$ROOT/scripts/repository_scope.py" "$WORK/ast.json" "$SRC" \
+    any "$REPORT/selection.json"
 fi
 cp "$WORK/ast.json" "$ROOT/ast-$MOD.json"
 cp "$WORK/ast.json" "$REPORT/ast-$MOD.json"

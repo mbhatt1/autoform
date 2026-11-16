@@ -319,11 +319,17 @@ theorem applyUnop_excSafe {d : Dialect} (hd : d = .python) (op : String) (a : Va
     | exact Stdlib.makeException_excSafe (Or.inr h)
     | (rename_i hne; cases hne; done)
 
-theorem valIn_ne_exn (x c : Val) {v : Val} : valIn x c = .exn v → False := by
+/-- A membership test raises only CPython's `TypeError` (a builtin scalar on the right, a
+builtin non-`str` left operand of a `str`, or -- in JavaScript only -- a primitive
+right operand, a `str` included). -/
+theorem valIn_excSafe (d : Dialect) (x c : Val) {v : Val} :
+    valIn d x c = .exn v → Stdlib.ExcSafe v := by
   intro h
   unfold valIn at h
   repeat' split at h
-  all_goals cases h
+  all_goals first
+    | (cases h; done)
+    | (cases h; exact Stdlib.excSafe_str (by decide))
 
 /-- Slice assignment fails only as CPython's `ValueError` (zero step, or an extended slice
 whose lengths differ); `Stmt.setSlice` raises the string it returns. -/
@@ -528,8 +534,11 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact (Iteration.builtin_excSafe _ _ _ _ (by assumption)).weaken)
   | (cases hy; exact (Iteration.containerMethod_excSafe _ _ _ _ _ _ (by assumption)).weaken)
   | (cases hy; exact (Stdlib.method_pure_excSafe hd _ _ _ _ _ _ (by assumption)).weaken)
+  | exact (Stdlib.method_pure_excSafe hd _ _ _ _ _ _
+      (boxStrMethod_exn_method hy (by assumption))).weaken
   | (cases hy; exact (Stdlib.method_mutating_not_exn hd _ _ _ _ _ _ _ (by assumption)).elim)
-  | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
+  | exact (valIn_excSafe _ _ _ (Prod.mk.inj hy).2).weaken
+  | exact (Stdlib.missingMethod_excSafe (Prod.mk.inj hy).2).weaken
   | exact (jsContainerField_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | exact (classMethodValue_ne_exn _ _ _ (Prod.mk.inj hy).2).elim
   | exact (storedAttributeValue_ne_exn _ _ _ _ _ (Prod.mk.inj hy).2).elim
@@ -547,6 +556,15 @@ macro "exc_close" : tactic => `(tactic| first
   | (exfalso; rename_i hne; rw [hd] at hne; exact hne (by decide))
   | (exfalso; rename_i hne; simp [hd] at hne)
   | (trace_state; fail "exc_close: no closer applies"))
+
+/-- `split`'s allocation (`boxStrMethodResult`) passes a method's exception through. -/
+theorem boxStrMethod_exn_method {d d' : Dialect} {recv recv' : Val} {m : String}
+    {h h₂ h' : Heap} {vs : List Val} {r : EResult} {v : Val}
+    (hy : boxStrMethodResult d recv h₂ r = (h', .exn v))
+    (hb : Stdlib.method d' h recv' m vs = some (h₂, .pure r)) :
+    Stdlib.method d' h recv' m vs = some (h₂, .pure (.exn v)) := by
+  obtain ⟨hr, _⟩ := boxStrMethodResult_exn_inv hy
+  rw [hb, hr]
 
 /-- `dict()`'s allocation (`boxBuiltinResult`) passes a builtin's exception through. -/
 theorem boxBuiltin_exn_builtin {d d' : Dialect} {f : String} {h h₂ h' : Heap} {vs : List Val}

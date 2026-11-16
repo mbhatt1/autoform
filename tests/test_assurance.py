@@ -71,9 +71,13 @@ def test_stage_deadline_rejects_invalid_limits(tmp_path, limit):
         assure.Assurance(tmp_path, 'Check', tmp_path, stage_timeout=limit)
 
 
+@pytest.mark.parametrize('inherited', ['default', 'ignored'])
 @pytest.mark.parametrize('signum', ['SIGINT', 'SIGTERM'])
 @pytest.mark.parametrize('mixed', [False, True])
-def test_driver_cancellation_finalizes_and_releases_stage_resources(tmp_path, signum, mixed):
+def test_driver_cancellation_finalizes_and_releases_stage_resources(tmp_path, signum, mixed, inherited):
+    """`inherited='ignored'` starts the driver the way a background job does (`cmd &` in a
+    non-interactive shell): SIGINT at SIG_IGN, which Python keeps. Cancellation must not
+    depend on it -- with it, SIGINT was silently dropped and the driver ran on."""
     import fcntl
     import signal
     import subprocess
@@ -98,8 +102,9 @@ def test_driver_cancellation_finalizes_and_releases_stage_resources(tmp_path, si
               'implementation = assure.Assurance\n'
               f'assure.Assurance = lambda *args, **kwargs: implementation(*args, root={str(tmp_path)!r}, **kwargs)\n'
               f'sys.exit(assure.main([{str(source)!r}, "Check"]))\n')
+    ignore = (lambda: signal.signal(signal.SIGINT, signal.SIG_IGN)) if inherited == 'ignored' else None
     process = subprocess.Popen([sys.executable, '-c', driver], stdout=subprocess.PIPE,
-                               stderr=subprocess.STDOUT, text=True)
+                               stderr=subprocess.STDOUT, text=True, preexec_fn=ignore)
     try:
         deadline = time.monotonic() + 10
         while not ready.exists():
@@ -140,10 +145,18 @@ def test_driver_cancellation_finalizes_and_releases_stage_resources(tmp_path, si
                 pass
 
 
+@pytest.mark.parametrize('inherited', ['default', 'ignored'])
 @pytest.mark.parametrize('phase', ['baseline', 'mutant'])
-def test_stage_deadline_restores_mutation_source(tmp_path, phase):
+def test_stage_deadline_restores_mutation_source(tmp_path, phase, inherited, request):
+    """`inherited='ignored'`: the caller runs with SIGINT ignored (a background job). The
+    stage still receives the cleanup SIGINT, because its ignored disposition is not
+    inherited (`assure._default_sigint`); before, mutate.py never saw it and was killed
+    with the mutant in place."""
     import fcntl
     import signal
+    if inherited == 'ignored':
+        previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        request.addfinalizer(lambda: signal.signal(signal.SIGINT, previous))
 
     assure = load(str(Path(SCRIPTS) / 'assure.py'), 'af_mutation_deadline')
     source = tmp_path / 'Check.lean'

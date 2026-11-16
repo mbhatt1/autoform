@@ -80,6 +80,26 @@ SPECS = {
     "SpecsGen/Django": "Django",
     # Linux lib/math (gcd.c, lcm.c), re-landed 2026-10-10 from kernel tag v7.2.
     "SpecsGen/LinuxLcm": "LinuxLcm",
+    # The example-fixture corpora (examples/source/<lang>), re-exported 2026-10-21 to
+    # retire their provenance backlog entries; their spec modules pin the same way as
+    # the real corpora, and an entry whose module does not exist yet is skipped above.
+    "SpecsGen/LangC": "LangC",
+    "SpecsGen/LangGo": "LangGo",
+    "SpecsGen/LangJS": "LangJS",
+    "SpecsGen/LangJava": "LangJava",
+    "SpecsGen/LangKt": "LangKt",
+    "SpecsGen/LangTS": "LangTS",
+    # The first real open-source corpora for Go, JS, TS and Kotlin (2026-10-22): the
+    # fixture-level oracle evidence for these languages is finally joined by a measured
+    # repository each (docs/languages.md names the revisions). AlgosGo is the
+    # TheAlgorithms/Go math/binary package (BitCounter, MeanUsingAndXor,
+    # MeanUsingRightShift) -- integer/bool bit-manipulation the Go runtime oracle drives
+    # without the NaN-equality refutation that any float-returning body would hit at
+    # synth time.
+    "SpecsGen/AlgosGo": "AlgosGo",
+    "SpecsGen/BitJS": "BitJS",
+    "SpecsGen/AlgosTS": "AlgosTS",
+    "SpecsGen/AlgosKt": "AlgosKt",
 }
 
 

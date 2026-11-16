@@ -257,3 +257,68 @@ end Autoform.Generated.NestedTest
     result = subprocess.run(['lake', 'env', 'lean', str(path)], cwd=ROOT, env=env,
                             text=True, capture_output=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_case_literal_folds_recorded_statics_into_the_heap(monkeypatch, differential):
+    """`differential.py` records the statics bindings a JVM case ran with as `globals`;
+    a refutation harness that replays the observation alone has to rebuild them, or a
+    static field read stays the hole `field:f:non-object` and the candidate is
+    `not_checked` (31 of 114 CommonsLang3 conformance candidates at once)."""
+    monkeypatch.setenv('AUTOFORM_NO_REEXEC', '1')
+    synth = load(str(Path(SCRIPTS) / 'synth_specs.py'), 'af_synth_case_lit_statics')
+    # A case without recorded statics renders byte-for-byte as before: every corpus
+    # without a globals frame (all non-JVM subjects, every fuzz domain) is unchanged.
+    plain = synth.case_lit({'heap': [], 'self': None, 'args': []})
+    assert plain == '{ heap := h0 ++ [], self := none, args := [] }'
+    statics = {'heap': [['<module>static:p.Codes', [['CODES', ('str', 'A')]]]],
+               'self': None, 'args': [],
+               'globals': [('<static>p.Codes', ('ref', 0)), ('Codes', ('ref', 0))]}
+    # Each binding is folded into the globals frame at `gref`, exactly as the recording
+    # harness (`drun`'s setField chain) does; refs stay case-relative via `base`.
+    assert synth.case_lit(statics) == (
+        '{ heap := Heap.setField '
+        '(Heap.setField (h0 ++ [{ cls := "<module>static:p.Codes", '
+        'fields := [("CODES", Val.str "A")] }]) '
+        'gref "<static>p.Codes" (Val.ref (base + 0))) '
+        'gref "Codes" (Val.ref (base + 0)), self := none, args := [] }')
+
+
+def test_a_recorded_static_read_replays_hole_free(tmp_path, monkeypatch, differential):
+    """The point of recording `globals`: the refutation replays a Java static field
+    read (`C.f`, `.field (.fnref "C") "f"`) through the folded globals frame and the
+    observation is CHECKED -- without the fold the read is `field:CODES:non-object`
+    and the candidate is `not_checked`."""
+    env = dict(os.environ, PATH=str(Path.home() / '.elan/bin') + os.pathsep + os.environ['PATH'])
+    if not shutil.which('lake', path=env['PATH']):
+        if os.environ.get('AUTOFORM_REQUIRE_LEAN'):
+            pytest.fail('Lean is required')
+        pytest.skip('Lean is not installed')
+    monkeypatch.setenv('AUTOFORM_NO_REEXEC', '1')
+    synth = load(str(Path(SCRIPTS) / 'synth_specs.py'), 'af_synth_statics_replay')
+    monkeypatch.setattr(synth, 'FUEL', 8)
+    # The frozen module-initialiser heap holds the globals frame at `gref`, the way
+    # `globals_literal` probes it for a real module: index 0 is the frame, the case
+    # heap lands after it and `base` counts it.
+    monkeypatch.setattr(synth, 'GLOBALS',
+                        ('[ { cls := "<globals>", fields := [] } ]', '0'))
+    program = '''namespace Autoform.Generated.StaticsReplay
+open Autoform.Core
+def f_known : Func :=
+  { name := "p.Codes.known:java.lang.String()", params := []
+  , body := .ret (.field (.fnref "p.Codes") "CODES") }
+def program : Program := { dialect := .java, funcs := [f_known] }
+end Autoform.Generated.StaticsReplay
+'''
+    run = synth.lean_run
+    monkeypatch.setattr(synth, 'lean_run', lambda source, *args, **kwargs:
+                        run(source.replace('import Autoform.Generated.StaticsReplay\n', program),
+                            *args, **kwargs))
+    rec = {'heap': [['<module>static:p.Codes', [['CODES', ('str', 'A')]]]],
+           'self': None, 'args': [],
+           'globals': [('<static>p.Codes', ('ref', 0))],
+           'outcome': ('val', ('str', 'A'))}
+    candidate = synth.Cand('conform_known', 'conform', 'native test', 'known', 'f_known',
+                          'lawConform C FUEL f_known', [synth.obs_lit(rec)], dom_kind='obs')
+    synth.refute([candidate], 'StaticsReplay')
+    assert candidate.status == 'candidate', candidate.checked
+    assert candidate.checked['holes'] == 0, candidate.checked

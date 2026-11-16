@@ -1,0 +1,153 @@
+[
+ {
+  "name": "algos.local/binary.MeanUsingAndXor",
+  "file": "arithmeticmean.go",
+  "sourceName": "MeanUsingAndXor",
+  "paramTypes": [
+   "int",
+   "int"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:i64:+",
+    "a": {
+     "k": "binop",
+     "op": "num:go:i64:>>",
+     "a": {
+      "k": "binop",
+      "op": "num:go:i64:^",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     },
+     "b": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "num:go:i64:&",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "algos.local/binary.MeanUsingRightShift",
+  "file": "arithmeticmean.go",
+  "sourceName": "MeanUsingRightShift",
+  "paramTypes": [
+   "int",
+   "int"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:go:i64:>>",
+    "a": {
+     "k": "binop",
+     "op": "num:go:i64:+",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    },
+    "b": {
+     "k": "int",
+     "v": "1"
+    }
+   }
+  }
+ },
+ {
+  "name": "algos.local/binary.BitCounter",
+  "file": "bitcounter.go",
+  "sourceName": "BitCounter",
+  "paramTypes": [
+   "uint"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   "u64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "counter",
+     "e": {
+      "k": "unop",
+      "op": "cast:i64",
+      "a": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "holeS",
+      "label": "control:FOR:range"
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "counter"
+      }
+     }
+    }
+   }
+  }
+ }
+]

@@ -147,7 +147,7 @@ def defect_prior(allowed, result, native_match, unsupported=()) -> dict:
     return {k: v for k, v in prior.items() if k in allowed}
 
 
-def _guard_atoms(fn, params_by_name):
+def _guard_atoms(fn):
     """Comparisons over parameters that the function itself branches on."""
     out = []
     names = {p.name: p.id for p in fn.params}
@@ -174,7 +174,6 @@ def _guard_atoms(fn, params_by_name):
 def repairs(claim, result, fn, ctx) -> list:
     """Candidate repairs of a refuted claim, each a complete new claim."""
     base = C.complexity(claim)
-    witness = (result.get('witness') or {}).get('inputs', {})
     out = []
 
     def add(rid, text, new, kind, new_assumptions=0, evidence='none'):
@@ -220,7 +219,7 @@ def repairs(claim, result, fn, ctx) -> list:
         add('ALLOW_EXCEPTIONS', 'Treat a raised exception as permitted behavior (the function signals '
             'invalid input by raising).', new, 'exceptions')
     # Preconditions from the function's own guards (evidence-backed, not witness-shaped).
-    for i, atom in enumerate(_guard_atoms(fn, witness)):
+    for i, atom in enumerate(_guard_atoms(fn)):
         new = copy.deepcopy(claim)
         new['preconditions'] = claim['preconditions'] + [atom]
         add(f'GUARD_PRECONDITION_{i}', 'Add precondition taken from a branch in the code: ' +

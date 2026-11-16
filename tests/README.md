@@ -19,8 +19,9 @@ name unless `ast-Django.json` is on disk (`scripts/ledger_corpus.sh`).
 Set `AUTOFORM_TEST_JOERN=1` to run its source → Joern → Lean comparisons against
 CPython, Java, Go, C, and Node; these require the corresponding runtimes and Joern.
 The corpus covers lifted assignment effects, operand/call/index ordering, primitive
-casts, and object aliases. Strict expected failures record unsupported JavaScript
-array construction and string indexing; they are not native agreements.
+casts, and object aliases. The two JavaScript cases (array construction and string
+indexing) that used to be strict expected failures are ordinary tests now
+(`test_source_numeric.py`, "Formerly two strict xfails").
 See [typed-numerics.md](../docs/typed-numerics.md) for scope and commands.
 
 `AUTOFORM_TEST_JOERN=1 python -m pytest tests/test_source_pipeline.py -q` runs all
@@ -82,6 +83,50 @@ Exception: `test_machine_frontend.py` tests the optional binary/assembly path. I
 and proof tests require Lean, and the native oracle requires clang. These tests skip
 when optional tools are absent. The dedicated machine CI job installs them and sets
 `AUTOFORM_REQUIRE_LEAN=1` so missing Lean cannot become a silent skip.
+
+## Running the gated tests
+
+Most of the test suite runs without opt-in. The following test groups require explicit
+environment variables and prerequisites:
+
+- **`AUTOFORM_TEST_JOERN=1`** — Joern-backed parse/export and native differential oracle
+  comparisons. Requires Joern at `$JOERN_HOME` (default `~/joern`); on macOS also requires
+  GNU coreutils' `greadlink` on PATH for Joern's launcher scripts. Tests: `test_source_*`,
+  `test_control_flow`, `test_python_handlers`, `test_python_raises`, `test_python_signatures`,
+  `test_linux_pipeline` and `test_*_pipeline` variants (Java, Kotlin, C, C++, Go, JavaScript).
+
+- **`AUTOFORM_TEST_LEAN=1`** — Lean-backed proof stages and the natural-language pipeline.
+  Requires this checkout's `lake build` (the NL tests honour `AUTOFORM_LEAN_ROOT` /
+  `AUTOFORM_NL_LEAN_ROOT` to point at another lake root);
+  pipeline models are built on demand by the `pipeline_model` fixture via `autoform.sh`.
+  Tests: `test_nl_*`, `test_spec_synthesis`, `test_security_specs`, `test_rust_*` and others.
+
+- **`AUTOFORM_TEST_ORACLES=1`** — Differential oracle tests for specific languages. Requires
+  the language toolchain on PATH: `javac` (Java, Kotlin), `node` (JavaScript/TypeScript),
+  `go` (Go), `cc` (C), `kotlinc` (Kotlin). Tests: `test_java_*`, `test_kotlin_*`, `test_node_*`,
+  `test_c_*` and language-specific tests.
+
+- **`AUTOFORM_TEST_WHEEL=<built-wheel>`** — Distribution integrity and E2E tests.
+  Requires a path to the built `.whl` file. Also set `AUTOFORM_TEST_INSTALLED_E2E=1`
+  to install the wheel in a clean environment and test it; the `autoform` command must
+  be on PATH after installation. Tests: `test_package`.
+
+- **Rust tests** — `test_rust_aeneas`, `test_rust_regress`, `test_rust_unit`.
+  Requires: `AENEAS_HOME` (unpacked pinned Aeneas release with charon and aeneas binaries),
+  `AUTOFORM_RUST_LEAN_PROJECT` (scratch Lake project with Aeneas library built via
+  `scripts/rust_setup.sh`), and rustup proxies with nightly-2026-09-17 first on PATH
+  (not a distro rustc). Set `AUTOFORM_RUST_REQUIRED=1` to fail on missing prerequisites
+  instead of skipping.
+
+- **Machine-code tests** — `test_machine_frontend.py` and machine comparisons in `regress`.
+  Requires clang with AArch64 target support (`clang -target aarch64-unknown-linux-gnu`)
+  and `ld.lld` (LLVM ELF linker); tests skip when these are absent. A missing Lean
+  toolchain is a failure instead of a skip when `AUTOFORM_REQUIRE_LEAN=1` is set.
+
+- **Corpus-based regression tests** — `test_defect_cachetools_negative`, `test_defect_linux_lcm`.
+  Requires digest-pinned corpora under `~/.cache/autoform/corpora`: cachetools
+  7.1.4–7.1.7 composites and the linux-v7.2 sparse skeleton. See `docs/evidence-*.md`
+  for where to fetch them and how to verify.
 
 ## What this suite is for
 

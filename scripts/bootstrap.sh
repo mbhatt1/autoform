@@ -8,7 +8,8 @@
 #   1. host     : names the OS/arch and every prerequisite it will NOT install for you
 #   2. elan     : installs elan if absent and the toolchain pinned in `lean-toolchain`
 #   3. python   : a `.venv` on the first interpreter >= 3.10 it finds, with requirements.txt
-#   4. joern    : the release pinned in `joern-version`, verified by sha512 before unzip,
+#   4. joern    : the release pinned in `joern-version`, verified against the committed
+#                 `joern-sha512` before unzip (from the release, a mirror or a local zip),
 #                 then checked against the jars on disk (scripts/provenance.py)
 #   5. build    : the CI closure, with the memory sequencing ci.yml uses — the two ~13 GB
 #                 cachetools modules one at a time, then `Autoform.CI`
@@ -25,6 +26,9 @@
 # Tested: macOS 26 arm64, 2026-10-10 (log attached to the roadmap item).
 # NOT tested: Ubuntu. The Linux branches are transcribed from .github/workflows/ci.yml,
 # which is what runs on ubuntu-latest, but this script itself has not been run there.
+# The AUTOFORM_JOERN_URL / AUTOFORM_JOERN_ZIP paths (2026-10-18) were checked by running
+# step 4's verification lines on stand-in zips (a match, a tampered zip, a stale pin, a
+# missing asset), not by a full bootstrap run.
 #
 # Environment (all optional):
 #   AUTOFORM_PYTHON             interpreter for the venv (default: python3.12, 3.11, 3.13, python3)
@@ -32,6 +36,13 @@
 #   AUTOFORM_CACHETOOLS_DIR     where the corpus is cloned (default: /tmp/cachetools, as CI)
 #   AUTOFORM_BOOTSTRAP_ROOT     Autoform.CI (default, what CI proves) or Autoform (the whole
 #                               project incl. SpecsGen.V8Base: ~25 GB peak, release checklist)
+#   AUTOFORM_JOERN_URL          directory URL holding joern-cli-<os>-<arch>.zip, replacing the
+#                               upstream release (an internal artifact mirror)
+#   AUTOFORM_JOERN_ZIP          a local copy of that zip; nothing is downloaded for Joern
+#                               Either way the zip must match the committed joern-sha512.
+#   Behind a proxy, curl and git read HTTPS_PROXY / NO_PROXY themselves; git mirrors for the
+#   corpus and the Lake dependencies are `git config url.<mirror>.insteadOf <origin>`
+#   (docs/packaging.md, "Restricted networks and internal mirrors").
 #
 # Exit status: 0 only when every step ran and the audit printed VERDICT: PASS.
 set -Eeuo pipefail
@@ -177,15 +188,24 @@ elif [ -d "$JOERN_HOME/joern-cli" ]; then
   die "$JOERN_HOME/joern-cli exists but does not match the pin ($JOERN_PIN). Not overwriting someone's install: remove it, or point JOERN_HOME at an empty directory, and re-run."
 else
   ASSET="joern-cli-${OS_NAME}-${JOERN_ARCH}.zip"
-  URL="https://github.com/joernio/joern/releases/download/v${JOERN_PIN}"
+  URL="${AUTOFORM_JOERN_URL:-https://github.com/joernio/joern/releases/download/v${JOERN_PIN}}"
+  # The hash comes from the committed joern-sha512, never from where the zip came from:
+  # a mirror or a local copy can supply the bytes but cannot choose them.
+  [ "$(sed -n 1p joern-sha512 2>/dev/null)" = "# joern $JOERN_PIN" ] \
+    || die "joern-sha512 does not pin joern $JOERN_PIN (re-pin it together with joern-version)"
   dl="$(mktemp -d)"
-  # The .sha512 manifest names the zip as target/<asset>, so it is fetched there (ci.yml).
+  # The pinned lines name the zip as target/<asset>, as the release's .sha512 does (ci.yml).
   mkdir -p "$dl/target" "$JOERN_HOME"
-  echo "downloading $URL/$ASSET (about 1.7 GB)"
-  # -sS: no progress meter (a logged run is otherwise 60 KB of carriage returns), errors still shown.
-  curl -sSfL --retry 5 --retry-all-errors "$URL/$ASSET" -o "$dl/target/$ASSET"
-  curl -sSfL --retry 5 --retry-all-errors "$URL/$ASSET.sha512" -o "$dl/$ASSET.sha512"
-  (cd "$dl" && "${SHA512_CHECK[@]}" "$ASSET.sha512") || die "sha512 of $ASSET does not match the release manifest"
+  grep "  target/$ASSET\$" joern-sha512 > "$dl/$ASSET.sha512" || die "joern-sha512 has no hash for $ASSET"
+  if [ -n "${AUTOFORM_JOERN_ZIP:-}" ]; then
+    echo "using local $AUTOFORM_JOERN_ZIP as $ASSET (AUTOFORM_JOERN_ZIP)"
+    cp "$AUTOFORM_JOERN_ZIP" "$dl/target/$ASSET"
+  else
+    echo "downloading $URL/$ASSET (about 1.7 GB)"
+    # -sS: no progress meter (a logged run is otherwise 60 KB of carriage returns), errors still shown.
+    curl -sSfL --retry 5 --retry-all-errors "$URL/$ASSET" -o "$dl/target/$ASSET"
+  fi
+  (cd "$dl" && "${SHA512_CHECK[@]}" "$ASSET.sha512") || die "sha512 of $ASSET does not match the pin in joern-sha512"
   unzip -q "$dl/target/$ASSET" -d "$JOERN_HOME"
   rm -rf "$dl"
   # Reads the version out of the jar names on disk: catches an unzip that "worked"

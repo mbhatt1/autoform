@@ -16,6 +16,10 @@ SRC="${1:?usage: run.sh <source-dir> [out.json]}"
 OUT="${2:-formalization-graph.json}"
 JOERN="${JOERN_HOME:-$HOME/joern}/joern-cli"
 WORK="$(mktemp -d)"
+# Same JVM heap knob as autoform.sh: AUTOFORM_JOERN_XMX=8g appends -Xmx8g to JAVA_OPTS.
+if [ -n "${AUTOFORM_JOERN_XMX:-}" ]; then
+  export JAVA_OPTS="${JAVA_OPTS:-} -Xmx$AUTOFORM_JOERN_XMX"
+fi
 
 FRONTEND_ARGS=()
 if [ -n "${CPP_DEFINES:-}" ]; then

@@ -332,6 +332,146 @@ class TestScoringRules:
         assert "if rc == 0 or timed_out or all_error_lines(out):" in src
 
 
+UMBRELLA = 'Autoform.SpecsGen.Check'
+PART1, PART2 = UMBRELLA + '.Part1', UMBRELLA + '.Part2'
+
+
+class TestTargetedParts:
+    """`--targeted-parts`: a mutant of F builds only the split-spec parts holding a theorem
+    about F, one `lake build` per part, while baseline and restore build the umbrella.
+
+    The fixture is a split specification: Part1 proves `ta` about `a`, Part2 proves `tb`
+    about `b` (and, where a test needs a subject spread over two parts, `tc` about `a`)."""
+
+    def _fixture(self, tmp_path, monkeypatch, mutate, failure, tc=False):
+        source = tmp_path/'Autoform/Generated/Check.lean'
+        umbrella = tmp_path/'Autoform/SpecsGen/Check.lean'
+        parts = tmp_path/'Autoform/SpecsGen/Check'
+        parts.mkdir(parents=True)
+        source.parent.mkdir(parents=True)
+        original = 'def a : Nat := 1\ndef b : Nat := 2\n'
+        source.write_text(original)
+        umbrella.write_text(''.join(f'import {UMBRELLA}.{p}\n' for p in ('Base', 'Part1', 'Part2')))
+        (parts/'Base.lean').write_text('import Autoform.Generated.Check\n')
+        (parts/'Part1.lean').write_text(f'import {UMBRELLA}.Base\n\ntheorem ta : a = 1 := rfl\n')
+        (parts/'Part2.lean').write_text(f'import {UMBRELLA}.Base\n\ntheorem tb : b = 2 := rfl\n'
+                                        + ('\ntheorem tc : a = 1 := rfl\n' if tc else ''))
+        (tmp_path/'lakefile.toml').write_text('name="fixture"\n')
+        built = []
+
+        def run_build(root, module, timeout):
+            built.append(module)
+            return (0, '', False) if source.read_text() == original else failure(module)
+
+        monkeypatch.setattr(mutate, 'run_build', run_build)
+        monkeypatch.setattr(mutate, 'gen_mutants_generated', mutate.gen_mutants)
+        report = tmp_path/'mutation.json'
+        argv = ['mutate.py', str(source), 'Autoform.Generated.Check', '--spec-file', str(umbrella),
+                '--spec-module', UMBRELLA, '--json', str(report)]
+        return source, original, built, report, argv
+
+    @staticmethod
+    def _killing(module):
+        part = module.rsplit('.', 1)[1]
+        return (1, f'error: Autoform/SpecsGen/Check/{part}.lean:3:0: unsolved goals', False)
+
+    def test_a_mutant_builds_only_its_subjects_part(self, tmp_path, monkeypatch, mutate):
+        source, original, built, report, argv = self._fixture(tmp_path, monkeypatch, mutate,
+                                                              self._killing)
+        monkeypatch.setattr('sys.argv', argv + ['--subject', 'ta=a;tb=b', '--targeted-parts',
+                                                '--max-mutants', '2'])
+        assert mutate.main() == 0
+        data = json.loads(report.read_text())
+        assert built[0] == UMBRELLA and built[-1] == UMBRELLA
+        by_decl = {r['decl']: r for r in data['mutants']}
+        assert set(by_decl) == {'a', 'b'}
+        assert sorted(built[1:-1]) == [PART1, PART2]
+        assert by_decl['a']['built_modules'] == [PART1]
+        assert by_decl['a']['verdict'] == {'ta': 'killed', 'tb': 'not-built'}
+        assert by_decl['b']['verdict'] == {'ta': 'not-built', 'tb': 'killed'}
+        assert data['build_scope'] == 'targeted-parts' and data['spec_module'] == UMBRELLA
+        assert data['targeted_modules'] == {'a': [PART1], 'b': [PART2]}
+        assert data['theorems']['ta']['killed'] == 1 and data['theorems']['ta']['survived'] == 0
+        assert data['theorems']['ta']['coverage_score'] is None
+        assert 'not measured' in data['theorems']['ta']['coverage_reason']
+        assert source.read_text() == original
+
+    def test_a_clean_targeted_build_is_a_survival(self, tmp_path, monkeypatch, mutate):
+        source, original, built, report, argv = self._fixture(
+            tmp_path, monkeypatch, mutate, lambda module: (0, '', False))
+        monkeypatch.setattr('sys.argv', argv + ['--subject', 'ta=a;tb=b', '--targeted-parts',
+                                                '--decls', 'a', '--max-mutants', '1'])
+        # `tb` has no mutants (--decls a), so it is UNTESTED and exit 2 outranks the
+        # survivor's exit 1, exactly as a --decls-restricted run does in default mode.
+        assert mutate.main() == 2
+        data = json.loads(report.read_text())
+        assert built == [UMBRELLA, PART1, UMBRELLA]
+        assert data['mutants'][0]['verdict'] == {'ta': 'survived', 'tb': 'not-built'}
+        assert data['theorems']['ta']['survived'] == 1
+        assert data['theorems']['tb']['killed'] == data['theorems']['tb']['survived'] == 0
+        assert source.read_text() == original
+
+    def test_an_ill_typed_mutant_stops_after_the_first_part(self, tmp_path, monkeypatch, mutate):
+        source, original, built, report, argv = self._fixture(
+            tmp_path, monkeypatch, mutate,
+            lambda module: (1, 'error: Autoform/Generated/Check.lean:1:0: type mismatch', False),
+            tc=True)
+        monkeypatch.setattr('sys.argv', argv + ['--subject', 'ta=a;tb=b;tc=a', '--targeted-parts',
+                                                '--decls', 'a', '--max-mutants', '1'])
+        mutate.main()
+        data = json.loads(report.read_text())
+        assert data['targeted_modules'] == {'a': [PART1, PART2]}
+        assert built == [UMBRELLA, PART1, UMBRELLA]
+        assert data['mutants'][0]['verdict'] == 'invalid'
+        assert data['mutants'][0]['built_modules'] == [PART1]
+        assert source.read_text() == original
+
+    @pytest.mark.parametrize('extra', [
+        ['--targeted-parts'],
+        ['--targeted-parts', '--subject', 'ta=a', '--spec-module', 'Autoform.SpecsGen.Other'],
+    ])
+    def test_targeted_mode_refuses_what_it_cannot_map(self, tmp_path, monkeypatch, mutate, extra):
+        source, original, built, report, argv = self._fixture(tmp_path, monkeypatch, mutate,
+                                                              self._killing)
+        monkeypatch.setattr('sys.argv', argv + extra)
+        with pytest.raises(SystemExit):
+            mutate.main()
+        assert built == [] and source.read_text() == original
+
+    def test_default_mode_builds_only_the_umbrella(self, tmp_path, monkeypatch, mutate):
+        source, original, built, report, argv = self._fixture(
+            tmp_path, monkeypatch, mutate, lambda module: (0, '', False))
+        monkeypatch.setattr('sys.argv', argv + ['--subject', 'ta=a;tb=b', '--max-mutants', '2'])
+        mutate.main()
+        data = json.loads(report.read_text())
+        assert built and set(built) == {UMBRELLA}
+        assert data['build_scope'] == 'spec-module' and 'targeted_modules' not in data
+        for record in data['mutants']:
+            assert record['built_modules'] == [UMBRELLA]
+            assert 'not-built' not in record['verdict'].values()
+        assert data['theorems']['ta']['coverage_score'] is not None
+        assert source.read_text() == original
+
+    def test_mutation_adequacy_accepts_not_built_only_off_subject(self, tmp_path, monkeypatch, mutate):
+        from conftest import SCRIPTS, load
+        security = load(str(Path(SCRIPTS)/'security_specs.py'), 'af_security_specs_mutate_test')
+        source, original, built, report, argv = self._fixture(tmp_path, monkeypatch, mutate,
+                                                              self._killing)
+        monkeypatch.setattr('sys.argv', argv + ['--subject', 'ta=a;tb=b', '--targeted-parts',
+                                                '--max-mutants', '2'])
+        assert mutate.main() == 0
+        data = json.loads(report.read_text())
+        assert security.mutation_adequate(data, 'ta', 'a')
+        assert security.mutation_adequate(data, 'tb', 'b')
+        # The same records under the umbrella scope would mean a theorem was built and gave
+        # no verdict, which is not acceptable evidence.
+        assert not security.mutation_adequate(dict(data, build_scope='spec-module'), 'ta', 'a')
+        # And a mutant of the theorem's own subject must have built it.
+        own = next(r for r in data['mutants'] if r['decl'] == 'a')
+        own['verdict']['ta'] = 'not-built'
+        assert not security.mutation_adequate(data, 'ta', 'a')
+
+
 class TestDiagnosticCalibration:
     """`error_lines_sanity` — the guard the regex comment promises.
 

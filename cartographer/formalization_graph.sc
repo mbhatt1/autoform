@@ -51,7 +51,10 @@ import scala.collection.mutable
 
   val methods = cpg.method.isExternal(false).l
   val rows = methods.map { m =>
-    val callees = m.callee.fullName.dedup.l
+    // Operator dispatch (`<operator>.assignment`, `.addition`, ...) is spelled as a
+    // callee by Joern but is not a dependency to formalize first; counting it inflated
+    // fan-out for every method with an assignment (STRATEGY.md §13, Tier 4).
+    val callees = m.callee.fullName.dedup.l.filterNot(_.startsWith("<operator>"))
     val effects = effectsOf(m)
     ujson.Obj(
       "name"            -> m.fullName,

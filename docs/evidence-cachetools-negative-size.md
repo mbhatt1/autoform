@@ -79,9 +79,13 @@ scripts/differential.py ast-DefectCachetoolsNeg.json <corpus> DefectCachetoolsNe
 ```
 
 with `<corpus>` = `cachetools-7.1.5-sdist-with-tests` (cross revision) and
-`cachetools-7.1.4-lib-7.1.5-tests` (same-revision control). The AST is 3,229,674 bytes,
-sha256 `557473f4…0f5e5a`, over the 3 MB tracking limit, so it and its provenance record are
-gitignored and regenerated from the pinned corpus; the replay test checks the digest.
+`cachetools-7.1.4-lib-7.1.5-tests` (same-revision control). The AST is 3,228,162 bytes,
+sha256 `29daa945…11b6c498`, over the 3 MB tracking limit, so it and its provenance record are
+gitignored and regenerated from the pinned corpus; the replay test checks the digest. It was
+re-pinned on 2026-10-20: the exporter now lowers `for x in range(...)` headers, which changed
+6 functions of the corpus's own test suite (`test_pickle_maxsize`, four `ThreadingTest`
+stampede/locked tests, `test_ttu_heap_cleanup`) and none under `cachetools/`; the exporter of
+the runs below still produces `557473f4…0f5e5a`, 3,229,674 bytes, from the same CPG.
 Exported 473 functions + 19 module initializers; rendered 493 functions.
 
 ## The divergence

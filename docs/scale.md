@@ -34,6 +34,24 @@ parameterized, and one superlinear stage.
 the two blocking failures are one-line configuration changes, the third (the ledger) is a
 data-structure change, and none of them are in the semantics.
 
+## Operating limits
+
+Every limit below is either configurable or recorded when it is hit; none of them drops
+input without saying so.
+
+| limit | default | knob | when it is hit |
+|---|---|---|---|
+| size of one supported source file | 16 MiB | `--max-file-bytes N`, `AUTOFORM_MAX_FILE_BYTES` (`0` = none) | Joern is passed `--exclude` for the file; the inventory keeps it as unsupported and lists it under `excluded` (`max_file_bytes`), `context.json` under `excluded_files`. A path containing a comma cannot be given to Joern's `--exclude`, so that file is recorded as over the cap and still parsed |
+| Joern JVM heap | JVM default, a quarter of RAM | `AUTOFORM_JOERN_XMX=8g`, or `-Xmx` in `JAVA_OPTS` | the parse or export stage fails and its log is kept; `autoform doctor` prints the default heap for this host |
+| Lean memory per process | 1000 functions per part | `--shard-functions N` | see "Sharded rendering" below |
+| functions exported | 100,000 | `export_ast.sc --param maxMethods=N` | `truncated_by_method_limit` in `source-coverage.json` |
+| whole run | none | `--timeout SECONDS` (`source`, `assure`) | exit `143`; `pipeline.json` (`source`) or `run.json` (`assure`) names the stage it stopped in |
+| one `assure` stage | 7200 s | `--stage-timeout SECONDS` | that stage is `timed_out`, its log is kept, the guarantee is withheld |
+| directory nesting | Python's recursion limit | none | an inventory error; `scan_complete` is false |
+
+Paths with spaces, non-ASCII names and deep trees go through inventory and scope
+unchanged (`tests/test_large_repository_robustness.py`).
+
 ## Measurements
 
 Wall-clock seconds per stage, peak RSS of the whole stage process tree (`/usr/bin/time`).
@@ -65,9 +83,58 @@ below).
 
 ### Coverage, from the ledger
 
+The table below is the output of `scripts/scale_table.py`, which reads
+`ledger-<Module>.json` for the eight scale corpora named in
+`docs/GOAL-arbitrary-codebases.md` and prints one row each: functions, hole-free,
+verifiable core (`closedByTranslation`), `closedByContract`, holes, and whether the
+GOAL bar (>= 85 % hole-free, >= 60 % in the core) holds — a row that misses it names
+the top hole label and count from `holesByLabel`, as milestone 7's exit criterion asks.
+The ledgers are gitignored run products: `scripts/ledger_corpus.sh <src> <Module>`
+regenerates one (export, render, Python ledger, no `lake build`), and
+`scripts/reland_corpus.sh <src> <Module>` does the full cascade. A corpus whose ledger
+is not on disk gets the words "ledger not on disk", not a remembered number. The
+`requests`, `click` and `jinja2` rows are pinned by `scripts/check_docs.py` like the
+`cachetools` row (re-derived when the ledger is present, named UNBOUND when it is not,
+since CI regenerates only the cachetools and commons-lang3 ledgers).
+
+Snapshot 2026-11-13, `d8a7b74`, `python3 scripts/scale_table.py`:
+
+| repo | functions | hole-free | verifiable core (closed by translation) | closed by contract | holes | bar (>= 85 % hole-free, >= 60 % core) |
+|---|--:|--:|--:|--:|--:|---|
+| `cachetools` (published) | 209 | 204 (97%) | 150 (71%) | 0 | 5 | holds |
+| `sqlparse` | ledger not on disk | — | — | — | — | — |
+| `requests` 2.32.5 | 260 | 226 (86%) | 134 (51%) | 1 | 42 | misses: core 51% < 60%; top hole `control:TRY-handler-type` 13 |
+| `flask` | ledger not on disk | — | — | — | — | — |
+| `jinja2` 3.1.6 | 817 | 662 (81%) | 439 (53%) | 2 | 211 | misses: hole-free 81% < 85%; core 53% < 60%; top hole `op:raise-cause` 16 |
+| `click` 8.2.1 | 549 | 475 (86%) | 264 (48%) | 5 | 107 | misses: core 48% < 60%; top hole `class-construction:unresolved-lexical-identity:TypeVar` 13 |
+| `rich` | ledger not on disk | — | — | — | — | — |
+| `django/` | ledger not on disk | — | — | — | — | — |
+
+Four of the eight corpora have a ledger on disk; one row (cachetools) holds the bar and
+three miss it on the core, jinja2 on hole-free as well. The other four have never been
+re-landed through `scripts/reland_corpus.sh` on the current exporter; their only figures
+are the historical ones below. The "closed by contract" column is reported beside the
+core and never added to it (docs/ledger-schema.md, "Closure by contract in `E6`"): a
+function closed by contract supports a claim only together with an assumption per
+contracted callee.
+
+The ledger figures disagree with the timing table above (`requests` 847 functions there,
+260 here) because the two were measured on different things: the timings ran
+`./autoform.sh` on the whole repository, tests included, with the 2026-10 exporter; the
+ledgers are the re-landed sdist subsets (`provenance/ast-<Module>.json.prov.json` names
+each) on the current exporter. Rows within each table are internally consistent; rows
+across the two are not comparable.
+
+#### Historical coverage table (2026-10 run; ledgers not on disk)
+
+The table this section carried until 2026-11-13, typed in from the same 2026-10
+`scripts/scale_test.py` run as the timings. None of these ledgers is on disk and none is
+pinned by `check_docs.py`; the figures are kept because the two paragraphs that follow
+reason from them. The `cachetools` row is omitted here: its current figures are in the
+generated table above.
+
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 209 | 204 (97%) | 150 (71%) | 5 | 6,625 | 1,449 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |
@@ -76,26 +143,31 @@ below).
 | `rich`     | 2,087  | 914 (44%) | 675 (32%) | 3,361  | 119,630 | 13,045 |
 | `django/`  | 10,623 | 6,926 (65%) | **5,574 (52%)** | 12,010 | 397,571 | 76,694 |
 
-**Coverage does not collapse at scale.** The call-closed fraction on Django is 52%.
+**Coverage did not collapse at scale in that run.** The call-closed fraction on Django
+was 52%.
 
 The `cachetools` figure this was originally compared against was 19%, and the comparison
 was read as evidence that call closure is largely an artifact of corpus *size*: a small
 library calls mostly outward into an unmodelled stdlib, while a large framework calls
 mostly inward and its callees resolve inside the translated program.
 
-**That reading no longer follows from these two numbers.** `cachetools` is now 101/209 =
-48%, against Django's 52%. The change came from exporter work — emitting Joern's resolved
-`fullName` so `Ctx.resolve`'s exact match fires, closing `op:starredUnpack`, and dropping
-`<metaClassCallHandler>` synthetics — not from the corpus getting larger. So most of the
-original gap was a resolution defect in the exporter, not a property of corpus size.
+**That reading no longer follows from these two numbers.** `cachetools` had moved to
+101/209 = 48% when this was written, against Django's 52% (the ledger on disk now says
+150/209 = 71%, generated table above). The change came from exporter work — emitting
+Joern's resolved `fullName` so `Ctx.resolve`'s exact match fires, closing
+`op:starredUnpack`, and dropping `<metaClassCallHandler>` synthetics — not from the
+corpus getting larger. So most of the original gap was a resolution defect in the
+exporter, not a property of corpus size.
 
 The size effect may still exist; it is simply not measurable from a 48%-versus-52%
 comparison. Establishing it would require re-running Django with the current exporter,
-which has not been done — every Django figure in this table predates that work.
+which has not been done — every Django figure in the historical table predates that
+work, and `ledger-Django.json` is not on disk.
 
-Hole *density* is stable — 2.4%-3.0% of AST nodes across every corpus including Django's
-397,571 nodes — so translation quality is size-independent. The hole causes shift:
-Django's top cause is `import:unresolved` (5,122), which barely registers on `cachetools`.
+Hole *density* was stable in that run — 2.4%-3.0% of AST nodes across every corpus
+including Django's 397,571 nodes — so translation quality looked size-independent. The
+hole causes shift: Django's top cause was `import:unresolved` (5,122), which barely
+registers on `cachetools`.
 
 ## Sharded rendering — measured 2026-10-09
 

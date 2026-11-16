@@ -57,13 +57,19 @@ open Autoform.Core Autoform.Refine Autoform.Generated.Cachetools
 
 /-! ## 4. What the mutation gate actually said
 
-**The figure below predates the `_Link.unlink` theorems** (`TTLLink_unlink_mrefines`,
-`TTLLink_unlink_ring`, 2026-10-10). They are not in the 68/73; the gate has to be re-run
-with `cachetools/__init__.py:<module>.TTLCache._Link.unlink` added to `--decls` and both
-theorems mapped to it in `--subject`, and the README figure replaced with that run's
-output — not edited by hand. What the run should show: every mutant of `unlink`'s body
-fails `TTLLink_unlink_body` (a `rfl` against the generated term) and therefore both
-theorems; a mutant elsewhere in the module is off-subject for them.
+**Current figure (README "Fidelity, measured", re-run 2026-10-11): 104 of 109 (95.4%)
+theorem-mutant kills** on `Autoform/Generated/Cachetools.lean` — 60 mutants, 0 invalid,
+0 inconclusive, seed 20260819, re-run after the batched Core change (Java strings, boxed
+`dict()`, C `for (;;)`, `MutableMapping.popitem`) with the same figure as the 2026-10-10
+run. That run includes the `_Link.unlink` theorems: `TTLLink_unlink_mrefines` and
+`TTLLink_unlink_ring` are stated on `applyFunc` of the generated function and score
+14 of 14 each, as does the pin `TTLLink_unlink_body`; before that restatement they scored
+0 of 14 because they reached the body only through the pin. The report the 104/109 is read
+from was written to `/tmp/af-agents/cb-scratch/mutation-gate.json` and **is not in the
+tree** (checked 2026-11-13: no `mutation-gate*.json` anywhere under the repository), so that
+figure is reproducible only by re-running the gate, not by re-reading an artifact. The
+per-survivor analysis below is of the earlier 2026-10-09 run (68/73); its 5 survivors and
+2 untested theorems are the same 5 and 2 the 2026-10-11 run reports.
 
 Run (2026-10-09, after the re-land on the final exporter and semantics):
 `scripts/mutate.py Autoform/Generated/Cachetools.lean Autoform.Generated.Cachetools
@@ -145,8 +151,12 @@ Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
    `LRUCache.popitem`; the container representation of item 1 is, together with
    `next(iter(self.__order))` on a boxed `OrderedDict`, which these bodies go through.
    `LFUCache._Link.unlink` has the same body as `TTLCache._Link.unlink`
-   (`dlinkUnlinkBody`) and would be the same proof under `LFUCache._Link`'s slot keys; it
-   is not stated here.
+   (`dlinkUnlinkBody`) and would, we expect, be the same proof under `LFUCache._Link`'s
+   slot keys — but **no theorem about `LFUCache._Link.unlink` is stated anywhere in this
+   module** (checked 2026-11-13: `CachetoolsSpec/Part7.lean` pins and proves only
+   `f_cachetools___init___py__module__TTLCache__Link_unlink`, and no `Part*.lean` mentions
+   `LFUCache`). "Same proof" is therefore a claim about what would work, not a result; the
+   gap stands until an `LFULink_unlink_*` pair is written and run through the gate.
 
 3. **Exception arguments are unmodelled.** `TimedCache_expire_raises` names the class —
    the `py:exception:<Name>` constructor evaluates to the represented class name, and
@@ -154,12 +164,25 @@ Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
    only its class here: `KeyError(key)` and `KeyError()` are the same value, so no
    statement in this file can speak about what an exception *carries*.
 
-4. **`Cache.get` is not specified.** Its body is `if key in self: return self[key]`, and
-   `Expr.inOp`/`Expr.index` applied to a `ref` receiver hole out (`in:non-container`)
-   rather than dispatching to `__contains__`/`__getitem__`. That is a genuine fidelity
-   gap in the semantics — Python's `in` on an object *is* a method call — and it means
-   `Cache.get` currently joins the not-refinable set for a reason the ledger does not
-   record as a hole, because the hole is dynamic rather than static.
+4. **`Cache.get` — the semantic blocker is resolved; a refinement theorem is still not
+   stated here.** Its body is `if key in self: return self[key]`. This item used to record
+   that `Expr.inOp`/`Expr.index` on a `ref` receiver holed out as `in:non-container`
+   instead of dispatching to `__contains__`/`__getitem__`. That is no longer the case:
+   `evalExpr`'s `.inOp` arm asks `ctx.dunderOn h₂ c "__contains__"` and runs the method
+   (negating its truthiness for `not in`), its `.index` arm asks
+   `ctx.dunderOn h₂ c "__getitem__"` and applies it, and the `for` driver consults
+   `dunderOn h₁ v "__getitem__"` for the sequence protocol (`Autoform/Lang/Core/Semantics.lean`,
+   the `.inOp`/`.index` cases of `evalExpr` and the iteration fallback). The
+   `in:non-container` label survives only in `valIn`, for a receiver whose class defines
+   none of the three protocols, and `ledger-Cachetools.json` records 0 `in:non-container`
+   and 0 `index:non-container`. On the specification side,
+   `Autoform/SpecsGen/Cachetools/Base.lean` defines
+   `dom_conform_cachetools___init___py__module__Cache_get` (5 recorded cases over `Cache`
+   receivers holding a boxed `dict`) and `SpecsGen/Cachetools/Part4.lean` proves
+   `conform_cachetools___init___py__module__Cache_get` over it, for every fuel at or above
+   its bound. What remains open is an `MRefines` statement for `Cache.get` in *this* file,
+   and what blocks it is item 1 (no representation predicate for the boxed-`dict` payload
+   `self.__data`), not the dispatch.
 -/
 
 end Autoform.Specs.Cachetools

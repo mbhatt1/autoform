@@ -16,7 +16,8 @@ What the sandbox is, per host:
   Linux   `bwrap` when it runs: the host tree bound read-only, `work` and `writable`
           bound read-write, a new (empty) network namespace. Otherwise `unshare -rn`
           for the network with each `read_only` path bind-mounted read-only; writes
-          elsewhere are NOT limited and the record says so.
+          elsewhere are NOT limited and the record says so. `AUTOFORM_SANDBOX=strict`
+          refuses that fallback: only a mechanism that confines the filesystem counts.
   none    the launch FAILS (`SandboxUnavailable` names what to install). The explicit
           opt-out is `AUTOFORM_SANDBOX=off`; it is written into every artifact a run
           produces (`sandbox: {mechanism: "off", enforced: false}`), never implied.
@@ -46,9 +47,10 @@ import shutil
 import subprocess
 import sys
 
-ENV = 'AUTOFORM_SANDBOX'                  # unset/on (required), off (recorded opt-out), or a mechanism
+ENV = 'AUTOFORM_SANDBOX'                  # unset/on (required), strict, off (recorded opt-out), or a mechanism
 ACTIVE = 'AUTOFORM_SANDBOX_ACTIVE'        # JSON record in the environment of a sandboxed process
 MECHANISMS = ('seatbelt', 'bwrap', 'unshare')
+CONFINING = ('seatbelt', 'bwrap')         # the mechanisms that also deny writes outside the work tree
 PROBE_TIMEOUT = 30
 
 INSTALL = {
@@ -83,9 +85,9 @@ class Launch:
 
 def policy(environ=None) -> str:
     value = ((environ if environ is not None else os.environ).get(ENV) or 'on').strip().lower()
-    if value in ('on', 'off') or value in MECHANISMS:
+    if value in ('on', 'off', 'strict') or value in MECHANISMS:
         return value
-    raise ValueError('%s=%r: expected on, off or one of %s' % (ENV, value, ', '.join(MECHANISMS)))
+    raise ValueError('%s=%r: expected on, strict, off or one of %s' % (ENV, value, ', '.join(MECHANISMS)))
 
 
 def active(environ=None):
@@ -160,6 +162,10 @@ def detect(environ=None):
     else:
         candidates = []
     reasons = []
+    if wanted == 'strict':
+        dropped = [m for m in candidates if m not in CONFINING]
+        candidates = [m for m in candidates if m in CONFINING]
+        reasons += ['%s: refused by %s=strict (it does not confine the filesystem)' % (m, ENV) for m in dropped]
     for mechanism in candidates:
         path, why = _probe(mechanism)
         if path:
@@ -221,6 +227,7 @@ def sandboxed(cmd, *, cwd=None, env=None, work, writable=(), read_only=()) -> La
     os.makedirs(work, exist_ok=True)
     inherited = active(base)
     if inherited:
+        _strict_inherited(inherited, base)
         return Launch(argv, cwd, base, dict(inherited, inherited=True))
     if policy(base) == 'off':
         return Launch(argv, cwd, base, off_record())
@@ -263,13 +270,24 @@ def sandboxed(cmd, *, cwd=None, env=None, work, writable=(), read_only=()) -> La
     return Launch(wrapped, cwd, child, record)
 
 
+def _strict_inherited(inherited, environ):
+    """Under `strict`, an inherited sandbox must itself confine the filesystem."""
+    if policy(environ) == 'strict' and inherited.get('mechanism') not in CONFINING:
+        raise SandboxUnavailable('%s=strict, but this process runs inside a %s sandbox, which does not '
+                                 'confine the filesystem' % (ENV, inherited.get('mechanism')))
+
+
 def _sh_quote(s):
     return "'" + s.replace("'", "'\\''") + "'"
 
 
 def require(environ=None):
     """Fail now, with the install message, if no launch could be confined."""
-    if active(environ) or policy(environ) == 'off':
+    inherited = active(environ)
+    if inherited:
+        _strict_inherited(inherited, environ)
+        return
+    if policy(environ) == 'off':
         return
     mechanism, detail = detect(environ)
     if mechanism is None:

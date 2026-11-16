@@ -30,7 +30,10 @@ EVIDENCE = ROOT / "tests" / "fixtures" / "defect" / "getsizeof_negative"
 CORPORA = Path(os.path.expanduser("~/.cache/autoform/corpora"))
 OLD = CORPORA / "cachetools-7.1.4-lib-7.1.5-tests"   # src/cachetools of 7.1.4, tests of 7.1.5
 NEW = CORPORA / "cachetools-7.1.5-sdist-with-tests"  # 7.1.5 sdist, tests included
-AST_SHA256 = "557473f45fa6c50c9d7d6391b8805c9b31a5a8aab641e5b48c562a15750f5e5a"
+# Re-pinned 2026-10-20: the exporter now lowers `for x in range(...)` headers (892149f), which
+# changed 6 functions of the corpus's own test suite and none of cachetools/; the previous
+# exporter still yields 557473f4...0f5e5a from the same CPG.
+AST_SHA256 = "29daa9450425529ef22bf497d9f53b2c7a1683073ac7fb3a950ce03c11b6c498"
 SETITEM = "cachetools/__init__.py:<module>.Cache.__setitem__"
 needs_old = pytest.mark.skipif(not (OLD / "cachetools").is_dir(),
                                reason="cachetools 7.1.4 corpus absent under ~/.cache/autoform/corpora")

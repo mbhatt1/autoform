@@ -1,0 +1,677 @@
+[
+ {
+  "name": "BinaryCountSetBits.js::program:BinaryCountSetBits",
+  "file": "BinaryCountSetBits.js",
+  "sourceName": "BinaryCountSetBits",
+  "paramTypes": [
+   "ANY"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "ifte",
+       "c": {
+        "k": "unop",
+        "op": "!",
+        "a": {
+         "k": "call",
+         "f": "isInteger",
+         "args": [
+          {
+           "k": "name",
+           "v": "a"
+          }
+         ]
+        }
+       },
+       "t": {
+        "k": "raise",
+        "e": {
+         "k": "hole",
+         "label": "expr:BLOCK-impure"
+        }
+       },
+       "e": {
+        "k": "skip"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "count",
+        "e": {
+         "k": "int",
+         "v": "0"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "loop",
+         "c": {
+          "k": "name",
+          "v": "a"
+         },
+         "body": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "a",
+           "e": {
+            "k": "binop",
+            "op": "num:js:i32:&",
+            "a": {
+             "k": "name",
+             "v": "a"
+            },
+            "b": {
+             "k": "binop",
+             "op": "js:-",
+             "a": {
+              "k": "name",
+              "v": "a"
+             },
+             "b": {
+              "k": "int",
+              "v": "1"
+             }
+            }
+           }
+          },
+          "b": {
+           "k": "assign",
+           "x": "count",
+           "e": {
+            "k": "binop",
+            "op": "js:+",
+            "a": {
+             "k": "name",
+             "v": "count"
+            },
+            "b": {
+             "k": "int",
+             "v": 1
+            }
+           }
+          }
+         }
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "name",
+          "v": "count"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "BinaryCountSetBits.js::program",
+  "file": "BinaryCountSetBits.js",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "BinaryCountSetBits",
+     "e": {
+      "k": "fnref",
+      "v": "BinaryCountSetBits.js::program:BinaryCountSetBits"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "exports"
+     },
+     "f": "BinaryCountSetBits",
+     "v": {
+      "k": "name",
+      "v": "BinaryCountSetBits"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "IsPowerOfTwo.js::program:IsPowerOfTwo",
+  "file": "IsPowerOfTwo.js",
+  "sourceName": "IsPowerOfTwo",
+  "paramTypes": [
+   "ANY"
+  ],
+  "returnType": "__ecma.Boolean",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "&&",
+    "a": {
+     "k": "binop",
+     "op": ">",
+     "a": {
+      "k": "name",
+      "v": "n"
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "binop",
+      "op": "num:js:i32:&",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "binop",
+       "op": "js:-",
+       "a": {
+        "k": "name",
+        "v": "n"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "IsPowerOfTwo.js::program",
+  "file": "IsPowerOfTwo.js",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "IsPowerOfTwo",
+     "e": {
+      "k": "fnref",
+      "v": "IsPowerOfTwo.js::program:IsPowerOfTwo"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "exports"
+     },
+     "f": "IsPowerOfTwo",
+     "v": {
+      "k": "name",
+      "v": "IsPowerOfTwo"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "IsPowerofFour.js::program:isPowerOfFour",
+  "file": "IsPowerofFour.js",
+  "sourceName": "isPowerOfFour",
+  "paramTypes": [
+   "__ecma.Number"
+  ],
+  "returnType": "__ecma.Boolean",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "&&",
+    "a": {
+     "k": "binop",
+     "op": "&&",
+     "a": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "binop",
+       "op": "num:js:i32:&",
+       "a": {
+        "k": "name",
+        "v": "n"
+       },
+       "b": {
+        "k": "binop",
+        "op": "js:-",
+        "a": {
+         "k": "name",
+         "v": "n"
+        },
+        "b": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "binop",
+      "op": "js:%",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "int",
+      "v": "1"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "IsPowerofFour.js::program",
+  "file": "IsPowerofFour.js",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "isPowerOfFour",
+     "e": {
+      "k": "fnref",
+      "v": "IsPowerofFour.js::program:isPowerOfFour"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "exports"
+     },
+     "f": "isPowerOfFour",
+     "v": {
+      "k": "name",
+      "v": "isPowerOfFour"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "NextPowerOfTwo.js::program:nextPowerOfTwo",
+  "file": "NextPowerOfTwo.js",
+  "sourceName": "nextPowerOfTwo",
+  "paramTypes": [
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": "&&",
+      "a": {
+       "k": "binop",
+       "op": ">",
+       "a": {
+        "k": "name",
+        "v": "n"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "binop",
+       "op": "==",
+       "a": {
+        "k": "binop",
+        "op": "num:js:i32:&",
+        "a": {
+         "k": "name",
+         "v": "n"
+        },
+        "b": {
+         "k": "binop",
+         "op": "js:-",
+         "a": {
+          "k": "name",
+          "v": "n"
+         },
+         "b": {
+          "k": "int",
+          "v": "1"
+         }
+        }
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "n"
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "result",
+      "e": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "loop",
+       "c": {
+        "k": "binop",
+        "op": ">",
+        "a": {
+         "k": "name",
+         "v": "n"
+        },
+        "b": {
+         "k": "int",
+         "v": "0"
+        }
+       },
+       "body": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "result",
+         "e": {
+          "k": "binop",
+          "op": "num:js:i32:<<",
+          "a": {
+           "k": "name",
+           "v": "result"
+          },
+          "b": {
+           "k": "int",
+           "v": "1"
+          }
+         }
+        },
+        "b": {
+         "k": "assign",
+         "x": "n",
+         "e": {
+          "k": "binop",
+          "op": "num:js:i32:>>",
+          "a": {
+           "k": "name",
+           "v": "n"
+          },
+          "b": {
+           "k": "int",
+           "v": "1"
+          }
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "result"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "NextPowerOfTwo.js::program",
+  "file": "NextPowerOfTwo.js",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "nextPowerOfTwo",
+     "e": {
+      "k": "fnref",
+      "v": "NextPowerOfTwo.js::program:nextPowerOfTwo"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "exports"
+     },
+     "f": "nextPowerOfTwo",
+     "v": {
+      "k": "name",
+      "v": "nextPowerOfTwo"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "SetBit.js::program:setBit",
+  "file": "SetBit.js",
+  "sourceName": "setBit",
+  "paramTypes": [
+   "__ecma.Number",
+   "__ecma.Number"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "number",
+   "bitPosition"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:js:i32:|",
+    "a": {
+     "k": "name",
+     "v": "number"
+    },
+    "b": {
+     "k": "binop",
+     "op": "num:js:i32:<<",
+     "a": {
+      "k": "int",
+      "v": "1"
+     },
+     "b": {
+      "k": "name",
+      "v": "bitPosition"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "SetBit.js::program",
+  "file": "SetBit.js",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "setBit",
+     "e": {
+      "k": "fnref",
+      "v": "SetBit.js::program:setBit"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "exports"
+     },
+     "f": "setBit",
+     "v": {
+      "k": "name",
+      "v": "setBit"
+     }
+    }
+   }
+  }
+ }
+]

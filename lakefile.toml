@@ -1,5 +1,6 @@
 name = "autoform"
-version = "0.1.0"
+# Kept equal to the package version in pyproject.toml (scripts/release_check.sh checks).
+version = "0.0.1"
 defaultTargets = ["Autoform"]
 
 [leanOptions]

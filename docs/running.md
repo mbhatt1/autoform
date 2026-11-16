@@ -43,8 +43,9 @@ scripts/bootstrap.sh
 In order: elan and the toolchain in `lean-toolchain`; a `.venv` from the first Python 3.10+
 it finds (`python3.12`, `python3.11`, `python3.13`, `python3`, or `AUTOFORM_PYTHON`) with
 `requirements.txt`; the Joern release pinned in `joern-version` into `JOERN_HOME`
-(default `~/joern`), its zip verified against the release's `.sha512` before unpacking and
-the jars on disk checked against the pin afterwards; the build with the memory sequencing
+(default `~/joern`), its zip verified against the committed `joern-sha512` before unpacking
+(the release's own `.sha512` is never downloaded) and the jars on disk checked against the
+pin afterwards; the build with the memory sequencing
 CI uses (`Autoform.SpecsGen.Cachetools`, then `Autoform.Specs.CachetoolsSpec`, then
 `Autoform.CI`, under `taskset -c 0` on Linux and one after another on macOS, which has no
 `taskset`); the cachetools corpus at the commit `ast-Cachetools.json` was exported from
@@ -214,6 +215,13 @@ Eight stages, each announced:
 then instantiates `scripts/ledger.lean.tmpl` and `#eval`s it, which prints the ledger and
 writes `ledger-<Module>.json`.
 
+**Gradle and Maven projects.** Point either entry point at the project root (a
+multi-module build included); no `--subdir` is needed. After stage 3, functions from
+`build/`, `target/`, `.gradle/`, generated-source directories and test source sets
+(`src/test`, `src/testFixtures`, ...) are dropped from the AST and listed with their
+reason in `selection.json`, matching the exclusions in `inventory.json`
+([repository-analysis.md](repository-analysis.md#gradle-and-maven-projects)).
+
 **The ledger without elaborating the module.** `scripts/ledger.py ast-<M>.json <M>` writes
 the same `ledger-<M>.json` from the AST alone, in seconds, mirroring `Autoform/Ledger.lean`
 arm for arm (it runs the renderer's own lowering passes and walks the renderer's node
@@ -343,8 +351,9 @@ the facts a run records:
 The reverse of each row is an improvement; functions present at only one commit are
 listed as added or removed and are never regressions by themselves (a removed
 function's proved theorems are named). Exit `0` when nothing regressed and no outcome
-changed, `1` otherwise, `2` when a run never reached translation or the source is not a
-Git repository. A behavior change is reported under its own heading and still exits `1`:
+changed, `1` otherwise -- including when one run never reached translation, so there is
+nothing to compare (the CLI names that run and its `pipeline.json` on stderr) -- and `2`
+when the source is not a Git repository or a ref could not be fetched (§7). A behavior change is reported under its own heading and still exits `1`:
 the tool can show that the two commits provably compute different things on the same
 inputs, not whether that was intended.
 
@@ -354,6 +363,12 @@ drawn with a fixed seed so the two runs see the same inputs; test-suite cases fo
 the repository's own tests at each commit. `scripts/regression.py profile <report>`
 prints the facts one run recorded; `compare <base> <head>` diffs any two report
 directories, including ones produced by hand or by CI at different times.
+
+Rust: when `--base` of a local checkout is a Cargo library crate (or with `--lang rust`),
+`regress` runs the Rust path at base and replays its oracle inputs natively at base, again
+at base (a control) and at head, judged against the base revision's Aeneas model
+(`scripts/rust_regress.py`, report under `artifacts/regression/<Module>/rust/`; docs/rust.md,
+"Regressions across commits"). Same exit codes.
 
 ### `autoform regress <repo> [Module] --base REF [--head REF] --machine --files FILE...` — compare compiled code
 
@@ -463,7 +478,13 @@ python3 scripts/mutate.py Autoform/Lang/Imp/Semantics.lean Autoform.Lang.Imp.Sem
 # mutation gate, generated module (mutate the data, rebuild the specs about it)
 python3 scripts/mutate.py Autoform/Generated/<M>.lean Autoform.Generated.<M> \
         --spec-file Autoform/Specs/<M>Spec.lean --spec-module Autoform.Specs.<M>Spec \
-        --decls f_a,f_b
+        --decls f_a,f_b [--timeout S] [--restore-timeout S]
+
+# mutation gate, after a run was killed harder than SIGINT/SIGTERM/SIGHUP (SIGKILL,
+# power loss): put each <file>.lean back from its .mutate-backup, remove the marker,
+# exit 0 (1 if there is nothing to recover); then `lake build <module>` before
+# trusting any .olean built while the mutant was live
+python3 scripts/mutate.py Autoform/Generated/<M>.lean --recover
 
 # assurance case
 python3 scripts/sacm.py --module <M> [--markdown sacm-<M>.md]
@@ -471,6 +492,16 @@ python3 scripts/sacm.py --module <M> [--markdown sacm-<M>.md]
 # scale measurement, stage by stage (see docs/scale.md)
 python3 scripts/scale_test.py --out results.json --target Name /path/to/repo
 ```
+
+**`mutate.py` restores before it reports.** After the last mutant it rebuilds the original
+source, bounded by `--restore-timeout` (default: three times `--timeout`). The report's
+`status` tells a restore build that *failed* (`RESTORE_FAILED`: the restored source does
+not compile, which should be impossible and means the tree is not what the baseline
+built) from one that *timed out* (`RESTORE_TIMEOUT`: the source is restored and every
+verdict stands, but the tree's build state is unverified until you run `lake build
+<module>`). Neither lets the gate exit 0. The `.mutate-backup` marker is also what
+`scripts/integrity_guard.sh` refuses on and what `differential.py` reports as
+`mutation_in_progress`.
 
 **Everything that runs the code under test runs sandboxed.** `scripts/differential.py`
 re-executes itself under `scripts/sandbox.py` from its command-line entry; the Node, JVM
@@ -481,8 +512,10 @@ inside the work directory. macOS uses `sandbox-exec`; Linux needs `bwrap` (packa
 `bubblewrap`) or falls back to `unshare -rn` (network only). With neither, the run
 **refuses** and names what to install. `AUTOFORM_SANDBOX=off` runs the subject
 unconfined; the opt-out is recorded in `conformance.json`, `native-build.json`,
-`emit.json`, `model.meta.json`, `fuzz.json` and `run.json` as
-`sandbox: {"mechanism": "off", "enforced": false}`. `AUTOFORM_SANDBOX=seatbelt|bwrap|unshare`
+`emit.json`, `model.meta.json`, `fuzz.json` and the `autoformalize` pipeline's `run.json`
+(`src/autoform/nl/pipeline.py`) as `sandbox: {"mechanism": "off", "enforced": false}`;
+`assure`'s `run.json` (`scripts/assure.py`) records stage statuses and does not carry it --
+read the oracle's `conformance.json` for that run. `AUTOFORM_SANDBOX=seatbelt|bwrap|unshare`
 forces a mechanism. See docs/trust-model.md, "What the sandbox does and does not do".
 
 **The conformance oracle is incremental by default.** It stores one verdict file per
@@ -492,13 +525,46 @@ function's own AST record and its rendered Lean definition, the same for every f
 it can reach (by name, by dispatch through its class hierarchy, or through the classes
 of the objects in its cases), the module bodies and the rest of the rendered module,
 `Autoform/Lang/Core`, the renderer, the harness, the Lean toolchain, the runtime
-version, or the recorded cases themselves. A change to
+version, the runtime source (the files of the function and of everything it can reach,
+so a verdict from another revision of that code is never replayed), or the recorded
+cases themselves. A change to
 `Autoform/Lang/Core` invalidates every entry. The test suite is traced on every run; only
 the evaluation is skipped. Replayed verdicts are reported as such -- the summary reads
 `N COMPARED now, M cached from <timestamp>`, and each replayed observation in
 `conformance.json` carries `cached_from` -- and are never counted as comparisons made
-now. `--no-cache` ignores the store and re-compares everything (the entries are still
-refreshed). The store is scratch state: delete the directory to start cold.
+now. `pr` counts a replayed agreement as compared (level `oracle-agreed` or
+`proved`, with `oracle.cached_from` and the replay named in the reason): its key is the
+same model, inputs and runtime fingerprint a fresh comparison would have. The
+cross-revision behaviour leg still runs `--no-cache`. `--no-cache` ignores the store and
+re-compares everything (the entries are still refreshed). The store is scratch state: delete the directory to start cold.
+
+**What `conformance.json` records about its own apparatus.** Besides the verdicts, the
+file says what the run itself did to the population, so a figure can be read against what
+was never compared (all written by `scripts/differential.py`):
+
+* `case_cap` -- `limit` is the cap in force (default 600), `requested` the raw
+  `AUTOFORM_CASE_CAP` string (`null` when unset), `recorded` the cases built and `dropped`
+  how many the cap removed; when it removed any, `duplicates_dropped`,
+  `per_function_floor`, `functions_dropped` and `dropped_by_origin` say how. The C backend
+  cuts its *plan* before running it, accounted separately in the same block:
+  `dropped_c_plan` planned calls never ran, `functions_affected_c_plan` lost some call and
+  `functions_dropped_c_plan` lost every call (`c_plan_cap_record`; zero or empty when the
+  plan fits).
+* `lean_chunk_failures` -- present when a Lean evaluation chunk produced no answer: one
+  entry per chunk (`cases`, `depth`, `reason`, `stderr_tail`). A chunk that runs past
+  `AUTOFORM_LEAN_CHUNK_TIMEOUT` (default 1800 s) is never bisected; each of its cases is
+  INCONCLUSIVE with label `lean-chunk-timeout (...)`, which is not `lean-no-answer` (a
+  per-case interpreter failure).
+* `lean_retry_builds` -- present when a chunk never reached its first case and the oracle
+  ran `lake build` once and retried: each entry keeps the rebuild's `returncode` and
+  `output_tail`, so a failed rebuild is visible at its cause rather than one step removed.
+* `backend_info` for the JVM and Node drivers -- `driver_returncode` (`null` when the
+  driver was killed), `driver_stderr_tail` when it failed or wrote to stderr, and
+  `driver_timed_out_after_s` when it exceeded its budget (300 s JVM, 120 s Node); every
+  planned call is then a recorded skip with that reason, and partial output from a killed
+  driver is never read. The Go driver runs per package and records the same under
+  `backend_info.driver_failures[]` as `package`, `returncode`, `timed_out_after_s` (180 s)
+  and `stderr_tail`.
 
 `Demo.lean` (`lake env lean Demo.lean`) is a guided tour of the refutation gate, the axiom
 audit, vacuity detection and the ledger. It **deliberately contains an admitted theorem and
@@ -546,9 +612,12 @@ scripts/export_with_provenance.sh <source-dir> <ModuleName>
 ```
 
 `joern-parse` → `export_ast.sc` → `provenance.py record`, refusing to start unless the
-installed Joern matches the pin. `./autoform.sh` does **not** yet record provenance (see
-docs/architecture.md, "Merge-phase changes this asks for elsewhere"), so an AST it produces
-is unattributed and the checker will name it.
+installed Joern matches the pin. `./autoform.sh` records provenance too, in its export
+stage (`provenance.py record --command "autoform.sh <Module>"`), but **non-fatally**: a
+Joern that differs from the pin is recorded and announced rather than refused, and when
+the recording itself fails the stage prints a warning, keeps the reason in
+`artifacts/pipeline/<Module>/provenance.log`, and the AST stays unattributed -- which the
+checker will then name.
 
 To record provenance for an artifact produced some other way:
 
@@ -583,13 +652,18 @@ It is a **named gap, not an exemption**: every entry is printed by name on every
 entry stops applying the moment its artifact's digest changes — regenerate one and you must
 record real provenance for it.
 
-Three of them were re-exported to find out rather than assumed, and **all three differ from
-a fresh export** with the pinned Joern and the committed exporter: `ast-Sample.json` and
+As of 2026-11-13 it names six artifacts, beside eighteen `provenance/ast-*.prov.json`
+records (`ls provenance/` is the current count). Four carry `reproduction_attempted: true`:
+three were re-exported to find out rather than assumed, and **all three differ from a fresh
+export** with the pinned Joern and the committed exporter -- `ast-Sample.json` and
 `ast-Stress.json` are missing the module-initializer entries the exporter now emits, and in
-`ast-CMath.json` every integer literal is `"v": 0` where a fresh export writes `"v": "0"`.
-That is recorded in the file as the finding it is. The remaining eight were not reproduced
-because the source tree they came from is not identified anywhere in the repository — which
-is the same gap, one step earlier.
+`ast-CMath.json` every integer literal is `"v": 0` where a fresh export writes `"v": "0"`;
+the fourth, `ast-LinuxLibSample.json`, is not a Joern export at all but a byte-identical
+extraction from an untracked corpus AST with no committed extractor, so no command
+regenerates it. The remaining two, `ast-V8Base.json` and `ast-V8Numbers.json`, were not
+reproduced because the V8 tree and revision they came from are not identified anywhere in
+the repository -- the same gap, one step earlier, and the file says they are its weakest
+entries. Each finding is recorded in the file as the finding it is.
 
 ## 6. Troubleshooting
 
@@ -611,7 +685,12 @@ with the expected result can still refute a candidate.
 can silently no-op on a module that has only imports and no declarations of its own —
 exactly the shape of `Autoform.lean`. `scripts/audit_all.py` uses `--fresh` by default and
 records which mode ran in `audit.json`; `--no-fresh` exists but is strictly weaker. If you
-invoke the checker by hand, use `lake env leanchecker --fresh Autoform` (~1.5 min).
+invoke the checker by hand, use `lake env leanchecker --fresh Autoform`. It is single-threaded
+and replays every spec part: 53 min on a 10-core laptop for the 552-module tree (2026-10-20;
+it was ~1.5 min before the sharded spec modules landed). `scripts/audit_all.py` gives it
+3600 s by default and reports `leanchecker timed out` (verdict FAIL, never PASS) past that;
+on a machine that is also building or running a test suite set
+`AUTOFORM_LEANCHECKER_TIMEOUT=<seconds>` rather than trusting a replay that was cut short.
 
 **`leanchecker` is missing.** The audit reports UNVERIFIED — never a pass — and `--strict`
 turns that into a non-zero exit. A gap that is reported is a gap; a gap that is skipped
@@ -685,7 +764,7 @@ authority when they disagree, and a disagreement is a bug to file.
 | `autoform assure` / `./assure.sh` / a Git URL | every required check completed | the workflow finished with unresolved verification gaps — `completed_with_gaps` in `run.json`; a scoped certificate in `guarantee.json` can coexist with this | invocation, setup or orchestration failure; source acquisition failed; property input invalid; refused tree as above | `128+N` |
 | `autoform regress --machine` | no divergence found among the inputs tried | at least one kernel-checked diverging input (`machine/regression.json`) | usage error, a build, link or lift failure, or a source that is not a Git repository | `128+N` |
 | `autoform regress` | both runs translated and nothing that held at `--base` is lost at `--head`, and no recorded case changed outcome | a regression or a proven behavior change (`regression.json` says which), or a run that never produced an AST | usage error, the source is not a Git repository, a ref could not be fetched, busy workspace, or a refused tree as above | `128+N` from either run; `--timeout` expiry is `143` |
-| `autoform pr` / `scripts/pr_mode.py` | every changed function reported at the level its artifacts reach and none refuted | at least one changed function refuted (`pr.json` names the witness) | usage error, the source is not a Git repository, an unknown ref, or the SARIF failed validation | `128+N`; `--timeout` expiry is `143` |
+| `autoform pr` / `scripts/pr_mode.py` | every changed function reported at the level its artifacts reach and none refuted | at least one changed function refuted (`pr.json` names the witness), or a behaviour change under `--fail-on behaviour-changed` | usage error, the source is not a Git repository, an unknown ref, or the SARIF failed validation | `3` inconclusive under `--fail-on`: no changed non-test function was behaviour-compared (`gate` in `pr.json`); `128+N`; `--timeout` expiry is `143` |
 | `autoform machine` | as `scripts/formalize_machine.py` | as `formalize_machine.py` | CLI-level failure (workspace, lock, extraction) | — |
 
 Two things worth stating plainly. A `1` from `assure` is **not** a crash: it is the

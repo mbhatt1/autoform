@@ -137,12 +137,28 @@ def chain(cls):
     return [c for c in cls.__mro__ if c is not object]
 
 
+# Names the interpreter writes into a class as metadata, never behaviour, and that depend
+# on its version: CPython 3.13 writes the first two into every class body; 3.14 (PEP 649)
+# adds the annotation caches lazily, the first time anything reads `cls.__annotations__`
+# (pytest's introspection does), so the same class compares differently within one run.
+# `_removal_version` is written onto `collections.abc.ByteString` by 3.14's deprecated
+# `typing.ByteString` alias (`_BaseGenericAlias.__setattr__` forwards non-dunder names to the
+# origin class) as soon as anything touches that alias.
+# Without this, every contract
+# pinned on 3.10-3.12 "mismatched" on 3.13+, so each corpus class built on a contracted base
+# (cachetools' `Cache` on `MutableMapping`) became an unencodable receiver and its methods
+# were never compared -- the negative-size defect replay found 0 divergences instead of 1.
+CLASS_METADATA = frozenset({"__firstlineno__", "__static_attributes__",
+                            "__annotate_func__", "__annotations_cache__", "_removal_version"})
+
+
 def live_contract(cls):
     """The contract the running interpreter would state for `cls`: every name the class
     or an ancestor DEFINES (so an override of an `object` name such as `__eq__` or
     `__init__` is included -- `dir(cls) - dir(object)` would hide exactly those), and the
-    abstract methods a subclass must implement."""
-    return (sorted({n for c in chain(cls) for n in vars(c)}),
+    abstract methods a subclass must implement. Version-dependent class metadata
+    (`CLASS_METADATA`) is not part of a contract."""
+    return (sorted({n for c in chain(cls) for n in vars(c)} - CLASS_METADATA),
             sorted(getattr(cls, "__abstractmethods__", ())))
 
 

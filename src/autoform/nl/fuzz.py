@@ -1011,7 +1011,7 @@ def _genuine(out, res) -> bool | None:
     return out != rt
 
 
-def _entry(args, point, out, res):
+def _entry(point, out, res):
     rt = pv.canon_outcome(res)
     return {'inputs': pv.show_args(point), 'model': pv.display(out), 'runtime': pv.display(rt),
             'model_raw': out, 'runtime_raw': rt}
@@ -1169,7 +1169,7 @@ def extend(ev, *, fn, cand, lean_name: str, module: str, lean_root, work, stem: 
         rt.append(res)
         ev.outputs.append(out)
         ev.compared += 1
-        e = _entry(args, p, out, res)
+        e = _entry(p, out, res)
         e['point'] = len(points) - 1
         e['fuzz'] = True
         new_disagreements.append(e)

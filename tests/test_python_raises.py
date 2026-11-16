@@ -66,8 +66,8 @@ def lean_value(value):
 def test_exception_constructor_boundaries(tmp_path, numeric_env):
     details = [None, False, 0, [], (), {}, 'abc', 'abcd', 'abcdef',
                [None, None, None, None], dict(enumerate(range(4)))]
-    details += [list(range(n)) for n in range(8)]
-    details += [tuple(range(n)) for n in range(8)]
+    details += [list(range(n)) for n in range(9)]
+    details += [tuple(range(n)) for n in range(9)]
     arguments = [[], ['bad'], ['bad', 1, 2]] + [['bad', value] for value in details]
     source = 'import Autoform.Lang.Core.Stdlib\nopen Autoform.Core\n'
     source += 'set_option maxRecDepth 10000\nset_option maxHeartbeats 2000000\n'
@@ -79,10 +79,19 @@ def test_exception_constructor_boundaries(tmp_path, numeric_env):
                 kind, expected = 'val', cls.__name__
             except BaseException as error:
                 kind, expected = 'exn', type(error).__name__
+            if cls is not ValueError and len(args) == 2 and type(args[1]) in (list, tuple) \
+                    and len(args[1]) == 7:
+                # The one interpreter-dependent arity: 3.10-3.13 refuse a 7-field details
+                # tuple, 3.14 accepts it. Pin which one this interpreter is, then require
+                # the model to refuse to choose (a named hole, not either answer).
+                assert (kind, expected) == (('val', cls.__name__) if sys.version_info >= (3, 14)
+                                            else ('exn', 'TypeError'))
+                kind, expected = 'hole', f'exception:{cls.__name__}:details-version-dependent'
             cases.append(dict(constructor=cls.__name__, args=args, kind=kind, expected=expected))
             encoded = ', '.join(lean_value(v) for v in args)
+            pattern = (f'.hole name' if kind == 'hole' else f'.{kind} (.str name)')
             source += (f'example : (match Stdlib.builtin .python [] "{cls.__name__}" [{encoded}] with\n'
-                       f'  | some (_, .{kind} (.str name)) => name == "{expected}"\n'
+                       f'  | some (_, {pattern}) => name == "{expected}"\n'
                        '  | _ => false) = true := by\n'
                        '  first | decide +kernel | fail "native constructor outcome not established"\n')
     (tmp_path / 'native-constructors.json').write_text(json.dumps(cases, indent=2) + '\n')

@@ -19,13 +19,14 @@ sys.path.insert(0, str(ROOT / 'src'))
 
 from autoform.nl import check as K  # noqa: E402
 from autoform.nl import schema  # noqa: E402
+from conftest import nl_fixture  # noqa: E402
 
 FIX = ROOT / 'tests/fixtures/nl'
 LEAN = pytest.mark.skipif(os.environ.get('AUTOFORM_TEST_LEAN') != '1', reason='set AUTOFORM_TEST_LEAN=1')
 
 
 def load(name):
-    return json.loads((FIX / name).read_text())
+    return nl_fixture(name)
 
 
 def statement(sid, post, pre='true', binders=None, fn='numbers.py:<module>.add'):
@@ -198,7 +199,8 @@ def lean_root(tr):
 
 
 @LEAN
-def test_lean_bounded_refuted_model_and_runtime(tmp_path):
+def test_lean_bounded_refuted_model_and_runtime(tmp_path, pipeline_model):
+    pipeline_model('PipelinePython', 'examples/source/python')
     tr = load('translation-PipelinePython.json')
     sts = {s['property']: s for s in load('statements-PipelinePython.json')
            if s['function'] == 'numbers.py:<module>.add'}
@@ -226,11 +228,13 @@ def test_lean_bounded_refuted_model_and_runtime(tmp_path):
 
 
 @LEAN
-def test_lean_exception_statement_and_c_without_runtime(tmp_path):
+def test_lean_exception_statement_and_c_without_runtime(tmp_path, pipeline_model):
+    pipeline_model('PipelinePython', 'examples/source/python')
     tr = load('translation-PipelinePython.json')
     st = next(s for s in load('statements-PipelinePython.json') if s['id'].endswith('quotient__p1'))
     r = K.check(tr, [st], tmp_path / 'q', lean_root=lean_root(tr))[0]
     assert r.status == 'BOUNDED_HOLDS' and r.runtime_agrees is True
+    pipeline_model('PipelineC', 'examples/source/c')
     trc = load('translation-PipelineC.json')
     stc = next(s for s in load('statements-PipelineC.json') if s['id'] == 'wrap__p2')
     r = K.check(trc, [stc], tmp_path / 'c', lean_root=lean_root(trc))[0]

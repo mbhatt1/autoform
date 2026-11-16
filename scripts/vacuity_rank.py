@@ -28,7 +28,6 @@ import random
 import re
 import subprocess
 import tempfile
-import time
 
 DEFAULT_FUEL = 5000
 DEFAULT_MAX_SAMPLES = 200

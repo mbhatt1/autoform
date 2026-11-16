@@ -219,3 +219,17 @@ example : (ClassHierarchy.lookup graph "Odd" "size" ==
     .blocked "class-hierarchy:unresolved-base:<external>foo.Bar") = true := by decide +kernel
 ''')
     run(['lake', 'env', 'lean', path], ROOT, numeric_env, timeout=300)
+
+
+def test_every_contract_verifies_on_the_running_interpreter():
+    """A contract states behaviour, not interpreter metadata: CPython 3.13 writes
+    `__firstlineno__` and `__static_attributes__` into every class body, and before they
+    were excluded every pinned base "mismatched" on 3.13+, silently turning each corpus
+    class built on one (cachetools' `Cache`) into an unencodable receiver."""
+    failures = {}
+    for name in external_bases.CONTRACTS:
+        module, attr = name.rsplit('.', 1)
+        reason = external_bases.verify(getattr(importlib.import_module(module), attr))
+        if reason:
+            failures[name] = reason
+    assert failures == {}

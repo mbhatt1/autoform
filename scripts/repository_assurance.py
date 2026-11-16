@@ -102,6 +102,11 @@ class RepositoryRun:
         job = self.job
         print('==> inventory: ' + str(job.source), flush=True)
         self.inventory = repository_inventory.discover(job.source, exclude=self.exclusions)
+        layout = self.inventory.get('layout') or {}
+        if layout.get('build_systems'):
+            print('==> layout: ' + '+'.join(layout['build_systems']) + ', '
+                  + str(len(layout['source_roots'])) + ' source root(s), '
+                  + str(len(self.inventory['excluded'])) + ' path(s) excluded (inventory.json)', flush=True)
         languages = sorted(language for language, data in self.inventory['languages'].items()
                            if data['supported_files'])
         if len(languages) == 1 and len(self.inventory['languages']) == 1:

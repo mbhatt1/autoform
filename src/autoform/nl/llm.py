@@ -25,6 +25,14 @@ Backends (`AUTOFORM_CLAUDE_AUTH`):
            as for `api`. The proving agents run the `claude` CLI with
            `CLAUDE_CODE_USE_BEDROCK=1`, so they bill Bedrock too.
 
+Egress policy (`AUTOFORM_LLM_ALLOWED_BACKENDS`): a comma list of the backend names above.
+When it is set, a backend not on it is refused before anything is sent, with an error that
+names the policy; set but empty refuses every backend. It covers the `claude` CLI children
+too (the per-call CLI and the proving agents): their backend is `login` or `api-key` (the
+`api` mode hands its key to the CLI), or `bedrock` when `CLAUDE_CODE_USE_BEDROCK=1` routes
+them there, and it must be on the list as well. Unset means no policy. `autoform doctor`
+reports it (`policy_report`). Cache entries are written owner-only (`private_write`).
+
 Spend is reported per call as `(text, cost_usd)`; the CLI reports its own cost, the api
 backend prices its usage. The per-run budget (`--budget-usd`) is enforced by the stages
 with `over_budget` / `record_skips` here: a stage starts no new function once the spend
@@ -70,11 +78,87 @@ class LLMError(RuntimeError):
     pass
 
 
+ALLOWED_ENV = 'AUTOFORM_LLM_ALLOWED_BACKENDS'
+
+
+def allowed_backends(environ=None) -> tuple | None:
+    """The egress allow-list, or None when no policy is set. Set but empty allows nothing:
+    a policy that was meant to restrict must never read as no policy."""
+    raw = (os.environ if environ is None else environ).get(ALLOWED_ENV)
+    if raw is None:
+        return None
+    names = tuple(dict.fromkeys(n.strip().lower() for n in raw.split(',') if n.strip()))
+    unknown = [n for n in names if n not in AUTH_MODES]
+    if unknown:
+        raise LLMError(f'{ALLOWED_ENV}: unknown backend {", ".join(map(repr, unknown))}; '
+                       f'expected a comma list of {", ".join(AUTH_MODES)}')
+    return names
+
+
+def require_backend(backend: str, what: str, environ=None) -> None:
+    """Refuse `backend` unless the egress policy allows it. Called before any model call."""
+    allowed = allowed_backends(environ)
+    if allowed is not None and backend not in allowed:
+        raise LLMError(f'{what} uses the {backend} backend, which {ALLOWED_ENV}={",".join(allowed) or "(empty)"} '
+                       'does not allow; nothing was sent')
+
+
+def cli_backend(mode: str, environ=None) -> str:
+    """The backend a `claude` CLI child reaches under `mode`. Only the exact value autoform
+    itself sets counts as forcing the child elsewhere; anything else is judged unforced."""
+    env = os.environ if environ is None else environ
+    if mode == 'bedrock' or env.get('CLAUDE_CODE_USE_BEDROCK', '').strip() == '1':
+        return 'bedrock'
+    return 'login' if mode == 'login' else 'api-key'
+
+
 def claude_auth() -> str:
     mode = os.environ.get('AUTOFORM_CLAUDE_AUTH', 'login').strip().lower()
     if mode not in AUTH_MODES:
         raise LLMError(f'AUTOFORM_CLAUDE_AUTH must be one of {", ".join(AUTH_MODES)}, not {mode!r}')
+    # login/api-key are the CLI: judged by where the child goes, so a child forced onto an
+    # allowed backend (CLAUDE_CODE_USE_BEDROCK=1) is not refused for its nominal mode.
+    require_backend(mode if mode in SDK_MODES else cli_backend(mode), f'AUTOFORM_CLAUDE_AUTH={mode}')
     return mode
+
+
+def policy_report(environ=None) -> dict:
+    """The egress policy as data, for `autoform doctor`; never raises."""
+    env = os.environ if environ is None else environ
+    mode = (env.get('AUTOFORM_CLAUDE_AUTH') or 'login').strip().lower()
+    out = dict(env=ALLOWED_ENV, backend=mode, allowed=None, backend_allowed=True, cli_backend=None,
+               cli_allowed=True, cache=str(CACHE))
+    try:
+        allowed = allowed_backends(env)
+    except LLMError as exc:
+        return dict(out, backend_allowed=False, cli_allowed=False, error=str(exc))
+    out['allowed'] = None if allowed is None else list(allowed)
+    if mode not in AUTH_MODES:
+        return dict(out, backend_allowed=False, cli_allowed=False,
+                    error=f'AUTOFORM_CLAUDE_AUTH must be one of {", ".join(AUTH_MODES)}, not {mode!r}')
+    out['cli_backend'] = cli_backend(mode, env)
+    if allowed is not None:
+        out.update(backend_allowed=(mode if mode in SDK_MODES else out['cli_backend']) in allowed,
+                   cli_allowed=out['cli_backend'] in allowed)
+    return out
+
+
+def private_write(path: Path, text: str) -> bool:
+    """Write a cache entry readable by its owner only (directory 0700, file 0600): cached
+    model output is derived from the analysed code. A directory that cannot be made private
+    is not written to; False says nothing was cached."""
+    path = Path(path)
+    path.parent.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(mode=0o700, exist_ok=True)
+    try:
+        os.chmod(path.parent, 0o700)   # also tightens a cache an older version left 0755
+    except OSError:
+        return False
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        os.fchmod(stream.fileno(), 0o600)   # an entry an older version left 0644
+        stream.write(text)
+    return True
 
 
 _API_CLIENT = None
@@ -86,7 +170,12 @@ def sdk_available() -> bool:
 
 def available() -> bool:
     """Whether the configured backend can answer at all (no call is made)."""
-    mode = os.environ.get('AUTOFORM_CLAUDE_AUTH', 'login').strip().lower()
+    try:
+        mode = claude_auth()           # an unknown mode, or one the egress policy refuses
+        if mode not in SDK_MODES:
+            claude_env()               # the CLI child's own backend must be allowed too
+    except LLMError:
+        return False
     if mode == 'api':
         # A client already built (or injected by a test over a fake transport) answers
         # without the SDK being importable; otherwise both the key and the SDK are needed.
@@ -99,8 +188,10 @@ def available() -> bool:
 
 
 def claude_env() -> dict:
-    """The environment for a `claude` child process under the chosen authentication."""
+    """The environment for a `claude` child process under the chosen authentication.
+    Raises LLMError when the egress policy does not allow the backend the child reaches."""
     mode = claude_auth()
+    require_backend(cli_backend(mode), f'the claude CLI (AUTOFORM_CLAUDE_AUTH={mode})')
     if mode == 'bedrock':
         # The proving agents run the claude CLI; this routes it through Bedrock with the
         # same AWS credentials and region the SDK client uses.
@@ -158,19 +249,19 @@ def api_client():
             try:
                 import anthropic
                 _API_CLIENT = anthropic.AnthropicBedrock(aws_region=region)
-            except ImportError:
+            except ImportError as exc:
                 raise LLMError('AUTOFORM_CLAUDE_AUTH=bedrock needs the anthropic SDK with its Bedrock extra: '
                                'pip install -e ".[bedrock]" (anthropic[bedrock]>=1,<2: boto3 resolves the AWS '
-                               'credentials)')
+                               'credentials)') from exc
             return _API_CLIENT
         key = os.environ.get('ANTHROPIC_API_KEY')
         if not key:
             raise LLMError('AUTOFORM_CLAUDE_AUTH=api but ANTHROPIC_API_KEY is not set')
         try:
             import anthropic
-        except ImportError:
+        except ImportError as exc:
             raise LLMError('AUTOFORM_CLAUDE_AUTH=api needs the anthropic SDK: pip install -e ".[llm]" '
-                           '(anthropic>=1,<2; optional, the default claude backend needs no package)')
+                           '(anthropic>=1,<2; optional, the default claude backend needs no package)') from exc
         _API_CLIENT = anthropic.Anthropic(api_key=key)
     return _API_CLIENT
 
@@ -201,11 +292,11 @@ def ask_api(prompt: str, *, model: str | None = None, timeout: int = 1800) -> tu
         resp = client.with_options(timeout=float(timeout)).messages.create(
             model=model, max_tokens=API_MAX_TOKENS, messages=[{'role': 'user', 'content': prompt}])
     except _api_errors() as exc:   # the SDK's APIError family: status, connection and timeout errors
-        raise LLMError(f'model error ({type(exc).__name__}): {str(exc)[:500]}')
+        raise LLMError(f'model error ({type(exc).__name__}): {str(exc)[:500]}') from exc
     except ImportError as exc:     # boto3 is imported when the first Bedrock request is signed
         if claude_auth() == 'bedrock':
             raise LLMError('AUTOFORM_CLAUDE_AUTH=bedrock needs boto3 to sign requests: '
-                           f'pip install -e ".[bedrock]" ({exc})')
+                           f'pip install -e ".[bedrock]" ({exc})') from exc
         raise
     cost = api_cost_usd(model, resp.usage)
     text = ''.join(b.text for b in resp.content if getattr(b, 'type', '') == 'text')
@@ -237,8 +328,7 @@ def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turn
     else:
         text, cost = ask_cli(prompt, cwd, tools=tools, max_turns=max_turns, timeout=timeout, model=model)
     if cache and not tools and text:
-        CACHE.mkdir(parents=True, exist_ok=True)
-        hit.write_text(json.dumps({'text': text}))
+        private_write(hit, json.dumps({'text': text}))
     return text, cost
 
 

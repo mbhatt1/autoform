@@ -35,6 +35,20 @@ open Autoform.Generated.Requests
 domain the parts quantify over, elaborated once here rather than once per
 part. No theorem lives in this file. -/
 
+def dom_conform_requests___init___py__module___check_cryptography : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-3)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-18)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-19)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (17)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-8)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) }]
+
+def dom_conform_requests___init___py__module__check_compatibility : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (11), Val.int (7), Val.int (14)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (19), Val.int (-11), Val.int (0)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (6), Val.int (-9), Val.int (4)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-16), Val.int (-19), Val.int (-13)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-10), Val.int (15), Val.int (-1)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) }]
+
 def dom_conform_requests_adapters_py__module__BaseAdapter_close : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "requests/adapters.py:<module>.BaseAdapter", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.exn (Val.str "NotImplementedError"), post := (some { heap := h0 ++ [{ cls := "requests/adapters.py:<module>.BaseAdapter", fields := [] }], roots := [(base + 0)], budget := 198 }) }]
 
@@ -180,6 +194,13 @@ def dom_conform_requests_models_py__module__RequestHooksMixin_register_hook : Li
    { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.RequestHooksMixin", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.int (8)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.RequestHooksMixin", fields := [] }], roots := [(base + 0)], budget := 196 }) },
    { case := { heap := h0 ++ [{ cls := "requests/models.py:<module>.RequestHooksMixin", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (6), Val.int (-4)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [{ cls := "requests/models.py:<module>.RequestHooksMixin", fields := [] }], roots := [(base + 0)], budget := 196 }) }]
 
+def dom_conform_requests_utils_py__module___parse_content_type_header : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "application/xml"] }, expected := EResult.val (Val.tuple [Val.str "application/xml", Val.ref (base + 0)]), post := (some { heap := h0 ++ [{ cls := "dict", fields := [], payload := .dict [] }], roots := [], budget := 200 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "text/plain"] }, expected := EResult.val (Val.tuple [Val.str "text/plain", Val.ref (base + 0)]), post := (some { heap := h0 ++ [{ cls := "dict", fields := [], payload := .dict [] }], roots := [], budget := 190 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (14)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-4)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (20)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) }]
+
 def dom_conform_requests_utils_py__module__default_user_agent : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.str "python-requests"] }, expected := EResult.val (Val.str "python-requests/2.32.5"), post := (some { heap := h0 ++ [], roots := [], budget := 112 }) },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (-13)] }, expected := EResult.val (Val.str "-13/2.32.5"), post := (some { heap := h0 ++ [], roots := [], budget := 88 }) },
@@ -187,8 +208,22 @@ def dom_conform_requests_utils_py__module__default_user_agent : List Obs :=
    { case := { heap := h0 ++ [], self := none, args := [Val.int (-15)] }, expected := EResult.val (Val.str "-15/2.32.5"), post := (some { heap := h0 ++ [], roots := [], budget := 88 }) },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (19)] }, expected := EResult.val (Val.str "19/2.32.5"), post := (some { heap := h0 ++ [], roots := [], budget := 86 }) }]
 
+def dom_conform_requests_utils_py__module__parse_header_links : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.int (15)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-8)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-9)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (16)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) }]
+
 def dom_conform_requests_utils_py__module__unquote_header_value : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.unit, Val.bool false] }, expected := EResult.val (Val.unit), post := (some { heap := h0 ++ [], roots := [], budget := 62 }) }]
+
+def dom_conform_requests_utils_py__module__unquote_unreserved : List Obs :=
+  [{ case := { heap := h0 ++ [], self := none, args := [Val.str "http://127.0.0.1:10000//v:h"] }, expected := EResult.val (Val.str "http://127.0.0.1:10000//v:h"), post := (some { heap := h0 ++ [], roots := [], budget := 122 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.str "http://localhost/"] }, expected := EResult.val (Val.str "http://localhost/"), post := (some { heap := h0 ++ [], roots := [], budget := 102 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-4)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (19)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) },
+   { case := { heap := h0 ++ [], self := none, args := [Val.int (-6)] }, expected := EResult.exn (Val.str "AttributeError"), post := (some { heap := h0 ++ [], roots := [], budget := 78 }) }]
 
 
 end Autoform.SpecsGen.Requests

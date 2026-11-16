@@ -48,16 +48,31 @@ def _dump(value, stream):
 
 
 def select_ast(ast_path, source, language, output_report):
+    """Keep one language's functions, minus those the inventory's layout rules exclude.
+
+    With ``language`` None only the layout rules apply, and only when ``source`` is
+    itself a Gradle or Maven project root; otherwise nothing is read or written.
+    Functions whose file cannot be placed in ``source`` are then kept, as before.
+    """
     path = Path(ast_path)
-    adapter = repository_inventory.ADAPTERS[language]
+    if language is None and not any(os.path.lexists(os.path.join(source, name))
+                                    for name in repository_inventory.BUILD_FILES):
+        return None
+    adapter = repository_inventory.ADAPTERS[language] if language else None
     functions = deep_json.load(path)
     if not isinstance(functions, list) or any(not isinstance(f, dict) for f in functions):
         raise ValueError('frontend AST must be a function list')
-    selected, excluded, files = [], [], set()
+    selected, excluded, files, cache = [], [], set(), {}
     for function in functions:
         filename = function.get('file')
         relative = source_path(filename, source)
-        if filename == '' or (relative is not None and Path(relative).suffix in adapter['extensions']):
+        # The frontend parsed the whole tree; drop what the inventory records as a
+        # build output, generated source or test source set, under the same reason.
+        reason = relative and repository_inventory.layout_reason(source, relative, cache)
+        if reason:
+            excluded.append(dict(name=function.get('name'), file=filename, reason=reason))
+        elif adapter is None or filename == '' or (
+                relative is not None and Path(relative).suffix in adapter['extensions']):
             selected.append(function)
             if relative is not None:
                 files.add(relative)
@@ -74,13 +89,16 @@ def select_ast(ast_path, source, language, output_report):
             temporary.replace(path)
         finally:
             temporary.unlink(missing_ok=True)
-    report = dict(schema_version=1, language=language, frontend=adapter['frontend'],
+    report = dict(schema_version=1, language=language, frontend=adapter['frontend'] if adapter else None,
                   source=str(Path(source).resolve()), input_sha256=before,
                   output_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
                   kept_functions=len(selected), kept_files=sorted(files),
                   excluded_functions=excluded, source_census_complete=False)
     Path(output_report).write_text(json.dumps(report, indent=2) + '\n')
-    if not files:
+    if adapter is None and not files and excluded:
+        raise ValueError('frontend exported no files outside build outputs, generated '
+                         'sources and test source sets')
+    if adapter is not None and not files:
         raise ValueError('frontend exported no files in the selected source language')
     return report
 
@@ -139,10 +157,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('ast', type=Path)
     parser.add_argument('source', type=Path)
-    parser.add_argument('language', choices=sorted(repository_inventory.ADAPTERS))
+    parser.add_argument('language', choices=sorted(repository_inventory.ADAPTERS) + ['any'],
+                        help='`any` applies only the Gradle/Maven layout exclusions')
     parser.add_argument('output', type=Path)
     args = parser.parse_args()
-    select_ast(args.ast, args.source, args.language, args.output)
+    select_ast(args.ast, args.source, None if args.language == 'any' else args.language, args.output)
 
 
 if __name__ == '__main__':

@@ -206,6 +206,64 @@ with `AUTOFORM_RUST_REQUIRED=1`: a missing prerequisite fails the job, and a JUn
 asserts nothing was skipped. Every action is pinned by commit SHA; the job has
 `contents: read` only. The run's evidence is uploaded as an artifact.
 
+## Regressions across commits
+
+`autoform regress <repo> [Module] --base REF [--head REF]` takes a Rust leg when `--base` of a
+local checkout is a Cargo library crate (`--lang rust` forces it, e.g. for a Git URL; `--lang
+joern` refuses it). The driver is `scripts/rust_regress.py --base DIR --head DIR --out DIR`:
+
+1. **Base model.** The Rust path runs on the base tree, and `--cases-out` records every
+   oracle case: inputs, the native result and the Aeneas `#eval` result.
+2. **Inputs.** Those cases, plus seeded boundary/random inputs for every public function that
+   is a hole at base but whose signature the harness encodes (`native-only`: no model).
+3. **Signatures.** rustdoc at both revisions. A function is replayed at head only under the
+   same callee path with the same encoded signature; otherwise it is listed as removed,
+   signature changed or not encodable, and added functions are listed, never compared.
+4. **Native runs.** The same inputs, in the same order, in three harnesses: the base tree,
+   the base tree again from a separate copy and target directory (the **control**), and the
+   head tree. All three are sandboxed and offline, debug profile.
+5. **Verdicts.** The same classifier is applied to the control and to head:
+   `regression` when base native agreed with the base model and head does not;
+   `behaviour-change` when head native differs from base native and no model verdict exists
+   (a native-only function, a model `div`, or a case where base already diverged from its
+   model); otherwise `unchanged` or `inconclusive` with the reason. A case the control flags,
+   or whose base rebuild differs from what the base-model run recorded, is `unstable`:
+   excluded from every verdict and listed.
+
+`<workspace>/artifacts/regression/<Module>/rust/` receives `rust-regression.json` (per function
+the evidence kind, counts per verdict and up to five examples with base native, base model
+and head native), `rust-regression.md`, and `base-model/` (the base run's full Rust-path
+artifacts). Exit `0` no regression and no behaviour change, `1` at least one, `2` refused (a
+prerequisite, the base-model run, a build).
+
+`autoform pr` takes the same leg when the repository (or `--subdir`) at base is a Cargo
+library (the test `regress --lang auto` makes) and a changed file is Rust: the public
+functions whose head rustdoc span sits on the changed lines join pr.json/SARIF/markdown
+with the leg's verdicts mapped -- `regression`/`behaviour-change` as behaviour `changed`
+with the counter-inputs (base model, base native and head native), `unchanged` as
+`unchanged-on-inputs`, anything else (signature changed, not encodable, inconclusive,
+added at head) as `not-compared` with its reason -- and no evidence level is claimed for
+Rust. A public function the leg flags although none of its lines changed (a private
+callee did) is listed too, saying so; one removed at head is listed under removed. The
+Lean project is `AUTOFORM_RUST_LEAN_PROJECT`, as for `rust_regress.py`. A missing
+prerequisite or a refused leg leaves the Rust files not compared with the reason, and
+exits `2` when nothing else was analysed, never a pass.
+
+Measured on the gcd repository's history (github.com/frewsxcv/rust-gcd) through `autoform
+regress`, three seeded commits on top of 2.3.0 and five real commits (2026-10-19; not re-derived
+by CI). "fns" is model-backed/native-only; the control flagged nothing in any run.
+
+| base..head | change | fns | cases | regression | behaviour-change | unchanged | flagged functions |
+|---|---|---|---|---|---|---|---|
+| df6ba81..seeded | euclid loop `while b > 1` | 12/18 | 2945 | 659 | 0 | 2286 | 12 regressions (every `euclid_*`, `gcd_euclid`) |
+| df6ba81..seeded | remainder form, tuple swap (refactor) | 12/18 | 2945 | 0 | 0 | 2945 | none |
+| df6ba81..seeded | binary returns `v` when `v == 0` (a hole) | 12/18 | 2945 | 0 | 100 | 2845 | 18 behaviour changes (`binary_*`, `gcd`, `gcd_binary`) |
+| 285c438..78f84ac | real: swap mechanism | 6/12 | 1767 | 0 | 0 | 1767 | none |
+| 78f84ac..ed85752 | real: const free functions (12 added) | 6/12 | 1767 | 0 | 0 | 1767 | none |
+| ab61dfd..da9073a | real: drop the `paste` dependency | 12/18 | 2945 | 0 | 0 | 2945 | none |
+| eaf5dc6..25286fb | real: NonZero versions (30 added) | 12/18 | 2945 | 0 | 0 | 2945 | none |
+| bb23202..700deee | real: Euclid replaced by binary GCD | 6/0 | 589 | 0 | 0 | 589 | none (head judged against the base Euclid model) |
+
 ## Not covered
 
 * Anything the oracle cannot encode (above), and every hole: those functions get no
@@ -217,6 +275,8 @@ asserts nothing was skipped. Every action is pinned by commit SHA; the job has
 * Multi-crate models: dependencies are opaque to Charon by default, so a crate whose
   functions call into a dependency gets external-axiom or no-definition holes there.
 * Workspaces: point the CLI at a member package, not the workspace root.
-* `autoform pr` and `regress` do not take the Rust path; they run the Joern pipeline.
+* No model is built at head, by either the regress leg or the pr leg above: a head-only
+  function has no comparison, and a function whose callee path or encoded signature changed
+  is not compared.
 * Proofs about all inputs. The ledger, the oracle and the case theorems are evidence on the
   sampled inputs; there is no `∀ x` theorem about a Rust function here.

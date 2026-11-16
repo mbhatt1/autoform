@@ -32,6 +32,9 @@ Reads whichever of these exist, degrading gracefully:
     conformance.json          differential run -> translation faithfulness
     mutation.json             mutation gate    -> specification adequacy
     axioms.json               #audit_axioms    -> proof validity
+    ledger-<Module>.json      Lean trust ledger-> call closure, closure by contract
+                                                (one Assumption per contracted callee),
+                                                dynamic-hole risk
 """
 from __future__ import annotations
 
@@ -231,7 +234,7 @@ def sha256(path):
         return None
 
 
-def walk_holes(node, out, path="body"):
+def walk_holes(node, out):
     """Collect holes by label. `hole` is an Expr hole, `holeS` a Stmt hole; both carry
     the CPG node label that produced them, which is what makes them nameable."""
     work = [node]
@@ -453,9 +456,9 @@ def build_case(module, root):
             c.link(d, cid, "COUNTERS")
     sub_status[g2] = st
     c.link(cid, strat, "SUPPORTS")
-    faithful_id = cid
 
     # ---- G3 coverage -------------------------------------------------------
+    by_contract, n_contract_assumptions = None, 0   # filled from the ledger below
     ast = art["ast"]
     if ast is None:
         st = UNDEVELOPED
@@ -606,7 +609,9 @@ def build_case(module, root):
                    artifact=f"ledger-{module}.json",
                    value={"verifiableCore": closed, "functions": led_fns,
                           "holeFree": led.get("holeFree"),
-                          "dynamicHoleRisk": risk},
+                          "dynamicHoleRisk": risk,
+                          "closedByContract": led.get("closedByContract"),
+                          "contractsUsed": led.get("contractsUsed")},
                    metric="call-closed-core", evidence_kind=STATIC,
                    status=None)
 
@@ -632,6 +637,62 @@ def build_case(module, root):
         c.link(core, cov, "SUPPORTS")
         if led_ok:
             c.link("E6", core, "SUPPORTS")
+
+        # ---- Closure by contract -------------------------------------------
+        # `Autoform/Ledger.lean` reports, SEPARATELY from `verifiableCore`, the
+        # hole-free functions whose only open callees are on the dialect's
+        # `contractedCallees` list (`closedByContract`), and names those callees with
+        # their call-site counts (`contractsUsed`). Such a function is closed only
+        # relative to a stated premise about each callee -- pure, total, heap-neutral,
+        # returns a value of the stated kind (docs/contracts.md) -- and nothing in this
+        # case proves that premise. So the population gets its own narrowed claim,
+        # G3.3, supported by the same ledger evidence as G3.1, with one Assumption
+        # node per contracted callee attached to THAT claim. The two closure counts
+        # are never summed and G3.1 keeps `verifiableCore`. Unlike hole assumptions
+        # these are not linked to the top goal: the core does not rest on them, and
+        # a reader walking from G3.3 reaches every premise it does rest on.
+        by_contract = led.get("closedByContract") if led_ok else None
+        contract_rows = [r for r in ((led.get("contractsUsed") if led_ok else None) or [])
+                         if isinstance(r, dict) and r.get("callee")]
+        if led_ok and by_contract:
+            n_sites = sum(int(r.get("sites") or 0) for r in contract_rows)
+            cc_st = SUPPORTED if contract_rows else UNSUPPORTED
+            cc_notes = (
+                f"CONDITIONAL: these {by_contract} function(s) are hole-free but NOT in "
+                f"the {core_n}-function core; each calls at least one of the "
+                f"{len(contract_rows)} contracted callee(s) attached below ({n_sites} "
+                f"call sites module-wide). They are closed only relative to those "
+                f"assumptions, which this case does not discharge "
+                f"(Autoform/Ledger.lean `contractedCallees`; docs/contracts.md)."
+                if contract_rows else
+                f"ledger-{module}.json reports {by_contract} function(s) closed by "
+                f"contract but names no contracted callee in `contractsUsed`, so the "
+                f"premise they rest on cannot be stated here and the closure is not earned.")
+            by_contract_claim = c.claim(
+                "G3.3",
+                f"A further {by_contract} hole-free function(s) of {module} are call-closed "
+                f"once the dialect's contracted callees are assumed to behave as their "
+                f"contracts state.",
+                cc_st, evidence_kind=STATIC,
+                scope={"functions": by_contract, "functionsTotal": fn_total,
+                       "quantifiedOver": "closed-by-contract functions",
+                       "contractedCallees": [str(r["callee"]) for r in contract_rows]},
+                notes=cc_notes)
+            c.link(by_contract_claim, cov, "SUPPORTS")
+            c.link("E6", by_contract_claim, "SUPPORTS" if contract_rows else "COUNTERS")
+            for row in contract_rows:
+                callee = str(row["callee"])
+                sites_n = int(row.get("sites") or 0)
+                aid = c.assume(
+                    "A.contract:" + callee.replace(" ", "-"),
+                    f"Assumed of the {by_contract} function(s) closed by contract: the "
+                    f"external callee `{callee}` is pure, total, heap-neutral and returns "
+                    f"a value of the kind its contract states. The call itself is not "
+                    f"translated; this premise is what makes it count as closed "
+                    f"(docs/contracts.md, \"The API for assumption extraction\").",
+                    count=sites_n or None)
+                c.link(aid, by_contract_claim, "SUPPORTS")
+                n_contract_assumptions += 1
 
         # Execution evidence is limited to the inputs actually tried.
         exec_cov = (art["conformance"] or {}).get("functions_covered") \
@@ -949,7 +1010,9 @@ def build_case(module, root):
         "artifactsMissing": sorted(set(paths) - set(present)),
         "counts": {"functions": fn_total, "holeFree": holefree,
                    "holeOccurrences": sum(labels.values()) if labels else 0,
-                   "distinctHoleCauses": len(labels)},
+                   "distinctHoleCauses": len(labels),
+                   "closedByContract": by_contract or 0,
+                   "contractAssumptions": n_contract_assumptions},
         "subClaimStatus": sub_status,
         "topStatus": top_status,
     }
@@ -1023,7 +1086,7 @@ def render_markdown(c, meta):
     L.append("```")
     L.append(f"{GLYPH[st]} G1  module {c.module} behaves as specified   [{st}]")
     L.append("└── S1  argue over the four failure modes")
-    order = ["G2", "G2.1", "G2.2", "G3", "G3.1", "G3.2", "G4", "G5", "G5.1"]
+    order = ["G2", "G2.1", "G2.2", "G3", "G3.1", "G3.2", "G3.3", "G4", "G5", "G5.1"]
     for cid in order:
         n = byid.get(cid)
         if not n:
@@ -1056,7 +1119,8 @@ def render_markdown(c, meta):
     if c.assumptions:
         L.append(f"## Assumptions carried ({len(c.assumptions)})\n")
         L.append("Every untranslated construct is an explicit assumption of the "
-                 "argument, not an omission from it.\n")
+                 "argument, not an omission from it; so is every contracted callee "
+                 "(`A.contract:*`) a function closed by contract calls out to.\n")
         L.append("| Assumption | Occurrences | Example sites |")
         L.append("|---|---|---|")
         for a in sorted(c.assumptions, key=lambda x: -(x.get("occurrences") or 0)):
@@ -1073,13 +1137,17 @@ def render_markdown(c, meta):
              f"{meta['counts']['functions']}** functions hole-free.")
     L.append(f"- Assumptions carried: **{meta['counts']['holeOccurrences']}** hole "
              f"occurrences over **{meta['counts']['distinctHoleCauses']}** distinct causes.")
+    if meta["counts"].get("closedByContract"):
+        L.append(f"- Closed by contract: **{meta['counts']['closedByContract']}** further "
+                 f"function(s), conditional on **{meta['counts']['contractAssumptions']}** "
+                 f"callee assumption(s) (G3.3); not counted in the core above.")
     L.append(f"- Undeveloped goals: **{', '.join(und) or 'none'}**.")
     L.append(f"- Unsupported/defeated: **{', '.join(bad) or 'none'}**.")
     L.append(f"- Artifacts missing: **{', '.join(meta['artifactsMissing']) or 'none'}**.")
     g2n = byid.get("G2")
     if g2n is not None:
         cov = (g2n.get("scope") or {}).get("coverage")
-        L.append(f"- Faithfulness: **TESTED, NOT PROVED**"
+        L.append("- Faithfulness: **TESTED, NOT PROVED**"
                  + (f", over {cov:.1%} of the module's functions" if cov else "")
                  + ". This is the same statement as the trust ledger's "
                    "`NOT PROVED : transpiler faithfulness — see conformance.json`; the "

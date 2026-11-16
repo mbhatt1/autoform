@@ -1,0 +1,10 @@
+# joern 4.0.606
+# sha512 of each release asset of the Joern version pinned in joern-version, copied from
+# the release's own <asset>.sha512 manifests. scripts/bootstrap.sh verifies the zip
+# against THIS file, wherever it came from (the release, AUTOFORM_JOERN_URL, or
+# AUTOFORM_JOERN_ZIP), so a mirror can serve the bytes but cannot choose them.
+# Re-pin together with joern-version (tests/test_package.py checks they agree).
+67f8f4378cb6e09895e4fe4d38dbeb6124bb67905a3552ef191ed89f9e8b57adb7965bfc0e4ffaa6e3a2bf04f88743477af5378f8691de826fa2cda89fd44295  target/joern-cli-linux-x86_64.zip
+200b686db07617d248e37caedf3939a26a9d654049836dd74f10712d626a269a06f68b078559b0d05b3a438bea45ef003b3c48058c7a9353d2d81af5fa4027fe  target/joern-cli-linux-arm64.zip
+01abbe9134afb3fdf3eabf8a4162b6e09ea25ffebf519b298e76fcb01dd4552b554a3d5d350b2cffa577c69fb9cf1e5f719bdcaf0170d6b6ba232b71944d27d7  target/joern-cli-macos-x86_64.zip
+f133960693a49604d16f4998a6c4e19fb7b3e1ecadb77406d084567abe57b75021605e7455d5e910c72b80b6204b5ee0ca567066b5d7a467de2a90235193df94  target/joern-cli-macos-arm64.zip

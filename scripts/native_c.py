@@ -23,6 +23,76 @@ TYPES = {'i8': ('int8_t', ctypes.c_int8), 'u8': ('uint8_t', ctypes.c_uint8),
          'i64': ('int64_t', ctypes.c_int64), 'u64': ('uint64_t', ctypes.c_uint64)}
 DEFAULT_TIMEOUT = 3.0
 
+CPP_SOURCES = ('.cc', '.cpp', '.cxx')
+SOURCES = ('.c',) + CPP_SOURCES
+CPP_HEADERS = ('.hh', '.hpp', '.hxx')
+# Spellings a C ABI thunk can name at global scope. A C++ entry point whose declared
+# types are all spelled this way is called through a cast to its exact function type,
+# which selects that one overload and rejects a non-static member function.
+CPP_BUILTIN_TYPES = {
+    'char', 'signed char', 'unsigned char', 'short', 'short int', 'unsigned short',
+    'unsigned short int', 'int', 'signed', 'signed int', 'unsigned', 'unsigned int', 'long',
+    'long int', 'unsigned long', 'unsigned long int', 'long long', 'long long int',
+    'unsigned long long', 'unsigned long long int', 'size_t', 'ptrdiff_t', 'intptr_t',
+    'uintptr_t', *('%sint%d_t' % (s, w) for s in ('', 'u') for w in (8, 16, 32, 64))}
+_IDENT = r'[A-Za-z_]\w*'
+_DIAGNOSTIC = re.compile(r'^(.*?):(\d+):(?:\d+:)? (?:fatal )?error: (.*)$', re.M)
+
+
+CPP_TOKEN = re.compile(rb'^\s*(?:namespace\s+\w+\s*\{|template\s*<|class\s+\w+\s*(?:final\s*)?[:{])', re.M)
+
+
+def cpp_corpus(source):
+    """A C++ corpus: no C translation unit, and either a C++ source or header or -- a
+    header-only library -- a `.h` with a C++-only declaration (`namespace n {`,
+    `template <`, `class C {`). Only there is a `.h` header read as C++; a C project's
+    headers keep the C path's behaviour unchanged. The exporter's `cxxCorpus` is the
+    same rule."""
+    files = [p for p in Path(source).rglob('*')
+             if p.suffix in SOURCES + CPP_HEADERS + ('.h',) and p.is_file()]
+    suffixes = {p.suffix for p in files}
+    if '.c' in suffixes:
+        return False
+    if suffixes & set(CPP_SOURCES + CPP_HEADERS):
+        return True
+    return any(CPP_TOKEN.search(p.read_bytes()) for p in files if p.suffix == '.h')
+
+
+def cpp_callee(f):
+    """`(qualified name, exact function type or None)` of a C++ entry point, or a
+    refusal reason string.
+
+    Joern's full name is `ns.Class.method:signature`; the scope segments become the C++
+    qualification, so `double_conversion.Double.SignificandSizeForOrderOfMagnitude`
+    is called as `::double_conversion::Double::SignificandSizeForOrderOfMagnitude` and
+    a namespace member is never looked up unqualified at global scope. (An anonymous
+    namespace is absent from the full name; its members are found through the enclosing
+    namespace in the same translation unit.)"""
+    name = f.get('sourceName', f['name'])
+    scope = f['name'].split(':', 1)[0].split('.')[:-1]
+    if '<duplicate>' in f['name'].split(':', 1)[0]:
+        return 'ambiguous conditional or overloaded entry point'
+    if not re.fullmatch(_IDENT, name) or any(not re.fullmatch(_IDENT, s) for s in scope):
+        return 'source callable identity unavailable'
+    qualified = '::' + '::'.join(scope + [name])
+
+    def spelled(t):
+        t = ' '.join(re.sub(r'\b(?:const|volatile)\b', ' ', t or '').split())
+        return t if t in CPP_BUILTIN_TYPES else None
+    types = [spelled(t) for t in [f.get('returnType', ''), *f.get('paramTypes', [])]]
+    exact = None
+    if len(types) == len(f['params']) + 1 and all(types):
+        exact = '%s (*)(%s)' % (types[0], ', '.join(types[1:]) or 'void')
+    return qualified, exact
+
+
+def _cpp_refusal(message):
+    if '::*' in message or 'non-static member' in message or 'without object' in message:
+        return 'C++ non-static member function: the native oracle has no receiver to call it on'
+    if 'private' in message or 'protected' in message:
+        return 'C++ member is not accessible from a thunk (private or protected)'
+    return 'C++ entry point thunk did not compile: ' + message.strip()[:200]
+
 
 class NativeExecutionError(RuntimeError):
     def __init__(self, result):
@@ -183,7 +253,51 @@ def _link_failure(diagnostics):
                  or 'Undefined symbols' in diagnostics or 'ld returned' in diagnostics))
 
 
-def compile_sources(source, funcs, work):
+def _cpp_admit(unit, path, lines, bindings, flags, skipped, source):
+    """C++ only: syntax-check a unit's thunks before any library is built from it.
+
+    One thunk that does not compile (a non-static member called without a receiver, a
+    private member, an overload the cast does not match) would otherwise fail its whole
+    translation unit, and with it every other entry point in the file. Each error the
+    compiler places on a thunk's line refuses that entry point with the compiler's
+    reason; the rest are checked again. Returns the admitted `(lines, bindings)`, or
+    `(None, None)` for a header unit with nothing left to run (a header supplies no
+    definitions another unit needs, unlike a source file)."""
+    header = path.suffix not in SOURCES
+    first = 2   # lines[0:2] are the two includes; thunk k is on line first + k + 1
+    for _ in range(3):
+        unit.write_text('\n'.join(lines) + '\n')
+        try:
+            proc = subprocess.run(['c++', '-fsyntax-only', *flags, '-x', 'c++', str(unit)],
+                                  capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            return lines, bindings   # the build reports it
+        if proc.returncode == 0:
+            return lines, bindings
+        bad = {}
+        for match in _DIAGNOSTIC.finditer(proc.stdout + proc.stderr):
+            k = int(match.group(2)) - first - 1
+            if Path(match.group(1)).resolve() == unit.resolve() and 0 <= k < len(bindings):
+                bad.setdefault(k, match.group(3))
+        if not bad:
+            if not header:
+                return lines, bindings   # the build reports the unit's own failure
+            for f, _ in bindings:
+                skipped[f['name']] = 'translation unit compile failed: ' + str(path.relative_to(source))
+            return None, None
+        for k, message in bad.items():
+            skipped[bindings[k][0]['name']] = _cpp_refusal(message)
+        keep = [k for k in range(len(bindings)) if k not in bad]
+        lines = lines[:first] + [lines[first + k] for k in keep]
+        bindings = [bindings[k] for k in keep]
+        if header and not bindings:
+            return None, None
+    return lines, bindings
+
+
+def compile_sources(source, funcs, work, population=None):
+    """`population` (default `funcs`) is every function the exporter produced; a C++
+    entry point called by name alone must be the only one of that qualified name in it."""
     source, work = Path(source).resolve(), Path(work)
     work.mkdir(parents=True, exist_ok=True)
     # dlopen caches by path, even if the file at that path was rebuilt. Reusing
@@ -204,16 +318,45 @@ def compile_sources(source, funcs, work):
         return result
     by_file = collections.defaultdict(list)
     counts = collections.Counter((f.get('file'), f.get('sourceName', f['name'])) for f in funcs)
+    # C++ only: identity is the qualified name (and, when spelled with builtin types, the
+    # exact function type), not the bare source name, and a header is a translation unit
+    # of its own. A C function's selection below is unchanged.
+    cpp_headers = CPP_HEADERS + (('.h',) if not context['kernel_root'] and any(
+        Path(f.get('file', '')).suffix == '.h' for f in funcs) and cpp_corpus(source) else ())
+
+    def callee_of(f):
+        suffix = Path(f.get('file', '')).suffix
+        return cpp_callee(f) if suffix in CPP_SOURCES or suffix in cpp_headers else None
+    named = {identity(f): callee_of(f) for f in (population if population is not None else funcs)}
+    named.update({identity(f): callee_of(f) for f in funcs if identity(f) not in named})
+    by_qualified = collections.Counter(c[0] for c in named.values() if isinstance(c, tuple))
+    by_exact = collections.Counter((f.get('file'),) + named[identity(f)] for f in funcs
+                                   if isinstance(named[identity(f)], tuple))
+    thunks = {}
     for idx, f in enumerate(funcs):
         path = (source / f.get('file', '')).resolve()
         name = f.get('sourceName', f['name'])
         tags = f.get('paramIntegerTypes', [])
-        if (not path.is_file() or path.suffix not in ('.c', '.cc', '.cpp', '.cxx')
-                or not path.is_relative_to(source)):
+        callee = named[identity(f)]
+        if (not path.is_file() or not path.is_relative_to(source)
+                or path.suffix not in SOURCES + (cpp_headers if callee else ())):
             reason = 'entry point is not in a source translation unit'
         elif (f.get('returnIntegerType') not in TYPES or len(tags) != len(f['params'])
               or any(t not in TYPES for t in tags)):
             reason = 'scalar integer ABI unavailable'
+        elif isinstance(callee, str):
+            reason = callee
+        elif callee:
+            qualified, exact = callee
+            # The exact-type cast names one overload, so only a second record of the same
+            # type in the same file is ambiguous; a bare qualified call resolves among
+            # every overload, so it must be the only one of its name anywhere.
+            if by_exact[(f.get('file'), qualified, exact)] > 1 if exact else by_qualified[qualified] > 1:
+                reason = 'ambiguous conditional or overloaded entry point'
+            else:
+                thunks[idx] = ('static_cast<%s>(&%s)' % (exact, qualified)) if exact else qualified
+                by_file[path].append((idx, f))
+                continue
         elif not re.fullmatch(r'[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*', name):
             reason = 'source callable identity unavailable'
         elif counts[(f.get('file'), name)] > 1:
@@ -229,6 +372,7 @@ def compile_sources(source, funcs, work):
         for path in source.rglob('*'):
             if path.suffix in ('.c', '.cc', '.cpp', '.cxx') and path.is_file():
                 by_file.setdefault(path.resolve(), [])
+    flags = source_context.native_flags(context, work) + shlex.split(os.environ.get('AUTOFORM_CFLAGS', ''))
     for index, (path, members) in enumerate(sorted(by_file.items())):
         cpp = path.suffix != '.c'
         unit = work / ('unit%d' % index + ('.cpp' if cpp else '.c'))
@@ -241,12 +385,16 @@ def compile_sources(source, funcs, work):
             args = ', '.join('a%d' % n for n in range(len(f['params'])))
             prefix = 'extern "C" ' if cpp else ''
             lines.append('%s%s %s(%s) { return %s(%s); }' %
-                         (prefix, TYPES[f['returnIntegerType']][0], symbol, params, name, args))
+                         (prefix, TYPES[f['returnIntegerType']][0], symbol, params,
+                          thunks.get(idx, name), args))
             bindings.append((f, symbol))
+        if any(idx in thunks for idx, _ in members):
+            lines, bindings = _cpp_admit(unit, path, lines, bindings, flags, result.skipped, source)
+            if lines is None:
+                continue
         unit.write_text('\n'.join(lines) + '\n')
         units.append((unit, path, bindings))
     result.info['files_attempted'] = len(units)
-    flags = source_context.native_flags(context, work) + shlex.split(os.environ.get('AUTOFORM_CFLAGS', ''))
     arch = ['-arch', platform.machine()] if sys.platform == 'darwin' else []
     suffix = '.dylib' if sys.platform == 'darwin' else '.so'
 

@@ -91,16 +91,16 @@ class Resolver:
 
 def walk(node, out: list, holes: list):
     """Collect (kind, key) for every call site and every hole label under `node`."""
-    for node in deep_json.dict_nodes(node):
-        k = node.get("k")
+    for item in deep_json.dict_nodes(node):
+        k = item.get("k")
         if k == "call":
-            out.append(("call", node.get("f", "")))
+            out.append(("call", item.get("f", "")))
         elif k == "mcall":
-            recv = node.get("recv") or {}
+            recv = item.get("recv") or {}
             r = recv.get("v") if recv.get("k") == "name" else None
-            out.append(("mcall", (r, node.get("m", ""))))
+            out.append(("mcall", (r, item.get("m", ""))))
         elif k in ("hole", "holeS"):
-            holes.append(node.get("label", "?"))
+            holes.append(item.get("label", "?"))
 
 
 def analyse(path: str) -> dict:

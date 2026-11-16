@@ -72,20 +72,48 @@ private def run (a b : Int) : EResult :=
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int (-1)) -/
 #guard_msgs in #eval run (-7) 3
 
-/-! ## Open obligation
+/-! ## The `rhs = -1` half
 
-Stated, not admitted — the convention this project uses everywhere. A `def` of a `Prop`
-asserts nothing, which is why it is honest in a way `sorry` is not. -/
+Until 2026-11-13 this was an open obligation, stated as a `Prop`-valued `def`. The
+`rhs = 0` case reduces because `0` is a literal; `-1` is `Expr.unop "-" (lit 1)`, so the
+guard's second disjunct goes through `applyUnop .cLike "-" (.int 1)`, i.e.
+`numToE (NumConfig.c32Wrapv.neg 1)`, and `simp` with the numeric model unfolded did not
+close it: the only `@[simp]` equation for C negation, `applyUnop_c_neg`, carries a
+`Fits32 (-x)` side condition that the default discharger cannot settle because
+`IntType.inRange` is not in the simp set. The fix is two concrete equations, each closed by
+the kernel rather than by `simp`, which the main proof then rewrites with. -/
 
-/-- The `rhs = -1` half of the contract, for every `lhs`. Not proved here.
+/-- `-1` is representable in 32 bits, so the wrapping C config negates `1` exactly.
+Closed by `decide` (`NumResult` derives `DecidableEq`), the same way `Numeric.lean` pins
+`c32Wrapv.mul 100000 100000`. -/
+@[simp] theorem c32Wrapv_neg_one : NumConfig.c32Wrapv.neg 1 = .ok (-1) := by decide
 
-The `rhs = 0` case reduces because `0` is a literal; `-1` is `Expr.unop "-" (lit 1)`, so
-the guard's second disjunct goes through `NumConfig.c32Wrapv.neg`, and `simp` did not
-close it with the numeric model unfolded. The behaviour IS pinned above at three
-representative inputs including `INT_MIN`; what is missing is the universally quantified
-proof, which is a different and stronger claim. -/
-def ob_signedMod32_minus_one : Prop :=
-  ∀ (lhs : Int) (k : Nat),
-    (applyFunc C (k+9) [] smod32 none [.int lhs, .int (-1)] []).2 = .val (.int 0)
+/-- The unary-minus corollary at the `applyUnop` level: what the translated guard's
+`Expr.unop "-" (Expr.lit (Lit.int 1))` evaluates to under the C dialect. -/
+@[simp] theorem applyUnop_c_neg_one : applyUnop .cLike "-" (.int 1) = .val (.int (-1)) := by
+  simp [applyUnop, numToE, Dialect.toNumConfig, c32Wrapv_neg_one]
+
+/-- **The other half of the contract, for every `lhs`.**
+
+`rhs = -1`: the guard's second disjunct fires and the function returns zero without
+evaluating `lhs % rhs`, so `INT_MIN % -1` -- `#DE` on x86 -- is never reached. Same shape
+as `signedMod32_zero_divisor`: universally quantified over `lhs` and over any fuel budget
+at least 9. The script is the zero-divisor script plus the unary-minus equations above, the
+`||` arm of `applyBinop` on the two concrete booleans the guard produces; `simp` decides
+`-1 ≠ 0` as `Int`s itself, so the first disjunct's `==` is seen to be `false`. -/
+theorem signedMod32_minus_one (lhs : Int) (k : Nat) :
+    (applyFunc C (k+9) [] smod32 none [.int lhs, .int (-1)] []).2 = .val (.int 0) := by
+  simp [applyFunc, smod32, f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_,
+        bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, Env.set,
+        execStmt, evalExpr, applyBinop, Val.truthy, Val.beq, C,
+        binopNeedsHeap, Val.kind,
+        -- The pieces the `rhs = 0` proof never needed: the unary minus on the literal
+        -- `1`, the non-short-circuit `||` arm (its left disjunct is `false` here), and the
+        -- dialect's answer to "is `a || b` a value or a boolean".
+        applyUnop, numToE, Dialect.toNumConfig, Dialect.boolOpsAreValues,
+        c32Wrapv_neg_one]
+
+#audit_axioms signedMod32_minus_one
+#audit_depends signedMod32_minus_one on f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_
 
 end Autoform.V8Spec

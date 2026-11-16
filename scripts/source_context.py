@@ -8,6 +8,10 @@ import argparse
 import ctypes
 import json
 import os
+import stat
+import sys
+
+import repository_inventory
 
 
 KERNEL_ATTRIBUTES = (
@@ -70,6 +74,47 @@ def profile(source):
             'Concurrency, hardware and unmodeled memory operations remain explicit gaps.',
         ] if root else []),
     )
+
+
+# Extensions Joern's language guess weighs when `joern-parse` is given no --language
+# (`guessMajorityLanguageInDir`: the language with the most files wins).
+_GUESS_EXTENSIONS = {
+    '.java': 'JAVASRC', '.kt': 'KOTLIN', '.py': 'PYTHONSRC', '.go': 'GOLANG',
+    '.js': 'JSSRC', '.jsx': 'JSSRC', '.ts': 'JSSRC', '.tsx': 'JSSRC', '.c': 'C', '.h': 'C',
+    '.cpp': 'C', '.cc': 'C', '.hpp': 'C', '.cs': 'CSHARPSRC', '.php': 'PHP', '.rb': 'RUBYSRC',
+    '.swift': 'SWIFTSRC',
+}
+
+
+def guessed_frontend(source):
+    """The frontend `joern-parse` will pick for `source`: AUTOFORM_FRONTEND, else the
+    majority language by file count (hidden directories skipped, symlinks not followed)."""
+    if os.environ.get('AUTOFORM_FRONTEND'):
+        return os.environ['AUTOFORM_FRONTEND'].upper()
+    counts = {}
+    for directory, dirs, files in os.walk(source):
+        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        for name in files:
+            frontend = _GUESS_EXTENSIONS.get(os.path.splitext(name)[1].lower())
+            if frontend:
+                counts[frontend] = counts.get(frontend, 0) + 1
+    return max(counts, key=counts.get) if counts else None
+
+
+def jvm_frontend_args(source):
+    """`--delombok-mode` for the Java frontend, or [] for any other.
+
+    Joern's default runs delombok on any project that uses Lombok and then parses the
+    delombok OUTPUT; when delombok fails (it needs the project's dependency jars, which
+    are not fetched) that output does not exist and javasrc2cpg writes an empty CPG with
+    only warnings -- measured on a 1,472-file Gradle service: 0 functions exported.
+    `types-only` parses the original sources and uses delombok for type information
+    only, so a failed delombok costs types, never the code. AUTOFORM_DELOMBOK_MODE
+    overrides it (no-delombok, default, types-only, run-delombok).
+    """
+    if guessed_frontend(source) != 'JAVASRC':
+        return []
+    return ['--delombok-mode', os.environ.get('AUTOFORM_DELOMBOK_MODE') or 'types-only']
 
 
 HOST_HEADER_SHIMS = {
@@ -181,19 +226,81 @@ def native_flags(context, work):
     return flags
 
 
-def main():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('source')
-    p.add_argument('output')
-    p.add_argument('--args-file', required=True)
-    a = p.parse_args()
-    ctx = profile(a.source)
+def oversized(source, limit):
+    """Supported source files above ``limit`` bytes, in the inventory's terms.
+
+    Joern is told to skip each one by absolute path. Its ``--exclude`` option splits
+    on commas, so a path containing one cannot be named to it; that file is recorded
+    as over the cap but still parsed, never dropped silently from either side.
+    """
+    if not limit:
+        return []
+    extensions = {e for adapter in repository_inventory.ADAPTERS.values() for e in adapter['extensions']}
+    root, found = os.path.abspath(source), []
+    for directory, names, files in os.walk(root):
+        names[:] = sorted(n for n in names if n not in repository_inventory._VCS_NAMES)
+        for name in sorted(files):
+            path = os.path.join(directory, name)
+            try:
+                info = os.lstat(path)
+            except OSError:
+                continue
+            if os.path.splitext(name)[1] in extensions and stat.S_ISREG(info.st_mode) \
+                    and info.st_size > limit:
+                found.append(dict(path=Path(os.path.relpath(path, root)).as_posix(),
+                                  bytes=info.st_size, reason='max_file_bytes',
+                                  frontend_excluded=',' not in path))
+    return found
+
+
+def context(source):
+    """The frontend context for ``source``: `profile`'s preprocessor configuration,
+    the AUTOFORM_LANGUAGE partition, the over-cap files (`oversized`) and the JVM
+    delombok mode, with the assembled ``frontend_args`` -- the exact `--frontend-args`
+    list for this tree (the `--language` of a forced AUTOFORM_FRONTEND is a separate
+    argument the callers pass alongside it). `main()` writes it for `autoform.sh`;
+    pr mode's export (scripts/pr_mode.py) passes it directly, so a pull request's
+    head and base trees are parsed exactly as the pipeline parses them, and no
+    caller can drift from the others. Over-cap files are reported on stderr whatever
+    the caller. Raises ValueError when AUTOFORM_MAX_FILE_BYTES is not a number or
+    the compilation database does not exist."""
+    ctx = profile(source)
     language = os.environ.get('AUTOFORM_LANGUAGE')
     if language:
         ctx['language'] = language
         ctx['frontend'] = os.environ.get('AUTOFORM_FRONTEND')
         if language != 'c':
             ctx['frontend_args'] = []
+    limit = repository_inventory.max_file_bytes()
+    ctx['max_file_bytes'] = limit or None
+    ctx['excluded_files'] = oversized(source, limit)
+    if not language or language == 'java':
+        jvm = jvm_frontend_args(source)
+        if jvm:
+            ctx['delombok_mode'] = jvm[1]
+            ctx['frontend_args'] = (ctx['frontend_args'] or ['--frontend-args']) + jvm
+    skip = [arg for entry in ctx['excluded_files'] if entry['frontend_excluded']
+            for arg in ('--exclude', os.path.join(os.path.abspath(source), entry['path']))]
+    if skip:
+        ctx['frontend_args'] = (ctx['frontend_args'] or ['--frontend-args']) + skip
+    for entry in ctx['excluded_files']:
+        print('autoform: %s is %d bytes, over the %d-byte cap (AUTOFORM_MAX_FILE_BYTES); %s'
+              % (entry['path'], entry['bytes'], limit, 'excluded from the frontend'
+                 if entry['frontend_excluded'] else 'cannot be excluded (comma in path)'),
+              file=sys.stderr)
+    return ctx
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('source')
+    p.add_argument('output')
+    p.add_argument('--args-file', required=True)
+    a = p.parse_args()
+    try:
+        ctx = context(a.source)
+    except ValueError as exc:
+        sys.exit('source_context: ' + str(exc))
     Path(a.output).write_text(json.dumps(ctx, indent=2) + '\n')
     Path(a.args_file).write_bytes(b''.join(s.encode() + b'\0' for s in ctx['frontend_args']))
 

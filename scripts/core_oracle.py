@@ -309,7 +309,7 @@ def synth_cases(fentry, n_inputs, fields_of):
 
 # ------------------------------------------------------------------- test-suite inputs
 
-def testsuite_cases(ast_path, funcs, src_root, wanted, per_fn, tests_override, stats):
+def testsuite_cases(funcs, src_root, wanted, per_fn, tests_override, stats):
     """Real arguments, recorded by tracing the repository's own suite (§3).
 
     Reuses `differential.py`'s tracer and encoder verbatim. If the suite cannot run
@@ -554,7 +554,7 @@ def main():
         stats["runtime"] = evidence["runtime"]
     elif src_root and not a.no_tests:
         try:
-            recs, src_root = testsuite_cases(a.ast, funcs, src_root, core_set,
+            recs, src_root = testsuite_cases(funcs, src_root, core_set,
                                              max(4, a.inputs // 4), a.tests, stats)
             cases += recs
         except Exception as e:                                   # noqa: BLE001

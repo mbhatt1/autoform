@@ -198,6 +198,30 @@ carries a `.mutate-backup` sibling, or contains a `__mutated` marker.
 (`.int 0` → `.int 1`) carries no marker. The git-dirty check is what catches that class,
 which is why all three conditions are tested rather than the most obvious one.
 
+**Getting out of a stranded mutation.** The `.mutate-backup` marker is written before the
+first mutant and removed by `mutate.py`'s restore path on exit, including on Ctrl-C. Until
+2026-11-13 that path ran only for `KeyboardInterrupt`: a `kill`, a CI cancel or a closed
+terminal (SIGTERM, SIGHUP) ended the process with the mutant on disk and the marker set,
+so the next run refused to start and `differential.py` kept reporting
+`mutation_in_progress`, with no documented way out short of hand-copying the backup.
+`mutate.py` now routes SIGTERM and SIGHUP through the same restore path, and
+`scripts/mutate.py <file> --recover` handles what that cannot (SIGKILL, a dead machine):
+it copies each `<file>.mutate-backup` back over its file, removes the marker, and exits 0
+— or 1 when there is nothing to recover. In both cases any `.olean` produced while the
+mutant was live is suspect; rebuild before trusting the tree.
+
+The report's `status` also stopped conflating two different ends to a run. After the last
+mutant the original source is rebuilt, bounded by `--restore-timeout` (default: three
+times `--timeout`, because the restore rebuilds the whole umbrella from a cold cache
+while a `--targeted-parts` mutant never did). `RESTORE_FAILED` now means that build
+returned non-zero without timing out — the restored source does not compile, which is
+the alarming case. `RESTORE_TIMEOUT` means it did not finish inside the bound: the source
+is restored and every theorem verdict stands, but the tree's build state is unverified
+until `lake build <spec-module>` is run. Neither lets the gate exit 0, and both leave
+`restored_build.exit_code` non-zero, so `scripts/sacm.py`, `guarantee.py` and
+`security_specs.py`, which already refuse a report whose restore build did not pass,
+need no change; `restored_build.timeout_s` and `restored_build.status` are additions.
+
 **Incident.** The differential harness stopped skipping varargs functions. Conclusive
 cases went from 2 to 14 — seven times more of the artifact actually checked — while the
 headline rate fell from 100% to 64%. Quoting the rate alone would have read as a
@@ -319,9 +343,14 @@ the old artifact.
 The other two are recorded honestly as the weakest class of entry in the file: they name
 the commit that produced or changed the artifact and nothing about the tree it came from.
 A V8-sized C++ corpus cannot be identified by matching a fresh export the way cachetools
-was. **The gate passing does not mean the ASTs are attributed** — it reports 0 of 14
-attributed, with all 14 named. What it now prevents is a *new* unattributed artifact, and
-a regenerated one silently keeping an entry that no longer describes it.
+was. **The gate passing does not mean every AST is attributed.** When it first became a
+gate it reported 0 of 14 attributed, with all 14 named. As of 2026-11-13 the tree tracks
+24 `ast-*.json`: 18 have a `provenance/ast-<M>.json.prov.json` record (counted from that
+directory) and 6 are named in `provenance/unattributed.json` (CMath, LinuxLibSample,
+Sample, Stress, V8Base, V8Numbers). `scripts/check_provenance.py` prints the current
+split on every run; that line, not this paragraph, is the figure to quote. What the gate
+prevents is a *new* unattributed artifact, and a regenerated one silently keeping an entry
+that no longer describes it.
 
 ## Two failure shapes worth naming
 

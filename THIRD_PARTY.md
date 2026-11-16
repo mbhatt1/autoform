@@ -14,9 +14,12 @@ byte for byte. The required repository CI also compares its complete notice with
 the pinned upstream file and blocks release on a difference or unavailable input.
 
 The Python package installs Hypothesis separately. The optional `machine` extra
-installs pypcode, pyelftools, macholib and pefile separately. Their dependencies
-and license files belong to their own distributions; they are not vendored in
-Autoform's runtime archive. `pyproject.toml` records the requested versions.
+installs pypcode, pyelftools, macholib and pefile separately, and the optional `llm`
+and `bedrock` extras install the `anthropic` SDK (with its `bedrock` extra for the
+latter) separately; nothing is installed for a model backend unless one of those
+extras is requested. Their dependencies and license files belong to their own
+distributions; they are not vendored in Autoform's runtime archive. `pyproject.toml`
+records the requested versions.
 
 Lean, Joern, Git, compilers and source runtimes are external tools. Lake downloads
 specimen, aesop, batteries, plausible and proofwidgets at the revisions in

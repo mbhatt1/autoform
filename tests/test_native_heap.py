@@ -84,7 +84,10 @@ def test_graph_record_validation_never_downgrades(differential):
 def test_function_code_identity_and_changed_attributes(differential, tmp_path):
     from native_heap import function_identities
     path = tmp_path / 'mod.py'
-    path.write_text('def f():\n    return 1\n')
+    # A string constant: it is a LOAD_CONST from co_consts on every supported CPython.
+    # A small int is not on 3.14 (LOAD_SMALL_INT reads no constant), so a test that swaps
+    # the code's constants would not change what the function returns.
+    path.write_text("def f():\n    return 'plain'\n")
     ns = {}
     exec(compile(path.read_text(), str(path), 'exec'), ns)
     funcs = [{'name': 'mod.py:<module>.f', 'file': 'mod.py'}]
@@ -103,7 +106,10 @@ def test_function_code_identity_and_changed_attributes(differential, tmp_path):
 def plain_function(differential, tmp_path):
     from native_heap import function_identities
     path = tmp_path / 'plain.py'
-    path.write_text('def f():\n    return 1\n')
+    # A string constant: it is a LOAD_CONST from co_consts on every supported CPython.
+    # A small int is not on 3.14 (LOAD_SMALL_INT reads no constant), so a test that swaps
+    # the code's constants would not change what the function returns.
+    path.write_text("def f():\n    return 'plain'\n")
     ns = {'__name__': 'plain'}
     exec(compile(path.read_text(), str(path), 'exec'), ns)
     identities = function_identities([{'name': 'plain.py:<module>.f', 'file': 'plain.py'}],
@@ -180,7 +186,10 @@ def test_equal_but_replaced_function_code_is_observed(differential, plain_functi
 def test_mutable_function_code_constants_are_refused(differential, plain_function, nested):
     fn, enc = plain_function
     constant = ([] ,) if nested else []
-    fn.__code__ = fn.__code__.replace(co_consts=(None, constant))
+    # Replace the returned constant where it is: its index in co_consts is not stable
+    # across versions (3.10-3.13 keep a leading None, 3.14 does not).
+    fn.__code__ = fn.__code__.replace(
+        co_consts=tuple(constant if c == 'plain' else c for c in fn.__code__.co_consts))
     assert fn() is constant
     with pytest.raises(differential.Unencodable, match='callable-code-state'):
         enc.enc(fn)
@@ -255,7 +264,10 @@ def test_distinct_function_objects_cannot_share_an_identity(differential, tmp_pa
     from native_heap import function_identities
     import types
     path = tmp_path / 'cloned.py'
-    path.write_text('def f():\n    return 1\n')
+    # A string constant: it is a LOAD_CONST from co_consts on every supported CPython.
+    # A small int is not on 3.14 (LOAD_SMALL_INT reads no constant), so a test that swaps
+    # the code's constants would not change what the function returns.
+    path.write_text("def f():\n    return 'plain'\n")
     ns = {}
     exec(compile(path.read_text(), str(path), 'exec'), ns)
     first = ns['f']

@@ -1,0 +1,20 @@
+{
+ "artifact": "ast-AlgosKt.json",
+ "artifact_bytes": 25998,
+ "artifact_sha256": "f6877c2acba12c23a7fb7944cc065c29737cf64dcf396b86035c0b0acc0f34a5",
+ "command": "scripts/reland_corpus.sh /private/tmp/af-corpora/corpus-algokt AlgosKt",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+ "exporter_sources": {
+  "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+  "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+  "cartographer/compiler/SourceCompiler.scala": "5ed9256d0bea0b7f84448df845181b9853029d30e044ea845a4031987115c6ad",
+  "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
+ },
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/private/tmp/af-corpora/corpus-algokt",
+ "source_revision": "tree-sha256:369a2af2f19e979f881a835bdc58c9e58df5861a5bf98848a2b2cae2d314c1af:5files"
+}

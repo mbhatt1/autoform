@@ -556,7 +556,9 @@ jobs:
         id: joern
         with:
           path: ~/joern
-          key: joern-${{ runner.os }}-${{ hashFiles('joern-version') }}
+          # Both pins: the cached install was verified against joern-sha512, so a re-pin of
+          # the hashes must miss the cache as a re-pin of the version does.
+          key: joern-${{ runner.os }}-${{ hashFiles('joern-version', 'joern-sha512') }}
 
       - name: Install pinned Joern
         if: steps.joern.outputs.cache-hit != 'true'
@@ -565,10 +567,15 @@ jobs:
           # The release ships per-platform zips (joern-cli-linux-x86_64.zip, ...); there is
           # no joern-cli.zip, so that URL was a 404 that failed every Joern-gated job.
           ASSET="joern-cli-linux-x86_64.zip"
-          # The .sha512 manifest names the zip as target/<asset>, so it is fetched there.
+          # The committed joern-sha512 names the zip as target/<asset>, so it is fetched there.
           mkdir -p /tmp/joern-dl/target "$HOME/joern"
           curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}" -o "/tmp/joern-dl/target/${ASSET}"
-          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/${ASSET}.sha512" -o "/tmp/joern-dl/${ASSET}.sha512"
+          # The hash comes from the committed joern-sha512, as scripts/bootstrap.sh does. The
+          # release's own .sha512 is not downloaded: it only attests that the download matched
+          # itself, so a replaced release asset would have passed.
+          [ "$(sed -n 1p joern-sha512)" = "# joern $(cat joern-version)" ] \
+            || { echo "joern-sha512 does not pin joern $(cat joern-version); re-pin it together with joern-version" >&2; exit 1; }
+          grep "  target/${ASSET}\$" joern-sha512 > "/tmp/joern-dl/${ASSET}.sha512"
           (cd /tmp/joern-dl && sha512sum -c "${ASSET}.sha512")
           unzip -q "/tmp/joern-dl/target/${ASSET}" -d "$HOME/joern"
 

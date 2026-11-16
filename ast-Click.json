@@ -41330,13 +41330,8 @@
                    "a": {
                     "k": "exprS",
                     "e": {
-                     "k": "mcall",
-                     "recv": {
-                      "k": "name",
-                      "v": "e"
-                     },
-                     "m": "show",
-                     "args": []
+                     "k": "hole",
+                     "label": "exception:payload:show"
                     }
                    },
                    "b": {
@@ -82530,55 +82525,44 @@
                     "b": {
                      "k": "seq",
                      "a": {
-                      "a": {
+                      "k": "forIn",
+                      "x": "$comp$_",
+                      "e": {
+                       "k": "call",
+                       "f": "<python-range>",
+                       "args": [
+                        {
+                         "k": "name",
+                         "v": "nargs"
+                        }
+                       ]
+                      },
+                      "body": {
                        "e": {
                         "args": [
                          {
-                          "v": "nargs",
-                          "k": "name"
+                          "args": [
+                           {
+                            "v": "args",
+                            "k": "name"
+                           }
+                          ],
+                          "f": {
+                           "v": "_fetch",
+                           "k": "name"
+                          },
+                          "k": "callV"
                          }
                         ],
-                        "f": "range",
-                        "k": "call"
-                       },
-                       "x": "tmp2",
-                       "k": "assign"
-                      },
-                      "b": {
-                       "k": "forIn",
-                       "x": "$comp$_",
-                       "e": {
-                        "k": "name",
-                        "v": "tmp2"
-                       },
-                       "body": {
-                        "e": {
-                         "args": [
-                          {
-                           "args": [
-                            {
-                             "v": "args",
-                             "k": "name"
-                            }
-                           ],
-                           "f": {
-                            "v": "_fetch",
-                            "k": "name"
-                           },
-                           "k": "callV"
-                          }
-                         ],
-                         "recv": {
-                          "v": "tmp0",
-                          "k": "name"
-                         },
-                         "k": "mcall",
-                         "m": "append"
+                        "recv": {
+                         "v": "tmp0",
+                         "k": "name"
                         },
-                        "k": "exprS"
-                       }
-                      },
-                      "k": "seq"
+                        "k": "mcall",
+                        "m": "append"
+                       },
+                       "k": "exprS"
+                      }
                      },
                      "b": {
                       "k": "assign",

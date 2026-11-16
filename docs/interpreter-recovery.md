@@ -4,6 +4,13 @@ The completion target remains [the arbitrary-codebase goal](GOAL-arbitrary-codeb
 including the corpus comparisons, kernel proofs and provenance gates. This is a
 recovery record, not a completion claim.
 
+**Dated record.** This file was last changed on 2026-09-26
+(`git log -1 --format=%cs -- docs/interpreter-recovery.md`); every gate status below is
+as of that date. Later commits record the gates it reports as failing being green —
+commit `34bd308` (2026-10-21) rebuilt the tree "with every audit gate green" after the
+corpus re-lands and provenance re-pins of 2026-10-09 to 2026-10-22. `scripts/check_render.py`
+and `scripts/check_provenance.py` are the current answer, not this document.
+
 The latest Claude session stopped during its second interpreter round. Inspection on
 2026-09-22 found the main checkout at `40c9a8e`, with several uncommitted worktrees.
 The original worktrees have been preserved. Their contents require review and live
@@ -61,7 +68,10 @@ pytest tests/test_source_generators.py -q` with `lake` on PATH.
 Remaining gaps are explicit: `generator:yieldFromS`, `generator:close`,
 `generator:throw`, `generator:return-value`, `generator:free-variable-cells`,
 `generator:closure-frame` and `generator:async`. Return values need exception payloads;
-free variables need shared cells. Suspended `for` uses the `iter`/`next`
+free variables need shared cells. (A lowering of statement-position `yield from` was
+written and withdrawn on 2026-11-13: it changes the render of every corpus with a
+`yield from`, so it must land together with those re-renders, ledgers and spec modules
+-- `docs/core-language.md`, `generator:yieldFromS` row.) Suspended `for` uses the `iter`/`next`
 protocol. `Autoform/Lang/Core/Iteration.lean` now provides heap-backed list, tuple,
 string and dictionary iterators, sequence fallback through `__getitem__`, and
 callable/sentinel iteration. Positions and exhaustion survive across calls; list
@@ -100,8 +110,9 @@ then passed on an independent frozen copy of commit `bbe15f03c0e9596ff68b197dab4
 with stable artifacts and fresh kernel replay of the complete `Autoform` import closure.
 The [audit record](../artifacts/interpreter-recovery/iterator-audit.json) identifies that
 revision and the complete local report. It excludes subsequent generator-expression
-changes. Stale corpus provenance remains a separate gate, and this extension does not
-meet the arbitrary-codebase goal.
+changes. Stale corpus provenance remained a separate gate as of 2026-09-26 (it was green
+at commit `34bd308`, 2026-10-21), and this extension does not meet the
+arbitrary-codebase goal.
 
 Generator expressions now use the same frame compiler. Following Python's
 [expression rules](https://docs.python.org/3/reference/expressions.html#generator-expressions),
@@ -299,8 +310,10 @@ stable inputs. Commands, input hashes, failed attempts, and the end-to-end pipel
 status are recorded in
 [`object-lookup-validation.json`](../artifacts/interpreter-recovery/object-lookup-validation.json)
 and [`object-lookup-audit.json`](../artifacts/interpreter-recovery/object-lookup-audit.json).
-The existing corpus render and provenance gates still fail; this checkpoint does not
-claim a completed re-land or completion of the arbitrary-codebase goal.
+As of 2026-09-26 the existing corpus render and provenance gates still failed (both were
+green at commit `34bd308`, 2026-10-21, after the re-lands recorded in `git log --grep
+re-land`); this checkpoint does not claim a completed re-land or completion of the
+arbitrary-codebase goal.
 The packaged `ObjectLookupRecovery` pipeline completed its native comparison,
 generated proofs, core oracle, restored build and strict scoped kernel audit. Its
 mutation run found survivors and untested subjects, including field writes that
@@ -333,8 +346,9 @@ through the CLI while reading an AST deeper than Python's recursion limit. The
 [validation report](../artifacts/interpreter-recovery/native-deadline-validation.json)
 records the focused checks and full Python suite.
 
-A fresh Cachetools export under the first object-lookup change still fails its
-existing `Cache.__init__` conformance theorem. Its class-value read of
+As of 2026-09-26, a fresh Cachetools export under the first object-lookup change still
+failed its existing `Cache.__init__` conformance theorem (Cachetools was since re-landed
+with its specs proved: `d5bc3f2` on 2026-10-09 and `b472443` on 2026-10-10). Its class-value read of
 `Cache.getsizeof` reaches an unmodeled field branch. A separate diagnostic sample
 also reports inherited-attribute divergences; this has not completed a corpus
 re-land. The [diagnostic report](../artifacts/interpreter-recovery/cachetools-object-lookup-diagnostic.json)

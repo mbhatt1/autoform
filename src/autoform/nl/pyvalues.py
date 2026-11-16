@@ -113,8 +113,8 @@ def tag(v, depth: int = 0, classes=None):
             raise Unencodable('str too long')
         try:
             s.encode('utf-8')
-        except UnicodeEncodeError:
-            raise Unencodable('str with lone surrogates')
+        except UnicodeEncodeError as exc:
+            raise Unencodable('str with lone surrogates') from exc
         return ['s', s]
     if type(v) is bytes:
         if len(v) > MAX_STR:

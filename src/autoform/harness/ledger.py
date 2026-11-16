@@ -33,9 +33,6 @@ class AssumptionLedger:
             if claim_id not in self.dependents[a['id']]:
                 self.dependents[a['id']].append(claim_id)
 
-    def invalidated_by(self, assumption_ids) -> list:
-        return sorted({c for a in assumption_ids for c in self.dependents.get(a, [])})
-
     def to_json(self):
         return dict(assumptions=[dict(a, dependents=sorted(self.dependents.get(a['id'], [])),
                                       text_sha256=sha256(a['text']))

@@ -59,7 +59,11 @@ def test_installed_distribution(tmp_path):
         assert "scripts/sandbox.py" in names   # the one confinement layer, shipped with the oracle and workers
         assert "examples/security/autoform.properties.json" in names
         for name in ('LICENSE', 'NOTICE', 'THIRD_PARTY.md', 'SUPPORT.md', 'SECURITY.md',
-                     'licenses/cachetools-MIT.txt', 'docs/packaging.md'):
+                     'licenses/cachetools-MIT.txt', 'docs/packaging.md',
+                     # the bundled bootstrap.sh verifies Joern against this pin and dies without it
+                     'joern-version', 'joern-sha512',
+                     # linked from the bundled docs/github-action.md
+                     'examples/ci/gitlab-ci.yml', 'examples/ci/Jenkinsfile'):
             assert name in names
         assert "Autoform/Lang/Core/TypedNumeric.lean" in names
         assert "Autoform/Lang/PCode/Properties.lean" in names
@@ -301,3 +305,39 @@ def test_distribution_rejects_coherent_dependency_metadata_tampering(
             altered.addfile(member, io.BytesIO(content) if content is not None else None)
     with pytest.raises(ValueError, match=error + ' differs from pyproject.toml'):
         distribution_checker.check(broken_wheel, broken_sdist)
+
+
+def test_joern_sha512_pins_every_release_asset_of_the_pinned_joern():
+    """scripts/bootstrap.sh verifies the Joern zip against the committed joern-sha512,
+    whether it came from the release, AUTOFORM_JOERN_URL or AUTOFORM_JOERN_ZIP. A
+    re-pin of joern-version without new hashes must fail here, not on a mirror."""
+    import re
+    root = Path(__file__).resolve().parents[1]
+    pin = (root / 'joern-version').read_text().strip()
+    lines = (root / 'joern-sha512').read_text().splitlines()
+    assert lines[0] == '# joern ' + pin
+    entries = [line for line in lines if not line.startswith('#')]
+    assets = {}
+    for line in entries:
+        match = re.fullmatch(r'([0-9a-f]{128})  target/(joern-cli-(?:linux|macos)-(?:x86_64|arm64)\.zip)', line)
+        assert match, line
+        assets[match.group(2)] = match.group(1)
+    assert sorted(assets) == sorted(f'joern-cli-{o}-{a}.zip' for o in ('linux', 'macos')
+                                    for a in ('x86_64', 'arm64'))
+    bootstrap = (root / 'scripts/bootstrap.sh').read_text()
+    # The hash is taken from the pin file, never downloaded beside the zip.
+    assert 'joern-sha512' in bootstrap and '$ASSET.sha512" -o' not in bootstrap
+    assert subprocess.run(['bash', '-n', str(root / 'scripts/bootstrap.sh')]).returncode == 0
+    # The CI install steps and the composite Action hold the same line: a release's own
+    # .sha512 only attests that the download matched itself.
+    for installer in ('.github/workflows/ci.yml', '.github/workflows/pr.yml',
+                      '.github/workflows/source.yml', 'action.yml'):
+        text = (root / installer).read_text()
+        assert 'joern-sha512' in text, installer
+        assert '.sha512" -o' not in text, installer + ' downloads the release .sha512'
+    # The pin file is in the runtime bundle: bootstrap.sh runs from an installed workspace too.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('build_support', root / 'build_support.py')
+    build_support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build_support)
+    assert 'joern-sha512' in build_support.runtime_files(root)

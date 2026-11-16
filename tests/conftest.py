@@ -44,6 +44,42 @@ def load(path: str, name: str) -> types.ModuleType:
 
 
 @pytest.fixture(scope="session")
+def pipeline_model():
+    """`make(module, source)`: the translated model of `source` as `Autoform.Generated.<module>`,
+    built in this repository's lake root, and the path of its `ast-<module>.json`.
+
+    The Lean-backed NL and harness tests read a pipeline model (`PipelinePython`,
+    `PipelineSecurityScoped`, ...). Those are build products -- `ast-Pipeline*.json` and
+    `Autoform/Generated/*.lean` are gitignored -- so the tests used to pass only where an
+    earlier `autoform.sh` run had left them behind. Run the documented pipeline once per
+    session when the AST or the module's .olean is missing; without Joern it is a named skip.
+    """
+    built = {}
+
+    def make(module, source):
+        ast = os.path.join(ROOT, "ast-%s.json" % module)
+        olean = os.path.join(ROOT, ".lake/build/lib/lean/Autoform/Generated/%s.olean" % module)
+        if module in built:
+            return built[module]
+        if not (os.path.isfile(ast) and os.path.isfile(olean)):
+            joern = os.environ.get("JOERN_HOME", os.path.expanduser("~/joern"))
+            if not os.path.exists(os.path.join(joern, "joern-cli", "joern-parse")) and \
+                    not os.path.exists(os.path.join(joern, "joern-parse")):
+                pytest.skip("pipeline model %s absent and Joern is not installed to build it "
+                            "(autoform.sh %s %s)" % (module, source, module))
+            run = subprocess.run(["bash", os.path.join(ROOT, "autoform.sh"), str(source), module],
+                                 cwd=ROOT, capture_output=True, text=True)
+            # autoform.sh exits 1 when the run finished with named gaps; the model is still built.
+            assert run.returncode in (0, 1) and os.path.isfile(ast) and os.path.isfile(olean), \
+                "autoform.sh %s %s did not build the model (exit %d):\n%s" % (
+                    source, module, run.returncode, (run.stdout + run.stderr)[-3000:])
+        built[module] = ast
+        return ast
+
+    return make
+
+
+@pytest.fixture(scope="session")
 def render_lean():
     return load(os.path.join(CARTO, "render_lean.py"), "af_render_lean")
 
@@ -158,3 +194,25 @@ def make_repo(tmp_path, module="Sample", funcs=None, lean_text=None,
         subprocess.run([sys.executable, os.path.join(d, "scripts", "check_render.py"),
                         "--record", module], cwd=d, check=True, capture_output=True)
     return d, ast, gen
+
+
+NL_FIXTURES = os.path.join(ROOT, "tests", "fixtures", "nl")
+# The checkout the NL fixtures were recorded in; their lean_root/ast/source_root are under it.
+NL_RECORDED_ROOT = "/Users/mbhatt/autoform"
+
+
+def rebase_paths(value, root=ROOT, recorded=NL_RECORDED_ROOT):
+    """`value` with every string path under the recording checkout moved under `root`."""
+    if isinstance(value, str):
+        return root + value[len(recorded):] if value == recorded or value.startswith(recorded + "/") else value
+    if isinstance(value, list):
+        return [rebase_paths(v, root, recorded) for v in value]
+    if isinstance(value, dict):
+        return {k: rebase_paths(v, root, recorded) for k, v in value.items()}
+    return value
+
+
+def nl_fixture(name):
+    """A recorded NL fixture (tests/fixtures/nl/<name>) with its paths rebased onto this checkout."""
+    with open(os.path.join(NL_FIXTURES, name), encoding="utf-8") as stream:
+        return rebase_paths(json.load(stream))

@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / 'src'))
 from autoform.nl import judge as J, llm, pipeline, repair as R  # noqa: E402
 from autoform.nl.formalize import statement_id  # noqa: E402
 from autoform.nl.schema import FILES, CheckResult, Statement, dump  # noqa: E402
+from conftest import nl_fixture  # noqa: E402
 
 FIXTURE = ROOT / 'tests/fixtures/nl/translation-PipelinePython.json'
 ADD = 'numbers.py:<module>.add'
@@ -21,7 +22,7 @@ TESTS = [{'location': 'tests/test_numbers.py:3', 'text': 'assert add(2, 3) == 5'
 
 
 def translation():
-    t = json.loads(FIXTURE.read_text())
+    t = nl_fixture('translation-PipelinePython.json')
     t['lean_root'] = str(ROOT)
     for f in t['functions']:
         if f['name'] == ADD:
@@ -212,7 +213,7 @@ def test_repair_candidates_from_guards_docs_and_tests_never_witness_constants():
     stmt = {'id': 's', 'english': 'quotient(a, b) returns a // b.', 'pre': 'true'}
     chk = {'status': 'REFUTED_MODEL', 'counterexample': ce({'a': 17, 'b': 0},
                                                            model='EResult.exn (Val.str "ZeroDivisionError")')}
-    opts, dropped = R.candidates(stmt, P('p2', stmt['english']), chk, q, 'MISSING_PRECONDITION')
+    opts, dropped = R.candidates(stmt, P('p2', stmt['english']), chk, q)
     pres = {o['precondition']: o['evidence'] for o in opts if o['kind'] == 'precondition'}
     assert pres == {'b != 0': 'code guard'}           # the docstring says the same; deduplicated
     assert any(o['id'] == 'ALLOW_EXCEPTION' and 'ZeroDivisionError' in o['english'] for o in opts)
@@ -220,7 +221,7 @@ def test_repair_candidates_from_guards_docs_and_tests_never_witness_constants():
     assert not any('17' in (o.get('english') or '') for o in opts)
     # A guard the code itself states may mention the witness value (it is evidence) ...
     f = dict(q, source='def quotient(a, b):\n    if a == 17:\n        return 0\n    return a // b\n', doc='')
-    opts, dropped = R.candidates(stmt, P('p2', stmt['english']), chk, f, 'MISSING_PRECONDITION')
+    opts, dropped = R.candidates(stmt, P('p2', stmt['english']), chk, f)
     assert {o['precondition'] for o in opts if o['kind'] == 'precondition'} == {'a != 17'}
     assert any(d['precondition'] == 'a == 17' and 'witness satisfies' in d['reason'] for d in dropped)
     # ... a precondition mentioning a witness value no evidence mentions never is.
@@ -232,7 +233,7 @@ def test_weaken_iff():
     f = fn_add()
     stmt = {'id': 's', 'english': 'add(a, b) returns True exactly when a equals b.', 'pre': 'true'}
     opts, _ = R.candidates(stmt, P('p', stmt['english']), {'status': 'REFUTED_MODEL', 'counterexample': ce({})},
-                           f, 'BAD_SPEC')
+                           f)
     texts = {o['english'] for o in opts if o['kind'] == 'weaken'}
     assert texts == {'add(a, b) returns True whenever a equals b.', 'add(a, b) returns True only when a equals b.'}
 

@@ -1,0 +1,49 @@
+// autoform pr in a Jenkins multibranch pipeline. UNTESTED: written against the
+// documented change-request environment, never run on a Jenkins instance. Treat the
+// first run as the test.
+//
+// Assumes an agent that already has the pinned Lean (elan), Joern (JOERN_HOME), a JDK,
+// bubblewrap and Python 3.10+; `autoform doctor` fails the build early, naming whatever
+// is missing. AUTOFORM_SRC is a checkout or mirror of autoform you have pinned. The
+// checkout must hold the base commit (no shallow clone, or fetch it first).
+// See docs/github-action.md, "Other CI systems".
+
+pipeline {
+  agent any
+  environment {
+    AUTOFORM_WORKSPACE = "${env.WORKSPACE}/.autoform-work"
+    AUTOFORM_PROBE_JOBS = '1'
+  }
+  stages {
+    stage('autoform pr') {
+      when { changeRequest() }
+      steps {
+        sh 'python3 -m pip install --quiet "$AUTOFORM_SRC"'
+        sh 'autoform --workspace "$AUTOFORM_WORKSPACE" doctor'
+        script {
+          // Exit codes: 0 nothing refuted, 1 a function refuted, 2 could not run,
+          // 3 inconclusive (no evidence when --fail-on was set, meaning no changed
+          // non-test function was compared).
+          def code = sh(returnStatus: true, script: '''
+            git fetch --no-tags origin "$CHANGE_TARGET"
+            autoform --workspace "$AUTOFORM_WORKSPACE" pr . PullRequest \
+              --base "$(git merge-base FETCH_HEAD HEAD)" --head HEAD \
+              --fail-on no-evidence \
+              --sarif autoform-pr.sarif --markdown autoform-pr.md
+          ''')
+          if (code == 1) { unstable('autoform: a changed function was refuted') }
+          else if (code == 3) { unstable('autoform: inconclusive (no evidence)') }
+          else if (code != 0) { error("autoform pr could not run (exit ${code})") }
+        }
+      }
+      post {
+        always {
+          archiveArtifacts allowEmptyArchive: true,
+            artifacts: 'autoform-pr.sarif, autoform-pr.md, .autoform-work/artifacts/pr/PullRequest/pr.json'
+          // With the Warnings Next Generation plugin installed, the SARIF can be shown too:
+          // recordIssues tool: sarif(pattern: 'autoform-pr.sarif')
+        }
+      }
+    }
+  }
+}

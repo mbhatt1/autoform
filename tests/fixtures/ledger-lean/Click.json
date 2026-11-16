@@ -1,20 +1,36 @@
 {
  "ast": "ast-Click.json",
- "astSha256": "51b74421c6880be8d63691bc303a9f60a37da4ca465dbca3ab35b3e6bf523e32",
+ "astSha256": "c3f6c9348229c7f04d4a0f1e2c4fc4fb8d3ba9af79b35531bceca12a976e5798",
  "ledger": {
-  "closedByContract": 3,
+  "closedByContract": 5,
   "closedByTranslation": 264,
   "contractsUsed": [
    {
+    "callee": ".join",
+    "sites": 7
+   },
+   {
     "callee": ".get",
     "sites": 7
+   },
+   {
+    "callee": ".upper",
+    "sites": 3
+   },
+   {
+    "callee": ".replace",
+    "sites": 1
+   },
+   {
+    "callee": ".split",
+    "sites": 1
    }
   ],
   "dialect": "python",
-  "dynamicHoleRisk": 6473,
+  "dynamicHoleRisk": 6472,
   "functions": 549,
   "holeFree": 475,
-  "holes": 106,
+  "holes": 107,
   "holesByLabel": [
    {
     "count": 13,
@@ -138,6 +154,10 @@
    },
    {
     "count": 1,
+    "label": "exception:payload:show"
+   },
+   {
+    "count": 1,
     "label": "exception:payload:strerror"
    },
    {
@@ -150,7 +170,7 @@
    }
   ],
   "module": "Click",
-  "nodes": 29818,
+  "nodes": 29815,
   "verifiableCore": 264
  },
  "module": "Click",

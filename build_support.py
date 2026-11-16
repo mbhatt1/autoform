@@ -19,18 +19,25 @@ def runtime_files(root=ROOT):
         pending.extend(re.findall(r"^import (Autoform(?:\.[\w]+)+)\s*$",
                                   content.decode(), re.MULTILINE))
     files["Autoform.lean"] = b"import Autoform.Runtime\n"
+    # joern-sha512 travels with joern-version: the bundled scripts/bootstrap.sh verifies the
+    # Joern zip against it and dies without it, so a workspace lacking it cannot install Joern.
     for name in ("autoform.sh", "assure.sh", "lakefile.toml", "lake-manifest.json",
-                 "lean-toolchain", "joern-version", "rust-pins.json", "requirements.txt", "requirements-machine.txt",
+                 "lean-toolchain", "joern-version", "joern-sha512", "rust-pins.json",
+                 "requirements.txt", "requirements-machine.txt",
                  "LICENSE", "NOTICE", "THIRD_PARTY.md", "SUPPORT.md", "SECURITY.md"):
         files[name] = (root / name).read_bytes()
     for path in sorted((root / "licenses").glob("*.txt")):
         files[path.relative_to(root).as_posix()] = path.read_bytes()
-    for folder, suffixes in (("scripts", {".py", ".tmpl", ".mjs", ".sh", ".h"}),
-                             ("docs", {".md"}),
-                             ("cartographer", {".py", ".sc", ".scala", ".sh"}),
-                             ("examples", {".s", ".asm", ".py", ".c", ".cpp", ".go", ".java", ".kt", ".js", ".ts", ".json"})):
+    # Extensionless files are named explicitly (examples/ci/Jenkinsfile), mirroring the
+    # bare-name pattern in MANIFEST.in; a blanket "no suffix" rule would also admit dotfiles.
+    for folder, suffixes, names in (("scripts", {".py", ".tmpl", ".mjs", ".sh", ".h"}, set()),
+                                    ("docs", {".md"}, set()),
+                                    ("cartographer", {".py", ".sc", ".scala", ".sh"}, set()),
+                                    ("examples", {".s", ".asm", ".py", ".c", ".cpp", ".go", ".java", ".kt",
+                                                  ".js", ".ts", ".json", ".yml"}, {"Jenkinsfile"})):
         for path in sorted((root / folder).rglob("*")):
-            if path.is_file() and path.suffix in suffixes and "__pycache__" not in path.parts:
+            if (path.is_file() and (path.suffix in suffixes or path.name in names)
+                    and "__pycache__" not in path.parts):
                 files[path.relative_to(root).as_posix()] = path.read_bytes()
     return files
 
@@ -45,15 +52,19 @@ def source_files(root=ROOT):
     names = set(runtime_files(root)) - {"Autoform.lean"}
     names.update(("README.md", "CONTRIBUTING.md", "pyproject.toml", "build_support.py",
                   "setup.py", "MANIFEST.in"))
+    # tests/fixtures mirrors MANIFEST.in's `graft tests/fixtures`: every file, less the
+    # global excludes, so `pytest tests` from the sdist finds its inputs.
     for folder, patterns in (("src/autoform", ("*.py",)),
                              ("tests", ("*.py", "*.md")),
+                             ("tests/fixtures", ("*",)),
                              ("Autoform/Lang", ("*.lean",)),
                              ("Autoform/Harness", ("*.lean",)),
                              ("Autoform/Tactics", ("*.lean",))):
         for pattern in patterns:
             names.update(path.relative_to(root).as_posix()
                          for path in (root / folder).rglob(pattern)
-                         if path.is_file() and "__pycache__" not in path.parts)
+                         if path.is_file() and "__pycache__" not in path.parts
+                         and path.suffix not in (".pyc", ".mutate-backup"))
     return {name: (root / name).read_bytes() for name in sorted(names)}
 
 

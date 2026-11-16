@@ -4,8 +4,8 @@
 #
 # Fails (exit 1) unless ALL of these hold:
 #   1. the working tree is clean (no modified, staged or untracked files);
-#   2. pyproject.toml, src/autoform/__init__.py and the top CHANGELOG.md section agree
-#      on one version, and the tag v<version> does not exist locally or on origin;
+#   2. pyproject.toml, src/autoform/__init__.py, lakefile.toml and the top CHANGELOG.md
+#      section agree on one version, and the tag v<version> does not exist locally or on origin;
 #   3. every required workflow has a SUCCESSFUL run on exactly this HEAD (`gh run list`);
 #   4. that version is not already on PyPI (a published version can never be replaced).
 # Exit 2: a tool the check needs (git, gh, curl, python3) is missing or a lookup failed
@@ -44,10 +44,13 @@ print(m.group(1) if m else "")
 PY
 )"
 init_version="$(sed -n 's/^__version__ *= *"\([^"]*\)".*/\1/p' src/autoform/__init__.py | head -1)"
+lake_version="$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' lakefile.toml | head -1)"
 changelog_version="$(sed -n 's/^## \[\([^]]*\)\].*/\1/p' CHANGELOG.md | head -1)"
 if [ -z "$version" ]; then bad "no version in pyproject.toml"; fi
 [ "$version" = "$init_version" ] && ok "pyproject.toml == src/autoform/__init__.py ($version)" \
   || bad "pyproject.toml says '$version' but src/autoform/__init__.py says '$init_version'"
+[ "$version" = "$lake_version" ] && ok "pyproject.toml == lakefile.toml ($version)" \
+  || bad "pyproject.toml says '$version' but lakefile.toml says '$lake_version'"
 [ "$version" = "$changelog_version" ] && ok "top CHANGELOG.md section is [$version]" \
   || bad "top CHANGELOG.md section is [$changelog_version], not [$version]"
 tag="v$version"

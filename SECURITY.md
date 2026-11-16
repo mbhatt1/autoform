@@ -17,10 +17,17 @@ replay the corrected proofs independently, and document whether prior evidence
 must be regenerated. Until resolved, treat affected guarantees as unverified.
 
 Autoform executes analyzed code, compiler tools and proof elaboration. Its
-process deadlines do not provide filesystem or network isolation. Analyze
-untrusted repositories in a disposable environment with no credentials and
-restricted access to other systems. Evidence hashes assume a trusted runner;
-they do not authenticate evidence against a malicious runner.
+process deadlines bound wall-clock time only. Isolation comes from one sandbox
+layer (`scripts/sandbox.py`): the code under test runs with the network denied
+unless `AUTOFORM_SANDBOX=off`, and with filesystem writes confined to the work
+tree under `bwrap` (Linux) or `sandbox-exec` (macOS); the Linux `unshare`
+fallback denies the network but does not confine writes, and
+`AUTOFORM_SANDBOX=strict` refuses it. Every artifact records which mechanism
+was enforced. That layer confines the target, not the analysing user's
+privileges or data, so analyze untrusted repositories in a disposable
+environment with no credentials and restricted access to other systems.
+Evidence hashes assume a trusted runner; they do not authenticate evidence
+against a malicious runner.
 
 The alpha has no published long-term maintenance window. Supported versions
 and remediation timelines for a paid engagement must be stated separately.
@@ -36,7 +43,8 @@ stage, so nothing below is a surprise:
 |---|---|---|
 | `autoform <git-url>` | `git clone` of an arbitrary URL | network egress; writes under the workspace |
 | `joern-parse` | Joern's frontends on the source (JVM) | parses only, but the JVM frontends are large and process attacker-chosen input |
-| `cartographer/export_ast.sc` | a Joern script, plus an **embedded Python decoder run via `python3 -c`** on each Python source file | the decoder uses `ast.parse`/`symtable` and does not `import` or `exec` the target — but it is a Python process reading attacker-chosen text |
+| `cartographer/export_ast.sc` with `cartographer/compiler/SourceCompiler.scala` | a Joern script; for each Python source file the compiler spawns an **embedded Python decoder** (`python3 -I -S -c`, interpreter overridable with `AUTOFORM_PYTHON`, 30 s timeout) with the file on stdin | the decoder uses `ast.parse`/`symtable` and does not `import` or `exec` the target — but it is a Python process reading attacker-chosen text |
+| `cartographer/generator_lowering.py` (from `render_lean.py` and the oracles) | rewrites generator bodies in the exported AST JSON | pure Python over the exporter's own output; no target code runs |
 | `scripts/differential.py` | **the target's own functions, in the real runtime** — CPython, `cc`-compiled C, `node`, `javac`, `go` — on generated inputs, and the target's own test suite where present | **arbitrary code execution as the analysing user**; filesystem, network, credentials |
 | `scripts/synth_specs.py` (non-synthetic mode) | the target's test suite and functions, to *observe* behaviour before synthesising specs | same as above |
 | `scripts/native_c.py`, `scripts/runtime_backends.py` | compile and run target C/Go/Java/JS | same as above |
@@ -74,3 +82,40 @@ What this project does *not* claim: that a proof about the translated program is
 about the source. The trust chain in `README.md` and `docs/trust-model.md` names every link
 between them, and each is checked by a different oracle; a break in any one of them is a
 security-relevant bug in the sense given at the top of this file.
+
+## Operating on proprietary code
+
+What leaves the machine, by command. Everything not listed stays local: artifacts are
+written under the workspace and nothing is uploaded.
+
+| what | when | where it goes |
+|---|---|---|
+| `git clone`/`fetch` of the target and its submodules | `autoform <git-url>`, `assure`/`source`/`regress`/`pr` given a URL, `pr` fetching a missing base | the Git remotes the repository names; a local checkout needs no network |
+| prompts containing **source code, function bodies, generated Lean and test observations** | `autoformalize`, `formalize --prover claude`, `formalize --generators llm`, `formalize prove` | the backend chosen by `AUTOFORM_CLAUDE_AUTH`: `login`/`api-key` through the `claude` CLI, `api` through the Messages API SDK, `bedrock` through the SDK's cloud client (and the CLI agents with `CLAUDE_CODE_USE_BEDROCK=1`) |
+| proof goals (fragments of the translated code) | the tier-3 proposer, only with `AUTOFORM_NEURAL=1` | `AUTOFORM_NEURAL_BACKEND`: local `ollama` by default; the two others are remote APIs |
+
+`source`, `assure`, `pr` and `regress` make no model call. The code under test runs with
+the network denied (`scripts/sandbox.py`) unless `AUTOFORM_SANDBOX=off`, which every
+artifact records.
+
+Settings for a host with data-egress rules:
+
+* `AUTOFORM_LLM_ALLOWED_BACKENDS=<comma list>` restricts model calls to the named
+  `AUTOFORM_CLAUDE_AUTH` values. Any other backend is refused before a prompt is sent,
+  including the backend a `claude` CLI child (the proving agents) would reach, the harness
+  `llm` generator (`api`) and the tier-3 proposer (its Messages API backend counts as `api`;
+  its other remote backend is never allowed under a policy). Set but empty refuses every backend. `autoform doctor` prints the
+  policy and warns when the configured backend is refused.
+* Model answers are cached by prompt hash in `AUTOFORM_LLM_CACHE` (default
+  `~/.cache/autoform/llm`) and proofs in `AUTOFORM_PROOF_CACHE`; the directories are made
+  0700 and the entries 0600. Point both inside the workspace to keep them with the run.
+* `AUTOFORM_SANDBOX=strict` refuses the Linux `unshare` fallback, which denies the network
+  but does not confine filesystem writes; only `bwrap` or `sandbox-exec` is accepted.
+* Credentials in a Git URL (`https://user:token@`, `ssh://user:pw@`, a remote-helper
+  `helper::https://user:token@` address, a query string) are removed from the acquisition
+  records, `checkout.log`, SARIF and console messages. Prefer a credential helper to a URL
+  credential anyway: the URL is still in the `git` process's argv while it runs.
+* Records (`run.json`, `guarantee.json`, `repository.json`, the autoformalizer's run
+  directory) do not contain environment values; tests scan them for planted secrets.
+  Logs of the stages (`*.log`, agent transcripts) contain whatever the analysed code and
+  the tools print.

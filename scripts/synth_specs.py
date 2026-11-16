@@ -538,9 +538,18 @@ def heap_lit(heap):
 
 def case_lit(c):
     slf = "none" if c["self"] is None else "(some (%s))" % val_lit(c["self"])
-    return ("{ heap := h0 ++ %s, self := %s, args := [%s] }"
-            % (heap_lit(c["heap"]), slf,
-               ", ".join(val_lit(a) for a in c["args"])))
+    # Java/Kotlin statics live as fields of the globals frame, each bound to its
+    # holder cell's ref — differential folds the recorded `case['globals']` into
+    # the heap the same way in its own harness (`drun`'s setField chain). Without
+    # the fold, a case that executes a static field read holes in refutation.
+    # The call is explicit, not `.setField`: dot notation elaborates its receiver
+    # with no expected type, and then the `{ cls := ... }` cell literals inside it
+    # have none either ("invalid {...} notation, expected type is not known").
+    heap = "h0 ++ %s" % heap_lit(c["heap"])
+    for key, v in (c.get("globals") or []):
+        heap = "Heap.setField (%s) gref %s (%s)" % (heap, lean_str(key), val_lit(v))
+    return ("{ heap := %s, self := %s, args := [%s] }"
+            % (heap, slf, ", ".join(val_lit(a) for a in c["args"])))
 
 
 def eresult_lit(outcome):
@@ -711,22 +720,50 @@ def conformance_subjects(byname, recs):
     return subjects
 
 
-def gen_candidates(core, byname, recs, rng, synthetic=False, conformance_only=False):
+def rendered_definitions(gen_path):
+    """Program-table name -> the Lean identifier the renderer gave that function.
+
+    `render_lean.ident` cuts an identifier at 120 characters, and the renderer resolves
+    the collisions that cut produces by appending a prime to each later definition
+    (`nm += "'"` in `render_lean.py`). Re-deriving the identifier from the name alone
+    cannot see the prime: on CommonsLang3 the 4-argument `StringUtils.replaceIgnoreCase`
+    collides with the 3-argument overload at that length, so its conformance candidate was
+    bound to the 3-argument definition and refuted on its own agreeing cases (2026-10-22).
+    Read the identifiers the module actually declares instead; a name the module does not
+    declare falls back to `lean_ident` at the call site."""
+    defs = {}
+    for path in runtime_backends.generated_module.model_files(gen_path):
+        try:
+            with open(path, encoding="utf-8") as stream:
+                text = stream.read()
+        except OSError:
+            continue
+        for ident, name in re.findall(
+                r'^def (f_[A-Za-z0-9_\']+) : Func :=\s*\{ name := "([^"]+)"', text, re.M):
+            defs.setdefault(name, ident)
+    return defs
+
+
+def gen_candidates(core, byname, recs, rng, synthetic=False, conformance_only=False,
+                   definitions=None):
     """Mine candidates for the selected functions the suite actually exercised.
 
     With `synthetic=True` there is no suite and no recorded call: the domain is fuzzed
     from the signature instead, and the three families that are mined *from observations*
-    (`conform`, `const`, `raises`, `projects`) are not generated at all. See §3b."""
+    (`conform`, `const`, `raises`, `projects`) are not generated at all. See §3b.
+    `definitions` is `rendered_definitions` of the subject module: the identifier each
+    theorem is about must be the one the renderer declared, not a re-derivation."""
     cands = []
     by_fn = {}
     for r in recs:
         by_fn.setdefault(r["name"], []).append(r)
+    definitions = definitions or {}
 
     for name in core:
         f = byname.get(name)
         if f is None:
             continue
-        fdef = lean_ident(name)
+        fdef = definitions.get(name) or lean_ident(name)
         obs = by_fn.get(name, [])
         sid = re.sub(r'[^A-Za-z0-9]', '_', name)[-70:].strip("_")
         doc, core_body = strip_doc(f["body"])
@@ -2342,7 +2379,8 @@ def main():
               % (len(excluded), ", ".join(excluded) or "(none matched)"))
     observations = recs if args.conformance_only else incore
     cands = gen_candidates(subjects, byname, observations, rng, synthetic=args.synthetic,
-                           conformance_only=args.conformance_only)
+                           conformance_only=args.conformance_only,
+                           definitions=rendered_definitions(gen_path))
     print("   %d candidates" % len(cands))
 
     # Every verdict below (refutation, guard, proof fuel, execution hints, budget probe,

@@ -1068,6 +1068,10 @@ refactor of the interpreter, and would require re-repairing the 74-theorem
 refinement layer. Global *rebinding* (`global x; x = 5`) is unsupported for the same
 reason.
 
+*Status, 2026-11-13:* Global rebinding is translated now. `cartographer/compiler/SourceCompiler.scala:10476`
+(`globalDeclNames`) reads the `global x` statement and writes to a declared global are emitted
+as `setGlobal`; `ast-Cachetools.json` carries 7 `setGlobal` nodes.
+
 The boundary: reads across scopes work and are correct; writes across
 scopes are a hole. Implementing writes by copying values back would work on
 simple cases and be silently wrong on aliased ones.
@@ -1181,6 +1185,9 @@ artifact will flatter itself.
   list order. Recorded rather than resolved by a guessed topological sort.
 * **`Expr.classClosure`** — the constructor that would close the 18 `scope:class-closure`
   holes.
+  *Status, 2026-11-13:* built. `Autoform/Lang/Core/Syntax.lean:477` declares `classClosure : String → Expr`
+  and `Autoform/Lang/Core/Semantics.lean:2576` evaluates it to `Val.clsClos`; no
+  `scope:class-closure` hole remains in `ledger-Cachetools.json`.
 * **`<metaClassCallHandler>` synthetics** pad the function count; the `synthetic` filter
   excludes `<metaClassAdapter>` but not these. Left alone so that this pass's numbers move
   for one reason only.
@@ -1419,6 +1426,10 @@ per name. Any proof touching method dispatch will hit this.
 bound is the correct fix and is not done — a limitation of the refinement
 relation, not of these proofs.
 
+*Status, 2026-11-13:* done. `RefinesWith` (`Autoform/Refine.lean:162-173`) carries an argument-dependent
+bound `N : List Val → Nat`; `sumto_refinesWith` (`:2149`), `gcdish_refinesWith` (`:2312`) and
+`total_refinesWith` (`:2707`) use it, and `RefinesWith.toRefines` (`:182`) recovers the constant form.
+
 Also: `n ≤ 65535` in `sumto`'s domain is *implied* by `Fits32 (n*(n+1)/2)` but stated
 rather than derived, because deriving it needs nonlinear arithmetic unavailable without
 Mathlib. And representation covers field-mutating objects only; container classes need
@@ -1450,6 +1461,11 @@ to CPython, produce zero cases, and print "no comparable cases". The oracle that
 every dialect bug in this project's history does not exist for four of six languages,
 so the findings below were found by hand.
 
+*Status, 2026-11-13:* superseded. `scripts/differential.py:4042-4066` picks the runtime from a per-language
+table (`cpython`, `cc`, `jvm`, `go`, `node`, `kotlin`) and refuses when the language cannot be
+identified; the JVM, Go, Node and Kotlin backends have run on real corpora — `conformance.json` under
+`.autoform-work/reland/{AlgosGo,AlgosKt,AlgosTS,BitJS}/` (gitignored) and the rows at `docs/languages.md:1107-1110`.
+
 ### Six silent mistranslations, one in the flagship corpus
 
 1. **`and`/`or` return an operand, not a bool — including Python.** `pick(0,5)` is `0` in
@@ -1469,6 +1485,10 @@ so the findings below were found by hand.
 5. **Java `long` and Go `int` are 64-bit; Core models 32.** `100000L*100000L` → 1410065408.
    `Numeric.lean` already defines `java32`/`java64`/`go64` — but `Dialect` has only
    `python | cLike`, so they are unreachable dead code.
+   *Status, 2026-11-13:* `Dialect` is `python | cLike | javascript | java | go`
+   (`Autoform/Lang/Core/Syntax.lean:54-71`); `Dialect.toNumConfig` (`Autoform/Lang/Core/Numeric.lean:262-272`)
+   wires `.java` to `java32` and `.go` to `go64`, and wider operations reach Core as width-tagged
+   `num:<family>:<type>:<op>` codes (`SourceCompiler.scala:8151, 8170`).
 6. **`.cLike` string rules are C's, applied to Java/JS/TS.** `"a"+"b"` becomes a pointer
    hole instead of `"ab"` — safe, but the inverse of the case §22 fixed.
 
@@ -1481,6 +1501,9 @@ project has been under-provisioned: one for integer division, then unary minus, 
 strings, now widths and boolean-operator semantics. The right shape is a dialect per
 *language*, wired to the `NumConfig`s that already exist, with `infer_dialect` refusing
 rather than guessing.
+
+*Status, 2026-11-13:* the split has landed for Java and Go (`Syntax.lean:54-71`); Kotlin still routes to
+`.java` and TypeScript to `.javascript` (`Numeric.lean:757-771`, `Lang.dialect`).
 
 ## §30 — The verifiable core survives execution about 40% of the time
 
@@ -1561,11 +1584,20 @@ constructors, so Java, Go, JavaScript, TypeScript and Kotlin were all run as `.c
 That is right about `and`/`or` for Java, Go and Kotlin — they yield a bool — and **wrong**
 for JavaScript and TypeScript, where `0 || 5` is `5`, as in Python.
 
+*Status, 2026-11-13:* `Dialect` has five constructors (`Syntax.lean:54-71`); JavaScript and TypeScript
+are evaluated under `.javascript`, whose `toNumConfig` is `NumConfig.python` (`Numeric.lean:265`),
+so they no longer run under C's rules.
+
 `Lang` (in `Numeric.lean`) names the language and states, per language, the dialect it is
 evaluated under, its `NumConfig`, its file extensions, and whether that pairing is
 `approximated` — known-wrong rather than unknown. `Lang.known_wrong` currently evaluates
 to `[javascript, typescript]`. This also wires `java64` and `go64`, written months ago
 and never connected to anything, because nothing named a language.
+
+*Status, 2026-11-13:* `Lang.approximated` is now `true` for C, Java, Go, Kotlin, JavaScript and TypeScript
+(`Numeric.lean:777-779`): the untagged language-wide default is an approximation for every
+non-Python language and only width-tagged exports escape it, so `known_wrong` (`Numeric.lean:803-804`)
+is no longer the two-element list.
 
 This is deliberately *not* the constructor-per-language split §29 calls for. About 110
 sites still `match` on `Dialect` directly, so adding constructors makes all of them
@@ -1573,6 +1605,10 @@ non-exhaustive simultaneously — and four agents are mid-build. The split is th
 state; it is blocked on those sites, not on this type. What `Lang` buys now is that a
 divergence found by the new oracle can be attributed: caused by the transpiler, or caused
 by an approximation the build already admits to.
+
+*Status, 2026-11-13:* the constructor-per-language split this paragraph deferred has since happened for
+Java and Go (`Syntax.lean:54-71`); `Lang` (`Numeric.lean:757-771`) still maps Kotlin to `.java`
+and TypeScript to `.javascript`.
 
 ## §31 — 104 nodes were silently wrong
 
@@ -1692,6 +1728,9 @@ What Velvet does **not** help with: the remaining holes. `op:starredUnpack` (36)
 `call:computed-callee` (6) and the `_HashedTuple` builtin-base gap are all missing
 *language modelling* in Core, not missing proof automation. No verifier closes them.
 
+*Status, 2026-11-13:* every label named here is at 0 on cachetools. `ledger-Cachetools.json` reports 5 holes,
+all `class-construction:unresolved-lexical-identity:*` (`OrderedDict` 4, `WeakKeyDictionary` 1).
+
 ## §33 — Correction to §31: contamination in the measurement
 
 §31 attributed five `cachetools` conformance divergences to `class _HashedTuple(tuple)`
@@ -1799,6 +1838,9 @@ ledger number produced in that state describes a build that does not correspond 
 committed AST. `scripts/check_docs.py` reports this as STALE and should keep failing
 until the module is re-rendered from the AST and both are committed together.
 
+*Status, 2026-11-13:* resolved. `ast-Cachetools.json` and `ledger-Cachetools.json` both carry 209 functions,
+and `check_render` is a passing CI gate (`.github/workflows/ci.yml:215-216`).
+
 ## §35 — Closing the `_HashedTuple` gap: the payload has to be in the value
 
 §34 settled that the divergence is real: `hashkey (tuple [int 0])` was `Val.ref 0` where
@@ -1871,10 +1913,16 @@ side is demonstrated against the *committed* `hashkey` body with the one base su
 the test site (`Autoform/BuiltinBase.lean`). Until the exporter is re-run, the capability
 exists and the corpus does not use it.
 
+*Status, 2026-11-13:* the exporter has been run. `ast-Cachetools.json` carries a `classBases` map on the
+`cachetools/keys.py:<module>` initializer (`_HashedTuple → tuple`).
+
 `Autoform/Generated/Cachetools.lean` is also still stale against its AST (238 functions
 against 208, §34's standing hazard). Re-rendering it would delete declarations
 `Autoform/SpecsGen/Cachetools.lean` depends on, so it stays a separate change and
 `scripts/check_render.py` keeps failing on exactly that one module, as it did before.
+
+*Status, 2026-11-13:* no longer stale — the module and its AST agree at 209 functions (see the §34 note),
+and `scripts/check_render.py` passes in CI (`.github/workflows/ci.yml:215-216`).
 
 ## §36 — `op:starredUnpack` closed: a calling convention, not a hole-filler
 
@@ -1924,6 +1972,9 @@ implements CPython's binding rule. `applyFunc`/`applyClosure` gained a `kws` arg
 | `control:TRY-multiCatch` | 1 | 1 |
 | `import:unresolved` | 1 | 1 |
 | **total** | **78** | **42** |
+
+*Status, 2026-11-13:* every label in this table is at 0 on cachetools; the ledger's 5 remaining holes are
+all `class-construction:unresolved-lexical-identity:*` (`ledger-Cachetools.json`, `holesByLabel`).
 
 Hole-free **159 → 179** of 208; verifiable core **94 → 100**. No other label rose — the
 outcome §29/§31 warn about (a category that moves rather than closes) did not occur.
@@ -1993,6 +2044,9 @@ been unsound, not merely imprecise.
   reject calls CPython accepts. (The *surplus* direction, `f(1,2,3)`, used to truncate and
   now raises: `posRejected`, `surplusPositional_now_agrees_with_cpython`.)
 * **Keyword-only parameters** (`def f(*, a)`) are not distinguished from positional ones.
+  *Status, 2026-11-13:* defaults and keyword-only parameters are now carried in the exporter's
+  `pythonSignature` (`SourceCompiler.scala:1070` `keyword_only`, `:1095` `keywordOnly`,
+  `:14872-14885` `classAttrDefaults`); `ledger-Cachetools.json` has no `call:python-defaults` hole.
 * **A starred form outside an argument list** (`a, *b = xs`) is the narrower hole
   `op:starred-outside-call`. It does not occur in `cachetools`; the label exists so that
   when it does occur it is counted rather than guessed at.
@@ -2050,6 +2104,10 @@ Every rejected site falls into one of two classes, and neither was correct befor
 
 Both are pre-existing and neither is fixed here (`cartographer/export_ast.sc` and the
 resolution rule are separate changes); what changed is that they are now loud.
+
+*Status, 2026-11-13:* the resolution order is documented as deliberate rather than fixed —
+`Autoform/Lang/Core/Semantics.lean:3082-3084`: modelled stdlib is consulted last so a user
+function of the same name always wins; the `Ansible` shadowing is the price of that rule.
 
 ### The same two fixes, run rather than argued
 
@@ -2226,6 +2284,10 @@ Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), 
 `cast:i64` value that then takes part in `+` is wrapped back to 32 bits. The cast is now
 right; the arithmetic around it is still under the two-constructor `Dialect` §29 records.
 
+*Status, 2026-11-13:* arithmetic carries its own width now: the exporter tags each integer operation
+`num:<family>:<type>:<op>` (`SourceCompiler.scala:8151, 8170`) and `TypedNumeric` interprets the
+tag; the 32-bit `.cLike` default applies only to legacy untagged ASTs (`Numeric.lean:772-776`).
+
 ## §39 — Reconciling the `cachetools` figures
 
 Sections above quote the verifiable core as 45, 69, 74, 94, 97, 100 and 101, and the
@@ -2240,6 +2302,9 @@ cachetools v7.1.7 (`provenance/ast-Cachetools.json.prov.json`):**
     hole-free        207
     verifiable core  107
     holes            3
+
+*Status, 2026-11-13:* `ledger-Cachetools.json` now reads functions 209, hole-free 204, verifiable core 150,
+holes 5 — the 5 holes are all `class-construction:unresolved-lexical-identity:*`.
 
 (Later the same day -- object protocol on user instances, value-callees, receiver-then-
 collectors binding, comprehension lowering -- took the 22 holes to 3, all three the
@@ -2311,6 +2376,10 @@ correctly: `mutation-SpecsGenCachetools.json` is not a kill rate but
     "reason": "the module under test does not build before any mutation is applied;
                no mutation verdict is possible"
 
+*Status, 2026-11-13:* `mutation-SpecsGenCachetools.json` is a stale artifact: last written 2026-08-20
+(`git log`, commit `6fd0934`) against a worktree path that no longer exists. The module it says
+does not build is imported by `Autoform.lean:59` and elaborates on every build.
+
 A mutation gate whose baseline does not build could have reported a 100% kill rate — every
 mutant "dies" because everything dies. It refused to, and that refusal is the only reason
 the breakage was written down anywhere before this merge.
@@ -2348,6 +2417,11 @@ module was generated. This is not repairable by hand; it needs regeneration, and
 `synth_specs.py`'s trace step currently records zero calls on cachetools — inside
 `scripts/differential.py`, owned by another branch. The failure is pinned in CI, which
 also fails if it starts passing, so the pin cannot go stale in silence.
+
+*Status, 2026-11-13:* `Autoform/SpecsGen/Cachetools.lean` elaborates — it is imported from `Autoform.lean:59`
+(as `Base.lean` + `Part1..8`) with `obligations := []` (`SpecsGen/Cachetools.lean:83-85`); the
+module-wide `C_tfFree` premise was replaced by a per-law finalizer side condition
+(`docs/GOAL-arbitrary-codebases.md`, Milestone 6).
 
 `fuelMonoExclusions` was not touched. The right response to a table that is no longer
 `tryFinally`-free is a narrower context, not a wider exclusion list.
@@ -2423,6 +2497,12 @@ agree exactly with the figures this workflow started from.
   pinned Joern. That is the honest baseline it was built to establish, not a pass.
 * `scripts/differential.py`'s trace step on cachetools, which is what blocks the
   regeneration above.
+
+*Status, 2026-11-13:* both "does not elaborate" rows are superseded — `SpecsGen/V8Base` and
+`SpecsGen/Cachetools` are imported from `Autoform.lean:75` and `:59` and kernel-checked on every
+build. Provenance: `provenance/` holds 18 `*.prov.json` records and `provenance/unattributed.json`
+names the 6 remaining backlog artifacts (`ast-CMath`, `ast-LinuxLibSample`, `ast-Sample`,
+`ast-Stress`, `ast-V8Base`, `ast-V8Numbers`).
 
 ## §41 — `op:addressOf` is a corpus-boundary problem, not a location-model problem
 
@@ -2595,6 +2675,9 @@ went quiet on a fresh clone, and this.
 concrete lesson: the only oracle that tests the semantics against reality rather than
 against itself is the one nothing was guarding.
 
+*Status, 2026-11-13:* conformance is in CI — `.github/workflows/ci.yml:254-302` pins the cachetools corpus
+and fails if `scripts/differential.py` compares zero cases.
+
 ### The 33 divergences, diagnosed
 
 All are `lean raised TypeError` where CPython succeeds, and all have one cause.
@@ -2649,6 +2732,9 @@ packed tuple was simply bound to the first parameter — the same wrong answer, 
 by a different route, and reported as agreement. The fix is to spread the recorded packed
 values back into positionals when the callee has a `vararg`/`kwarg`.
 
+*Status, 2026-11-13:* fixed — `scripts/differential.py:1063-1068` spreads a recorded `*args` tuple back
+into positionals instead of passing the packed value.
+
 ### The pattern
 
 Every one of these four faults reported as INCONCLUSIVE or as a divergence in Core, never
@@ -2679,6 +2765,10 @@ coupling between Core and the front end, not a semantic property. The right shap
 `receiver` field on `Func`. That changes `Func`, which re-generates every AST and breaks the
 hand-written `CachetoolsSpec` and `Contracts` proofs -- a larger change than is wise while
 the conformance number is still moving. A stated shortcut, not a hidden one.
+
+*Status, 2026-11-13:* done, in a different shape from the one proposed: `Func.pythonSignature` carries
+`isMethod`, `receiverKind` and `receiverName` (`Autoform/Lang/Core/Syntax.lean:762-776`), and
+`Func.isMethod` (`Syntax.lean:819`) reads it, falling back to the naming heuristic only for legacy models.
 
 ### The part that was not a win
 
@@ -2815,6 +2905,8 @@ Adding the constructor would move those 9 functions from `blocked (value model):
 `match` on `Val` -- the risk the `bobj` note in `Syntax.lean` already spells out. The real
 blocker underneath is mutable containers on the heap, which is also what
 `mcall:clear:unboxed-container` and `setIndex:immutable-containers` are.
+
+*Status, 2026-11-13:* the blocker named here landed as boxed containers (§57.8).
 
 ### 48a. A fix that was measured and reverted
 
@@ -3167,6 +3259,8 @@ figures either way, because every artifact it quotes is tracked.
 * **CI will now go red on a fresh clone**, at `check_specs_fresh` (3) as it presumably
   already does at `check_render` (3). That is the correct reading of the current tree and
   not something this change should paper over.
+  *Status, 2026-11-13:* the structural question was resolved by tracking the corpus — `ast-V8Base.json` is
+  in the tree (§56) — and `check_render` passes in CI (`.github/workflows/ci.yml:215-216`).
 * `audit_all.py --skip-lean` exits 0 and prints `VERDICT: PASS (no trusted-code leak)`
   with the axiom sweep and the kernel replay both `SKIPPED`. It labels them SKIPPED, and CI
   runs `--strict` without the flag, so this is not the same defect -- but the verdict line
@@ -3247,6 +3341,10 @@ unbacked, and I ran it twice. Copy first, hide second.
 * `ast-LinuxLibSample.json` and `ast-V8BaseSample.json` are byte-identical *subsets* of the
   untracked corpora, not exports -- so no committed command reproduces them. The extractor
   is not in the repository. Committing it is the fix.
+  *Status, 2026-11-13:* `provenance/ast-Cachetools.json.prov.json` records real provenance for cachetools and
+  `check_provenance.py` is a CI step (`.github/workflows/ci.yml:254`); the extractor is committed as
+  `scripts/extract_sample_ast.py`. `ast-V8Numbers.json` and `ast-LinuxLibSample.json` remain in
+  `provenance/unattributed.json`.
 * `Ansible`, `LinuxCrypto` and `LinuxLib` remain untracked and therefore remain
   `UNVERIFIABLE`/`SKIPPED` rather than checked. Only `V8Base` had tracked theorems hanging
   off it, and only `V8Base` was small enough for tracking to be the honest answer.
@@ -3407,6 +3505,10 @@ receiver. Not done, and the harder question is on record: holing is the conserva
 choice and `AttributeError` the faithful one, and which is right depends on whether Core's
 object model is complete -- a claim about the project, not a refactor.
 
+*Status, 2026-11-13:* done where the class model can answer — `Autoform/Lang/Core/Semantics.lean:1688,
+1853-1861, 1907` raise `AttributeError` when `classLookup` resolves the class (slot, property, or a
+class that does not allow `__dict__`), and fall back to `unit` or a hole otherwise.
+
 ### 57.7 `nonlocal` was filed under "needs semantics"; Core already expressed it
 
 The exporter comment said `Expr.closure` captures by value, so a write cannot reach the
@@ -3474,6 +3576,9 @@ xfailed, no open numeric divergence.** Both `xfail`s are `strict` and neither is
 the new **length** where Python's `append` returns `None`. `indexString` is UTF-16
 indexing. "No known divergence" and "the suite was run and says so" are different claims.
 
+*Status, 2026-11-13:* both xfails are gone — `tests/test_source_numeric.py:776-778` runs `indexSnapshot`
+and `indexString` as ordinary conformance cases.
+
 ### 57.10 Property dispatch: implemented, proved fuel-monotone, blocked on provability
 
 Making `c.prop` *run* its getter was built twice. A `Ctx.properties` field cost **289
@@ -3492,6 +3597,9 @@ where absence is `[] = []`, and align the handful of `Ctx` construction sites th
 the 289. The design that was cheaper to *write* was far more expensive to *prove*, and
 which one mattered was not visible until the proof was attempted.
 
+*Status, 2026-11-13:* adopted — `Program.properties` (`Autoform/Lang/Core/Syntax.lean:860`) and
+`Ctx.properties` (`Autoform/Lang/Core/Semantics.lean:1042`) carry the property list.
+
 ### 57.11 Two apparatus errors of my own, for the record
 
 `check_render` "exited 0 at baseline" -- it did not; I had piped it to `tail` and captured
@@ -3500,3 +3608,59 @@ products under `Autoform/Generated/`. The same build products nearly produced a 
 finding about the boxed-containers plan (15,068 against 35). Untracked build products in
 the source tree are a standing hazard for anyone who measures by grep, and both incidents
 now sit in the documents they could have misled.
+
+## Open items as of 2026-11-13
+
+A survey of this document against the tree at `d8a7b74`; the dated *Status, 2026-11-13* notes
+above are its other half. What follows is what the survey found still open, each with where
+it lives in the tree.
+
+1. `Autoform/Harness/Audit.lean:32` — `partial def transitiveDeps`, the audit tool's own
+   walker; the accepted exception `CONTRIBUTING.md` §3 names, still `partial`.
+2. `Autoform/Lang/Core/Numeric.lean:610-634` — five `NumConfig` lemmas (`wrap_hom_add`,
+   `wrap_emod`, `shl_eq_mul`, `band_self`, `cast_bitsOf`) stated in prose as open obligations,
+   not as theorems.
+3. `Autoform/Specs/V8Spec.lean:80-89` — `ob_signedMod32_minus_one` is a `Prop`-valued `def`;
+   being converted to a theorem (another agent, today).
+4. `Autoform/Lang/Core/Stdlib.lean:962-964` — `len` matches `list`/`tuple`/`dict` payloads
+   only, so `len` of a builtin-based instance (`bobj`) returns `none`; pinned by
+   `Autoform/BuiltinBase.lean:412` `excluded_len`.
+5. `Autoform/Lang/Core/Semantics.lean:4077-4080` — cross-file initializer order is the
+   caller's responsibility; `runMain` runs `inits` in list order.
+6. `Autoform/CallingConvention.lean:318-326` — `duplicate_argument_is_not_detected`:
+   `h(1, a=2)` succeeds where CPython raises `TypeError`.
+7. `Autoform/Refine.lean:1952-1957` — `sumto_refines` states `n ≤ 65535` rather than deriving
+   it from `Fits32 (n*(n+1)/2)`.
+8. `Autoform/Lang/Core/Semantics.lean:3080-3100` — a keyword argument to a builtin is the hole
+   `call:<f>:keyword-to-builtin`, on both the dunder and the plain path.
+9. `Autoform/Refine.lean:2787-2797` — obligation (6) says `applyUnop "-"` bypasses
+   `NumConfig`; `Autoform/Lang/Core/Semantics.lean:805` routes it through
+   `d.toNumConfig.neg`, so the comment is stale. Not edited today: `Refine.lean` is upstream of
+   every spec module and a rebuild is multi-hour.
+10. `Autoform/Refine.lean:2733-2741` — obligation (1) says general fuel monotonicity is not
+    proved; `Autoform/FuelMono.lean:2052-2099` proves it (`evalExpr_fuel_mono` through
+    `evalPairs_fuel_mono`, under `TFFreeCtx`). Same reason for leaving the comment.
+11. The ledger has no `arithmeticModel` field. §16 (lines 776-779 above) requires that a result
+    record the integer policy it was obtained under; `ledger-Cachetools.json` records `dialect`
+    only.
+12. `cartographer/formalization_graph.sc:52-66` — `fanout` counts every entry of
+    `m.callee.fullName.dedup`, `<operator>.*` pseudo-callees included. Closed 2026-11-13:
+    the callee list is filtered with `.filterNot(_.startsWith("<operator>"))` before
+    `fanout`/`score`; `formalization-graph.json` is not a provenance-pinned artifact, so
+    this change invalidates nothing tracked. Expect `pure leaves` to grow on the next run.
+13. `cartographer/compiler/SourceCompiler.scala:9010` — `op:addressOf:*:unknown-type` does not
+    separate an operand whose type is unknown from one whose callee is external. Attempted
+    and reverted 2026-11-13: the one-arm change (`external-callee` when
+    `addressOfFeedsExternalCall(c)`) is correct, but `SourceCompiler.scala` is one of the
+    four exporter sources every `provenance/ast-*.prov.json` record pins, so landing it
+    turns all 18 attributed ASTs red in `scripts/check_provenance.py` until each is
+    re-exported from sources this machine no longer has. It waits for the next full
+    re-export cycle; the docs row in `docs/core-language.md` says so.
+14. `cartographer/generator_lowering.py:216` — statement-position `yield from` refuses the whole
+    generator frame (`generator:yieldFromS`) although the faithful lowering is a `forIn`
+    that re-yields each item with only non-`None` `send()` forwarding left as a hole.
+    Written and withdrawn 2026-11-13: `generator_lowering.py` runs inside `render_lean.py`,
+    so the change re-rendered `ast-Requests/Click/Jinja2.json` (`scripts/check_render.py`
+    MISMATCH on all three) and would have to land with those renders re-recorded, their
+    ledgers and the pinned Lean ledger fixtures regenerated, and `SpecsGen/{Requests,
+    Click,Jinja2}` rebuilt against the new `Generated` modules, in one commit.

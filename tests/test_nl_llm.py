@@ -391,3 +391,156 @@ def test_bedrock_preflight_names_each_missing_piece(bedrock_env, monkeypatch):
     text = ' | '.join(errors)
     assert 'AWS_REGION' in text and 'AUTOFORM_LLM_MODEL' in text and '[bedrock]' in text, errors
     assert any('credentials come from the standard chain' in w for w in warnings), warnings
+
+
+# --- egress policy (AUTOFORM_LLM_ALLOWED_BACKENDS), private cache, secrets in records --------
+
+@pytest.fixture(autouse=True)
+def _no_egress_policy(monkeypatch):
+    """A policy in the developer's shell must not change what the other tests see."""
+    monkeypatch.delenv(llm.ALLOWED_ENV, raising=False)
+    monkeypatch.delenv('CLAUDE_CODE_USE_BEDROCK', raising=False)
+
+
+def _no_cli(*args, **kwargs):
+    raise AssertionError('a claude CLI child was launched under a policy that refuses it')
+
+
+def test_policy_refuses_an_unlisted_backend_before_anything_is_sent(api_env, monkeypatch):
+    client = FakeClient(_usage(10))
+    monkeypatch.setattr(llm, '_API_CLIENT', client)
+    monkeypatch.setattr(llm.subprocess, 'Popen', _no_cli)
+    monkeypatch.setenv(llm.ALLOWED_ENV, 'bedrock')
+    assert llm.available() is False
+    with pytest.raises(llm.LLMError, match=r'AUTOFORM_CLAUDE_AUTH=api uses the api backend, which '
+                                           r'AUTOFORM_LLM_ALLOWED_BACKENDS=bedrock does not allow; nothing was sent'):
+        llm.ask('proprietary source', api_env)
+    errors, _ = pipeline.preflight(ROOT, needs_model=True)
+    assert any(llm.ALLOWED_ENV in e for e in errors), errors
+    # The CLI backends are refused the same way, and no `claude` process is started.
+    monkeypatch.setattr(llm.shutil, 'which', lambda name: '/bin/claude')
+    for mode in ('login', 'api-key'):
+        monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', mode)
+        assert llm.available() is False
+        with pytest.raises(llm.LLMError, match=f'uses the {mode} backend'):
+            llm.ask('proprietary source', api_env)
+        with pytest.raises(llm.LLMError, match=llm.ALLOWED_ENV):
+            llm.claude_env()
+    # Set but empty allows nothing; a typo is an error, never an open policy.
+    monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', 'api')
+    monkeypatch.setenv(llm.ALLOWED_ENV, ' ')
+    with pytest.raises(llm.LLMError, match=r'=\(empty\) does not allow'):
+        llm.ask('proprietary source', api_env)
+    monkeypatch.setenv(llm.ALLOWED_ENV, 'api,bedrok')
+    with pytest.raises(llm.LLMError, match="unknown backend 'bedrok'"):
+        llm.claude_auth()
+    assert client.prompts == []
+
+
+@pytest.mark.parametrize('backend, allowed, refused', [
+    ('any-remote', 'api,login,api-key,bedrock', True), ('ollama', '', False)])
+def test_tier3_proposer_obeys_the_policy(tmp_path, backend, allowed, refused):
+    import subprocess
+    env = dict(os.environ, AUTOFORM_NEURAL='1', AUTOFORM_NEURAL_BACKEND=backend,
+               OLLAMA_HOST='http://127.0.0.1:9', **{llm.ALLOWED_ENV: allowed})   # port 9: nothing listens
+    out = subprocess.run([sys.executable, str(ROOT / 'scripts/prover/propose.py')], input='True', env=env,
+                         capture_output=True, text=True, timeout=60).stdout
+    assert ('# refused (%s)' % backend in out) is refused, out
+
+
+def test_policy_allows_a_listed_backend_but_not_its_unlisted_cli_children(api_env, monkeypatch):
+    client = FakeClient(_usage(10))
+    monkeypatch.setattr(llm, '_API_CLIENT', client)
+    monkeypatch.setenv(llm.ALLOWED_ENV, ' API ')
+    text, _ = llm.ask('allowed', api_env)
+    assert text and len(client.prompts) == 1
+    # The api mode hands its key to the CLI agents, which is the api-key backend: refused.
+    with pytest.raises(llm.LLMError, match=r'the claude CLI \(AUTOFORM_CLAUDE_AUTH=api\) uses the api-key backend'):
+        llm.claude_env()
+    _, warnings = pipeline.preflight(ROOT, needs_model=True)
+    assert any('prove and refine agents run the claude CLI and will be refused' in w for w in warnings), warnings
+    from autoform.harness import generator, prover
+    monkeypatch.setattr(prover.shutil, 'which', lambda name: '/bin/claude')
+    with pytest.raises(llm.LLMError, match='api-key backend'):
+        prover.ClaudeCodeAgent()
+    # A CLI child forced onto an allowed backend is not refused for its nominal mode.
+    monkeypatch.setenv(llm.ALLOWED_ENV, 'bedrock')
+    monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', 'login')
+    monkeypatch.setenv('CLAUDE_CODE_USE_BEDROCK', '1')
+    assert llm.claude_auth() == 'login' and llm.claude_env()['CLAUDE_CODE_USE_BEDROCK'] == '1'
+    monkeypatch.setenv('CLAUDE_CODE_USE_BEDROCK', 'yes')   # not the value autoform sets: unforced
+    with pytest.raises(llm.LLMError, match='uses the login backend'):
+        llm.claude_env()
+    # The candidate generator calls the SDK directly (the api backend).
+    _, notes = generator.generators('llm')
+    assert any('the llm candidate generator uses the api backend' in n for n in notes), notes
+
+
+def test_doctor_reports_the_egress_policy():
+    from autoform import cli
+    env = dict(os.environ, AUTOFORM_CLAUDE_AUTH='login', **{llm.ALLOWED_ENV: 'api'})
+    warnings = []
+    policy = cli.llm_policy_report(env, warnings)
+    assert policy['allowed'] == ['api'] and policy['backend'] == 'login'
+    assert policy['backend_allowed'] is False and policy['cli_backend'] == 'login'
+    assert any('AUTOFORM_CLAUDE_AUTH=login is not in AUTOFORM_LLM_ALLOWED_BACKENDS' in w for w in warnings)
+    env['AUTOFORM_CLAUDE_AUTH'] = 'api'
+    warnings = []
+    policy = cli.llm_policy_report(env, warnings)
+    assert policy['backend_allowed'] is True and policy['cli_allowed'] is False
+    assert any('prove and refine agents will refuse' in w for w in warnings)
+    del env[llm.ALLOWED_ENV]
+    warnings = []
+    assert cli.llm_policy_report(env, warnings)['allowed'] is None and warnings == []
+
+
+def test_prompt_cache_is_never_readable_by_others(api_env, monkeypatch):
+    monkeypatch.setattr(llm, '_API_CLIENT', FakeClient(_usage(10)))
+    old = os.umask(0o022)
+    try:
+        llm.ask('first', api_env)
+        cache = api_env / 'llm-cache'
+        (entry,) = cache.iterdir()
+        assert cache.stat().st_mode & 0o777 == 0o700
+        assert entry.stat().st_mode & 0o777 == 0o600
+        # A cache an older version left world-readable is tightened on the next write.
+        os.chmod(cache, 0o755)
+        os.chmod(entry, 0o644)
+        llm.ask('second', api_env)
+        assert cache.stat().st_mode & 0o777 == 0o700
+        assert all(p.stat().st_mode & 0o077 == 0 for p in cache.iterdir() if p != entry)
+        from autoform.harness import prover
+        prover._cache_put(api_env / 'proofs', 'k', 'by rfl', [])
+        assert (api_env / 'proofs').stat().st_mode & 0o777 == 0o700
+        assert (api_env / 'proofs' / 'k.json').stat().st_mode & 0o777 == 0o600
+    finally:
+        os.umask(old)
+
+
+# Values planted under secret-shaped names (*_KEY, *_TOKEN, *SECRET*, *PASSWORD*, cloud
+# credential variables); none may reach any file a run writes.
+SECRETS = {'GH_TOKEN': 'planted-token-2',
+           'CLOUD_SECRET_ACCESS_KEY': 'planted-secret-access-3', 'DB_PASSWORD': 'planted-password-4',
+           'SERVICE_SESSION_TOKEN': 'planted-session-5', 'MY_CLIENT_SECRET': 'planted-client-6'}
+
+
+def test_run_records_hold_no_secret_environment_values(api_env, monkeypatch):
+    from test_nl_prove_pipeline import Stubs, _src
+    for name, value in SECRETS.items():
+        monkeypatch.setenv(name, value)
+    client = FakeClient(_usage(1000))
+    monkeypatch.setattr(llm, '_API_CLIENT', client)
+    stubs = Stubs()
+    # The real describe stage, so the prompt really goes to the (fake) model with the key set.
+    monkeypatch.setattr(pipeline, '_impl', lambda name: describe.describe if name == 'describe' else stubs.impl(name))
+    src, out = _src(api_env), api_env / 'run'
+    pipeline.main([str(src), 'PipelinePython', '--deep', '--no-prove', '--judge', 'none', '--skip-preflight',
+                   '--lean-root', str(ROOT), '--out', str(out), '--budget-usd', '5'])
+    files = [p for p in out.rglob('*') if p.is_file()]
+    # Not vacuous: the model was called (with the planted key in the environment) and records exist.
+    assert client.prompts and (out / 'run.json').is_file() and len(files) > 3, files
+    planted = dict(SECRETS, api_key='sk-ant-test-not-a-real-key')   # the key api_env sets
+    for path in files:
+        data = path.read_bytes()
+        for name, value in planted.items():
+            assert value.encode() not in data, f'{name} written to {path.relative_to(out)}'
