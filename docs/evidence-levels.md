@@ -43,9 +43,21 @@ the standard-library `ast` module at both commits: a `def` (method or nested fun
 whose syntax tree differs, or exists only at head, is changed; whitespace and comments
 are not a change. This is also where the line numbers in the SARIF come from, because
 the exporter's AST carries none. For any other language, every function the exporter
-exported from a changed file is reported (`detection: changed-file`), which rounds a
-one-line edit up to the whole file -- in the set of functions examined, never in a
-level.
+exported from a changed file is a candidate (`detection: changed-file`). The behaviour
+stage exports the base tree whenever there are such candidates (also when no runtime
+can compare their language), and each candidate is compared with it: a function
+whose exported AST is identical at base and head is dropped as unchanged -- unless that
+AST contains a hole, which carries none of the source it stands for, so the function
+stays `modified` (`change_detail: identical to the base export except inside its
+holes`) -- one absent at
+base is `added`, a base function absent at head is listed as `removed`, a signature
+change of a single `file + class + method` is paired as `modified` (`change_detail:
+signature changed`), and lambdas are matched by body, not by their index
+(`pr.json` `change_identity`). Without a base export (`--no-behaviour`, or a failed
+export) every exported function of the file is reported,
+which rounds a one-line edit up to the whole file -- in the set of functions examined,
+never in a level -- and `change_identity.reason` says why. Either way these functions
+carry no line number: the exporter records no position for an exported function.
 
 The chain runs on the changed functions, their enclosing scopes and nested functions,
 and the callees that resolve inside the exported AST (`pr.json` `selection.closure`),
@@ -111,8 +123,11 @@ with the artifacts to show it -- and that the unchanged ones were not looked at.
 
 The levels above compare one revision's model with that revision's runtime, so they cannot
 see that a change altered behaviour. `pr` therefore adds a second, separate result per
-changed function, `behaviour`, which is never a level and never a failure (a pull request
-may change behaviour on purpose; the exit code is unchanged):
+changed function, `behaviour`, which is never a level and, unless `--fail-on` is given, never
+a failure (a pull request may change behaviour on purpose; the exit code is unchanged).
+`--fail-on behaviour-changed` exits `1` when a changed function's behaviour `changed`, and
+either `--fail-on` value exits `3` when no changed non-test function was compared at all
+(the gate, below):
 
 * the model is the AST of the **base** revision (a second Joern export of the base checkout,
   with the head's `tests/` overlaid so the inputs a test builds exist in the model, and
@@ -121,11 +136,65 @@ may change behaviour on purpose; the exit code is unchanged):
 * the runtime is the **head** source, with inputs from the head's tests and the oracle's
   random cases (`--behaviour-cases`, default 100).
 
+For Java (and Kotlin, where a Kotlin compiler is present) the same design runs on the JVM
+oracle (`java_backend` in `scripts/differential.py`): the base model against the head
+source, compiled with `javac` against the head tree's own source roots, on the oracle's
+seeded random inputs, which are identical at both revisions. There is no test overlay and
+`plain_class_values.py` is not applied (both are Python-specific). Only static methods with
+a primitive/String signature are called; an instance method or a non-primitive signature
+is `not-compared` with the oracle's own reason (e.g. `instance method: needs a receiver`).
+Kotlin never compiles test source sets; it compiles the candidate files with the other
+main sources, then the candidate files alone, then each one alone, recording every attempt
+and its first errors in `kotlin_compile_attempts`. A Kotlin lambda is `not-compared`
+(`lambda: not callable by name`), not a static candidate.
+For C (`.c` files, where `cc` is present) the design runs on the native C oracle
+(`native_c` via `c_runtime` in `scripts/differential.py`): the base model against the head
+tree's translation units, compiled with `cc` and called in the sandboxed worker, on the
+oracle's seeded typed-boundary inputs (all-zero first, then each fixed-width type's
+extremes and powers of two, then seeded small integers), identical at both revisions. No
+test overlay. Only functions with a scalar fixed-width integer signature defined in a
+`.c` unit are called; a pointer or aggregate signature is `not-compared` with the
+oracle's reason. A case the model leaves as a hole -- undefined behaviour such as signed
+overflow -- is inconclusive, never a divergence. A `.h` function is not C here (the
+extension is shared with C++); outside a C++ corpus it is `not-compared` with the reason.
+Go (`go_backend`: package-level functions with scalar parameters, on fixed per-type pools)
+and JavaScript/TypeScript (`node_backend`: module-scope functions and static methods, on a
+fixed numeric pool and the body's own string literals) run the same way: base model
+against the head source, on inputs built from the base export alone. A method that needs
+a receiver, or a function returning an object, is `not-compared` with the backend's reason.
+A revision is a `git archive`, which carries no installed packages, so the working tree's
+`node_modules` directories are linked into it at the same paths (`pr.json` `dependencies`
+names each; `AUTOFORM_NODE_MODULES` names one more to link). With none installed, an
+import of a package that tsc would not emit (every binding it introduces is used only as a
+type: its name no longer occurs in Node's type-stripped text) is dropped from the oracle's
+copy, as the compiled program drops it, unless the `tsconfig.json` keeps such imports
+(`verbatimModuleSyntax`, `preserveValueImports`, `importsNotUsedAsValues`,
+`emitDecoratorMetadata`, or an `extends` that cannot be read); an extensionless relative
+import is spelled with the file it resolves to. A module that still imports a missing
+package is `not-compared` with `module load failed: package(s) not installed: <names>`
+and the fix (`npm ci`).
+For C++ (the `cpp` row: `.cc`, `.cpp`, `.cxx`, `.hh`, `.hpp`, `.hxx`, and `.h` in a C++
+corpus), where `c++` is present, the base model runs against the head source through the
+native oracle (`scripts/native_c.py`) on the same seeded random and width-boundary inputs:
+each free or static member function with a fixed-width integer signature is called
+through a C ABI thunk compiled in its own translation unit (a header, in a C++ corpus, is
+one), named by its qualified name and, when its declared types are builtins, cast to its
+exact function type so one overload is selected. A non-static member function, a private
+member and an ambiguous overload are `not-compared` with the reason, without taking the
+rest of the file down. A `.h` is C++ only in a C++ corpus (no `.c` file, and a C++ source
+or header, or a `.h` with a C++-only declaration); in a C project nothing changes.
+A language is compared when the oracle has a cross-revision backend for it
+(`CROSS_REVISION_INPUTS` in `scripts/runtime_backends.py`, which also says what the inputs
+are) and its toolchain is on PATH; any other language is `not-compared` with the reason.
+A function's language is taken from its file extension; one run compares one language (the
+one with the most changed functions), and the others are `not-compared` with that reason.
+`behaviour.languages` in `pr.json` lists the languages of the functions actually compared.
+
 | `behaviour` | meaning | not meant |
 |---|---|---|
 | `changed` | on at least one input the base model and the head runtime disagree; up to 3 counter-inputs are listed (call, receiver, what the base model returns, what the head runtime returns) | that the change is wrong |
 | `unchanged-on-inputs` | N compared cases all agreed; N is stated | equivalence on other inputs |
-| `not-compared` | no case was compared; the reason is stated (added at head, test code, all cases inconclusive, no Joern, non-Python, a stage failed) | that the behaviour is unchanged |
+| `not-compared` | no case was compared; the reason is stated (added at head, test code, all cases inconclusive, no Joern, a language with no cross-revision backend or toolchain here, a method or C function the backend cannot call, a stage failed) | that the behaviour is unchanged |
 
 A function whose cases were all inconclusive is `not-compared`, never `unchanged-on-inputs`.
 A divergence that also appears in a same-base control run (the base model against the
@@ -135,8 +204,33 @@ removed from `changed` and counted, in the report and the comment, as
 divergences. `pr.json` has `functions[].behaviour` and a top-level `behaviour` block
 (model, runtime, control, suppression count, stages); SARIF has rule
 `autoform/behaviour-changed` (level `warning`, message with the input and both results);
-the comment has a section "Behaviour changes in this PR". Covered: Python functions that
-exist at base and were modified. Not covered: other languages (`not-compared`), functions
+the comment leads with a "PR verdict" section (one row per changed function: `changed`,
+`unchanged-on-inputs`, `not-compared`), and the evidence level follows under "Head model
+conformance": it is about the head revision's own model, so a function whose behaviour
+changed can still be `proved` there. SARIF messages also lead with the PR verdict.
+
+Inputs reach the change, or the verdict says they did not. The behaviour runs pass
+`--literal-inputs` to the oracle: a string-typed or unannotated parameter also draws
+strings built from the literals of the function, its file and the head revision of the
+function (each literal, `a<sep>b`, a prefix, a suffix, pairs joined), Java/Kotlin `String`
+parameters and Node string pools take the same strings, and integer and C parameters the
+neighbours of the integer literals; every draw is seeded from the export, so the run and
+its same-base control get identical inputs. For Python the cross-revision run also records
+which changed lines and which outcomes of a changed `if`/`while` condition the COMPARED
+cases executed (`change_coverage` in `conformance.json`). An `unchanged-on-inputs` whose
+inputs never ran a changed statement or only ever took one side of a changed condition says
+so in its reason ("branch coverage: the inputs did not reach the change") and does not
+count as evidence for `--fail-on`: when every compared function is such, the gate is
+inconclusive (exit 3). Outcome coverage, not condition coverage: an `a or b` changed to
+`a and b` is checked through the outcomes of its `if`, not each operand. Other languages
+report `change_coverage` as not measured. `gate.exit_code` is always the exit code. A
+function identical to the base export except inside its holes is listed but is a gate
+subject only when no other function is. Covered: Python functions, static
+primitive/String Java and Kotlin methods, scalar Go package functions, JavaScript/
+TypeScript module-scope functions and static methods, and scalar fixed-width C functions
+of `.c` files, that exist at base and were modified. Not covered: other languages,
+methods that need a receiver the backend cannot build and C functions with pointer or
+aggregate signatures (`not-compared`), functions
 added at head, callers of a changed function unless the oracle happened to exercise them
 through it, and anything the model cannot represent (inconclusive cases).
 `--no-behaviour` skips it. The worked example is `docs/examples/pr-cachetools-7.1.5/`.

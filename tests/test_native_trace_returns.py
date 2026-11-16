@@ -58,7 +58,7 @@ def test_native_trace_returns_and_gaps(tmp_path, monkeypatch, differential):
     keys = {name: 'trace_cases.py:<module>.' + name for name in names}
     index = differential.build_lineno_index(str(tmp_path), ['trace_cases.py'])
 
-    def suite(_):
+    def suite(_, runner=None):
         for name in names[:6]:
             try:
                 namespace[name]()
@@ -94,7 +94,7 @@ def test_native_trace_returns_and_gaps(tmp_path, monkeypatch, differential):
     }
     assert stats['skip_ambiguous_trace_return'] == 1
     assert stats['skip_suspended_frame'] >= 2
-    assert stats['test_runs'] == [{'dir': str(tmp_path), 'rc': 0}]
+    assert stats['test_runs'] == [{'dir': str(tmp_path), 'rc': 0, 'runner': {}, 'output_tail': []}]
 
 
 CLOSURE_SOURCE = '''
@@ -124,7 +124,7 @@ def test_nested_function_reading_its_enclosing_scope_is_refused(tmp_path, monkey
     inner = 'closures.py:<module>.outer.inner'
     plain = 'closures.py:<module>.plain'
 
-    def suite(_):
+    def suite(_, runner=None):
         namespace['outer']('STRING')(None)
         namespace['plain'](3)
         return 0

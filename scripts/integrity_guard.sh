@@ -34,8 +34,12 @@ autoform_integrity_guard() {
       echo "  These files mean a translated module is currently a MUTANT, not the program:"
       printf '    %s\n' $backups
       echo "  Any conformance or proof taken now would describe the mutant (docs/integrity.md)."
-      echo "  Let scripts/mutate.py finish, or restore each <M>.lean from its .mutate-backup"
-      echo "  and delete the backup, then re-run."
+      echo "  Let scripts/mutate.py finish, or recover the tree with"
+      echo "    python3 scripts/mutate.py <path-to-M>.lean --recover"
+      echo "  (puts each <M>.lean back from its .mutate-backup and removes the marker; then"
+      echo "  lake build <module> before trusting any .olean built while the mutant was live)."
+      echo "  By hand: restore each <M>.lean from its .mutate-backup and delete the backup."
+      echo "  Then re-run."
     } >&2
     return 2
   fi

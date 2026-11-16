@@ -19,9 +19,19 @@ def is_git_url(value):
             or bool(re.fullmatch(r"[^/\s:@]+@[^/\s:]+:.+", value)))
 
 
+# `scheme:/user:token@` with one slash or two: Path.resolve() collapses `//`, so a remote
+# helper address reported as a missing local path still carries its credential.
+_USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*:/{1,2})[^\s/?#@'\"<>]+@")
+
+
 def display_url(value):
+    # A remote-helper address (`git::https://user:token@host/p`, `hg::...`) carries the
+    # credential in the URL after `::`; scrub that URL as one in its own right.
+    helper = re.match(r"(?i)^([a-z][a-z0-9+.-]*)::(.*)$", value, re.S)
+    if helper:
+        return helper.group(1) + '::' + display_url(helper.group(2))
     if not re.match(r"(?i)^(?:https?|ssh|git|file):", value):
-        return value
+        return _USERINFO.sub(r"\1", value)
     try:
         parsed = urlsplit(value)
     except ValueError:
@@ -37,8 +47,9 @@ def redact_git_output(text, source):
     # Git may normalize a URL (e.g. remove its query) in diagnostics, and
     # submodules can report URLs other than the requested root repository.
     text = text.replace(source, display_url(source))
-    return re.sub(r"(?i)(?:https?|ssh|git|file)://[^\s'\"<>]+",
+    text = re.sub(r"(?i)(?:https?|ssh|git|file)://[^\s'\"<>]+",
                   lambda match: display_url(match.group()), text)
+    return _USERINFO.sub(r"\1", text)
 
 
 def resolve_source(value, workspace, module, *, ref=None, subdir=None):

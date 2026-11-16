@@ -16,7 +16,14 @@ A cached verdict is reused only when EVERYTHING the verdict depends on is byte-i
 * the semantics (`Autoform/Lang/Core/**.lean`), the renderer (`cartographer/*.py`),
   this harness, and the Lean toolchain,
 * the real runtime's version,
+* the runtime's source: the digest of the source file of the function and of every
+  function in its dependency closure (`runtime_source`), so a verdict computed on another
+  revision of that code is never replayed, even when the cases came out identical,
 * the case set: the exact (receiver, arguments, outcome, post-heap) tuples recorded now.
+
+A replayed verdict is therefore about the same model, the same inputs and outcomes, and
+the same runtime source and version as a comparison made now would be: it is evidence of
+the same standing (and is still reported as cached, never as compared now).
 
 The dependency closure over-approximates on purpose: a mention is matched on the
 function's short name as well as its qualified name, and a class mention pulls in every
@@ -37,8 +44,9 @@ import re
 import time
 from pathlib import Path
 
-SCHEMA = 1
-"""Bump when the entry layout or the verdict semantics change; old entries then miss."""
+SCHEMA = 2
+"""Bump when the entry layout or the verdict semantics change; old entries then miss.
+2: the key binds the runtime source (`runtime_source`)."""
 
 
 def canonical(obj) -> str:
@@ -259,17 +267,25 @@ def case_digest(case) -> str:
     return digest(case)
 
 
-PARTS = ("function", "rendering", "dependencies", "module_bodies", "environment", "cases")
+PARTS = ("function", "rendering", "dependencies", "module_bodies", "environment",
+         "runtime_source", "cases")
 
 
-def plan(funcs, cases_by_name: dict, env: dict, rendered=None) -> dict:
+def plan(funcs, cases_by_name: dict, env: dict, rendered=None, sources=None) -> dict:
     """name -> {"key": ..., "parts": {...}, "cases": [case digests]} for every function
     that has at least one case. `parts` names each input so a miss can say why.
 
     `rendered` is the list of rendered Lean files (`generated_module.model_files`): the
     function's own rendered definition is part of its key, and the module text outside
     the function definitions is part of the module context, so an edit to the `.lean`
-    that no AST change explains still invalidates exactly what it touches."""
+    that no AST change explains still invalidates exactly what it touches.
+
+    `sources` maps a function record's `file` to the digest of that file in the tree the
+    runtime ran (`runtime_backends.source_fingerprints`). A function's `runtime_source`
+    part covers its own file and the files of its dependency closure; a file it names
+    that is absent from `sources` keys as missing, and with no `sources` at all every
+    key says the runtime source was not fingerprinted, so it can never match a key that
+    was."""
     fn_digest = {f["name"]: digest(f) for f in funcs}
     chunk_of, lean_context = ({}, "<no rendered module>")
     if rendered:
@@ -282,6 +298,14 @@ def plan(funcs, cases_by_name: dict, env: dict, rendered=None) -> dict:
     context = digest([sorted((n, d) for n, d in fn_digest.items() if is_module_body(n)),
                       lean_context])
     deps = dependencies(funcs, cases_by_name)
+    file_of = {f["name"]: f.get("file") or "" for f in funcs}
+
+    def runtime_source(n):
+        if sources is None:
+            return "<runtime source not fingerprinted>"
+        files = sorted({file_of[n]} | {file_of[d] for d in deps.get(n, ()) if d in file_of})
+        return digest([(p, sources.get(p, "<missing>")) for p in files])
+
     out = {}
     for n, cases in cases_by_name.items():
         if n not in fn_digest or not cases:
@@ -294,6 +318,7 @@ def plan(funcs, cases_by_name: dict, env: dict, rendered=None) -> dict:
                                           for d in deps.get(n, ()))),
             "module_bodies": context,
             "environment": digest(env),
+            "runtime_source": runtime_source(n),
             "cases": digest(sorted(case_digests)),
         }
         out[n] = {"key": digest(parts), "parts": parts, "cases": case_digests,

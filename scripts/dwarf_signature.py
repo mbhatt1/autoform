@@ -66,12 +66,6 @@ class Signature:
     def to_json(self):
         return asdict(self)
 
-    @classmethod
-    def from_json(cls, data):
-        return cls(name=data['name'], params=[Value(**p) for p in data['params']],
-                   ret=Value(**data['ret']), variadic=data.get('variadic', False),
-                   file=data.get('file'), line=data.get('line'), notes=list(data.get('notes', [])))
-
 
 def _attr(die, name):
     attribute = die.attributes.get(name)

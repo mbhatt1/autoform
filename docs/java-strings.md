@@ -20,7 +20,12 @@ is kept as written before the change; this paragraph says what was done and meas
   cases 87 -> 196, inconclusive 513 -> 404, divergences 0 -> 0; `call:length` 299 cases
   -> 0, `call:charAt` 7 -> 0, `call:toString` 8 -> 3, `str:reference-equality` 25 -> 25.
   The intermediate run's 2 divergences were a pre-existing Java `switch` lowering bug
-  (docs/languages.md, "Java at scale"), fixed before the recorded run.
+  (docs/languages.md, "Java at scale"), fixed before the recorded run. (The corpus was
+  re-measured on the `jvm-signatures-statics-v5` basis in the 2026-10-21 re-land --
+  125 compared / 252 agree / 348 inconclusive, `call:length` still 0 (no `length` label
+  of any kind among the inconclusive cases); array `.length` is a separate, static hole,
+  `op:sizeOf:array-length`, not part of the `String` model; the current figures
+  live in [languages.md](languages.md).)
 
 ## 1. What the model must touch
 
@@ -55,8 +60,9 @@ Additive routes considered, and why each fails:
 2. **Prelude functions in the generated module** (user functions win over builtins in
    `ctx.resolveCall`, so a function named for `String.length` would resolve). Its body
    needs a primitive that reads a `Val.str`. Under `.java` the only string-reading
-   primitive is `valIn` (substring test, dialect independent), which gives neither length,
-   code unit, prefix nor substring. `Func` has no native-body hook. So the body is not
+   primitive is `valIn` (a substring test; `.java` shares Python's reading, while
+   `.javascript` refuses a primitive right operand), which gives neither length, code
+   unit, prefix nor substring. `Func` has no native-body hook. So the body is not
    expressible.
 3. **Re-encode `String` as a list of UTF-16 code units** (lists have `size`/`get`/index
    under `.java`). This needs the exporter to rewrite every string literal, parameter,

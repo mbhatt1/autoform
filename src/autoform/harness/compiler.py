@@ -15,7 +15,6 @@ trusted base: it is small, total, and its output is re-parsed and kernel-checked
 from __future__ import annotations
 
 import itertools
-import json
 import re
 
 from . import claims as C
@@ -127,7 +126,7 @@ def precondition(claim, names, decidable):
     return f'decide ({pre})' if decidable else f'({pre})'
 
 
-def domain(claim, fn, program, extra=()) -> list:
+def domain(claim, fn, extra=()) -> list:
     """Finite quantification domain: small values, program literals, width boundaries."""
     lits = [v for vals in fn.literals.values() for v in vals] + list(extra)
     per = []
@@ -194,7 +193,7 @@ class Obligation:
         self.names = var_names(fn)
         self.program_const = f'Autoform.Generated.{module}.program'
         self.fuel = fuel
-        self.points = domain(claim, fn, program, extra_values)
+        self.points = domain(claim, fn, extra_values)
         bind = ' '.join(f"({self.names[b['param']]} : {LEAN_TYPE[b['domain']]})" for b in claim['forall'])
         self.binders = bind
         self.params = [self.names[b['param']] for b in claim['forall']]
@@ -286,6 +285,3 @@ def header(module) -> str:
             'set_option maxHeartbeats 4000000\nset_option linter.all false\nset_option maxErrors 100000\n'
             'open Autoform.Core\n' + SYMBOLIC_EVAL)
 
-
-def witness_json(point) -> str:
-    return json.dumps(point)

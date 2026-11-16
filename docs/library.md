@@ -1,6 +1,6 @@
 # Using autoform as a library
 
-The distribution `autoform-lean` installs one package, `autoform`, with three parts:
+The distribution `autoform-lean` installs one package, `autoform`, with four parts:
 
 | import | what it is |
 |---|---|
@@ -49,7 +49,7 @@ guarantee = json.loads((report / "guarantee.json").read_text())
 guarantee["status"]            # "verified_scoped" or "unverified"
 guarantee["claims"]            # [{theorem, subject, recorded_cases, all_inputs, property}, ...]
 guarantee["failed_checks"]     # names of the gates that did not pass, when unverified
-guarantee["artifacts"]         # sha256 of every artifact the claims are bound to
+guarantee["evidence_sha256"]   # sha256 of every artifact the claims are bound to
 
 conformance = json.loads((report / "conformance.json").read_text())
 conformance["agree"], conformance["divergences"], conformance["inconclusive"]
@@ -70,18 +70,23 @@ required gate did not pass; the claims list is then empty and `failed_checks` sa
 ```python
 from autoform.repository import is_git_url, resolve_source
 
-source, checkout = resolve_source("https://github.com/OWNER/REPO.git", workspace,
-                                  "Module", ref="v1.2.0", subdir="src")
+source, record = resolve_source("https://github.com/OWNER/REPO.git", workspace,
+                                "Module", ref="v1.2.0", subdir="src")
 ```
 
 `resolve_source` clones to a detached checkout under `<workspace>/sources/`, records the
-exact commit, and returns the directory to analyse; a local directory is returned as is.
+exact commit, and returns the directory to analyse (`--subdir` applied) together with the
+acquisition record it also writes to `repository.json`: a dict with `kind` (`git` or
+`local`), `commit` (Git sources only), `checkout` (the tree the subdirectory was resolved in), `ref`,
+`subdir`, `source` and `status`. A local directory is returned as is with `kind: local`.
+`autoform.cli.discard_checkout(record, keep=False)` removes a clone this record made.
 Output from `git` is redacted of credentials before it is shown.
 
 ## The harness and the autoformalizer
 
-`autoform.harness.pipeline.Options` and `run(...)` are what `autoform formalize` calls;
-`autoform.nl.pipeline.main(argv)` is `autoform autoformalize`. Both are documented by
+`autoform.harness.pipeline.Options` and `Harness` are what `autoform formalize` drives
+(`autoform.harness.cli.main(argv)` is the command itself); `autoform.nl.pipeline.main(argv)`
+is `autoform autoformalize`. Both are documented by
 their modules' docstrings and by `docs/harness.md` and `docs/autoformalize.md`. The pieces
 that are useful on their own:
 
@@ -95,7 +100,8 @@ that are useful on their own:
 * `autoform.nl.pyvalues` — Python values ↔ tagged JSON ↔ Lean `Val` literals, the encoding
   the oracle and the autoformalizer share.
 * `autoform.nl.llm` — the one model backend (`ask(prompt, ...)`), with
-  `AUTOFORM_CLAUDE_AUTH` selecting login or API-key authentication.
+  `AUTOFORM_CLAUDE_AUTH` selecting the backend: `login` (default) or `api-key` through the
+  `claude` CLI, `api` (the Messages API through the SDK) or `bedrock` (`llm.AUTH_MODES`).
 
 ## The scripts, from a checkout
 
@@ -112,8 +118,8 @@ with `--help`.
 | `synth_specs` | `budget_probe`, `emit`, `compile_repair`: observation theorems from a `conformance.json`. |
 | `mutate` | `parse_decls`, `gen_mutants_generated`: the mutation operators over a rendered model, and the gate itself. |
 | `proof_artifacts` | `digest`, `snapshot`, `replay_current`: binding evidence to compiled modules and configuration. |
-| `provenance` | `source_revision(path)` (a Git commit or a tree digest), `record`: how an AST is attributed to the exporter and source that produced it. |
-| `guarantee`, `security_specs`, `sacm`, `audit_all` | the gates, each `main(argv)`. |
+| `provenance` | `source_revision(path)` (a Git commit or a tree digest), `record_path(artifact)` (where its `provenance/<name>.prov.json` lives): how an AST is attributed to the exporter and source that produced it. Writing a record is the `record` subcommand of the script (`python3 scripts/provenance.py record ...`), not a function. |
+| `guarantee`, `security_specs`, `sacm`, `audit_all` | the gates. `guarantee` has no `main`: `emit(root, report, module, source, stages, ...)` writes `guarantee.json` and `guarantee.md` and returns the data. `security_specs.main(argv)` and `sacm.main(argv)` take an argv; `audit_all.main()` reads `sys.argv` itself. |
 | `pr_mode` | `autoform pr` without the workspace: `changed_functions(repo, base, head, subdir)`, `select_functions(ast, names)`, `evidence(...)`, `sarif_document(report)`, `validate_sarif(document)`, `markdown_comment(report)`; `main(argv)` runs the chain. |
 
 The Lean side is a library too: `import Autoform.Lang.Core.Semantics` gives the

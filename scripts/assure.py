@@ -28,6 +28,18 @@ class SignalInterrupt(KeyboardInterrupt):
         super().__init__(signal.Signals(signum).name)
 
 
+def _default_sigint():
+    """Child setup for a stage: SIGINT at its default disposition.
+
+    `Assurance.run` asks a stage to clean up (restore a mutated source, stop its own
+    children) by sending SIGINT to its group. An ignored disposition survives `exec`, so a
+    driver started from a background job (`cmd &` in a non-interactive shell ignores
+    SIGINT) would inherit SIG_IGN, never see the request, and be SIGKILLed with a mutant
+    still in the source file. A Python child that starts with SIGINT at SIG_DFL installs
+    its `KeyboardInterrupt` handler, so the request reaches its cleanup path."""
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
 def interrupt_exit_code(exc):
     return 128 + getattr(exc, 'signum', signal.SIGINT)
 
@@ -134,7 +146,7 @@ class Assurance:
             with log.open('w') as stream:
                 process = subprocess.Popen(command, cwd=self.root, env=self.env,
                                            stdout=stream, stderr=subprocess.STDOUT,
-                                           start_new_session=True)
+                                           start_new_session=True, preexec_fn=_default_sigint)
                 try:
                     code, error = process.wait(timeout=self.stage_timeout), None
                 except subprocess.TimeoutExpired:
@@ -419,7 +431,11 @@ def main(argv=None):
     def terminate(signum, _frame):
         raise SignalInterrupt(signum)
 
+    # SIGINT is installed explicitly, like SIGTERM: Python leaves an inherited SIG_IGN in
+    # place (a background job's), and cancellation must not depend on how the driver was
+    # launched.
     previous_termination = signal.signal(signal.SIGTERM, terminate)
+    previous_interrupt = signal.signal(signal.SIGINT, terminate)
     try:
         return job.execute()
     except (KeyboardInterrupt, Exception) as exc:
@@ -429,6 +445,7 @@ def main(argv=None):
         return interrupt_exit_code(exc) if isinstance(exc, KeyboardInterrupt) else 2
     finally:
         signal.signal(signal.SIGTERM, previous_termination)
+        signal.signal(signal.SIGINT, previous_interrupt)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,230 @@
+[
+ {
+  "name": "is_power_of_2.ts::program:isPowerOfTwo",
+  "file": "is_power_of_2.ts",
+  "sourceName": "isPowerOfTwo",
+  "paramTypes": [
+   "__ecma.Number"
+  ],
+  "returnType": "__ecma.Boolean",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "&&",
+    "a": {
+     "k": "binop",
+     "op": ">",
+     "a": {
+      "k": "name",
+      "v": "n"
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "binop",
+      "op": "num:js:i32:&",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "binop",
+       "op": "js:-",
+       "a": {
+        "k": "name",
+        "v": "n"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "is_power_of_2.ts::program",
+  "file": "is_power_of_2.ts",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "isPowerOfTwo",
+     "e": {
+      "k": "fnref",
+      "v": "is_power_of_2.ts::program:isPowerOfTwo"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "exports"
+     },
+     "f": "isPowerOfTwo",
+     "v": {
+      "k": "name",
+      "v": "isPowerOfTwo"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "is_power_of_4.ts::program:isPowerOfFour",
+  "file": "is_power_of_4.ts",
+  "sourceName": "isPowerOfFour",
+  "paramTypes": [
+   "__ecma.Number"
+  ],
+  "returnType": "__ecma.Boolean",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "&&",
+    "a": {
+     "k": "binop",
+     "op": "&&",
+     "a": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "binop",
+       "op": "num:js:i32:&",
+       "a": {
+        "k": "name",
+        "v": "n"
+       },
+       "b": {
+        "k": "binop",
+        "op": "js:-",
+        "a": {
+         "k": "name",
+         "v": "n"
+        },
+        "b": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "binop",
+      "op": "js:%",
+      "a": {
+       "k": "name",
+       "v": "n"
+      },
+      "b": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "int",
+      "v": "1"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "is_power_of_4.ts::program",
+  "file": "is_power_of_4.ts",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "isPowerOfFour",
+     "e": {
+      "k": "fnref",
+      "v": "is_power_of_4.ts::program:isPowerOfFour"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "exports"
+     },
+     "f": "isPowerOfFour",
+     "v": {
+      "k": "name",
+      "v": "isPowerOfFour"
+     }
+    }
+   }
+  }
+ }
+]

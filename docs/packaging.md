@@ -27,11 +27,23 @@ Install elan/Lean and Joern as described in [running.md](running.md). Source run
 also need the corresponding runtime: CPython, `cc`/`c++`, Java/Javac, Go, Node,
 or Kotlin/JVM. Kotlin can use Joern's bundled Kotlin compiler. Machine runs need
 Lean and the `machine` extra; assembling `.s` files also needs clang. These external
-toolchains are not silently installed by pip. Initial Lean builds fetch the pinned
-Lake dependencies and may need network access.
+toolchains are not silently installed by pip. The first Lean build in a workspace
+clones the pinned Lake dependencies from `github.com`; after that nothing is fetched (see
+"Restricted networks and internal mirrors" below).
 `autoform doctor` prints a summary with one `install:` line per problem, chosen for
-the host OS (Homebrew on macOS, apt on Linux, otherwise a URL), and `autoform doctor
---json` prints the same facts as a `schema_version: 1` document for scripts: per tool
+the host (Homebrew on macOS; on Linux the family named by `/etc/os-release`: `dnf`, or
+`yum` before RHEL 8, for the RHEL/Fedora family, `apk` for Alpine, apt otherwise;
+a URL elsewhere), and `autoform doctor
+--json` prints the same facts as a `schema_version: 1` document for scripts. Its `host`
+object carries the distribution (`id`, `id_like`, `version_id`, `family`), the
+`package_manager` command, the user-namespace sysctls (`max_user_namespaces`,
+`unprivileged_userns_clone`, `apparmor_restrict_unprivileged_userns`; `null` where the
+kernel lacks the knob), `bwrap`, the `sandbox` record a run would write into its
+artifacts, and any proxy variables with credentials masked. The `sandbox` tool entry
+is optional: without a working `bwrap` or `unshare` every differential oracle refuses
+to launch the code under test, and its hint gives the exact package and `sysctl`
+commands. Within `schema_version: 1` keys are only ever added; removing or renaming a
+key, or a new `status` value, bumps the version (`tests/test_cli.py` pins this). Per tool
 its `path`, `found_version`, `expected_version`, `status` (`ok`, `missing`,
 `version-mismatch`, `unknown-version`), whether it is `required`, an install `hint`,
 and for an optional runtime the list of languages it `disables`. It returns `1` when a
@@ -112,10 +124,64 @@ An existing workspace must match the package's bundled resources. After upgradin
 the package, choose a new workspace; Autoform refuses to overwrite changed
 semantics or user files. Generated output and build caches do not prevent reuse.
 
+## Restricted networks and internal mirrors
+
+What reaches the network, and when:
+
+| What | When | From | Pinned by |
+|---|---|---|---|
+| the Python package | `pip install` | PyPI or your index (`PIP_INDEX_URL`) | the version you install |
+| elan and the Lean toolchain | once per host | `elan.lean-lang.org`, `releases.lean-lang.org` | `lean-toolchain` (version) |
+| Joern | once per host | its `github.com` release | `joern-sha512` (bytes) |
+| the Lake dependencies in `lake-manifest.json` | the first `lake build` in each workspace | `github.com`, by `git clone` | `lake-manifest.json` (commit) |
+| the source under analysis | a Git URL argument | its remote | `--ref`, recorded in `repository.json` |
+
+`autoform init` only unpacks the bundled project; it fetches nothing. After the first
+build in a workspace, `lake build` and `lake env lean` run with the network denied --
+checked by building `Autoform.Runtime` plus a new module, and `lake env lean` on it,
+under `sandbox-exec` with `(deny network*)`, while a never-built workspace fails there
+at `git clone`.
+
+* **Proxy.** curl, git (so Lake) and pip read `HTTPS_PROXY`/`https_proxy` and
+  `NO_PROXY` themselves; nothing in autoform needs configuring. `autoform doctor` shows
+  which proxy variables it sees, with any `user:password@` masked.
+* **Git mirror for the Lake dependencies and the corpus.** Lake shells out to git, so
+  git's own URL rewriting redirects every clone without editing the manifest, and the
+  manifest's commit pins still decide what is checked out:
+
+  ```sh
+  git config --global url."https://git.mirror.example/github/".insteadOf "https://github.com/"
+  # or, per job: GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=url.https://git.mirror.example/github/.insteadOf \
+  #              GIT_CONFIG_VALUE_0=https://github.com/
+  ```
+
+  Checked: a fresh workspace built with the network denied and the rewrite pointing at
+  local copies of those repositories, and the rebuild cloned nothing. A
+  workspace's `.lake/packages` can also be copied into a new `autoform init` workspace
+  from one that has built.
+* **Joern from an artifact mirror or a file.** `scripts/bootstrap.sh` takes
+  `AUTOFORM_JOERN_URL` (a directory holding `joern-cli-<os>-<arch>.zip`) or
+  `AUTOFORM_JOERN_ZIP` (a local copy). Either way the zip is checked against the
+  committed `joern-sha512` before it is unpacked, so a mirror can serve the bytes but
+  cannot choose them. The release's own `.sha512` is not downloaded by bootstrap, by the
+  CI workflows (`ci.yml`, `pr.yml`, `source.yml`) or by the GitHub Action: it would only
+  attest that a download matched itself. `joern-sha512` ships in the runtime bundle next
+  to `joern-version`, so a workspace unpacked by `autoform init` can run the same check.
+* **Lean.** elan's installer always fetches the latest elan from `github.com` and has no
+  mirror setting, so bootstrap offers no override: on a host without that egress,
+  provide `~/.elan` with toolchain `$(cat lean-toolchain)` installed (an image, or a
+  copy from a connected host of the same OS and architecture). bootstrap then skips the
+  installer, and an installed toolchain builds with the network denied (checked above).
+* **Sandbox on minimal hosts.** The oracles need `bwrap` (package `bubblewrap` on the
+  RHEL, Debian and Alpine families) or `unshare` with unprivileged user namespaces.
+  RHEL/CentOS 7 ships `user.max_user_namespaces=0`, and most container runtimes' default
+  seccomp profile blocks user namespaces. `autoform doctor` names the blocking sysctl and the
+  install command for the host it runs on.
+
 ## CI and publishing
 
 `package.yml` builds the wheel from the source distribution, validates metadata,
-tests installation outside the checkout on macOS/Linux and Python 3.10/3.12, and
+tests installation outside the checkout on macOS/Linux and Python 3.10/3.12/3.13, and
 checks an installed assembly example in Lean. `source.yml` runs the eight source
 language fixtures through Joern, real runtimes and kernel proofs, then exercises the
 installed source CLI. The machine workflow checks the p-code models and host-native

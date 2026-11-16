@@ -1,0 +1,1490 @@
+[
+ {
+  "name": "math.areaOfARectangle:double(double,double)",
+  "file": "Area.kt",
+  "sourceName": "areaOfARectangle",
+  "paramTypes": [
+   "double",
+   "double"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "length",
+   "width"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "&&",
+     "a": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "length"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "width"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "t": {
+     "k": "assign",
+     "x": "$exprV$16",
+     "e": {
+      "k": "binop",
+      "op": "*",
+      "a": {
+       "k": "name",
+       "v": "length"
+      },
+      "b": {
+       "k": "name",
+       "v": "width"
+      }
+     }
+    },
+    "e": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "str",
+       "v": "Length and Width must be positive"
+      }
+     },
+     "b": {
+      "k": "raise",
+      "e": {
+       "k": "str",
+       "v": "IllegalArgumentException"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "$exprV$16"
+    }
+   }
+  }
+ },
+ {
+  "name": "math.areaOfASquare:double(double)",
+  "file": "Area.kt",
+  "sourceName": "areaOfASquare",
+  "paramTypes": [
+   "double"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "sideLength"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": ">",
+     "a": {
+      "k": "name",
+      "v": "sideLength"
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "t": {
+     "k": "assign",
+     "x": "$exprV$17",
+     "e": {
+      "k": "binop",
+      "op": "*",
+      "a": {
+       "k": "name",
+       "v": "sideLength"
+      },
+      "b": {
+       "k": "name",
+       "v": "sideLength"
+      }
+     }
+    },
+    "e": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "str",
+       "v": "Side Length must be positive"
+      }
+     },
+     "b": {
+      "k": "raise",
+      "e": {
+       "k": "str",
+       "v": "IllegalArgumentException"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "$exprV$17"
+    }
+   }
+  }
+ },
+ {
+  "name": "math.areaOfATriangle:double(double,double)",
+  "file": "Area.kt",
+  "sourceName": "areaOfATriangle",
+  "paramTypes": [
+   "double",
+   "double"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "base",
+   "height"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "&&",
+     "a": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "base"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "height"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "t": {
+     "k": "assign",
+     "x": "$exprV$18",
+     "e": {
+      "k": "binop",
+      "op": "/",
+      "a": {
+       "k": "binop",
+       "op": "*",
+       "a": {
+        "k": "name",
+        "v": "base"
+       },
+       "b": {
+        "k": "name",
+        "v": "height"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    },
+    "e": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "str",
+       "v": "Base and Height must be positive"
+      }
+     },
+     "b": {
+      "k": "raise",
+      "e": {
+       "k": "str",
+       "v": "IllegalArgumentException"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "$exprV$18"
+    }
+   }
+  }
+ },
+ {
+  "name": "math.areaOfACircle:double(double)",
+  "file": "Area.kt",
+  "sourceName": "areaOfACircle",
+  "paramTypes": [
+   "double"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "radius"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": ">",
+     "a": {
+      "k": "name",
+      "v": "radius"
+     },
+     "b": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "t": {
+     "k": "assign",
+     "x": "$exprV$19",
+     "e": {
+      "k": "binop",
+      "op": "*",
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "fnref",
+        "v": "java.lang.Math"
+       },
+       "f": "PI"
+      },
+      "b": {
+       "k": "call",
+       "f": "pow",
+       "args": [
+        {
+         "k": "name",
+         "v": "radius"
+        },
+        {
+         "k": "float",
+         "v": "2.0"
+        }
+       ]
+      }
+     }
+    },
+    "e": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "str",
+       "v": "Radius must be positive"
+      }
+     },
+     "b": {
+      "k": "raise",
+      "e": {
+       "k": "str",
+       "v": "IllegalArgumentException"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "$exprV$19"
+    }
+   }
+  }
+ },
+ {
+  "name": "math.average:double(double[])",
+  "file": "Average.kt",
+  "sourceName": "average",
+  "paramTypes": [
+   "double[]"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "numbers"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "sum",
+     "e": {
+      "k": "float",
+      "v": "0.0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "iterator_1",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "numbers"
+         },
+         "m": "iterator",
+         "args": []
+        }
+       },
+       "b": {
+        "k": "loop",
+        "c": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "numbers"
+         },
+         "m": "hasNext",
+         "args": []
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "number",
+           "e": {
+            "k": "mcall",
+            "recv": {
+             "k": "name",
+             "v": "iterator_1"
+            },
+            "m": "next",
+            "args": []
+           }
+          },
+          "b": {
+           "k": "assign",
+           "x": "sum",
+           "e": {
+            "k": "binop",
+            "op": "+",
+            "a": {
+             "k": "name",
+             "v": "sum"
+            },
+            "b": {
+             "k": "name",
+             "v": "number"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "binop",
+       "op": "/",
+       "a": {
+        "k": "name",
+        "v": "sum"
+       },
+       "b": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "numbers"
+        },
+        "f": "size"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "math.average:int(int[])",
+  "file": "Average.kt",
+  "sourceName": "average",
+  "paramTypes": [
+   "int[]"
+  ],
+  "returnType": "int",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "i32",
+  "params": [
+   "numbers"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "sum",
+     "e": {
+      "k": "unop",
+      "op": "cast:i32",
+      "a": {
+       "k": "int",
+       "v": "0"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "iterator_2",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "numbers"
+         },
+         "m": "iterator",
+         "args": []
+        }
+       },
+       "b": {
+        "k": "loop",
+        "c": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "numbers"
+         },
+         "m": "hasNext",
+         "args": []
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "number",
+           "e": {
+            "k": "unop",
+            "op": "cast:i32",
+            "a": {
+             "k": "mcall",
+             "recv": {
+              "k": "name",
+              "v": "iterator_2"
+             },
+             "m": "next",
+             "args": []
+            }
+           }
+          },
+          "b": {
+           "k": "assign",
+           "x": "sum",
+           "e": {
+            "k": "unop",
+            "op": "cast:i32",
+            "a": {
+             "k": "binop",
+             "op": "num:java:i32:+",
+             "a": {
+              "k": "name",
+              "v": "sum"
+             },
+             "b": {
+              "k": "name",
+              "v": "number"
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "binop",
+       "op": "num:java:i32:/",
+       "a": {
+        "k": "name",
+        "v": "sum"
+       },
+       "b": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "numbers"
+        },
+        "f": "size"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "mathematics.getFactorial:long(long)",
+  "file": "Factorial.kt",
+  "sourceName": "getFactorial",
+  "paramTypes": [
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "number"
+  ],
+  "body": {
+   "k": "ifte",
+   "c": {
+    "k": "binop",
+    "op": "num:java:i64:<",
+    "a": {
+     "k": "name",
+     "v": "number"
+    },
+    "b": {
+     "k": "int",
+     "v": "0"
+    }
+   },
+   "t": {
+    "k": "seq",
+    "a": {
+     "k": "exprS",
+     "e": {
+      "k": "str",
+      "v": "The number of which to calculate the factorial must be greater or equal to zero."
+     }
+    },
+    "b": {
+     "k": "raise",
+     "e": {
+      "k": "str",
+      "v": "InvalidParameterException"
+     }
+    }
+   },
+   "e": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "$exprV$20",
+     "e": {
+      "k": "name",
+      "v": "number"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "binop",
+       "op": "&&",
+       "a": {
+        "k": "unop",
+        "op": "!",
+        "a": {
+         "k": "binop",
+         "op": "==",
+         "a": {
+          "k": "name",
+          "v": "$exprV$20"
+         },
+         "b": {
+          "k": "unit"
+         }
+        }
+       },
+       "b": {
+        "k": "binop",
+        "op": "num:java:i64:==",
+        "a": {
+         "k": "name",
+         "v": "$exprV$20"
+        },
+        "b": {
+         "k": "int",
+         "v": "0"
+        }
+       }
+      },
+      "t": {
+       "k": "assign",
+       "x": "$exprV$21",
+       "e": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "e": {
+       "k": "ifte",
+       "c": {
+        "k": "binop",
+        "op": "&&",
+        "a": {
+         "k": "unop",
+         "op": "!",
+         "a": {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "$exprV$20"
+          },
+          "b": {
+           "k": "unit"
+          }
+         }
+        },
+        "b": {
+         "k": "binop",
+         "op": "num:java:i64:==",
+         "a": {
+          "k": "name",
+          "v": "$exprV$20"
+         },
+         "b": {
+          "k": "int",
+          "v": "1"
+         }
+        }
+       },
+       "t": {
+        "k": "assign",
+        "x": "$exprV$21",
+        "e": {
+         "k": "name",
+         "v": "number"
+        }
+       },
+       "e": {
+        "k": "assign",
+        "x": "$exprV$21",
+        "e": {
+         "k": "binop",
+         "op": "num:java:i64:*",
+         "a": {
+          "k": "name",
+          "v": "number"
+         },
+         "b": {
+          "k": "call",
+          "f": "mathematics.getFactorial:long(long)",
+          "args": [
+           {
+            "k": "binop",
+            "op": "num:java:i64:-",
+            "a": {
+             "k": "name",
+             "v": "number"
+            },
+            "b": {
+             "k": "int",
+             "v": "1"
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "$exprV$21"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "math.median:double(int[])",
+  "file": "Median.kt",
+  "sourceName": "median",
+  "paramTypes": [
+   "int[]"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "values"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "call",
+     "f": "sort",
+     "args": [
+      {
+       "k": "name",
+       "v": "values"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "$exprV$22",
+     "e": {
+      "k": "binop",
+      "op": "num:java:i32:%",
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "values"
+       },
+       "f": "size"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "cond",
+      "c": {
+       "k": "binop",
+       "op": "&&",
+       "a": {
+        "k": "unop",
+        "op": "!",
+        "a": {
+         "k": "binop",
+         "op": "==",
+         "a": {
+          "k": "name",
+          "v": "$exprV$22"
+         },
+         "b": {
+          "k": "unit"
+         }
+        }
+       },
+       "b": {
+        "k": "binop",
+        "op": "num:java:i32:==",
+        "a": {
+         "k": "name",
+         "v": "$exprV$22"
+        },
+        "b": {
+         "k": "int",
+         "v": "0"
+        }
+       }
+      },
+      "t": {
+       "k": "call",
+       "f": "math.getHalfwayBetweenMiddleValues:double(int[])",
+       "args": [
+        {
+         "k": "name",
+         "v": "values"
+        }
+       ]
+      },
+      "e": {
+       "k": "call",
+       "f": "math.getMiddleValue:double(int[])",
+       "args": [
+        {
+         "k": "name",
+         "v": "values"
+        }
+       ]
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "math.getHalfwayBetweenMiddleValues:double(int[])",
+  "file": "Median.kt",
+  "sourceName": "getHalfwayBetweenMiddleValues",
+  "paramTypes": [
+   "int[]"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "values"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "arraySize",
+     "e": {
+      "k": "unop",
+      "op": "cast:i32",
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "values"
+       },
+       "f": "size"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "sumOfMiddleValues",
+       "e": {
+        "k": "unop",
+        "op": "cast:i32",
+        "a": {
+         "k": "binop",
+         "op": "num:java:i32:+",
+         "a": {
+          "k": "index",
+          "a": {
+           "k": "name",
+           "v": "values"
+          },
+          "b": {
+           "k": "binop",
+           "op": "num:java:i32:/",
+           "a": {
+            "k": "name",
+            "v": "arraySize"
+           },
+           "b": {
+            "k": "int",
+            "v": "2"
+           }
+          }
+         },
+         "b": {
+          "k": "index",
+          "a": {
+           "k": "name",
+           "v": "values"
+          },
+          "b": {
+           "k": "binop",
+           "op": "num:java:i32:-",
+           "a": {
+            "k": "binop",
+            "op": "num:java:i32:/",
+            "a": {
+             "k": "name",
+             "v": "arraySize"
+            },
+            "b": {
+             "k": "int",
+             "v": "2"
+            }
+           },
+           "b": {
+            "k": "int",
+            "v": "1"
+           }
+          }
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "sumOfMiddleValues"
+        },
+        "b": {
+         "k": "float",
+         "v": "2.0"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "math.getMiddleValue:double(int[])",
+  "file": "Median.kt",
+  "sourceName": "getMiddleValue",
+  "paramTypes": [
+   "int[]"
+  ],
+  "returnType": "double",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "values"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "mcall",
+    "recv": {
+     "k": "index",
+     "a": {
+      "k": "name",
+      "v": "values"
+     },
+     "b": {
+      "k": "binop",
+      "op": "num:java:i32:/",
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "values"
+       },
+       "f": "size"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    },
+    "m": "toDouble",
+    "args": []
+   }
+  }
+ },
+ {
+  "name": "math.twoSum:int[](int[],int)",
+  "file": "TwoSum.kt",
+  "sourceName": "twoSum",
+  "paramTypes": [
+   "int[]",
+   "int"
+  ],
+  "returnType": "int[]",
+  "paramIntegerTypes": [
+   "",
+   "i32"
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "nums",
+   "target"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "iterator_1",
+      "e": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "nums.indices"
+       },
+       "m": "iterator",
+       "args": []
+      }
+     },
+     "b": {
+      "k": "loop",
+      "c": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "nums.indices"
+       },
+       "m": "hasNext",
+       "args": []
+      },
+      "body": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "index1",
+         "e": {
+          "k": "unop",
+          "op": "cast:i32",
+          "a": {
+           "k": "mcall",
+           "recv": {
+            "k": "name",
+            "v": "iterator_1"
+           },
+           "m": "next",
+           "args": []
+          }
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "startIndex",
+           "e": {
+            "k": "unop",
+            "op": "cast:i32",
+            "a": {
+             "k": "binop",
+             "op": "num:java:i32:+",
+             "a": {
+              "k": "name",
+              "v": "index1"
+             },
+             "b": {
+              "k": "int",
+              "v": "1"
+             }
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "iterator_2",
+             "e": {
+              "k": "mcall",
+              "recv": {
+               "k": "name",
+               "v": "startIndex..nums.lastIndex"
+              },
+              "m": "iterator",
+              "args": []
+             }
+            },
+            "b": {
+             "k": "loop",
+             "c": {
+              "k": "mcall",
+              "recv": {
+               "k": "name",
+               "v": "startIndex..nums.lastIndex"
+              },
+              "m": "hasNext",
+              "args": []
+             },
+             "body": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "index2",
+                "e": {
+                 "k": "unop",
+                 "op": "cast:i32",
+                 "a": {
+                  "k": "mcall",
+                  "recv": {
+                   "k": "name",
+                   "v": "iterator_2"
+                  },
+                  "m": "next",
+                  "args": []
+                 }
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "assign",
+                 "x": "$exprV$23",
+                 "e": {
+                  "k": "binop",
+                  "op": "num:java:i32:+",
+                  "a": {
+                   "k": "index",
+                   "a": {
+                    "k": "name",
+                    "v": "nums"
+                   },
+                   "b": {
+                    "k": "name",
+                    "v": "index1"
+                   }
+                  },
+                  "b": {
+                   "k": "index",
+                   "a": {
+                    "k": "name",
+                    "v": "nums"
+                   },
+                   "b": {
+                    "k": "name",
+                    "v": "index2"
+                   }
+                  }
+                 }
+                },
+                "b": {
+                 "k": "ifte",
+                 "c": {
+                  "k": "cond",
+                  "c": {
+                   "k": "binop",
+                   "op": "==",
+                   "a": {
+                    "k": "name",
+                    "v": "$exprV$23"
+                   },
+                   "b": {
+                    "k": "unit"
+                   }
+                  },
+                  "t": {
+                   "k": "binop",
+                   "op": "==",
+                   "a": {
+                    "k": "name",
+                    "v": "target"
+                   },
+                   "b": {
+                    "k": "unit"
+                   }
+                  },
+                  "e": {
+                   "k": "binop",
+                   "op": "&&",
+                   "a": {
+                    "k": "unop",
+                    "op": "!",
+                    "a": {
+                     "k": "binop",
+                     "op": "==",
+                     "a": {
+                      "k": "name",
+                      "v": "target"
+                     },
+                     "b": {
+                      "k": "unit"
+                     }
+                    }
+                   },
+                   "b": {
+                    "k": "binop",
+                    "op": "num:java:i32:==",
+                    "a": {
+                     "k": "name",
+                     "v": "$exprV$23"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "target"
+                    }
+                   }
+                  }
+                 },
+                 "t": {
+                  "k": "ret",
+                  "e": {
+                   "k": "call",
+                   "f": "intArrayOf",
+                   "args": [
+                    {
+                     "k": "name",
+                     "v": "index1"
+                    },
+                    {
+                     "k": "name",
+                     "v": "index2"
+                    }
+                   ]
+                  }
+                 },
+                 "e": {
+                  "k": "skip"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "intArrayOf",
+     "args": [
+      {
+       "k": "int",
+       "v": "0"
+      },
+      {
+       "k": "int",
+       "v": "1"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "name": "Area.kt:Area.kt:math.global",
+  "file": "Area.kt",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "Average.kt:Average.kt:math.global",
+  "file": "Average.kt",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ },
+ {
+  "name": "Factorial.kt:Factorial.kt:mathematics.global",
+  "file": "Factorial.kt",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "skip"
+  }
+ },
+ {
+  "name": "Median.kt:Median.kt:math.global",
+  "file": "Median.kt",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "skip"
+    }
+   }
+  }
+ },
+ {
+  "name": "TwoSum.kt:TwoSum.kt:math.global",
+  "file": "TwoSum.kt",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "skip"
+  }
+ }
+]

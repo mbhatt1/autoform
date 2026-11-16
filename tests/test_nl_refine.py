@@ -351,8 +351,9 @@ class _ScriptedAgent:
 
 
 @LEAN
-def test_l1_add_kernel_checked(tmp_path):
-    # The model module is test-only (not imported by Autoform.lean): build it on demand.
+def test_l1_add_kernel_checked(tmp_path, pipeline_model):
+    # Build the pipeline model and the model module (test-only, not imported by Autoform.lean).
+    pipeline_model('PipelinePython', 'examples/source/python')
     lake = shutil.which('lake') or str(Path.home() / '.elan/bin/lake')
     built = subprocess.run([lake, 'build', M], cwd=ROOT, capture_output=True, text=True, timeout=3600)
     assert built.returncode == 0, built.stdout[-2000:]

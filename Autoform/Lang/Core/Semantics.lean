@@ -339,6 +339,66 @@ def jsLooseEq (x y : Val) : Option Bool :=
   | a,        b        => if a.kind == b.kind || (a.kind ≤ 3 && b.kind ≤ 3)
                           then some (jsStrictEq a b) else none
 
+/-! ### Template literals and string templates
+
+The exporter lowers a JS/TS template literal and a Kotlin string template
+(`<operator>.formatString`) to a left fold of one append operator over the parts, seeded
+with the first literal segment: `acc op part`, `acc` the string so far. The operator
+converts `part` to a string the way the SOURCE language does and appends it; a literal
+segment is a `str` part, which appends as itself. Each conversion below is total on the
+values whose spelling Core can reproduce EXACTLY and answers `none` everywhere else,
+which the arm turns into the named hole `op:formatString:<reason>` -- never a guess. -/
+
+/-- ECMA-262 §7.1.17 ToString, which a substitution `${e}` applies (§13.2.8.6): a String
+is itself; Boolean `"true"`/`"false"`; an integral Number below 10^21 in magnitude is its
+decimal digits with a leading `-` when negative (Number::toString, §6.1.6.1.20, steps
+5-6 with `k ≤ n ≤ 21`; `-0` is a float in Core, never an `int`). Not reproduced: any
+float (shortest round-trip spelling), an integer of 10^21 or more (exponent form),
+`null`/`undefined` (one `Val.unit` in Core -- `"null"` vs `"undefined"` is exactly the
+difference it cannot see), and objects (their `toString`, possibly user-defined). -/
+def jsTemplateString : Val → Except String String
+  | .str t   => .ok t
+  | .bool b  => .ok (if b then "true" else "false")
+  | .int i   => if i.natAbs < 10 ^ 21 then .ok (toString i) else .error "js-number-exponent"
+  | .float _ => .error "js-float"
+  | .unit    => .error "js-nullish"
+  | _        => .error "js-object"
+
+/-- Kotlin/JVM `String.valueOf(value)`, which a template entry `$x`/`${e}` appends: a
+String is itself; Boolean `"true"`/`"false"`; an integer (`Int`/`Long`/`Short`/`Byte`)
+its decimal digits -- but only when the exporter KNOWS the part is integer-typed
+(`integral`), because Core holds a Kotlin `Char` as its code point and `"$c"` prints the
+character. Not reproduced: floats (`Double.toString`), `null` (one `Val.unit` with
+`Unit`, which prints `kotlin.Unit`), objects (`toString()`). -/
+def ktTemplateString (integral : Bool) : Val → Except String String
+  | .str t   => .ok t
+  | .bool b  => .ok (if b then "true" else "false")
+  | .int i   => if integral then .ok (toString i) else .error "kt-int-or-char"
+  | .float _ => .error "kt-float"
+  | .unit    => .error "kt-null"
+  | _        => .error "kt-object"
+
+/-- One step of the template fold: append the converted part, or the named hole. -/
+def templateAppend (acc : String) : Except String String → EResult
+  | .ok t    => .val (.str (acc ++ t))
+  | .error r => .hole s!"op:formatString:{r}"
+
+/-- `#guard` spelling of a conversion result (`Except` carries no `BEq`). -/
+private def tplShow : Except String String → String
+  | .ok t    => "ok:" ++ t
+  | .error r => "hole:" ++ r
+
+#guard tplShow (jsTemplateString (.str "us-east-1")) == "ok:" ++ "us-east-1"
+#guard tplShow (jsTemplateString (.int (-42))) == "ok:" ++ "-42"
+#guard tplShow (jsTemplateString (.int (10 ^ 21 - 1))) == "ok:" ++ "999999999999999999999"
+#guard tplShow (jsTemplateString (.int (10 ^ 21))) == "hole:" ++ "js-number-exponent"
+#guard tplShow (jsTemplateString (.bool false)) == "ok:" ++ "false"
+#guard tplShow (jsTemplateString .unit) == "hole:" ++ "js-nullish"
+#guard tplShow (ktTemplateString true (.int (-7))) == "ok:" ++ "-7"
+#guard tplShow (ktTemplateString false (.int 65)) == "hole:" ++ "kt-int-or-char"
+#guard tplShow (ktTemplateString false (.bool true)) == "ok:" ++ "true"
+#guard tplShow (ktTemplateString true .unit) == "hole:" ++ "kt-null"
+
 /-- Explicit language operators for newly exported terms. Keeping this dispatch
 separate also keeps reduction of the legacy integer operators inexpensive. -/
 def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
@@ -387,6 +447,20 @@ def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                                      | none   => .hole s!"js:loose-eq:{x.kind}-{y.kind}"
                      | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
   | "py:/", _, _ => flBinop .python "/" a b
+  -- Template folds (see "Template literals and string templates" above). The exporter
+  -- emits `js:tpl` for `.js`/`.ts` files and `kt:tpl`/`kt:tpl:integral` for `.kt`
+  -- files only, always with a `str` accumulator; anything else is refused by name.
+  | "js:tpl", .str s, x => match d with
+                         | .javascript => templateAppend s (jsTemplateString x)
+                         | _           => .hole "op:formatString:js-outside-javascript"
+  | "kt:tpl", .str s, x => match d with
+                         | .java => templateAppend s (ktTemplateString false x)
+                         | _     => .hole "op:formatString:kt-outside-jvm"
+  | "kt:tpl:integral", .str s, x => match d with
+                         | .java => templateAppend s (ktTemplateString true x)
+                         | _     => .hole "op:formatString:kt-outside-jvm"
+  | "js:tpl", _, _ | "kt:tpl", _, _ | "kt:tpl:integral", _, _ =>
+      .hole "op:formatString:accumulator"
   | _, _, _ => match d with
                -- Python never reaches a typed operator (the exporter emits none for it,
                -- and their traps name themselves in the family's own terms, not as Python
@@ -568,6 +642,27 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
   | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
   | _, _, _              => languageBinop d op a b
+
+/-- `#guard` spelling of a string-or-hole result (`EResult` carries no `BEq`). -/
+private def strOrHole : EResult → String
+  | .val (.str s) => "str:" ++ s
+  | .hole l       => "hole:" ++ l
+  | _             => "other"
+
+-- The template fold reaches `languageBinop` through `applyBinop` for every operand kind.
+#guard strOrHole (applyBinop .javascript "js:tpl" (.str "arn:aws:iam::") (.str "123")) ==
+  "str:arn:aws:iam::123"
+#guard strOrHole (applyBinop .javascript "js:tpl" (.str "n=") (.int 7)) == "str:n=7"
+#guard strOrHole (applyBinop .javascript "js:tpl" (.str "x=") (.float (Fl.zero .binary64 false))) ==
+  "hole:op:formatString:js-float"
+#guard strOrHole (applyBinop .java "kt:tpl" (.str "PREFIX_") (.str "a")) == "str:PREFIX_a"
+#guard strOrHole (applyBinop .java "kt:tpl:integral" (.str "n=") (.int (-3))) == "str:n=-3"
+#guard strOrHole (applyBinop .java "kt:tpl" (.str "n=") (.int 3)) ==
+  "hole:op:formatString:kt-int-or-char"
+#guard strOrHole (applyBinop .python "js:tpl" (.str "a") (.str "b")) ==
+  "hole:op:formatString:js-outside-javascript"
+#guard strOrHole (applyBinop .javascript "kt:tpl" (.str "a") (.str "b")) ==
+  "hole:op:formatString:kt-outside-jvm"
 
 /-!
 ### Operator equations
@@ -816,8 +911,38 @@ result is representable. `-INT_MIN` is precisely where it does not. -/
     applyUnop d "-" (.float f) = .val (.float f.neg) := by cases d <;> rfl
 
 
-/-- Membership test. -/
-def valIn (x c : Val) : EResult :=
+/-- Membership test (Language Reference §6.10.2, "Membership test operations").
+
+* `x in s` for strings "is True if and only if x is a substring of y ... Empty strings
+  are always considered to be a substring of any other string, so `"" in "abc"` will
+  return True" -- `Stdlib.pyInfix`, a structural scan of the code points. (This used to
+  be `(s.splitOn t).length > 1`, which answers `False` for the empty string: Lean's
+  `"abc".splitOn ""` is `["abc"]`.) A builtin non-`str` left operand is CPython's
+  `TypeError` ("'in <string>' requires string as left operand").
+* A builtin scalar on the right (`int`, `bool`, `None`, `float`) has neither
+  `__contains__`, `__iter__` nor `__getitem__`, so the test is CPython's `TypeError`
+  ("argument of type 'int' is not iterable"). An object on the right stays the hole
+  `in:non-container`: its class may define any of the three.
+* JavaScript's `in` is a different test (ECMA-262 *The in Operator*): the right operand
+  must be an Object, and a primitive throws -- a string too (Node: "Cannot use 'in'
+  operator to search for 'x' in str"), so `.str` and the four scalars are `TypeError`.
+  On an Object it asks for PROPERTY presence, not membership. An array answers it for an
+  integer index (`0 in [5]` is `true`, `5 in [5]` is `false`); any other key (`"0"`,
+  `"length"`, a prototype method) is the hole `in:javascript-property`. A `.dict` is a
+  plain object or a `Map` (`new Map()` reaches Core as one): an own key of the former
+  is `true`, `in` on the latter never sees an entry, and either may inherit from its
+  prototype -- the hole `in:javascript-object-property`. -/
+def valIn (d : Dialect) (x c : Val) : EResult :=
+  match d with
+  | .javascript =>
+    match c with
+    | .list vs | .tuple vs => match x with
+                 | .int i => .val (.bool (decide (0 ≤ i ∧ i < vs.length)))
+                 | _      => .hole "in:javascript-property"
+    | .dict _ => .hole "in:javascript-object-property"
+    | .str _ | .int _ | .bool _ | .unit | .float _ => .exn (.str "TypeError")
+    | _ => .hole "in:non-container"
+  | _ =>
   -- An instance of a class with a builtin base is a container: `0 in A((0,))` is `True`
   -- in CPython for `class A(tuple)`. `unbuiltin` is non-recursive, which keeps this
   -- function non-recursive too.
@@ -826,9 +951,51 @@ def valIn (x c : Val) : EResult :=
   | .tuple vs => .val (.bool (vs.any (Val.beq x)))
   | .dict kvs => .val (.bool (kvs.any (fun kv => Val.beq x kv.1)))
   | .str s    => match x with
-                 | .str t => .val (.bool ((s.splitOn t).length > 1))
+                 | .str t => .val (.bool (Stdlib.pyInfix t.toList s.toList))
+                 | .int _ | .bool _ | .unit | .float _ | .list _ | .tuple _ | .dict _ =>
+                     .exn (.str "TypeError")
                  | _      => .hole "in:non-str-in-str"
+  | .int _ | .bool _ | .unit | .float _ => .exn (.str "TypeError")
   | _         => .hole "in:non-container"
+
+/-- Guard helper: `EResult` carries no `BEq`. -/
+private def inShows (d : Dialect) (x c : Val) : String :=
+  match valIn d x c with
+  | .val (.bool b) => if b then "True" else "False"
+  | .exn (.str n)  => "exn " ++ n
+  | .hole l        => "hole " ++ l
+  | _              => "other"
+
+-- `in` (Language Reference §6.10.2). Every line is also run on CPython by
+-- tests/test_python_str_methods.py (`#guard inShows` lines are parsed there), except
+-- the `.javascript` lines, which state Node's answers.
+#guard inShows .python (.str "") (.str "abc") == "True"
+#guard inShows .python (.str "") (.str "") == "True"
+#guard inShows .python (.str "bc") (.str "abc") == "True"
+#guard inShows .python (.str "ac") (.str "abc") == "False"
+#guard inShows .python (.str "aab") (.str "aaab") == "True"
+#guard inShows .python (.str "overrides") (.str "s3://overrides-x/k") == "True"
+#guard inShows .python (.int 1) (.str "abc") == "exn TypeError"
+#guard inShows .python (.str "a") (.int 5) == "exn TypeError"
+#guard inShows .python (.str "a") .unit == "exn TypeError"
+#guard inShows .python (.int 2) (.list [.int 1, .int 2]) == "True"
+#guard inShows .python (.str "k") (.dict [(.str "k", .int 1)]) == "True"
+#guard inShows .python (.int 1) (.dict [(.str "k", .int 1)]) == "False"
+#guard inShows .python (.str "a") (.tuple [.str "b"]) == "False"
+-- The same expression, two dialects: Python answers the substring check (no `x` in
+-- "str"), JavaScript requires an Object on the right and throws on any primitive.
+#guard inShows .python (.str "x") (.str "str") == "False"
+#guard inShows .python (.str "s") (.str "str") == "True"
+#guard inShows .javascript (.str "x") (.str "str") == "exn TypeError"
+#guard inShows .javascript (.str "s") (.str "str") == "exn TypeError"
+#guard inShows .javascript (.str "x") (.int 5) == "exn TypeError"
+#guard inShows .javascript (.str "x") .unit == "exn TypeError"
+-- On an Object, JavaScript asks for a property: an array's integer index is answered,
+-- everything else is named.
+#guard inShows .javascript (.int 0) (.list [.int 5]) == "True"
+#guard inShows .javascript (.int 5) (.list [.int 5]) == "False"
+#guard inShows .javascript (.str "length") (.list [.int 5]) == "hole in:javascript-property"
+#guard inShows .javascript (.str "k") (.dict [(.str "k", .int 1)]) == "hole in:javascript-object-property"
 
 /-- Function table, keyed by name. -/
 abbrev FuncTable := List (String × Func)
@@ -842,6 +1009,13 @@ writes it from the module-objects initialiser; `applyFunc` reads it for a class-
 default and `evalExpr` reads it when `self.<attr>` misses the instance's own fields. One
 key format, defined once, so the two readers cannot disagree with the writer. -/
 @[simp] def classAttrKey (cls attr : String) : String := "<classattr>" ++ cls ++ "." ++ attr
+
+/-- The globals-frame key under which a Java class's **static state** is bound: a
+reference to a holder object whose fields are the class's initialised static fields.
+No Java program writes it (the exporter drops `<clinit>`); the differential harness
+binds it from the values the JVM reports, so a static read in the model starts from the
+same state as the JVM call (`Ctx.readClassAttribute`). -/
+@[simp] def javaStaticKey (cls : String) : String := "<static>" ++ cls
 
 /-- The base environment of a call: `self` bound if there is a receiver. Named so that a
 proof about `applyFunc` has a stable term to case on -- `simp only [applyFunc]` leaves it
@@ -1709,6 +1883,20 @@ first namespace in the C3 order and bind classmethods to the actual receiver cla
 Property descriptor objects and unknown namespace behavior remain named gaps. -/
 def Ctx.readClassAttribute (ctx : Ctx) (heap : Heap) (owner : String)
     (captured : List (String × Val)) (attr : String) : EResult :=
+  -- A Java STATIC field read, `C.f` (`.field (.fnref "pkg.C") "f"`). Core does not run
+  -- `<clinit>` (the exporter drops it), so it has no static state of its own; a caller
+  -- that knows a class's initialised statics binds a holder object under
+  -- `javaStaticKey C` in the globals frame and the read is that holder's field. With no
+  -- holder the read stays the hole it always was; a holder without the field is a
+  -- named gap, never `unit`.
+  if ctx.dialect == .java then
+    match (heap.get ctx.globals).bind (fun g => g.fields.find? (·.1 == javaStaticKey owner)) with
+    | some (_, .ref r) =>
+        match (heap.get r).bind (fun o => o.fields.find? (·.1 == attr)) with
+        | some (_, value) => .val value
+        | none => .hole s!"field:{attr}:static-not-captured"
+    | _ => .hole s!"field:{attr}:non-object"
+  else
   if ctx.dialect != .python || !strEndsWith owner "<meta>" then
     .hole s!"field:{attr}:non-object"
   else
@@ -1766,7 +1954,41 @@ def boxBuiltinResult (d : Dialect) (f : String) (h : Heap) : EResult → Heap ×
         let (h₂, r) := h.alloc { cls := "dict", fields := [], payload := .dict kvs }
         (h₂, .val (.ref r))
       else (h, .val (.dict kvs))
+  -- `list(iterable)` likewise: "Lists may be constructed in several ways: ... Using the
+  -- type constructor: `list()` or `list(iterable)`" (Library § Built-in Types, "Lists"),
+  -- a NEW list object, exactly as the display `[]` allocates (`Expr.listE`). The elements
+  -- are shared, not copied: a shallow copy.
+  | .val (.list vs) =>
+      if f == "list" && d.boxesContainers then
+        let (h₂, r) := h.alloc { cls := "list", fields := [], payload := .list vs }
+        (h₂, .val (.ref r))
+      else (h, .val (.list vs))
   | r => (h, r)
+
+/-- A `str` method that returns a list (`split`) returns a NEW list object (Library
+§ Built-in Types, `str.split`: "Return a list of the words in the string"), so under
+Python its result allocates exactly as a list display does. Every other method result is
+passed through unchanged. -/
+def boxStrMethodResult (d : Dialect) (recv : Val) (h : Heap) : EResult → Heap × EResult
+  | .val (.list vs) =>
+      match recv with
+      | .str _ =>
+          if d == .python then
+            let (h₂, r) := h.alloc { cls := "list", fields := [], payload := .list vs }
+            (h₂, .val (.ref r))
+          else (h, .val (.list vs))
+      | _ => (h, .val (.list vs))
+  | r => (h, r)
+
+/-- An exception out of `boxStrMethodResult` is the method's own, on the method's heap. -/
+theorem boxStrMethodResult_exn_inv {d : Dialect} {recv : Val} {h h' : Heap} {r : EResult}
+    {v : Val} (hy : boxStrMethodResult d recv h r = (h', .exn v)) : r = .exn v ∧ h' = h := by
+  unfold boxStrMethodResult at hy
+  split at hy
+  · split at hy
+    · split at hy <;> simp at hy
+    · simp at hy
+  · cases hy; exact ⟨rfl, rfl⟩
 
 @[simp] theorem boxBuiltinResult_exn (d : Dialect) (f : String) (h : Heap) (v : Val) :
     boxBuiltinResult d f h (.exn v) = (h, .exn v) := rfl
@@ -1778,6 +2000,7 @@ theorem boxBuiltinResult_exn_inv {d : Dialect} {f : String} {h h' : Heap} {r : E
   | val x =>
       unfold boxBuiltinResult at hy
       split at hy
+      · split at hy <;> simp at hy
       · split at hy <;> simp at hy
       · simp at hy
   | exn x => simp [boxBuiltinResult] at hy; exact ⟨by rw [hy.2], hy.1.symm⟩
@@ -2454,7 +2677,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                     | result => result
                 | (h₃, res)     => (h₃, res)
             | none =>
-            match valIn x (c.unbox h₂) with
+            match valIn ctx.dialect x (c.unbox h₂) with
             | .val (.bool r) => (h₂, .val (.bool (if neg then !r else r)))
             | r              => (h₂, r)
         | (h₂, r) => (h₂, r)
@@ -3087,13 +3310,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | some result => result
           | none =>
           match Stdlib.method ctx.dialect h₂ recv m vs with
-          | some (h₃, .pure r)       => (h₃, r)
+          | some (h₃, .pure r)       => boxStrMethodResult ctx.dialect recv h₃ r
           -- A mutating container method cannot be honoured while containers are values:
           -- writing back through the receiver *expression* updates a temporary, because
           -- the CPG has already desugared `self.d.pop(k)` into `t = self.d; t.pop(k)`.
           -- An honest hole until containers are boxed (see docs/boxed-containers.md).
           | some (h₃, .mutating _ _) => (h₃, .hole s!"mcall:{m}:unboxed-container")
-          | none                     => (h₂, .hole s!"mcall:{m}:non-object")
+          | none                     => (h₂, Stdlib.missingMethod ctx.dialect recv m)
       | (h₁, r)      => (h₁, r)
   -- `003-box-address-taken-locals`: unconditional, constructor-free allocation of a
   -- fresh single-field box. Evaluate the argument, allocate `{cls := "<local>",
@@ -5242,6 +5465,33 @@ private def javaProg : Program :=
 -- new Box(7).v + new Box(7).get()  -- java: 14
 #guard match runFunc javaProg 300 "pkg.Main.mk:int()" [] with | .val (.int 14) => true | _ => false
 
+/-- Java static state (`javaStaticKey`). `CODES` is a `static final Set<String> CODES =
+Set.of("A", "B")`; the JVM reports it initialised, and the harness binds it as an
+unboxed `.list` in a holder object. Both spellings of the read -- the implicit `CODES`
+(`.fnref "pkg.Codes"`) and the qualified `Codes.CODES` (a simple name bound to the same
+holder) -- see it; without a holder the read is the hole it always was. -/
+private def javaStaticFn : Func :=
+  { name := "pkg.Codes.known:boolean(java.lang.String)", params := ["c"]
+  , body := .ret (.binop "&&" (.mcall (.field (.fnref "pkg.Codes") "CODES") "contains" [.name "c"])
+                              (.mcall (.field (.name "Codes") "CODES") "contains" [.name "c"])) }
+private def javaStaticCtx : Ctx := { dialect := .java, table := [(javaStaticFn.name, javaStaticFn)] }
+private def javaStaticHeap : Heap :=
+  [ { cls := "<globals>", fields := [(javaStaticKey "pkg.Codes", .ref 1), ("Codes", .ref 1)] }
+  , { cls := "<module>static:pkg.Codes", fields := [("CODES", .list [.str "A", .str "B"])] } ]
+private def javaStaticRun (h : Heap) (arg : Val) : EResult :=
+  (applyFunc javaStaticCtx 50 h javaStaticFn none [arg] []).2
+
+#guard match javaStaticRun javaStaticHeap (.str "B") with | .val (.bool true) => true | _ => false
+#guard match javaStaticRun javaStaticHeap (.str "C") with | .val (.bool false) => true | _ => false
+-- `Set.of(..).contains(null)` throws in the JVM; `ArrayList.contains(null)` does not.
+#guard match javaStaticRun javaStaticHeap .unit with
+  | .hole "java:collection-null-query" => true | _ => false
+#guard match javaStaticRun [{ cls := "<globals>", fields := [] }] (.str "B") with
+  | .hole "field:CODES:non-object" => true | _ => false
+#guard match javaStaticRun [ { cls := "<globals>", fields := [(javaStaticKey "pkg.Codes", .ref 1)] }
+                           , { cls := "<module>static:pkg.Codes", fields := [] } ] (.str "B") with
+  | .hole "field:CODES:static-not-captured" => true | _ => false
+
 /-! ## JavaScript arrays and strings
 
 The JS frontend lowers `[a, b]` to `__ecma.Array.factory()` followed by `.push(a)`,
@@ -5664,6 +5914,38 @@ private def dictCallHeap (name : String) : Heap :=
        | [o₁], [o₂] => o₁.cls == "dict" && o₂.cls == "dict" &&
            (match o₁.payload, o₂.payload with | .dict [], .dict [] => true | _, _ => false)
        | _, _ => false
+
+/-- `list(iterable)` allocates a NEW list exactly as `[]` does, and reads a boxed list,
+dict or string through the box: `xs = [1, 2]; ys = list(xs); ys.append(3)` leaves `xs`
+alone (CPython: `len(xs) == 2`, `len(ys) == 3`, `ys is not xs`). Before, `list(xs)` on a
+boxed `xs` was the hole `call:list`. `s.split(",")` allocates the same way, so the list it
+returns can be appended to. -/
+private def listCallProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.copyLen", params := []
+      , body := .seq (.assign "xs" (.listE [.lit (.int 1), .lit (.int 2)]))
+                (.seq (.assign "ys" (.call "list" [.name "xs"]))
+                (.seq (.expr (.mcall (.name "ys") "append" [.lit (.int 3)]))
+                      (.ret (.tupleE [.call "len" [.name "xs"], .call "len" [.name "ys"],
+                                      .isOp false (.name "xs") (.name "ys")])))) }
+    , { name := "m.py:<module>.ofDict", params := []
+      , body := .ret (.call "len" [.call "list" [.dictE [(.lit (.str "a"), .lit (.int 1))]]]) }
+    , { name := "m.py:<module>.isRef", params := []
+      , body := .ret (.call "list" [.lit (.str "ab")]) }
+    , { name := "m.py:<module>.splitAppend", params := []
+      , body := .seq (.assign "ps" (.mcall (.lit (.str "a,b")) "split" [.lit (.str ",")]))
+                (.seq (.expr (.mcall (.name "ps") "append" [.lit (.str "c")]))
+                      (.ret (.mcall (.lit (.str "+")) "join" [.name "ps"]))) } ] }
+
+#guard match runFunc listCallProg 100 "m.py:<module>.copyLen" [] with
+       | .val (.tuple [.int 2, .int 3, .bool false]) => true | _ => false
+#guard match runFunc listCallProg 100 "m.py:<module>.ofDict" [] with
+       | .val (.int 1) => true | _ => false
+#guard match runFunc listCallProg 100 "m.py:<module>.isRef" [] with
+       | .val (.ref _) => true | _ => false
+#guard match runFunc listCallProg 100 "m.py:<module>.splitAppend" [] with
+       | .val (.str "a+b+c") => true | _ => false
 
 /-- `__getattr__` runs only on a MISS (§3.3.2): a present instance attribute reads and
 writes as usual, and the miss is a named gap rather than `AttributeError`. -/

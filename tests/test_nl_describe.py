@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'src'))
 
 from autoform.nl import describe, llm, schema  # noqa: E402
+from conftest import nl_fixture  # noqa: E402
 
 FIXTURES = ROOT / 'tests' / 'fixtures' / 'nl'
 
@@ -160,7 +161,7 @@ def test_model_error_falls_back_for_the_batch(monkeypatch, tmp_path):
 def test_unavailable_cli_uses_fallback_without_calling(monkeypatch, tmp_path):
     monkeypatch.setattr(llm, 'available', lambda: False)
     monkeypatch.setattr(llm, 'ask', lambda *a, **k: pytest.fail('model called'))
-    specs = describe.describe(schema.load(FIXTURES / 'translation-PipelinePython.json'), tmp_path)
+    specs = describe.describe(nl_fixture('translation-PipelinePython.json'), tmp_path)
     assert all(s.model == 'fallback' for s in specs)
     add = specs[0]
     assert add.properties[0].text == 'For all integers a and b, add(a, b) returns a + b.'
@@ -184,7 +185,7 @@ def test_fallback_templates():
 
 
 def test_fallback_on_c_fixture_mentions_c_semantics():
-    tr = schema.load(FIXTURES / 'translation-PipelineC.json')
+    tr = nl_fixture('translation-PipelineC.json')
     add = next(f for f in tr['functions'] if f['name'] == 'add')
     spec = describe.fallback(add, 'c')
     assert 'C expression `a + b`' in spec.properties[0].text

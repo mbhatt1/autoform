@@ -15,10 +15,13 @@ a C aggregate initializer has no identity to share. Read this before changing
 `Syntax.lean` or `Semantics.lean`; the history below explains why each piece has the
 shape it has, and §6b records the two ways it nearly went wrong.
 
-What remains is §9's named exclusions — slices, `del xs[a:b]` — and the exporter's side
-of `op:delete-index`, which is deliberately still a hole (§2). The switchover's effect
-on the oracle was measured and is recorded in §6c: byte-identical, and that is the
-result.
+Slices and `del xs[a:b]` are no longer exclusions (§9 item 3), and the exporter's side
+is landed too: the `<operator>.delete` case of `cartographer/compiler/SourceCompiler.scala`
+emits `delIndex` and `delSlice` under Python. What remains are the §9 items that stay
+holes by design, and `op:delete-index` / `op:delete-slice` under every *other* dialect,
+where a container is a value with no identity to delete from (§2); `op:delete-field` and
+`op:delete-shape` are untranslated under all dialects. The switchover's effect on the
+oracle was measured and is recorded in §6c: byte-identical, and that is the result.
 
 Step 2 landed WITHOUT re-typing `applyBinop`, which this document proposed and which is the
 wrong trade: 155 call sites, and it destroys the reducible scalar path that `Refine.lean`'s

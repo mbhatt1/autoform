@@ -318,11 +318,11 @@ theorem truthy_bobj_str :
 
 /-- CPython: `0 in A((0,))` is `True`. -/
 theorem valIn_bobj_true :
-    valIn (.int 0) (.bobj "A" (.tuple [.int 0])) = .val (.bool true) := by rfl
+    valIn .python (.int 0) (.bobj "A" (.tuple [.int 0])) = .val (.bool true) := by rfl
 
 /-- CPython: `1 in A((0,))` is `False`. -/
 theorem valIn_bobj_false :
-    valIn (.int 1) (.bobj "A" (.tuple [.int 0])) = .val (.bool false) := by rfl
+    valIn .python (.int 1) (.bobj "A" (.tuple [.int 0])) = .val (.bool false) := by rfl
 
 /-- CPython: `A((7,))[0]` is `7`; indexing sees through the base. -/
 theorem index_bobj :

@@ -318,6 +318,8 @@ class ClaudeCodeAgent:
         self.model, self.max_turns, self.timeout = model, max_turns, timeout
         if not shutil.which('claude'):
             raise RuntimeError('claude CLI not found on PATH')
+        from ..nl.llm import claude_env
+        claude_env()   # refuse now (LLMError) if AUTOFORM_LLM_ALLOWED_BACKENDS excludes the child's backend
 
     def run(self, prompt: str, cwd: Path, max_budget_usd: float | None = None) -> tuple[str, float]:
         cmd = ['claude', '-p', prompt, '--output-format', 'stream-json', '--verbose',
@@ -456,8 +458,8 @@ def _cache_get(cache_dir, key):
 
 def _cache_put(cache_dir, key, proof, helpers):
     if cache_dir:
-        Path(cache_dir).mkdir(parents=True, exist_ok=True)
-        (Path(cache_dir) / f'{key}.json').write_text(json.dumps({'proof': proof, 'helpers': helpers}))
+        from ..nl.llm import private_write   # proofs about proprietary code: owner-only, like the prompt cache
+        private_write(Path(cache_dir) / f'{key}.json', json.dumps({'proof': proof, 'helpers': helpers}))
 
 
 # --- the loop ----------------------------------------------------------------------------

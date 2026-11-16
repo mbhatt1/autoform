@@ -20,7 +20,7 @@ Usage:
     python3 scripts/lang_matrix.py ast-LangJava.json ast-LangGo.json ...
     python3 scripts/lang_matrix.py            # every ast-*.json in the repo root
 """
-import json, sys, os, glob, collections
+import sys, os, glob, collections
 import deep_json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                "cartographer"))

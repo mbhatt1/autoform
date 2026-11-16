@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / 'src'))
 from autoform.nl import check as K  # noqa: E402
 from autoform.nl import emit as E  # noqa: E402
 from autoform.nl import pipeline, pyprop, pyvalues as pv, schema  # noqa: E402
+from conftest import nl_fixture  # noqa: E402
 
 FIX = ROOT / 'tests/fixtures/nl'
 LEAN = pytest.mark.skipif(os.environ.get('AUTOFORM_TEST_LEAN') != '1', reason='set AUTOFORM_TEST_LEAN=1')
@@ -170,7 +171,7 @@ def arith_source(tmp_path, body='def add(a, b):\n    return a + b\n', with_tests
 
 
 def translation_for(src):
-    t = json.loads((FIX / 'translation-PipelinePython.json').read_text())
+    t = nl_fixture('translation-PipelinePython.json')
     t['source_root'] = str(src)
     t['lean_root'] = str(ROOT)
     for f in t['functions']:
@@ -311,10 +312,11 @@ def test_pipeline_wiring():
 # --- Lean-backed ------------------------------------------------------------------------
 
 @LEAN
-def test_lean_evaluates_pre_and_post_on_real_outcomes(tmp_path):
-    tr = json.loads((FIX / 'translation-PipelinePython.json').read_text())
+def test_lean_evaluates_pre_and_post_on_real_outcomes(tmp_path, pipeline_model):
+    pipeline_model('PipelinePython', ROOT / 'examples/source/python')
+    tr = nl_fixture('translation-PipelinePython.json')
     root = Path(os.environ.get('AUTOFORM_LEAN_ROOT', tr['lean_root']))
-    sts = {s['property']: s for s in json.loads((FIX / 'statements-PipelinePython.json').read_text())
+    sts = {s['property']: s for s in nl_fixture('statements-PipelinePython.json')
            if s['function'] == 'numbers.py:<module>.quotient'}
     fn = next(f for f in tr['functions'] if f['name'] == 'numbers.py:<module>.quotient')
     plans = [K.Plan(0, sts['p1'], fn, tr, 64), K.Plan(1, sts['p2'], fn, tr, 64)]
@@ -331,8 +333,9 @@ def test_lean_evaluates_pre_and_post_on_real_outcomes(tmp_path):
 
 
 @LEAN
-def test_lean_emit_end_to_end(tmp_path):
-    tr = json.loads((FIX / 'translation-PipelinePython.json').read_text())
+def test_lean_emit_end_to_end(tmp_path, pipeline_model):
+    pipeline_model('PipelinePython', ROOT / 'examples/source/python')
+    tr = nl_fixture('translation-PipelinePython.json')
     root = os.environ.get('AUTOFORM_LEAN_ROOT', tr['lean_root'])
     src = tmp_path / 'src'
     shutil.copytree(tr['source_root'], src)
@@ -341,7 +344,7 @@ def test_lean_emit_end_to_end(tmp_path):
     for f in tr['functions']:
         f['file'] = 'arith.py'
         f['name'] = f['name'].replace('numbers.py', 'arith.py')
-    sts = [s for s in json.loads((FIX / 'statements-PipelinePython.json').read_text()) if s['id'].endswith(('add__p1', 'quotient__p1'))]
+    sts = [s for s in nl_fixture('statements-PipelinePython.json') if s['id'].endswith(('add__p1', 'quotient__p1'))]
     for s in sts:
         s['function'] = s['function'].replace('numbers.py', 'arith.py')
     chk = [schema.CheckResult(s['id'], 'BOUNDED_HOLDS', 64, runtime_agrees=True, kernel_bounded_proof=True) for s in sts]

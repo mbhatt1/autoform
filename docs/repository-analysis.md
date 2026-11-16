@@ -44,13 +44,32 @@ Mixed-language runs add child modules such as `TranslatedJava` and
   retains child certificates without promoting their claims to whole-repository proof.
 
 The inventory hashes regular files without following symlinks or reading special
-files. VCS metadata and the active output workspace are explicitly excluded. File
+files. VCS metadata and the active output workspace are explicitly excluded, and so
+are the Gradle/Maven build products and test sources described below. File
 presence in an AST does not show that every function parsed successfully. Export
 truncation and the lack of an independent compiler function census remain visible.
 Files outside the selected directory, including external dependencies, are outside
 the inventory. Native execution runs in the worker sandbox (no network, writes only
 under its work directory; `native-build.json` records the mechanism), which is not a
 container and limits no CPU or memory.
+
+### Gradle and Maven projects
+
+A directory holding `settings.gradle[.kts]`, `build.gradle[.kts]` or `pom.xml` makes
+its subtree a JVM build tree. Inside one, the inventory excludes, each under
+`excluded` with its reason: `.gradle/` and any `build/` or `target/` outside `src/`
+(`build_output`); `generated/`, `generated-src/` and `generated-sources/`
+(`generated_code`); and test source sets such as `src/test`, `src/testFixtures` and
+`src/integrationTest` (`test_source_set`). The frontend still parses the whole tree,
+so the functions it exported from those paths are dropped from the model under the
+same reasons and listed in `selection.json`; `autoform source` does the same when the
+analysed directory is a Gradle/Maven root. `inventory.json`'s `layout` names the
+build systems, the directories holding a build file, and the remaining
+`src/<set>/{java,kotlin}` source roots, so a multi-module project needs no `--subdir`.
+To model a test source set itself, select it with `--subdir`, below the build file.
+The Java oracle samples static methods with random inputs; it does not run the
+project's JUnit tests. `tests/test_repository_layout.py` pins all of this on the
+multi-module fixture in `tests/fixtures/jvm_multimodule/`.
 
 Requirements in `autoform.properties.json` or `--properties` are frozen before source
 execution. Mixed-language routing requires each exact subject to appear in a fresh

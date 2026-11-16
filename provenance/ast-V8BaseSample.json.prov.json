@@ -1,0 +1,18 @@
+{
+ "artifact": "ast-V8BaseSample.json",
+ "artifact_bytes": 1539,
+ "artifact_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
+ "command": "python3 scripts/extract_sample_ast.py ast-V8Base.json --from-lean Autoform/Generated/V8BaseSample.lean --out ast-V8BaseSample.json",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "scripts/extract_sample_ast.py",
+ "exporter_sha256": "435335b90ff83cffb48327e762d90350bb73387089613913f273b6b876409620",
+ "exporter_sources": {
+  "scripts/extract_sample_ast.py": "435335b90ff83cffb48327e762d90350bb73387089613913f273b6b876409620"
+ },
+ "joern_version": "4.0.606",
+ "note": "Extraction from ast-V8Base.json (gitignored, local-only). Selects the 4 functions named in Autoform/SpecsGen/V8BaseSample.lean, sorts by name. The parent AST must exist locally and match what was produced from V8 base libraries (the V8 revision is not recorded here; record the parent's provenance separately).",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/Users/obelisk/autoform",
+ "source_revision": "tree-sha256:5551d313d731ab82166db60fc41b046f706a377452d14205096f622f11b5fff0:25932files"
+}

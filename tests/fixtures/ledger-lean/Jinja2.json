@@ -1,10 +1,18 @@
 {
  "ast": "ast-Jinja2.json",
- "astSha256": "5524fe8e205eb5a83581c11916c62a32c387c387c248f34f97da14382cee6b2e",
+ "astSha256": "db86a920a6a139a20ebc3687346ceb1b9c64c1a9557489b335a1b36750eadb04",
  "ledger": {
   "closedByContract": 2,
-  "closedByTranslation": 438,
+  "closedByTranslation": 439,
   "contractsUsed": [
+   {
+    "callee": ".join",
+    "sites": 6
+   },
+   {
+    "callee": ".split",
+    "sites": 2
+   },
    {
     "callee": ".items",
     "sites": 1
@@ -15,6 +23,10 @@
    },
    {
     "callee": ".remove",
+    "sites": 1
+   },
+   {
+    "callee": ".replace",
     "sites": 1
    },
    {
@@ -358,8 +370,8 @@
    }
   ],
   "module": "Jinja2",
-  "nodes": 39429,
-  "verifiableCore": 438
+  "nodes": 39421,
+  "verifiableCore": 439
  },
  "module": "Jinja2",
  "producedBy": "scripts/ledger.lean.tmpl via `lake env lean` (Program.ledgerJson)"

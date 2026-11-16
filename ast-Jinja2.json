@@ -80081,263 +80081,252 @@
               "b": {
                "k": "seq",
                "a": {
-                "k": "seq",
-                "a": {
-                 "k": "assign",
-                 "x": "tmp1",
-                 "e": {
-                  "k": "call",
-                  "f": "range",
-                  "args": [
-                   {
-                    "k": "name",
-                    "v": "slices"
-                   }
-                  ]
-                 }
+                "k": "forIn",
+                "x": "slice_number",
+                "e": {
+                 "k": "call",
+                 "f": "<python-range>",
+                 "args": [
+                  {
+                   "k": "name",
+                   "v": "slices"
+                  }
+                 ]
                 },
-                "b": {
-                 "k": "forIn",
-                 "x": "slice_number",
-                 "e": {
-                  "k": "name",
-                  "v": "tmp1"
-                 },
-                 "body": {
-                  "k": "seq",
-                  "a": {
-                   "k": "assign",
-                   "x": "start",
-                   "e": {
+                "body": {
+                 "k": "seq",
+                 "a": {
+                  "k": "assign",
+                  "x": "start",
+                  "e": {
+                   "k": "binop",
+                   "op": "+",
+                   "a": {
+                    "k": "name",
+                    "v": "offset"
+                   },
+                   "b": {
                     "k": "binop",
-                    "op": "+",
+                    "op": "*",
                     "a": {
                      "k": "name",
-                     "v": "offset"
+                     "v": "slice_number"
                     },
                     "b": {
+                     "k": "name",
+                     "v": "items_per_slice"
+                    }
+                   }
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "ifte",
+                   "c": {
+                    "k": "binop",
+                    "op": "<",
+                    "a": {
+                     "k": "name",
+                     "v": "slice_number"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "slices_with_extra"
+                    }
+                   },
+                   "t": {
+                    "k": "assign",
+                    "x": "offset",
+                    "e": {
                      "k": "binop",
-                     "op": "*",
+                     "op": "+",
                      "a": {
                       "k": "name",
-                      "v": "slice_number"
+                      "v": "offset"
                      },
                      "b": {
-                      "k": "name",
-                      "v": "items_per_slice"
+                      "k": "int",
+                      "v": "1"
                      }
                     }
+                   },
+                   "e": {
+                    "k": "skip"
                    }
                   },
                   "b": {
                    "k": "seq",
                    "a": {
-                    "k": "ifte",
-                    "c": {
+                    "k": "assign",
+                    "x": "end",
+                    "e": {
                      "k": "binop",
-                     "op": "<",
+                     "op": "+",
                      "a": {
                       "k": "name",
-                      "v": "slice_number"
+                      "v": "offset"
                      },
                      "b": {
-                      "k": "name",
-                      "v": "slices_with_extra"
-                     }
-                    },
-                    "t": {
-                     "k": "assign",
-                     "x": "offset",
-                     "e": {
                       "k": "binop",
-                      "op": "+",
+                      "op": "*",
                       "a": {
-                       "k": "name",
-                       "v": "offset"
+                       "k": "binop",
+                       "op": "+",
+                       "a": {
+                        "k": "name",
+                        "v": "slice_number"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": "1"
+                       }
                       },
                       "b": {
-                       "k": "int",
-                       "v": "1"
+                       "k": "name",
+                       "v": "items_per_slice"
                       }
                      }
-                    },
-                    "e": {
-                     "k": "skip"
                     }
                    },
                    "b": {
                     "k": "seq",
                     "a": {
                      "k": "assign",
-                     "x": "end",
+                     "x": "tmp",
                      "e": {
-                      "k": "binop",
-                      "op": "+",
+                      "k": "slice",
                       "a": {
                        "k": "name",
-                       "v": "offset"
+                       "v": "seq"
                       },
-                      "b": {
-                       "k": "binop",
-                       "op": "*",
-                       "a": {
-                        "k": "binop",
-                        "op": "+",
-                        "a": {
-                         "k": "name",
-                         "v": "slice_number"
-                        },
-                        "b": {
-                         "k": "int",
-                         "v": "1"
-                        }
-                       },
-                       "b": {
-                        "k": "name",
-                        "v": "items_per_slice"
-                       }
+                      "lo": {
+                       "k": "name",
+                       "v": "start"
+                      },
+                      "hi": {
+                       "k": "name",
+                       "v": "end"
+                      },
+                      "st": {
+                       "k": "unit"
                       }
                      }
                     },
                     "b": {
                      "k": "seq",
                      "a": {
-                      "k": "assign",
-                      "x": "tmp",
-                      "e": {
-                       "k": "slice",
-                       "a": {
-                        "k": "name",
-                        "v": "seq"
-                       },
-                       "lo": {
-                        "k": "name",
-                        "v": "start"
-                       },
-                       "hi": {
-                        "k": "name",
-                        "v": "end"
-                       },
-                       "st": {
-                        "k": "unit"
-                       }
-                      }
-                     },
-                     "b": {
                       "k": "seq",
                       "a": {
-                       "k": "seq",
-                       "a": {
-                        "k": "assign",
-                        "x": "$exprV$1733",
-                        "e": {
-                         "k": "isOp",
-                         "neg": true,
-                         "a": {
-                          "k": "name",
-                          "v": "fill_with"
-                         },
-                         "b": {
-                          "k": "unit"
-                         }
-                        }
-                       },
-                       "b": {
-                        "k": "seq",
+                       "k": "assign",
+                       "x": "$exprV$1733",
+                       "e": {
+                        "k": "isOp",
+                        "neg": true,
                         "a": {
-                         "k": "ifte",
-                         "c": {
-                          "k": "name",
-                          "v": "$exprV$1733"
-                         },
-                         "t": {
-                          "k": "seq",
-                          "a": {
-                           "k": "assign",
-                           "x": "$exprV$1734",
-                           "e": {
-                            "k": "binop",
-                            "op": ">=",
-                            "a": {
-                             "k": "name",
-                             "v": "slice_number"
-                            },
-                            "b": {
-                             "k": "name",
-                             "v": "slices_with_extra"
-                            }
-                           }
-                          },
-                          "b": {
-                           "k": "assign",
-                           "x": "$exprV$1735",
-                           "e": {
-                            "k": "int",
-                            "v": 0
-                           }
-                          }
-                         },
-                         "e": {
-                          "k": "seq",
-                          "a": {
-                           "k": "assign",
-                           "x": "$exprV$1734",
-                           "e": {
-                            "k": "name",
-                            "v": "$exprV$1733"
-                           }
-                          },
-                          "b": {
-                           "k": "assign",
-                           "x": "$exprV$1735",
-                           "e": {
-                            "k": "int",
-                            "v": 1
-                           }
-                          }
-                         }
+                         "k": "name",
+                         "v": "fill_with"
                         },
                         "b": {
-                         "k": "ifte",
-                         "c": {
-                          "k": "name",
-                          "v": "$exprV$1734",
-                          "pythonTruthCache": {
-                           "k": "name",
-                           "v": "$exprV$1735"
-                          }
-                         },
-                         "t": {
-                          "k": "exprS",
-                          "e": {
-                           "k": "mcall",
-                           "recv": {
-                            "k": "name",
-                            "v": "tmp"
-                           },
-                           "m": "append",
-                           "args": [
-                            {
-                             "k": "name",
-                             "v": "fill_with"
-                            }
-                           ]
-                          }
-                         },
-                         "e": {
-                          "k": "skip"
-                         }
+                         "k": "unit"
                         }
                        }
                       },
                       "b": {
-                       "k": "yieldS",
-                       "e": {
-                        "k": "name",
-                        "v": "tmp"
+                       "k": "seq",
+                       "a": {
+                        "k": "ifte",
+                        "c": {
+                         "k": "name",
+                         "v": "$exprV$1733"
+                        },
+                        "t": {
+                         "k": "seq",
+                         "a": {
+                          "k": "assign",
+                          "x": "$exprV$1734",
+                          "e": {
+                           "k": "binop",
+                           "op": ">=",
+                           "a": {
+                            "k": "name",
+                            "v": "slice_number"
+                           },
+                           "b": {
+                            "k": "name",
+                            "v": "slices_with_extra"
+                           }
+                          }
+                         },
+                         "b": {
+                          "k": "assign",
+                          "x": "$exprV$1735",
+                          "e": {
+                           "k": "int",
+                           "v": 0
+                          }
+                         }
+                        },
+                        "e": {
+                         "k": "seq",
+                         "a": {
+                          "k": "assign",
+                          "x": "$exprV$1734",
+                          "e": {
+                           "k": "name",
+                           "v": "$exprV$1733"
+                          }
+                         },
+                         "b": {
+                          "k": "assign",
+                          "x": "$exprV$1735",
+                          "e": {
+                           "k": "int",
+                           "v": 1
+                          }
+                         }
+                        }
                        },
-                       "target": "$exprV$1736"
+                       "b": {
+                        "k": "ifte",
+                        "c": {
+                         "k": "name",
+                         "v": "$exprV$1734",
+                         "pythonTruthCache": {
+                          "k": "name",
+                          "v": "$exprV$1735"
+                         }
+                        },
+                        "t": {
+                         "k": "exprS",
+                         "e": {
+                          "k": "mcall",
+                          "recv": {
+                           "k": "name",
+                           "v": "tmp"
+                          },
+                          "m": "append",
+                          "args": [
+                           {
+                            "k": "name",
+                            "v": "fill_with"
+                           }
+                          ]
+                         }
+                        },
+                        "e": {
+                         "k": "skip"
+                        }
+                       }
                       }
+                     },
+                     "b": {
+                      "k": "yieldS",
+                      "e": {
+                       "k": "name",
+                       "v": "tmp"
+                      },
+                      "target": "$exprV$1736"
                      }
                     }
                    }
@@ -95988,40 +95977,29 @@
     "b": {
      "k": "seq",
      "a": {
-      "k": "seq",
-      "a": {
-       "k": "assign",
-       "x": "tmp1",
+      "k": "forIn",
+      "x": "_",
+      "e": {
+       "k": "call",
+       "f": "<python-range>",
+       "args": [
+        {
+         "k": "name",
+         "v": "n"
+        }
+       ]
+      },
+      "body": {
+       "k": "exprS",
        "e": {
         "k": "call",
-        "f": "range",
+        "f": "next",
         "args": [
          {
           "k": "name",
-          "v": "n"
+          "v": "self"
          }
         ]
-       }
-      },
-      "b": {
-       "k": "forIn",
-       "x": "_",
-       "e": {
-        "k": "name",
-        "v": "tmp1"
-       },
-       "body": {
-        "k": "exprS",
-        "e": {
-         "k": "call",
-         "f": "next",
-         "args": [
-          {
-           "k": "name",
-           "v": "self"
-          }
-         ]
-        }
        }
       }
      },
@@ -162527,73 +162505,27 @@
                          }
                         },
                         "b": {
-                         "k": "seq",
-                         "a": {
-                          "k": "assign",
-                          "x": "tmp2",
-                          "e": {
-                           "k": "call",
-                           "f": "range",
-                           "args": [
-                            {
-                             "k": "call",
-                             "f": "min",
-                             "args": [
-                              {
-                               "k": "name",
-                               "v": "start_count"
-                              },
-                              {
-                               "k": "mcall",
-                               "recv": {
-                                "k": "name",
-                                "v": "tail"
-                               },
-                               "m": "count",
-                               "args": [
-                                {
-                                 "k": "name",
-                                 "v": "end_char"
-                                }
-                               ]
-                              }
-                             ]
-                            }
-                           ]
-                          }
-                         },
-                         "b": {
-                          "k": "forIn",
-                          "x": "_",
-                          "e": {
-                           "k": "name",
-                           "v": "tmp2"
-                          },
-                          "body": {
-                           "k": "seq",
-                           "a": {
-                            "k": "assign",
-                            "x": "end_index",
-                            "e": {
-                             "k": "binop",
-                             "op": "+",
-                             "a": {
+                         "k": "forIn",
+                         "x": "_",
+                         "e": {
+                          "k": "call",
+                          "f": "<python-range>",
+                          "args": [
+                           {
+                            "k": "call",
+                            "f": "min",
+                            "args": [
+                             {
+                              "k": "name",
+                              "v": "start_count"
+                             },
+                             {
                               "k": "mcall",
                               "recv": {
                                "k": "name",
                                "v": "tail"
                               },
-                              "m": "index",
-                              "args": [
-                               {
-                                "k": "name",
-                                "v": "end_char"
-                               }
-                              ]
-                             },
-                             "b": {
-                              "k": "call",
-                              "f": "len",
+                              "m": "count",
                               "args": [
                                {
                                 "k": "name",
@@ -162601,58 +162533,93 @@
                                }
                               ]
                              }
-                            }
-                           },
-                           "b": {
-                            "k": "seq",
+                            ]
+                           }
+                          ]
+                         },
+                         "body": {
+                          "k": "seq",
+                          "a": {
+                           "k": "assign",
+                           "x": "end_index",
+                           "e": {
+                            "k": "binop",
+                            "op": "+",
                             "a": {
-                             "k": "assign",
-                             "x": "middle",
-                             "e": {
-                              "k": "binop",
-                              "op": "+",
-                              "a": {
+                             "k": "mcall",
+                             "recv": {
+                              "k": "name",
+                              "v": "tail"
+                             },
+                             "m": "index",
+                             "args": [
+                              {
                                "k": "name",
-                               "v": "middle"
-                              },
-                              "b": {
-                               "k": "slice",
-                               "a": {
-                                "k": "name",
-                                "v": "tail"
-                               },
-                               "lo": {
-                                "k": "unit"
-                               },
-                               "hi": {
-                                "k": "name",
-                                "v": "end_index"
-                               },
-                               "st": {
-                                "k": "unit"
-                               }
+                               "v": "end_char"
                               }
-                             }
+                             ]
                             },
                             "b": {
-                             "k": "assign",
-                             "x": "tail",
-                             "e": {
+                             "k": "call",
+                             "f": "len",
+                             "args": [
+                              {
+                               "k": "name",
+                               "v": "end_char"
+                              }
+                             ]
+                            }
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "assign",
+                            "x": "middle",
+                            "e": {
+                             "k": "binop",
+                             "op": "+",
+                             "a": {
+                              "k": "name",
+                              "v": "middle"
+                             },
+                             "b": {
                               "k": "slice",
                               "a": {
                                "k": "name",
                                "v": "tail"
                               },
                               "lo": {
-                               "k": "name",
-                               "v": "end_index"
+                               "k": "unit"
                               },
                               "hi": {
-                               "k": "unit"
+                               "k": "name",
+                               "v": "end_index"
                               },
                               "st": {
                                "k": "unit"
                               }
+                             }
+                            }
+                           },
+                           "b": {
+                            "k": "assign",
+                            "x": "tail",
+                            "e": {
+                             "k": "slice",
+                             "a": {
+                              "k": "name",
+                              "v": "tail"
+                             },
+                             "lo": {
+                              "k": "name",
+                              "v": "end_index"
+                             },
+                             "hi": {
+                              "k": "unit"
+                             },
+                             "st": {
+                              "k": "unit"
                              }
                             }
                            }
@@ -164286,75 +164253,74 @@
           "b": {
            "k": "seq",
            "a": {
-            "k": "seq",
-            "a": {
-             "k": "assign",
-             "x": "tmp7",
-             "e": {
-              "k": "call",
-              "f": "range",
-              "args": [
-               {
-                "k": "name",
-                "v": "n"
-               }
-              ]
-             }
+            "k": "forIn",
+            "x": "_",
+            "e": {
+             "k": "call",
+             "f": "<python-range>",
+             "args": [
+              {
+               "k": "name",
+               "v": "n"
+              }
+             ]
             },
-            "b": {
-             "k": "forIn",
-             "x": "_",
-             "e": {
-              "k": "name",
-              "v": "tmp7"
+            "body": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "next_capitalized",
+              "e": {
+               "k": "bool",
+               "v": true
+              }
              },
-             "body": {
+             "b": {
               "k": "seq",
               "a": {
-               "k": "assign",
-               "x": "next_capitalized",
-               "e": {
-                "k": "bool",
-                "v": true
-               }
-              },
-              "b": {
                "k": "seq",
                "a": {
-                "k": "seq",
-                "a": {
-                 "k": "assign",
-                 "x": "tmp0",
-                 "e": {
-                  "k": "int",
-                  "v": "0"
-                 }
-                },
-                "b": {
-                 "k": "seq",
-                 "a": {
-                  "k": "assign",
-                  "x": "last_comma",
-                  "e": {
-                   "k": "name",
-                   "v": "tmp0"
-                  }
-                 },
-                 "b": {
-                  "k": "assign",
-                  "x": "last_fullstop",
-                  "e": {
-                   "k": "name",
-                   "v": "tmp0"
-                  }
-                 }
+                "k": "assign",
+                "x": "tmp0",
+                "e": {
+                 "k": "int",
+                 "v": "0"
                 }
                },
                "b": {
                 "k": "seq",
                 "a": {
                  "k": "assign",
-                 "x": "word",
+                 "x": "last_comma",
+                 "e": {
+                  "k": "name",
+                  "v": "tmp0"
+                 }
+                },
+                "b": {
+                 "k": "assign",
+                 "x": "last_fullstop",
+                 "e": {
+                  "k": "name",
+                  "v": "tmp0"
+                 }
+                }
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "word",
+                "e": {
+                 "k": "unit"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "assign",
+                 "x": "last",
                  "e": {
                   "k": "unit"
                  }
@@ -164363,74 +164329,82 @@
                  "k": "seq",
                  "a": {
                   "k": "assign",
-                  "x": "last",
+                  "x": "p",
                   "e": {
-                   "k": "unit"
+                   "k": "listE",
+                   "items": []
                   }
                  },
                  "b": {
                   "k": "seq",
                   "a": {
-                   "k": "assign",
-                   "x": "p",
-                   "e": {
-                    "k": "listE",
-                    "items": []
-                   }
-                  },
-                  "b": {
                    "k": "seq",
                    "a": {
-                    "k": "seq",
-                    "a": {
-                     "k": "assign",
-                     "x": "tmp3",
-                     "e": {
-                      "k": "call",
-                      "f": "enumerate",
-                      "args": [
-                       {
-                        "k": "call",
-                        "f": "range",
-                        "args": [
-                         {
-                          "k": "callV",
-                          "f": {
-                           "k": "field",
-                           "a": {
-                            "k": "name",
-                            "v": "<module>jinja2/utils.py"
-                           },
-                           "f": "randrange"
+                    "k": "assign",
+                    "x": "tmp3",
+                    "e": {
+                     "k": "call",
+                     "f": "enumerate",
+                     "args": [
+                      {
+                       "k": "call",
+                       "f": "range",
+                       "args": [
+                        {
+                         "k": "callV",
+                         "f": {
+                          "k": "field",
+                          "a": {
+                           "k": "name",
+                           "v": "<module>jinja2/utils.py"
                           },
-                          "args": [
-                           {
-                            "k": "name",
-                            "v": "min"
-                           },
-                           {
-                            "k": "name",
-                            "v": "max"
-                           }
-                          ]
-                         }
-                        ]
-                       }
-                      ]
-                     }
+                          "f": "randrange"
+                         },
+                         "args": [
+                          {
+                           "k": "name",
+                           "v": "min"
+                          },
+                          {
+                           "k": "name",
+                           "v": "max"
+                          }
+                         ]
+                        }
+                       ]
+                      }
+                     ]
+                    }
+                   },
+                   "b": {
+                    "k": "forIn",
+                    "x": "tmp4",
+                    "e": {
+                     "k": "name",
+                     "v": "tmp3"
                     },
-                    "b": {
-                     "k": "forIn",
-                     "x": "tmp4",
-                     "e": {
-                      "k": "name",
-                      "v": "tmp3"
+                    "body": {
+                     "k": "seq",
+                     "a": {
+                      "k": "assign",
+                      "x": "idx",
+                      "e": {
+                       "k": "index",
+                       "a": {
+                        "k": "name",
+                        "v": "tmp4"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": "0"
+                       }
+                      }
                      },
-                     "body": {
+                     "b": {
                       "k": "seq",
                       "a": {
                        "k": "assign",
-                       "x": "idx",
+                       "x": "_",
                        "e": {
                         "k": "index",
                         "a": {
@@ -164439,90 +164413,109 @@
                         },
                         "b": {
                          "k": "int",
-                         "v": "0"
+                         "v": "1"
                         }
                        }
                       },
                       "b": {
                        "k": "seq",
                        "a": {
-                        "k": "assign",
-                        "x": "_",
-                        "e": {
-                         "k": "index",
+                        "k": "loop",
+                        "c": {
+                         "k": "bool",
+                         "v": true
+                        },
+                        "body": {
+                         "k": "seq",
                          "a": {
-                          "k": "name",
-                          "v": "tmp4"
+                          "k": "assign",
+                          "x": "word",
+                          "e": {
+                           "k": "callV",
+                           "f": {
+                            "k": "field",
+                            "a": {
+                             "k": "name",
+                             "v": "<module>jinja2/utils.py"
+                            },
+                            "f": "choice"
+                           },
+                           "args": [
+                            {
+                             "k": "name",
+                             "v": "words"
+                            }
+                           ]
+                          }
                          },
                          "b": {
-                          "k": "int",
-                          "v": "1"
+                          "k": "ifte",
+                          "c": {
+                           "k": "binop",
+                           "op": "!=",
+                           "a": {
+                            "k": "name",
+                            "v": "word"
+                           },
+                           "b": {
+                            "k": "name",
+                            "v": "last"
+                           }
+                          },
+                          "t": {
+                           "k": "seq",
+                           "a": {
+                            "k": "assign",
+                            "x": "last",
+                            "e": {
+                             "k": "name",
+                             "v": "word"
+                            }
+                           },
+                           "b": {
+                            "k": "brk"
+                           }
+                          },
+                          "e": {
+                           "k": "skip"
+                          }
                          }
                         }
                        },
                        "b": {
                         "k": "seq",
                         "a": {
-                         "k": "loop",
+                         "k": "ifte",
                          "c": {
-                          "k": "bool",
-                          "v": true
+                          "k": "name",
+                          "v": "next_capitalized"
                          },
-                         "body": {
+                         "t": {
                           "k": "seq",
                           "a": {
                            "k": "assign",
                            "x": "word",
                            "e": {
-                            "k": "callV",
-                            "f": {
-                             "k": "field",
-                             "a": {
-                              "k": "name",
-                              "v": "<module>jinja2/utils.py"
-                             },
-                             "f": "choice"
-                            },
-                            "args": [
-                             {
-                              "k": "name",
-                              "v": "words"
-                             }
-                            ]
-                           }
-                          },
-                          "b": {
-                           "k": "ifte",
-                           "c": {
-                            "k": "binop",
-                            "op": "!=",
-                            "a": {
+                            "k": "mcall",
+                            "recv": {
                              "k": "name",
                              "v": "word"
                             },
-                            "b": {
-                             "k": "name",
-                             "v": "last"
-                            }
-                           },
-                           "t": {
-                            "k": "seq",
-                            "a": {
-                             "k": "assign",
-                             "x": "last",
-                             "e": {
-                              "k": "name",
-                              "v": "word"
-                             }
-                            },
-                            "b": {
-                             "k": "brk"
-                            }
-                           },
+                            "m": "capitalize",
+                            "args": []
+                           }
+                          },
+                          "b": {
+                           "k": "assign",
+                           "x": "next_capitalized",
                            "e": {
-                            "k": "skip"
+                            "k": "bool",
+                            "v": false
                            }
                           }
+                         },
+                         "e": {
+                          "k": "skip"
                          }
                         },
                         "b": {
@@ -164530,30 +164523,85 @@
                          "a": {
                           "k": "ifte",
                           "c": {
-                           "k": "name",
-                           "v": "next_capitalized"
+                           "k": "binop",
+                           "op": ">",
+                           "a": {
+                            "k": "binop",
+                            "op": "-",
+                            "a": {
+                             "k": "name",
+                             "v": "idx"
+                            },
+                            "b": {
+                             "k": "callV",
+                             "f": {
+                              "k": "field",
+                              "a": {
+                               "k": "name",
+                               "v": "<module>jinja2/utils.py"
+                              },
+                              "f": "randrange"
+                             },
+                             "args": [
+                              {
+                               "k": "int",
+                               "v": "3"
+                              },
+                              {
+                               "k": "int",
+                               "v": "8"
+                              }
+                             ]
+                            }
+                           },
+                           "b": {
+                            "k": "name",
+                            "v": "last_comma"
+                           }
                           },
                           "t": {
                            "k": "seq",
                            "a": {
                             "k": "assign",
-                            "x": "word",
+                            "x": "last_comma",
                             "e": {
-                             "k": "mcall",
-                             "recv": {
-                              "k": "name",
-                              "v": "word"
-                             },
-                             "m": "capitalize",
-                             "args": []
+                             "k": "name",
+                             "v": "idx"
                             }
                            },
                            "b": {
-                            "k": "assign",
-                            "x": "next_capitalized",
-                            "e": {
-                             "k": "bool",
-                             "v": false
+                            "k": "seq",
+                            "a": {
+                             "k": "assign",
+                             "x": "last_fullstop",
+                             "e": {
+                              "k": "binop",
+                              "op": "+",
+                              "a": {
+                               "k": "name",
+                               "v": "last_fullstop"
+                              },
+                              "b": {
+                               "k": "int",
+                               "v": "2"
+                              }
+                             }
+                            },
+                            "b": {
+                             "k": "assign",
+                             "x": "word",
+                             "e": {
+                              "k": "binop",
+                              "op": "+",
+                              "a": {
+                               "k": "name",
+                               "v": "word"
+                              },
+                              "b": {
+                               "k": "str",
+                               "v": ","
+                              }
+                             }
                             }
                            }
                           },
@@ -164588,49 +164636,55 @@
                               "args": [
                                {
                                 "k": "int",
-                                "v": "3"
+                                "v": "10"
                                },
                                {
                                 "k": "int",
-                                "v": "8"
+                                "v": "20"
                                }
                               ]
                              }
                             },
                             "b": {
                              "k": "name",
-                             "v": "last_comma"
+                             "v": "last_fullstop"
                             }
                            },
                            "t": {
                             "k": "seq",
                             "a": {
-                             "k": "assign",
-                             "x": "last_comma",
-                             "e": {
-                              "k": "name",
-                              "v": "idx"
+                             "k": "seq",
+                             "a": {
+                              "k": "assign",
+                              "x": "tmp1",
+                              "e": {
+                               "k": "name",
+                               "v": "idx"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "assign",
+                               "x": "last_comma",
+                               "e": {
+                                "k": "name",
+                                "v": "tmp1"
+                               }
+                              },
+                              "b": {
+                               "k": "assign",
+                               "x": "last_fullstop",
+                               "e": {
+                                "k": "name",
+                                "v": "tmp1"
+                               }
+                              }
                              }
                             },
                             "b": {
                              "k": "seq",
                              "a": {
-                              "k": "assign",
-                              "x": "last_fullstop",
-                              "e": {
-                               "k": "binop",
-                               "op": "+",
-                               "a": {
-                                "k": "name",
-                                "v": "last_fullstop"
-                               },
-                               "b": {
-                                "k": "int",
-                                "v": "2"
-                               }
-                              }
-                             },
-                             "b": {
                               "k": "assign",
                               "x": "word",
                               "e": {
@@ -164642,8 +164696,16 @@
                                },
                                "b": {
                                 "k": "str",
-                                "v": ","
+                                "v": "."
                                }
+                              }
+                             },
+                             "b": {
+                              "k": "assign",
+                              "x": "next_capitalized",
+                              "e": {
+                               "k": "bool",
+                               "v": true
                               }
                              }
                             }
@@ -164653,126 +164715,20 @@
                            }
                           },
                           "b": {
-                           "k": "seq",
-                           "a": {
-                            "k": "ifte",
-                            "c": {
-                             "k": "binop",
-                             "op": ">",
-                             "a": {
-                              "k": "binop",
-                              "op": "-",
-                              "a": {
-                               "k": "name",
-                               "v": "idx"
-                              },
-                              "b": {
-                               "k": "callV",
-                               "f": {
-                                "k": "field",
-                                "a": {
-                                 "k": "name",
-                                 "v": "<module>jinja2/utils.py"
-                                },
-                                "f": "randrange"
-                               },
-                               "args": [
-                                {
-                                 "k": "int",
-                                 "v": "10"
-                                },
-                                {
-                                 "k": "int",
-                                 "v": "20"
-                                }
-                               ]
-                              }
-                             },
-                             "b": {
-                              "k": "name",
-                              "v": "last_fullstop"
-                             }
+                           "k": "exprS",
+                           "e": {
+                            "k": "mcall",
+                            "recv": {
+                             "k": "name",
+                             "v": "p"
                             },
-                            "t": {
-                             "k": "seq",
-                             "a": {
-                              "k": "seq",
-                              "a": {
-                               "k": "assign",
-                               "x": "tmp1",
-                               "e": {
-                                "k": "name",
-                                "v": "idx"
-                               }
-                              },
-                              "b": {
-                               "k": "seq",
-                               "a": {
-                                "k": "assign",
-                                "x": "last_comma",
-                                "e": {
-                                 "k": "name",
-                                 "v": "tmp1"
-                                }
-                               },
-                               "b": {
-                                "k": "assign",
-                                "x": "last_fullstop",
-                                "e": {
-                                 "k": "name",
-                                 "v": "tmp1"
-                                }
-                               }
-                              }
-                             },
-                             "b": {
-                              "k": "seq",
-                              "a": {
-                               "k": "assign",
-                               "x": "word",
-                               "e": {
-                                "k": "binop",
-                                "op": "+",
-                                "a": {
-                                 "k": "name",
-                                 "v": "word"
-                                },
-                                "b": {
-                                 "k": "str",
-                                 "v": "."
-                                }
-                               }
-                              },
-                              "b": {
-                               "k": "assign",
-                               "x": "next_capitalized",
-                               "e": {
-                                "k": "bool",
-                                "v": true
-                               }
-                              }
-                             }
-                            },
-                            "e": {
-                             "k": "skip"
-                            }
-                           },
-                           "b": {
-                            "k": "exprS",
-                            "e": {
-                             "k": "mcall",
-                             "recv": {
+                            "m": "append",
+                            "args": [
+                             {
                               "k": "name",
-                              "v": "p"
-                             },
-                             "m": "append",
-                             "args": [
-                              {
-                               "k": "name",
-                               "v": "word"
-                              }
-                             ]
-                            }
+                              "v": "word"
+                             }
+                            ]
                            }
                           }
                          }
@@ -164781,55 +164737,109 @@
                       }
                      }
                     }
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "seq",
+                    "a": {
+                     "k": "assign",
+                     "x": "tmp5",
+                     "e": {
+                      "k": "str",
+                      "v": " "
+                     }
+                    },
+                    "b": {
+                     "k": "assign",
+                     "x": "p_str",
+                     "e": {
+                      "k": "mcall",
+                      "recv": {
+                       "k": "name",
+                       "v": "tmp5"
+                      },
+                      "m": "join",
+                      "args": [
+                       {
+                        "k": "name",
+                        "v": "p"
+                       }
+                      ]
+                     }
+                    }
                    },
                    "b": {
                     "k": "seq",
                     "a": {
-                     "k": "seq",
-                     "a": {
-                      "k": "assign",
-                      "x": "tmp5",
-                      "e": {
-                       "k": "str",
-                       "v": " "
-                      }
+                     "k": "ifte",
+                     "c": {
+                      "k": "mcall",
+                      "recv": {
+                       "k": "name",
+                       "v": "p_str"
+                      },
+                      "m": "endswith",
+                      "args": [
+                       {
+                        "k": "str",
+                        "v": ","
+                       }
+                      ]
                      },
-                     "b": {
+                     "t": {
                       "k": "assign",
                       "x": "p_str",
                       "e": {
-                       "k": "mcall",
-                       "recv": {
-                        "k": "name",
-                        "v": "tmp5"
-                       },
-                       "m": "join",
-                       "args": [
-                        {
+                       "k": "binop",
+                       "op": "+",
+                       "a": {
+                        "k": "slice",
+                        "a": {
                          "k": "name",
-                         "v": "p"
+                         "v": "p_str"
+                        },
+                        "lo": {
+                         "k": "unit"
+                        },
+                        "hi": {
+                         "k": "unop",
+                         "op": "-",
+                         "a": {
+                          "k": "int",
+                          "v": "1"
+                         }
+                        },
+                        "st": {
+                         "k": "unit"
                         }
-                       ]
+                       },
+                       "b": {
+                        "k": "str",
+                        "v": "."
+                       }
                       }
-                     }
-                    },
-                    "b": {
-                     "k": "seq",
-                     "a": {
+                     },
+                     "e": {
                       "k": "ifte",
                       "c": {
-                       "k": "mcall",
-                       "recv": {
-                        "k": "name",
-                        "v": "p_str"
-                       },
-                       "m": "endswith",
-                       "args": [
-                        {
-                         "k": "str",
-                         "v": ","
-                        }
-                       ]
+                       "k": "unop",
+                       "op": "!",
+                       "a": {
+                        "k": "mcall",
+                        "recv": {
+                         "k": "name",
+                         "v": "p_str"
+                        },
+                        "m": "endswith",
+                        "args": [
+                         {
+                          "k": "str",
+                          "v": "."
+                         }
+                        ]
+                       }
                       },
                       "t": {
                        "k": "assign",
@@ -164838,25 +164848,8 @@
                         "k": "binop",
                         "op": "+",
                         "a": {
-                         "k": "slice",
-                         "a": {
-                          "k": "name",
-                          "v": "p_str"
-                         },
-                         "lo": {
-                          "k": "unit"
-                         },
-                         "hi": {
-                          "k": "unop",
-                          "op": "-",
-                          "a": {
-                           "k": "int",
-                           "v": "1"
-                          }
-                         },
-                         "st": {
-                          "k": "unit"
-                         }
+                         "k": "name",
+                         "v": "p_str"
                         },
                         "b": {
                          "k": "str",
@@ -164865,62 +164858,25 @@
                        }
                       },
                       "e": {
-                       "k": "ifte",
-                       "c": {
-                        "k": "unop",
-                        "op": "!",
-                        "a": {
-                         "k": "mcall",
-                         "recv": {
-                          "k": "name",
-                          "v": "p_str"
-                         },
-                         "m": "endswith",
-                         "args": [
-                          {
-                           "k": "str",
-                           "v": "."
-                          }
-                         ]
-                        }
-                       },
-                       "t": {
-                        "k": "assign",
-                        "x": "p_str",
-                        "e": {
-                         "k": "binop",
-                         "op": "+",
-                         "a": {
-                          "k": "name",
-                          "v": "p_str"
-                         },
-                         "b": {
-                          "k": "str",
-                          "v": "."
-                         }
-                        }
-                       },
-                       "e": {
-                        "k": "skip"
-                       }
+                       "k": "skip"
                       }
-                     },
-                     "b": {
-                      "k": "exprS",
-                      "e": {
-                       "k": "mcall",
-                       "recv": {
+                     }
+                    },
+                    "b": {
+                     "k": "exprS",
+                     "e": {
+                      "k": "mcall",
+                      "recv": {
+                       "k": "name",
+                       "v": "result"
+                      },
+                      "m": "append",
+                      "args": [
+                       {
                         "k": "name",
-                        "v": "result"
-                       },
-                       "m": "append",
-                       "args": [
-                        {
-                         "k": "name",
-                         "v": "p_str"
-                        }
-                       ]
-                      }
+                        "v": "p_str"
+                       }
+                      ]
                      }
                     }
                    }

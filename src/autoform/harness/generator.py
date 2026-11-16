@@ -172,6 +172,8 @@ class LLMGenerator:
     name = 'llm'
 
     def __init__(self, model: str | None = None, max_claims: int = 12):
+        from ..nl.llm import require_backend
+        require_backend('api', 'the llm candidate generator')   # AUTOFORM_LLM_ALLOWED_BACKENDS
         import anthropic  # noqa: F401  (import error means the generator is unavailable)
         self.model = model or os.environ.get('AUTOFORM_GENERATOR_MODEL', 'claude-opus-5')
         self.max_claims = max_claims

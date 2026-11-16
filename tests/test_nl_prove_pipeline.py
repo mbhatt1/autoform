@@ -20,8 +20,8 @@ from autoform.nl import pipeline, report as nl_report  # noqa: E402
 from autoform.nl import prove as nl_prove  # noqa: E402
 from autoform.nl.schema import (CheckResult, EnglishProperty, EnglishSpec, FILES, JUDGE_FILES,  # noqa: E402
                                 Statement, dump)
+from conftest import nl_fixture  # noqa: E402
 
-FIXTURE = ROOT / 'tests/fixtures/nl/translation-PipelinePython.json'
 LEAN = pytest.mark.skipif(os.environ.get('AUTOFORM_TEST_LEAN') != '1', reason='set AUTOFORM_TEST_LEAN=1')
 ADD = 'numbers.py:<module>.add'
 CALL = 'runFunc Autoform.Generated.PipelinePython.program 1000 "numbers.py:<module>.add" [.int a, .int b]'
@@ -30,7 +30,7 @@ ADD_PROP = f'∀ (a b : Int), match {CALL} with | .val (.int r) => r = a + b | _
 
 
 def fixture():
-    t = json.loads(FIXTURE.read_text())
+    t = nl_fixture('translation-PipelinePython.json')
     t['lean_root'] = str(ROOT)
     return t
 
@@ -409,7 +409,8 @@ def test_nl_prove_budget_zero_skips_without_calling_agent(tmp_path, monkeypatch)
 
 
 @LEAN
-def test_nl_prove_kernel_checks_scripted_proof(tmp_path):
+def test_nl_prove_kernel_checks_scripted_proof(tmp_path, pipeline_model):
+    pipeline_model('PipelinePython', 'examples/source/python')
     stmts, checks = _stmts()
     cache = tmp_path / 'cache'
     reply = '<proof>by\n  -- af_eval computes the call; no sorry needed\n  intro a b\n  af_eval\n  simp</proof>'

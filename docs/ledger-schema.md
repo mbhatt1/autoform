@@ -227,5 +227,13 @@ whose every open callee is in the dialect's `contractedCallees` list (`Autoform/
 are reported side by side and never summed: `closedByTranslation` supports `G3.1`
 unconditionally, while a function closed by contract supports a claim only together with
 an `Assumption` node per contracted callee (docs/contracts.md, "The API for assumption
-extraction"). `scripts/sacm.py` does not yet consume `closedByContract`; until it does the
-number is informational and the case is built from `verifiableCore` alone.
+extraction"). `scripts/sacm.py` consumes both fields. When `closedByContract` is non-zero it
+emits a narrowed claim `G3.3` ("a further N hole-free functions are call-closed once the
+contracted callees are assumed to behave as their contracts state"), `STATIC` evidence,
+supported by the ledger reference `E6` and linked under `G3` beside `G3.1`; and one
+`Assumption` node `A.contract:<callee>` per `contractsUsed` entry, with `occurrences` set to
+its `sites`, linked to `G3.3` only. Nothing is linked to `G3.1`, whose count stays
+`verifiableCore`, or to the top claim, so no status elsewhere in the case moves; `E6.value`
+carries both fields verbatim and the summary reports them as `counts.closedByContract` and
+`counts.contractAssumptions`. A ledger that reports closure by contract but names no callee
+leaves `G3.3` `UNSUPPORTED`: the premise cannot be stated, so the closure is not earned.

@@ -31,6 +31,7 @@ found, so it can gate CI.
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import os
 import re
@@ -319,6 +320,22 @@ PATTERNS = [
 ]
 
 
+def newline_offsets(text: str) -> list[int]:
+    """Offsets of every newline in `text`, ascending, for `line_of`."""
+    offsets, i = [], text.find("\n")
+    while i != -1:
+        offsets.append(i)
+        i = text.find("\n", i + 1)
+    return offsets
+
+
+def line_of(offsets: list[int], pos: int) -> int:
+    """1-based line holding character offset `pos`, given `newline_offsets` of the same
+    text. Equals `text.count("\\n", 0, pos) + 1` -- the number of newlines strictly before
+    `pos` -- in O(log n) instead of O(pos)."""
+    return bisect.bisect_left(offsets, pos) + 1
+
+
 def source_sweep() -> dict:
     findings = []
     scanned = 0
@@ -352,9 +369,13 @@ def source_sweep() -> dict:
             continue
         code = strip_lean_comments(raw)
         lines = raw.splitlines()
+        # One pass over the file for the newline table, then a bisect per match.
+        # `code.count("\n", 0, m.start())` per match rescanned the prefix every time,
+        # which on a 22 MB generated module with thousands of matches is quadratic.
+        offsets = newline_offsets(code)
         for kind, pat in PATTERNS:
             for m in pat.finditer(code):
-                line_no = code.count("\n", 0, m.start()) + 1
+                line_no = line_of(offsets, m.start())
                 findings.append({
                     "kind": kind,
                     "file": rel,
@@ -447,10 +468,20 @@ def lean4checker(fresh: bool = True, module: str = "Autoform") -> dict:
         }
 
     cmd = ["lake", "env", exe] + (["--fresh"] if fresh else []) + [module]
+    # Single-threaded replay of the whole tree; ~1 h idle on a 10-core laptop
+    # (docs/running.md), several hours when a test suite or build shares the machine.
+    raw = os.environ.get("AUTOFORM_LEANCHECKER_TIMEOUT", "").strip()
+    try:
+        budget = int(raw) if raw else 3600
+    except ValueError:
+        budget = -1
+    if budget < 1:
+        return {"status": "ERROR", "available": True, "exe": exe, "command": " ".join(cmd),
+                "detail": f"AUTOFORM_LEANCHECKER_TIMEOUT must be a positive integer of seconds, got {raw!r}"}
     try:
         proc = subprocess.run(
             cmd, cwd=str(REPO), env=elan_env(),
-            capture_output=True, text=True, timeout=3600,
+            capture_output=True, text=True, timeout=budget,
         )
     except FileNotFoundError as e:
         return {"status": "ERROR", "available": True, "exe": exe,
@@ -624,6 +655,12 @@ def main() -> int:
         p("VERDICT: FAIL")
         for f in failures:
             p("  - " + f)
+    elif ax["status"] == "SKIPPED":
+        # Under --skip-lean only the source sweep ran. "No trusted-code leak" is a claim
+        # the axiom sweep and the kernel replay make; a PASS printed in their absence
+        # read as though they had been made.
+        p("VERDICT: PASS (source sweep only; axiom sweep and kernel replay SKIPPED)")
+        p("  caveat: --skip-lean; a sorryAx or ofReduceBool dependency would NOT have been seen")
     else:
         p("VERDICT: PASS (no trusted-code leak)")
         if l4c["status"] == "UNVERIFIED":

@@ -80,7 +80,7 @@ STDLIB_EXC_NAMES = [
 STDLIB_FREE_NAMES = STDLIB_EXC_NAMES + [
     "len", "abs", "sum", "min", "max", "sorted", "bool", "str", "repr", "format", "int",
     "ord", "chr", "callable", "isinstance", "getattr", "hasattr",
-    "list", "tuple", "dict"]
+    "list", "tuple", "dict", "<python-range>"]
 # `Iteration.freeNames` (Autoform/Lang/Core/Iteration.lean)
 ITERATION_FREE_NAMES = [
     "iter", "next", "<python-iter>", "<python-next>", "<iterator-next>", "<sequence-iter>",
@@ -90,7 +90,9 @@ ITERATION_FREE_NAMES = [
 STDLIB_METHOD_NAMES = [
     "get", "keys", "values", "items", "copy", "count", "index",
     "append", "insert", "extend", "clear", "remove", "pop", "popitem",
-    "setdefault", "update", "add", "discard"]
+    "setdefault", "update", "add", "discard",
+    "lower", "upper", "strip", "lstrip", "rstrip", "split", "startswith", "endswith",
+    "replace", "join"]
 # `contractedCallees` (Autoform/Ledger.lean), per dialect
 CONTRACTED_CALLEES = {
     ".python": ["." + m for m in STDLIB_METHOD_NAMES] + ["functools.update_wrapper"],

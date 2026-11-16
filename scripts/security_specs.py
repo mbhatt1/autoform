@@ -47,7 +47,13 @@ def completed_stage(stages, name):
 
 
 def mutation_adequate(mutation, theorem, definition):
-    """Require attributable mutation records, not only a favorable summary label."""
+    """Require attributable mutation records, not only a favorable summary label.
+
+    Every scored record must give this theorem a killed or survived verdict. The one
+    exception is a `build_scope: targeted-parts` report, where a mutant of some other
+    definition never built this theorem's part and records it as `not-built`; that is
+    accepted only off-subject, since a mutant of the theorem's own definition always
+    builds its part and must have been killed there."""
     result = obj(obj(mutation.get('theorems')).get(theorem))
     if (not isinstance(definition, str) or not definition
             or obj(mutation.get('restored_build')).get('timeout', False) is not False
@@ -64,6 +70,7 @@ def mutation_adequate(mutation, theorem, definition):
             or mutation['mutants_generated'] < len(records)
             or mutation['inconclusive'] != 0 or mutation['coarse_attributions'] != 0):
         return False
+    targeted = mutation.get('build_scope') == 'targeted-parts'
     killed, invalid = 0, 0
     for record in records:
         if (not isinstance(record, dict) or not isinstance(record.get('decl'), str)
@@ -73,7 +80,11 @@ def mutation_adequate(mutation, theorem, definition):
         if verdict == 'invalid':
             invalid += 1
             continue
-        if not isinstance(verdict, dict) or verdict.get(theorem) not in ('killed', 'survived'):
+        if not isinstance(verdict, dict):
+            return False
+        if targeted and record['decl'] != definition and verdict.get(theorem) == 'not-built':
+            continue
+        if verdict.get(theorem) not in ('killed', 'survived'):
             return False
         if record['decl'] == definition:
             if verdict[theorem] != 'killed':

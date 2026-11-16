@@ -474,6 +474,15 @@ def preflight(lean_root, *, budget_usd=None, domain_size=64, parallel=None, repa
                             'the Messages API directly)')
         if mode == 'api-key' and not os.environ.get('ANTHROPIC_API_KEY'):
             errors.append('AUTOFORM_CLAUDE_AUTH=api-key but ANTHROPIC_API_KEY is not set')
+        if mode is not None:
+            from .llm import SDK_MODES, claude_env
+            try:
+                claude_env()   # the egress policy also covers the claude CLI children
+            except LLMError as exc:
+                if mode in SDK_MODES:
+                    warnings.append(f'{exc}: the prove and refine agents run the claude CLI and will be refused')
+                else:
+                    errors.append(str(exc))
     for name, v, lo in (('--budget-usd', budget_usd, 0.0), ('--domain-size', domain_size, 1),
                         ('--parallel', parallel, 1), ('--repairs', repairs, 0), ('--repair-rounds', repair_rounds, 0)):
         if v is not None and v < lo:

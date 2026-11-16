@@ -37,35 +37,56 @@ number from the tool.
 
 ## 2. Language coverage
 
-Cells are taken from [languages.md](languages.md) (its support matrix is a historical
-measurement and says so: "not a current capability registry") and the README language
-table. "Real corpus" means a measured open-source repository, not a fixture.
+Cells are taken from the support matrix in [languages.md](languages.md), rebuilt
+2026-11-13 from the artifacts on disk (every measured row there has an oracle run and
+quotes the counts its `conformance.json` recorded; the 2026-10 rows that never had one
+are kept in a separate historical table), and from the README language table. "Real
+corpus" means a measured open-source repository, not a fixture.
 
-| Language | Source -> Lean model | Differential oracle against the real runtime | Measured on a real corpus (languages.md) |
-|---|---|---|---|
-| Python | yes; the reference dialect | CPython; yes | `cachetools`: 209 functions, 204 hole-free, 150 in the verifiable core (bound by check_docs). Pipeline run on Django (`django/`, 10,623 functions) in [scale.md](scale.md) |
-| Java | yes; own dialect, 64-bit `long` | JVM backend; ran on a real corpus | Apache commons-lang3 3.17.0 subset: 488 functions, 421 hole-free, 196 in the verifiable core; oracle compared **83** functions, 196/196 cases agree, 0 divergences, 404 cases inconclusive (all bound by check_docs) |
-| Go | yes; own dialect | `go test` backend; ran on a three-function fixture only | matrix row: 83 functions, 21 hole-free, 6 in the verifiable core (historical; oracle "not yet on this corpus") |
-| C | yes; typed fixed-width numerics, UB is a hole | `cc`; the matrix row records the oracle as crashed on that historical corpus; README lists `cc`/`clang` | matrix row: 59 functions, 17 hole-free, 8 in the verifiable core (historical). Linux `lib/math` (`LinuxLcm`) is re-landed from kernel v7.2 |
-| C++ | yes, through the C front end (README groups it with C) | as for C | no row in the support matrix. The V8 corpus (C++) is assessed in [evidence-V8Base.md](evidence-V8Base.md): "every function translated without holes" is marked UNSUPPORTED there |
-| Kotlin | yes on a toy; runs as `.java` dialect | JVM through a `@JvmStatic` thunk; **no** corpus run | the matrix row for a real Kotlin repository records the front end as failing (historical); the toy row has 3 functions |
-| TypeScript | yes; `.javascript` dialect | Node backend; fixture run covers `.js` only, not `.ts` | matrix row: 86 functions, 44 hole-free, 18 in the verifiable core (historical) |
-| JavaScript | yes; `.javascript` dialect | Node backend; fixture only | small corpus: 14 functions, 5 hole-free. A 693-function `lodash.js` run did **not** translate (historical renderer failure) |
-| **Rust** | yes, for library code Aeneas translates: rustdoc gives the public API, Charon + Aeneas the Lean (separate Lake project on Lean v4.31.0); every public function is translated or a named hole | native cargo harness (debug profile, sandboxed) vs Aeneas `#eval`, on integers, `bool`, tuples, fixed arrays and shared refs; anything else inconclusive with a reason; in CI (`rust.yml`) | gcd 2.3.0: 60 public functions, 12 translated, 12 compared, 1178/1178 cases agree, 0 divergences, 121/144 case theorems kernel-checked (bound by check_docs to `evidence-RustGcd.json`, re-derived by the Rust CI job); [rust.md](rust.md) lists what is not covered |
-| **Hack** | **not supported** | none | not mentioned in `languages.md`; no front end, dialect or oracle |
+| Language | Source -> Lean model | Differential oracle against the real runtime | Cross-revision behaviour (`pr` / `regress`) | Measured on a real corpus (languages.md) |
+|---|---|---|---|---|
+| Python | yes; the reference dialect | CPython; yes | `pr`: head tests + random cases against base model | `cachetools`: 209 functions, 204 hole-free, 150 in the verifiable core (bound by check_docs). Pipeline run on Django (`django/`, 10,623 functions) in [scale.md](scale.md) |
+| Java | yes; own dialect, 64-bit `long` | JVM backend; ran on a real corpus | `pr`: seeded random inputs + literals against base model | Apache commons-lang3 3.17.0 subset: 488 functions, 365 hole-free, 174 in the verifiable core; oracle compared **153** functions, 961/961 cases agree, 0 divergences, 1432 cases inconclusive (all bound by check_docs; the 2026-10-22 `--literal-inputs` run, strings drawn from the corpus's own literals) |
+| Go | yes; own dialect | `go test` backend; ran on a real corpus (`AlgosGo`) | `pr`: fixed per-type pools against base model | `AlgosGo` (TheAlgorithms/Go `math/binary`): 3 functions, 2 hole-free; oracle ran 24/24 cases agree, 0 divergences, 2 of 2 hole-free functions driven by `go test` ([languages.md](languages.md#first-real-open-source-corpora-for-go-javascript-typescript-and-kotlin-2026-10-22)). Historical matrix row: 83 functions, 21 hole-free, 6 in the verifiable core |
+| C | yes; typed fixed-width numerics, UB is a hole | `cc`; the measured matrix row (in-repo fixture `LangC`) records 12 of 13 hole-free functions compared, 56/56 cases agree, 0 divergences, 4 inconclusive on named UB; the historical `antirez/sds` row records the oracle as crashed in the 2026-10 run; README lists `cc`/`clang` | `pr`: seeded typed-boundary inputs against base model | no real C corpus in the measured matrix: the measured row is the 13-function fixture `LangC`; the historical `antirez/sds` row has 59 functions, 17 hole-free, 8 in the verifiable core. Linux `lib/math` (`LinuxLcm`) is re-landed from kernel v7.2 |
+| C++ | yes, through the C front end (README groups it with C) | as for C | `pr`: seeded random and width-boundary inputs (C ABI thunks) against base model | no row in the support matrix. The V8 corpus (C++) is assessed in [evidence-V8Base.md](evidence-V8Base.md): "every function translated without holes" is marked UNSUPPORTED there |
+| Kotlin | yes; runs as `.java` dialect | JVM through a `@JvmStatic` thunk; ran on a real corpus (`AlgosKt`) | `pr`: seeded random inputs + literals, object/companion/enum receivers against base model | `AlgosKt` (`corpus-algokt`): 16 functions, 16 hole-free; oracle ran 22/22 cases agree, 0 divergences, 3 cases inconclusive, 5 of 16 hole-free functions driven through the `@JvmStatic` thunk ([languages.md](languages.md#first-real-open-source-corpora-for-go-javascript-typescript-and-kotlin-2026-10-22)). Historical matrix row recorded the front end as failing; the toy row has 3 functions |
+| TypeScript | yes; `.javascript` dialect | Node backend; ran on a real corpus (`AlgosTS`) | `pr`: fixed numeric pool + body literals against base model | `AlgosTS` (TheAlgorithms/TypeScript `maths`): 4 functions, 4 hole-free; oracle ran 24/24 cases agree, 0 divergences, 2 of 4 hole-free functions driven by Node ([languages.md](languages.md#first-real-open-source-corpora-for-go-javascript-typescript-and-kotlin-2026-10-22)). Historical matrix row: 86 functions, 44 hole-free, 18 in the verifiable core |
+| JavaScript | yes; `.javascript` dialect | Node backend; ran on a real corpus (`BitJS`) | `pr`: fixed numeric pool + body literals against base model | `BitJS` (TheAlgorithms/JavaScript bit-manipulation): 10 functions, 9 hole-free; oracle ran 48/48 cases agree, 0 divergences, 4 of 9 hole-free functions driven by Node ([languages.md](languages.md#first-real-open-source-corpora-for-go-javascript-typescript-and-kotlin-2026-10-22)). Earlier small corpus had 14 functions, 5 hole-free; a 693-function `lodash.js` run did **not** translate (historical renderer failure) |
+| **Rust** | yes, for library code Aeneas translates: rustdoc gives the public API, Charon + Aeneas the Lean (separate Lake project on Lean v4.31.0); every public function is translated or a named hole | native cargo harness (debug profile, sandboxed) vs Aeneas `#eval`, on integers, `bool`, tuples, fixed arrays and shared refs; anything else inconclusive with a reason; in CI (`rust.yml`) | `regress`: native head vs base model (where translated) and base native on same inputs | gcd 2.3.0: 60 public functions, 12 translated, 12 compared, 1178/1178 cases agree, 0 divergences, 121/144 case theorems kernel-checked (bound by check_docs to `evidence-RustGcd.json`, re-derived by the Rust CI job); [rust.md](rust.md) lists what is not covered |
+| **Hack** | **not supported** | none | — | not mentioned in `languages.md`; no front end, dialect or oracle |
 
-The percentages and function counts that are not marked "bound" are quoted from a
-historical table whose language rows have not been re-run since the fixes the document
-lists. [languages.md](languages.md) records, among others, that `.tsx` once got the
+The "Cross-revision behaviour" column describes how `autoform pr` and `autoform regress`
+detect changes in what a function does between revisions. `pr` compares the base revision's
+model against the head runtime on the same inputs, with a control run (base model against
+base runtime) that filters model noise; the inputs come from the head's tests (Python only),
+the backend's seeded random or fixed pools, and string/integer literals mined from the base
+export. `regress` on a Cargo library (the Rust route, `scripts/rust_regress.py`) replays the base model's test cases and boundary inputs through
+three harnesses (base native, base rebuilt, head native) to detect regressions where the head
+diverges from the base model or the base native: a case the control flags is unstable and
+excluded. Neither is a proof of equivalence; they report whether the compared inputs showed
+a change ([evidence-levels.md](evidence-levels.md), "Behaviour" section). With
+`--fail-on behaviour-changed` a behaviour change exits 1; with `--fail-on` set, a run in which
+no changed function reached `changed` or `unchanged-on-inputs` exits 3 (no evidence) rather
+than passing.
+
+The figures marked "historical" are quoted from the historical table in
+[languages.md](languages.md), whose rows have not been re-run since the fixes the document
+lists; the other unbound figures are as current as the on-disk artifact the matrix names.
+[languages.md](languages.md) records, among others, that `.tsx` once got the
 Python dialect and that JavaScript numbers and Java `long` were modelled as 32-bit
-before their dialects were added; the rows are from before or around those fixes.
+before their dialects were added; the historical rows are from before or around those fixes.
 Machine code (ELF, PE, Mach-O, assembly) is a separate path
 ([machine-code.md](machine-code.md)).
 
 For a typical stack this means: Python and Java have the deepest evidence;
-Go, C, C++, Kotlin, TypeScript and JavaScript translate and type-check but have little or
-no oracle evidence on real code; Rust has a narrow real-crate result (integer library code that Aeneas translates) and Hack gets nothing. A hole-free function is
-far from a verified function (Java: 83 compared of 421 hole-free).
+Go, Kotlin, TypeScript and JavaScript now each have a narrow real-corpus oracle result
+(a handful of integer/bit-manipulation functions driven by the real runtime, recorded in
+the 2026-10-22 section of [languages.md](languages.md)) on top of their fixtures; C and C++
+translate and type-check but still have little or no oracle evidence on real code; Rust has
+a narrow real-crate result (integer library code that Aeneas translates) and Hack gets
+nothing. A hole-free function is far from a verified function
+(Java: 153 compared of 365 hole-free).
 
 ## 3. Security posture
 
@@ -94,8 +115,8 @@ user. Analyse untrusted code only in a disposable environment.
 * **Provenance of the inputs.** Joern is pinned (`joern-version`) and its release is
   SHA-512 verified in CI; the Lean toolchain is pinned (`lean-toolchain`); each tracked
   AST carries a provenance record naming the command that regenerates it
-  (`scripts/check_provenance.py`). The gate reports `7/20 in-repository artifacts fully
-  attributed` and **13 unattributed ASTs** that predate the mechanism, listed by name in
+  (`scripts/check_provenance.py`). The gate reports `18/24 in-repository artifacts fully
+  attributed` and **6 unattributed ASTs** that predate the mechanism, listed by name in
   `provenance/unattributed.json` (a named backlog, not an exemption).
 * **Network.** Nothing in the analysis path needs the network except fetching the
   toolchain: `elan` and the Lean toolchain, Lake's Lean dependencies (from GitHub), Joern,
@@ -107,8 +128,9 @@ user. Analyse untrusted code only in a disposable environment.
   workflow job has an explicit least-privilege `permissions:` block; the publish path
   attaches a CycloneDX SBOM and a build-provenance attestation to the release, and PyPI
   upload uses trusted publishing (no stored token). These are defined in
-  `.github/workflows/package.yml` and have not yet run, because no release exists
-  ([packaging.md](packaging.md)).
+  `.github/workflows/package.yml`; whether they ran for the `v0.0.1` tag (2026-10-11) is
+  not verified from this checkout (`gh run list --workflow package.yml` is the record;
+  [packaging.md](packaging.md)).
 * **License.** `Apache-2.0 AND MIT` (`pyproject.toml`); notices in `LICENSE`, `NOTICE`,
   `licenses/` and [THIRD_PARTY.md](../THIRD_PARTY.md). The one runtime dependency of the
   wheel is `hypothesis`.
@@ -161,24 +183,35 @@ bound"):
 * **Django figures are unbound** in `check_docs` when `ledger-Django.json` is absent
   (it is not regenerated by CI), so those numbers in the docs are not guarded against
   drift.
-* **13 ASTs are unattributed** (`provenance/unattributed.json`): the tree and revision
-  that produced them is not recorded, including the V8 corpora. They are evidence of
+* **6 ASTs are unattributed** (`provenance/unattributed.json`): the command that
+  reproduces each committed artifact is not recorded. Three (`ast-CMath`, `ast-Sample`,
+  `ast-Stress`) predate an exporter change, so a fresh export *differs* from the committed
+  bytes rather than reproducing them; one (`ast-LinuxLibSample`) is an extraction whose
+  selector was never committed; and two (the V8 corpora `ast-V8Base` and `ast-V8Numbers`)
+  were built from a V8 revision the repository does not identify. They are evidence of
   what the tool did, not reproducible from the repository.
 * **Linux sandboxing needs unprivileged user namespaces.** CI relaxes the Ubuntu 24.04
   AppArmor restriction to get `bwrap`; on hosts that forbid it, only the network-only
   `unshare` fallback or no confinement is available.
-* **Java evidence is 83 of 421** hole-free functions compared with the real JVM
-  (commons-lang3 subset). The inconclusive cases are named in
-  [languages.md](languages.md): `String` methods beyond the modelled set
-  (`trim`, `toLowerCase`, `toCharArray`, ...), static calls into `java.lang`, and
-  Java class initializers, which are not exported.
+* **Java evidence is 153 of 365** hole-free functions compared with the real JVM
+  (commons-lang3 subset, strings drawn from the corpus's own literals). The inconclusive
+  cases are named in
+  [languages.md](languages.md): the `op:instanceOf` and `control:TRY-handler-language`
+  holes reached through callees, `String` methods beyond the modelled set
+  (`trim`, `toLowerCase`, `toCharArray`, ...), method calls on boxed parameters
+  (`booleanValue`, `equals`), static calls into `java.lang` and `ObjectUtils`, and the
+  static fields the JVM binding does not carry (`char[]`, `String[]`, `Locale`). Java arrays are not
+  modelled: every `.length` read is the named hole `op:sizeOf:array-length` (76 sites),
+  and functions with an array in their signature are skipped by the backend.
 * **Joern, `lake` and compiler steps are not sandboxed** (section 3).
 * **Joern's export is not byte-stable** on some inputs: re-exports differ in the choice of
   an overload resolution on commons-lang3 and in an argument order on Jinja2
   ([languages.md](languages.md)). Provenance records name the command, not a promise of
   identical bytes.
 * **No Hack, Bazel or Buck support, and Rust only for library code Aeneas translates** (pure integer-style functions; traits, generics, floats, strings, collections and `unsafe` end as named holes or inconclusive, see rust.md). C#, PHP, Ruby and Swift were not tested.
-* **The GitHub Action and the release supply-chain jobs have not run.**
+* **The GitHub Action has one recorded real run** (PR #14, 2026-10-11,
+  [github-action.md](github-action.md)); whether the release supply-chain jobs ran for
+  `v0.0.1` is not verified from this checkout.
 
 ## 7. A first-week evaluation plan
 

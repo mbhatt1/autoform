@@ -30,7 +30,6 @@ Exit status: 0 no divergence found; 1 at least one kernel-checked divergence;
 from __future__ import annotations
 
 import argparse
-import ctypes
 import datetime
 import hashlib
 import itertools
@@ -43,7 +42,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]

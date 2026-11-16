@@ -17,6 +17,13 @@ Backends, selected by AUTOFORM_NEURAL_BACKEND:
                        their own install — the failure is a dlopen arch mismatch, not a
                        missing package).
 
+Model selection: the three backends take mutually incompatible model ids (an ollama tag,
+an Anthropic id, an OpenAI id), so one shared name cannot be right for more than one of
+them. The model is read from AUTOFORM_NEURAL_MODEL_<BACKEND> (the backend name
+uppercased: AUTOFORM_NEURAL_MODEL_OLLAMA, AUTOFORM_NEURAL_MODEL_ANTHROPIC,
+AUTOFORM_NEURAL_MODEL_OPENAI), then from AUTOFORM_NEURAL_MODEL, then the backend's
+default (qwen2.5:7b, claude-opus-5-5, gpt-4o-mini).
+
 The key is never read from a file and never written to one. Do not add it to the repo:
 this project is public, and a committed key is a credential leak, not a configuration
 detail.
@@ -39,6 +46,16 @@ if os.environ.get("AUTOFORM_NEURAL") != "1":
 goal = (open(sys.argv[1]).read() if len(sys.argv) > 1 else sys.stdin.read()).strip()
 backend = os.environ.get("AUTOFORM_NEURAL_BACKEND", "ollama").lower()
 
+# The egress allow-list of autoform.nl.llm covers this proposer too: the Messages API backend
+# is the `api` backend; the other remote one is not an autoform backend, so any policy refuses
+# it. Local ollama sends nothing off the machine (unless OLLAMA_HOST points elsewhere).
+_allowed = os.environ.get("AUTOFORM_LLM_ALLOWED_BACKENDS")
+if _allowed is not None and backend != "ollama" and (
+        backend != "anthropic" or "api" not in [n.strip().lower() for n in _allowed.split(",")]):
+    print("# refused (%s): AUTOFORM_LLM_ALLOWED_BACKENDS=%s does not allow it; nothing was sent"
+          % (backend, _allowed))
+    sys.exit(0)
+
 PROMPT = """You are proving a theorem in Lean 4 (core + Batteries only; Mathlib and aesop are NOT available).
 Goal:
 {goal}
@@ -49,8 +66,18 @@ simp, simp_all, decide, omega, constructor, exact, apply, cases, rcases-free `ca
 induction, split, unfold, funext, bv_decide.
 """
 
+DEFAULT_MODEL = {"ollama": "qwen2.5:7b", "anthropic": "claude-opus-5-5", "openai": "gpt-4o-mini"}
+
+
+def neural_model(backend_name: str) -> str:
+    """AUTOFORM_NEURAL_MODEL_<BACKEND>, else AUTOFORM_NEURAL_MODEL, else the backend default."""
+    return (os.environ.get("AUTOFORM_NEURAL_MODEL_" + backend_name.upper())
+            or os.environ.get("AUTOFORM_NEURAL_MODEL")
+            or DEFAULT_MODEL[backend_name])
+
+
 def ask_ollama(prompt: str) -> str:
-    model = os.environ.get("AUTOFORM_NEURAL_MODEL", "qwen2.5:7b")
+    model = neural_model("ollama")
     host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
     if not host.startswith("http"):
         host = "http://" + host
@@ -75,14 +102,15 @@ def ask_anthropic(prompt: str) -> str:
         raise RuntimeError("ANTHROPIC_API_KEY is not set in the environment")
 
     client = anthropic.Anthropic()
-    # Thinking is ON BY DEFAULT on Claude Opus 5, and max_tokens caps thinking
+    # Thinking is always on for Claude Opus 5.5 (it cannot be disabled; depth is
+    # `output_config.effort`, whose default is `medium`), and max_tokens caps thinking
     # *plus* response text — a tight budget truncates mid-proof. Hence 16000
     # rather than the few hundred tokens the tactic scripts themselves need.
     #
     # No `temperature`: sampling parameters are rejected (400) on this model.
     # Variety across candidates comes from adaptive thinking, not sampling.
     msg = client.messages.create(
-        model=os.environ.get("AUTOFORM_NEURAL_MODEL", "claude-opus-5"),
+        model=neural_model("anthropic"),
         max_tokens=16000,
         output_config={"effort": os.environ.get("AUTOFORM_NEURAL_EFFORT", "high")},
         messages=[{"role": "user", "content": prompt}],
@@ -99,7 +127,7 @@ def ask_openai(prompt: str) -> str:
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
         raise RuntimeError("OPENAI_API_KEY is not set in the environment")
-    model = os.environ.get("AUTOFORM_NEURAL_MODEL", "gpt-4o-mini")
+    model = neural_model("openai")
     req = urllib.request.Request(
         os.environ.get("OPENAI_BASE", "https://api.openai.com/v1") + "/chat/completions",
         data=json.dumps({"model": model,

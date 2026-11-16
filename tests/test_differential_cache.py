@@ -176,6 +176,33 @@ def test_store_hit_miss_and_invalidate(tmp_path):
     assert oracle_cache.lookup(tmp_path, name, plan[name]) == (None, "no entry")
 
 
+def test_a_verdict_from_another_revision_of_the_runtime_source_is_not_replayed(tmp_path):
+    """The key binds the runtime's source: the file of the function and of everything it
+    can reach. The same model and the same recorded cases on a different revision of that
+    source miss (`runtime_source changed`); an edit to a file it cannot reach does not
+    invalidate it; and a key made without fingerprints never matches one made with."""
+    funcs = _funcs()
+    for f in funcs:
+        if f["name"].endswith(".alone"):
+            f["file"] = "pkg/alone.py"
+    cases = _cases(funcs)
+    sources = {"pkg/m.py": "a" * 64, "pkg/alone.py": "b" * 64}
+    name = "pkg/m.py:<module>.alone"
+    plan = oracle_cache.plan(funcs, cases, ENV, sources=sources)
+    verdicts = {d: {"kind": "agree", "desc": "cpython=3 lean=3", "lean_repr": "Val.int 3"}
+                for d in plan[name]["cases"]}
+    oracle_cache.store(tmp_path, name, plan[name], verdicts, module="M")
+    assert oracle_cache.lookup(tmp_path, name, plan[name])[1] == "hit"
+    moved = oracle_cache.plan(funcs, cases, ENV, sources=dict(sources, **{"pkg/alone.py": "c" * 64}))
+    assert oracle_cache.lookup(tmp_path, name, moved[name]) == (None, "runtime_source changed")
+    other = oracle_cache.plan(funcs, cases, ENV, sources=dict(sources, **{"pkg/m.py": "d" * 64}))
+    assert oracle_cache.lookup(tmp_path, name, other[name])[1] == "hit"
+    # `use` reaches `Cache.get` in pkg/m.py: an edit there is a different revision for it
+    assert other["pkg/m.py:<module>.use"]["key"] != plan["pkg/m.py:<module>.use"]["key"]
+    unfingerprinted = oracle_cache.plan(funcs, cases, ENV)
+    assert oracle_cache.lookup(tmp_path, name, unfingerprinted[name]) == (None, "runtime_source changed")
+
+
 RENDERED = """import Autoform.Lang.Core.Semantics
 namespace Autoform.Generated.M
 
@@ -322,8 +349,10 @@ def test_second_run_is_served_from_the_cache_and_says_so(tmp_path, generated_mod
     assert report_e["agree"] == report["agree"] - report_e["divergences"]
     lean.write_text(rendered)
 
-    # one function changes (source and translation): it is re-compared, the others
-    # are replayed, and the summary counts the one real comparison
+    # one function changes (source and translation). The key binds the runtime source
+    # file (`runtime_source`, oracle_cache.plan), so the edit re-compares the changed
+    # function for its own change AND its file-mates, whose stored verdicts were
+    # computed against a file that is no longer the one on disk; nothing is replayed
     (source / filename).write_text(text.replace("return 40", "return 41"))
     changed = copy.deepcopy(funcs)
     forty = next(f for f in changed if f["name"].endswith("forty"))
@@ -334,12 +363,17 @@ def test_second_run_is_served_from_the_cache_and_says_so(tmp_path, generated_mod
     work = tmp_path / "run3"; work.mkdir()
     r, report3, summary, compared = _run_oracle(ast, source, module, work, cache)
     assert r.returncode == 0, (r.stdout[-2000:], r.stderr[-2000:])
-    assert compared == 1
-    assert report3["cache"]["functions_compared_now"] == 1
-    assert report3["cache"]["misses"] == {forty["name"]: "function changed"}
+    assert compared == len(names)
+    assert report3["cache"]["functions_compared_now"] == len(names)
+    assert report3["cache"]["misses"][forty["name"]] == "function changed"
+    assert set(report3["cache"]["misses"]) == names
+    assert all(reason == "runtime_source changed"
+               for name, reason in report3["cache"]["misses"].items()
+               if name != forty["name"])
+    assert report3["cache"]["functions_from_cache"] == 0
     assert report3["divergences"] == 0
     assert report3["coverage"]["by_status"][forty["name"]] == "compared"
-    assert report3["cache"]["functions_stored"] == 1
+    assert report3["cache"]["functions_stored"] == len(names)
 
     # --no-cache: everything is compared now, nothing is replayed
     work = tmp_path / "run4"; work.mkdir()

@@ -86,15 +86,15 @@ def _term_sort(t, env, result_sort):
         if not isinstance(args, list) or len(args) != ARITH[op]:
             raise ClaimError(f'{op} takes {ARITH[op]} arguments')
         if op == 'LEN':
-            _unify(_term_sort(args[0], env, result_sort), 'str', args[0], result_sort)
+            _unify(_term_sort(args[0], env, result_sort), 'str', result_sort)
             return 'int'
         for a in args:
-            _unify(_term_sort(a, env, result_sort), 'int', a, result_sort)
+            _unify(_term_sort(a, env, result_sort), 'int', result_sort)
         return 'int'
     raise ClaimError(f'not a term: {json.dumps(t)[:80]}')
 
 
-def _unify(found, wanted, term, result_sort):
+def _unify(found, wanted, result_sort):
     if found == 'result?':
         if result_sort.get('sort') not in (None, wanted):
             raise ClaimError('result used at two different sorts')
@@ -120,11 +120,11 @@ def _formula(f, env, result_sort, program, fn):
         if sa == 'result?' and sb == 'result?':
             raise ClaimError('comparison of result with itself is reflexive')
         if sa == 'result?':
-            sort = _unify(sa, sb, a, result_sort)
+            sort = _unify(sa, sb, result_sort)
         elif sb == 'result?':
-            sort = _unify(sb, sa, b, result_sort)
+            sort = _unify(sb, sa, result_sort)
         else:
-            sort = _unify(sa, sb, a, result_sort)
+            sort = _unify(sa, sb, result_sort)
         if op in ORDER and sort != 'int':
             raise ClaimError(f'{op} needs int arguments')
         return

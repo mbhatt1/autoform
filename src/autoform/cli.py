@@ -138,6 +138,22 @@ def prepare_workspace(destination):
     return destination
 
 
+def _oracle_arguments(command):
+    """The Python oracle's interpreter and pytest options (`source`, `assure`, `pr`)."""
+    command.add_argument("--python",
+                         help="interpreter the Python oracle runs the project's tests and functions "
+                              "under: one with the project's dependencies installed (default: "
+                              "$AUTOFORM_ORACLE_PYTHON, else autoform's own); recorded in "
+                              "conformance.json. `pr` alone also auto-detects the analysed "
+                              "repository's lone .venv/bin/python or venv/bin/python at its root "
+                              "when the change touches an analysed Python file, and records "
+                              "`auto: .venv`/`auto: venv` in pr.json")
+    command.add_argument("--pytest-addopts", choices=("project", "ignore"),
+                         help="'ignore' runs the project's tests without its pytest addopts "
+                              "(-o addopts=), e.g. when they need a plugin the interpreter lacks; "
+                              "recorded in the measurement basis (default: 'project')")
+
+
 def environment():
     env = dict(os.environ)
     env["AUTOFORM_PYTHON"] = sys.executable
@@ -218,6 +234,8 @@ _DISABLES = {
     'macholib': ('the machine-code frontend',), 'pefile': ('the machine-code frontend',),
     'cargo': ('Rust',), 'rust-toolchain': ('Rust',), 'charon': ('Rust',), 'aeneas': ('Rust',),
     'aeneas-lean-project': ('Rust',),
+    'sandbox': ('every differential oracle and test runner that executes the code under test '
+                '(AUTOFORM_SANDBOX=off runs it unconfined, recorded in every artifact)',),
 }
 
 
@@ -229,17 +247,87 @@ def _os_flavor():
     return 'other'
 
 
+# Minimal RHEL-family and Alpine CI hosts are where a first run most often fails, and an
+# `apt-get` line is no help there. The Linux family comes from os-release(5): ID first,
+# then ID_LIKE, so derivatives (Rocky, Alma, CentOS Stream, Ubuntu, ...) resolve to
+# their parent without being listed one by one.
+_FAMILY_IDS = {'rhel': ('rhel', 'fedora', 'centos'), 'debian': ('debian', 'ubuntu'),
+               'alpine': ('alpine',)}
+# Package names that differ from the tool's own name, for the families not served by the
+# apt lines in install_hint (Debian keeps those); bubblewrap is the same everywhere.
+_PACKAGES = {
+    'java': {'rhel': 'java-21-openjdk-devel', 'alpine': 'openjdk21-jdk'},
+    'go': {'rhel': 'golang'},
+    'cc': {'rhel': 'gcc gcc-c++ make', 'alpine': 'build-base'},
+    'bwrap': {'debian': 'bubblewrap', 'rhel': 'bubblewrap', 'alpine': 'bubblewrap'},
+}
+
+
+def os_release(path='/etc/os-release'):
+    """`id`, `id_like`, `version_id`, `pretty_name` from os-release(5); {} if unreadable."""
+    try:
+        text = Path(path).read_text(errors='replace')
+    except OSError:
+        return {}
+    fields = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition('=')
+        if sep and key.strip() in ('ID', 'ID_LIKE', 'VERSION_ID', 'PRETTY_NAME'):
+            fields[key.strip().lower()] = value.strip().strip('"\'')
+    return fields
+
+
+def distro_family(release):
+    """'rhel', 'debian', 'alpine', or None when os-release names none of them."""
+    for ident in [release.get('id', '')] + release.get('id_like', '').split():
+        for family, ids in _FAMILY_IDS.items():
+            if ident.lower() in ids:
+                return family
+    return None
+
+
+def package_manager(family, release=None):
+    """The install command prefix for a Linux family (yum before RHEL 8, which has no dnf)."""
+    if family == 'rhel':
+        major = (release or {}).get('version_id', '').split('.')[0]
+        old = (release or {}).get('id') in ('rhel', 'centos') and major.isdigit() and int(major) < 8
+        return 'sudo yum install -y' if old else 'sudo dnf install -y'
+    return {'debian': 'sudo apt-get install -y', 'alpine': 'sudo apk add'}.get(family)
+
+
+def linux_install(package, release=None):
+    """`<manager> <package name on this family>`, or None when the family is unknown."""
+    release = os_release() if release is None else release
+    family = distro_family(release)
+    manager = package_manager(family, release)
+    if manager is None:
+        return None
+    return manager + ' ' + _PACKAGES.get(package, {}).get(family, package)
+
+
 def install_hint(name, lean_toolchain=None, joern_pin=None):
     """One actionable line for a missing tool on this OS. Points at docs for the rest."""
     flavor = _os_flavor()
     mac, linux = flavor == 'macos', flavor == 'linux'
+    if name == 'sandbox':
+        return sandbox_hint()
+    if (linux and name in ('git', 'java', 'javac', 'go', 'node', 'cc', 'clang', 'ld.lld')
+            and distro_family(os_release()) in ('rhel', 'alpine')):
+        # dnf/yum/apk and that family's package name; Debian-family and unknown hosts keep
+        # the apt lines below.
+        return linux_install({'javac': 'java', 'node': 'nodejs', 'ld.lld': 'lld'}.get(name, name))
     lean_line = ("curl -sSfL https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain "
                  + (lean_toolchain or '$(cat lean-toolchain)')
                  + "   # then: export PATH=$HOME/.elan/bin:$PATH")
     joern_v = joern_pin or '<pinned version in joern-version>'
-    joern_line = (f"curl -L -o joern-cli.zip https://github.com/joernio/joern/releases/download/v{joern_v}/joern-cli.zip "
+    # The release ships per-platform zips only (a plain joern-cli.zip is a 404), each with
+    # a .sha512 that names it target/<asset>; scripts/bootstrap.sh checks the committed pin.
+    machine = os.uname().machine if hasattr(os, 'uname') else ''
+    asset = (f"joern-cli-{'macos' if mac else 'linux'}-"
+             f"{'arm64' if machine in ('arm64', 'aarch64') else 'x86_64'}.zip")
+    joern_line = (f"curl -fL -o joern-cli.zip https://github.com/joernio/joern/releases/download/v{joern_v}/{asset} "
                   "&& mkdir -p ~/joern && unzip -q joern-cli.zip -d ~/joern   "
-                  "# needs a JDK (temurin 21); see docs/running.md §1")
+                  "# check it against its .sha512 (pinned in joern-sha512) first; needs a JDK (temurin 21); see docs/running.md §1")
     jdk = ('brew install --cask temurin@21' if mac else
            'sudo apt-get install -y temurin-21-jdk  (or openjdk-21-jdk)' if linux else 'install a JDK 21')
     hints = {
@@ -307,8 +395,13 @@ def rust_report(env, record):
     toolchain = pins.get('rust_toolchain')
     found = None
     if cargo and toolchain:
+        # A rustc/cargo not managed by rustup (Homebrew, a distro) ignores or rejects
+        # `+toolchain`, so both must resolve it and a nightly pin must report a nightly.
         banner = tool_version(['rustc', '+' + toolchain, '-V'], env)
-        found = toolchain if banner and banner.startswith('rustc ') else None
+        cargo_banner = tool_version(['cargo', '+' + toolchain, '-V'], env)
+        found = toolchain if (banner and banner.startswith('rustc ') and cargo_banner
+                              and cargo_banner.startswith('cargo ')
+                              and ('nightly' in banner or not toolchain.startswith('nightly'))) else None
     record('rust-toolchain', toolchain if found else None, found=found, expected=toolchain,
            note=None if found else f'rustc {toolchain} with rustc-dev (what Charon is built against)')
     charon = rust_tool('charon', env)
@@ -398,7 +491,144 @@ def joern_report(env):
     if len(found) > 1:
         # Never guess: which jar wins is unpredictable, and the AST is a function of it.
         return path, None, f'{lib} contains several joern-cli versions ({", ".join(found)}); remove the stale one'
+    # The macOS launchers resolve their own path with `greadlink` (GNU coreutils). Without
+    # it every `joern-parse` exits 1 before the JVM starts, yet the jar check above passes.
+    try:
+        script = (lib.parent / 'joern-parse').read_text(errors='replace')
+    except OSError:
+        script = ''
+    if 'greadlink' in script and not shutil.which('greadlink', path=env.get('PATH')):
+        return path, None, ("Joern's launchers call greadlink, which is not on PATH; "
+                            'install GNU coreutils (brew install coreutils)')
     return path, found[0], None
+
+
+# The sysctls that decide whether an unprivileged process may create a user namespace,
+# which is what `bwrap` (setuid-less) and `unshare -r` both need. Absent files mean the
+# kernel does not have the knob, not that it is off; they are reported as None.
+_USERNS_SYSCTLS = {
+    'max_user_namespaces': 'user/max_user_namespaces',                    # 0 on RHEL/CentOS 7
+    'unprivileged_userns_clone': 'kernel/unprivileged_userns_clone',      # Debian-patched kernels
+    'apparmor_restrict_unprivileged_userns': 'kernel/apparmor_restrict_unprivileged_userns',  # Ubuntu 24.04
+}
+
+
+def user_namespaces(proc_sys='/proc/sys'):
+    """The integer value of each user-namespace sysctl, None where the kernel lacks it."""
+    values = {}
+    for key, rel in _USERNS_SYSCTLS.items():
+        try:
+            values[key] = int(Path(proc_sys, rel).read_text().strip())
+        except (OSError, ValueError):
+            values[key] = None
+    return values
+
+
+def sandbox_hint(release=None, userns=None, bwrap=None):
+    """The exact commands that give this host a sandbox for the code under test."""
+    if _os_flavor() == 'macos':
+        return '/usr/bin/sandbox-exec ships with macOS; it is missing or refused to run'
+    if _os_flavor() != 'linux':
+        return 'no sandbox mechanism is known for ' + sys.platform + '; see docs/running.md §4'
+    release = os_release() if release is None else release
+    userns = user_namespaces() if userns is None else userns
+    bwrap = shutil.which('bwrap') if bwrap is None else bwrap
+    steps = []
+    if not bwrap:
+        steps.append(linux_install('bwrap', release) or 'sudo apt-get install -y bubblewrap')
+    if userns.get('max_user_namespaces') == 0:
+        steps.append('sudo sysctl -w user.max_user_namespaces=15000')
+    if userns.get('unprivileged_userns_clone') == 0:
+        steps.append('sudo sysctl -w kernel.unprivileged_userns_clone=1')
+    if userns.get('apparmor_restrict_unprivileged_userns') == 1:
+        steps.append('sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0')
+    if not steps:
+        steps.append('bwrap is installed and user namespaces look enabled, yet it does not run: '
+                     'inside a container this needs the runtime to allow user namespaces '
+                     '(for example a seccomp profile permitting unshare)')
+    return ('; '.join(steps) + '   # persist sysctls in /etc/sysctl.d/; or AUTOFORM_SANDBOX=off, '
+            'recorded in every artifact (docs/running.md §4)')
+
+
+def _sandbox_layer():
+    """`scripts/sandbox.py` from the packaged runtime: the very detection a run uses."""
+    import types
+    source = packaged_pin('scripts/sandbox.py')
+    if not source:
+        return None
+    module = types.ModuleType('_autoform_doctor_sandbox')
+    exec(compile(source, 'scripts/sandbox.py', 'exec'), module.__dict__)
+    return module
+
+
+_PROXY_VARS = ('HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy',
+               'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy')
+
+
+def host_report(env, record):
+    """Distribution family, sandbox and user namespaces, proxies: what decides whether a
+    minimal Linux CI host can run the pipeline, beyond the tools on PATH.
+
+    The sandbox is recorded as an optional tool: without one every differential oracle
+    refuses to launch the code under test, but translation and kernel proofs still run.
+    """
+    release = os_release() if _os_flavor() == 'linux' else {}
+    family = 'macos' if _os_flavor() == 'macos' else distro_family(release)
+    userns = user_namespaces() if _os_flavor() == 'linux' else {}
+    try:
+        layer = _sandbox_layer()
+        sandbox = layer.report(env) if layer else None
+    except ValueError as exc:                     # an unrecognised AUTOFORM_SANDBOX value
+        sandbox = dict(mechanism='none', enforced=False, reason=str(exc))
+    if sandbox is None:
+        record('sandbox', None, note='scripts/sandbox.py is not in the package runtime')
+    elif sandbox.get('enforced') or sandbox.get('mechanism') == 'off':
+        note = sandbox.get('reason') if sandbox.get('mechanism') == 'off' else None
+        record('sandbox', sandbox['mechanism'], found=sandbox['mechanism'], note=note)
+    else:
+        record('sandbox', None, note=sandbox.get('reason'))
+    # Credentials in a proxy URL are not the doctor's to print.
+    proxies = {name: re.sub(r'//[^/@]*@', '//***@', env[name]) for name in _PROXY_VARS if env.get(name)}
+    distro = {key: release.get(key) for key in ('id', 'id_like', 'version_id', 'pretty_name')}
+    return dict(os=_os_flavor(), distro=dict(distro, family=family),
+                package_manager=package_manager(family, release) if family != 'macos' else 'brew install',
+                user_namespaces=userns, bwrap=shutil.which('bwrap', path=env['PATH']),
+                sandbox=sandbox, proxy=proxies)
+
+
+_HEAP = re.compile(r'^([1-9][0-9]*)([kKmMgGtT]?)$')
+
+
+def memory_report(env):
+    """Host RAM against the heap Joern's JVM will get, with a hint when it is short.
+
+    Joern sets no -Xmx of its own, so the JVM takes a quarter of physical memory.
+    docs/scale.md records Joern at about 5 GB parsing a 165k-line package, which that
+    default does not cover on a 16 GB host. Advisory only: it never changes the exit code.
+    """
+    try:
+        total = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    except (AttributeError, ValueError, OSError):
+        total = None
+    setting = env.get('AUTOFORM_JOERN_XMX') or None
+    report = dict(host_memory_bytes=total, joern_xmx=setting, hint=None)
+    if setting is not None:
+        match = _HEAP.match(setting)
+        if not match:
+            report['hint'] = f'AUTOFORM_JOERN_XMX={setting!r} is not a JVM heap size such as 8g'
+            return report
+        heap = int(match.group(1)) * 1024 ** ' kmgt'.index((match.group(2) or ' ').lower())
+        if total and heap > total:
+            report['hint'] = (f'AUTOFORM_JOERN_XMX={setting} exceeds host memory '
+                              f'({total / 2**30:.1f} GiB); the JVM may be killed instead of failing cleanly')
+    elif total:
+        default = total / 4 / 2**30
+        report['hint'] = f'Joern heap: JVM default, {default:.1f} GiB (a quarter of RAM)'
+        if default < 6:
+            report['hint'] += (f'; likely short for a repository over ~100k lines: set '
+                               f'AUTOFORM_JOERN_XMX={max(1, total // 2 // 2**30)}g '
+                               '(docs/scale.md, "Operating limits")')
+    return report
 
 
 def doctor_report(env):
@@ -477,6 +707,9 @@ def doctor_report(env):
     # Optional: the Rust path (docs/rust.md), pinned in rust-pins.json.
     rust_report(env, record)
 
+    # Optional: confinement for the code under test, and the host facts behind it.
+    host = host_report(env, record)
+
     # Optional: the machine-code frontend, pinned in pyproject's [machine] extra.
     for dist, pin in (('pypcode', '3.3.3'), ('pyelftools', '0.33'),
                       ('macholib', '1.16.4'), ('pefile', '2024.8.26')):
@@ -488,10 +721,40 @@ def doctor_report(env):
         record(dist, sys.executable if installed else None, found=installed, expected=pin,
                note=None if installed else "install with: pip install 'autoform-lean[machine]'")
 
+    policy = llm_policy_report(env, warnings)
     return dict(schema_version=1, autoform=__version__, platform=sys.platform,
                 pins=dict(lean_toolchain=toolchain, joern=joern_pin,
                           rust={k: v for k, v in rust_pins().items() if k not in ('comment', 'assets')}),
-                tools=tools, problems=problems, warnings=warnings)
+                host=host, tools=tools, llm_policy=policy, problems=problems, warnings=warnings,
+                memory=memory_report(env))
+
+
+def llm_policy_report(env, warnings):
+    """The model-egress policy (AUTOFORM_LLM_ALLOWED_BACKENDS, autoform.nl.llm). A backend the
+    policy refuses disables the model stages only, so it is a warning, not a problem."""
+    from .nl.llm import policy_report
+    policy = policy_report(env)
+    if policy.get('error'):
+        warnings.append('llm policy: ' + policy['error'])
+    elif not policy['backend_allowed']:
+        warnings.append(f"llm policy: AUTOFORM_CLAUDE_AUTH={policy['backend']} is not in "
+                        f"{policy['env']}; the model stages will refuse to run")
+    elif not policy['cli_allowed']:
+        warnings.append(f"llm policy: the claude CLI agents would use {policy['cli_backend']}, which "
+                        f"{policy['env']} does not allow; the prove and refine agents will refuse to run")
+    return policy
+
+
+def _print_host(host):
+    distro = host['distro']
+    name = distro.get('pretty_name') or distro.get('id') or host['os']
+    print(f"  host: {name}  family={distro.get('family') or 'unknown'}  "
+          f"installs with: {host.get('package_manager') or '?'}")
+    if host['user_namespaces']:
+        print('  user namespaces: ' + '  '.join(
+            f'{key}={"absent" if value is None else value}' for key, value in host['user_namespaces'].items()))
+    if host['proxy']:
+        print('  proxy: ' + '  '.join(f'{key}={value}' for key, value in host['proxy'].items()))
 
 
 def doctor(env, strict=False, as_json=False):
@@ -517,6 +780,12 @@ def doctor(env, strict=False, as_json=False):
               f"[{report['platform']}, autoform {__version__}]")
         pins = report['pins']
         print(f"  pins: lean-toolchain={pins['lean_toolchain'] or '?'}  joern={pins['joern'] or '?'}")
+        _print_host(report['host'])
+        policy = report['llm_policy']
+        allowed = 'any (unset)' if policy['allowed'] is None else (','.join(policy['allowed']) or 'none')
+        print(f"  llm egress: backend={policy['backend']}  claude-cli={policy['cli_backend'] or '?'}  "
+              f"allowed={allowed}  cache={policy['cache']}"
+              + ('' if policy['backend_allowed'] and policy['cli_allowed'] else '  REFUSED'))
         for name, entry in tools.items():
             status = entry['status']
             if status == 'ok':
@@ -541,6 +810,8 @@ def doctor(env, strict=False, as_json=False):
                 if entry.get('note'):
                     print(f"             {entry['note']}")
                 print(f"             install: {entry['hint']}")
+        if report['memory']['hint']:
+            print(f"  memory   {report['memory']['hint']}")
         print("  exit codes: 0 all required present and pinned; 1 a required tool is missing or "
               "mismatched (with --strict, also an optional one); 2 the check itself could not run.")
     if problems:
@@ -614,9 +885,12 @@ def _regress(args, workspace, report, env):
     theorem identifiers are per function and must line up across the runs.
     """
     source = args.source
+    lang = getattr(args, 'lang', 'joern')
     if not is_git_url(source):
         local = Path(source)
         if local.is_dir() and (local / '.git').exists():
+            if lang == 'auto' and not args.machine and _cargo_library_at(local, args.base, args.subdir):
+                lang = 'rust'
             source = local.resolve().as_uri()
         else:
             raise ValueError('regress compares two commits, so the source must be a Git URL '
@@ -625,6 +899,8 @@ def _regress(args, workspace, report, env):
     out.mkdir(parents=True, exist_ok=True)
     if args.machine:
         return _regress_machine(args, workspace, source, out, env)
+    if lang == 'rust':
+        return _regress_rust(args, workspace, source, out, env)
     runs = {}
     for label, ref in (('base', args.base), ('head', args.head)):
         _discard_previous_report(report, args.module)
@@ -680,10 +956,16 @@ def _pr(args, workspace, env):
                              'or a local checkout with a .git directory')
         command = [sys.executable, str(workspace / 'scripts/pr_mode.py'), str(source),
                    '--base', args.base, '--module', args.module, '--out', str(out),
-                   '--cases', str(args.cases), '--mutants', str(args.mutants),
-                   '--stage-timeout', str(args.stage_timeout)]
+                   '--mutants', str(args.mutants), '--stage-timeout', str(args.stage_timeout)]
+        # `--cases` only when given: pr_mode.py's own default reads $AUTOFORM_CASES (else 5),
+        # and always passing the flag made that documented fallback dead for `autoform pr`.
+        for flag in ('cases', 'behaviour_cases'):
+            if getattr(args, flag, None) is not None:
+                command += ['--' + flag.replace('_', '-'), str(getattr(args, flag))]
         if not getattr(args, 'behaviour', True):
             command.append('--no-behaviour')
+        for condition in getattr(args, 'fail_on', None) or ():
+            command += ['--fail-on', condition]
         for flag in ('head', 'subdir'):
             if getattr(args, flag):
                 command += ['--' + flag, getattr(args, flag)]
@@ -693,6 +975,50 @@ def _pr(args, workspace, env):
         return _run_command(command, env=env, timeout=args.timeout)
     finally:
         discard_checkout(repository, keep=args.keep_checkout)
+
+
+def _cargo_library_at(repo, ref, subdir=None):
+    """`is_cargo_library` for the tree of commit `ref` in a local checkout, read with git."""
+    prefix = (subdir.strip('/') + '/') if subdir and subdir.strip('/') not in ('', '.') else ''
+    try:
+        shown = subprocess.run(['git', '-C', str(repo), 'show', f'{ref}:{prefix}Cargo.toml'],
+                               capture_output=True, text=True, timeout=60)
+        if shown.returncode or not re.search(r'^\s*\[package\]', shown.stdout, re.M):
+            return False
+        lib = subprocess.run(['git', '-C', str(repo), 'cat-file', '-e', f'{ref}:{prefix}src/lib.rs'],
+                             capture_output=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return lib.returncode == 0 or bool(re.search(r'^\s*\[lib\]', shown.stdout, re.M))
+
+
+def _regress_rust(args, workspace, source, out, env):
+    """Check out both commits of a Cargo library crate and let `scripts/rust_regress.py`
+    replay the base revision's Rust-oracle inputs at base (twice: the control) and at head."""
+    trees, records = {}, {}
+    try:
+        for label, ref in (('base', args.base), ('head', args.head)):
+            print(f'==> {label}: {ref or "HEAD"}', flush=True)
+            tree, record = resolve_source(source, workspace, args.module, ref=ref, subdir=args.subdir)
+            trees[label], records[label] = tree, record
+        command = [sys.executable, str(workspace / 'scripts/rust_regress.py'),
+                   '--base', str(trees['base']), '--head', str(trees['head']), '--out', str(out / 'rust'),
+                   '--module', args.module,
+                   '--base-label', records['base'].get('commit') or str(args.base),
+                   '--head-label', records['head'].get('commit') or str(args.head or 'HEAD')]
+        lean_project = getattr(args, 'rust_lean_project', None) or env.get('AUTOFORM_RUST_LEAN_PROJECT')
+        if lean_project:
+            command += ['--lean-project', str(Path(lean_project).expanduser().resolve())]
+        code = _run_command(command, env=env, timeout=args.timeout)
+        (out / 'runs.json').write_text(json.dumps(
+            {label: dict(ref=getattr(args, label), commit=records[label].get('commit'))
+             for label in records}, indent=2) + '\n')
+        if code in (0, 1):
+            print(f'regression report: {out / "rust" / "rust-regression.md"}')
+        return code
+    finally:
+        for record in records.values():
+            discard_checkout(record, keep=args.keep_checkout)
 
 
 def _regress_machine(args, workspace, source, out, env):
@@ -722,7 +1048,12 @@ def _regress_machine(args, workspace, source, out, env):
             discard_checkout(record, keep=args.keep_checkout)
 
 
-def main(argv=None):
+def build_parser():
+    """The `autoform` argument parser, built without parsing anything.
+
+    `main` builds and runs it; tests build it to check what a flag forwards
+    (`tests/test_cli_pr_flags.py`) without a workspace, Joern or Lean.
+    """
     parser = argparse.ArgumentParser(
         description="Formalize source or machine code and check it with Lean.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -773,11 +1104,15 @@ def main(argv=None):
                              help="render the model in parts of at most N functions that "
                                   "Lean elaborates in parallel, bounding each process's "
                                   f"memory (default: {SHARD_FUNCTIONS}; 0 = one module)")
-        if name == "source":
-            command.add_argument("--timeout", type=float,
-                                 help="overall wall-clock limit in seconds for the whole run "
-                                      "(default: no limit). `source` runs autoform.sh, which "
-                                      "has no per-stage deadline of its own.")
+        command.add_argument("--timeout", type=float,
+                             help="overall wall-clock limit in seconds for the whole run "
+                                  "(default: no limit); on expiry the run record names the "
+                                  "stage it stopped in and the exit status is 143")
+        _oracle_arguments(command)
+        command.add_argument("--max-file-bytes", type=int,
+                             help="skip supported source files larger than N bytes, recording "
+                                  "each as an exclusion (default: $AUTOFORM_MAX_FILE_BYTES or "
+                                  "16 MiB; 0 = no cap)")
         if name == "assure":
             command.add_argument("--stage-timeout", type=float, default=7200,
                                  help="maximum seconds for each assurance stage (default: 7200)")
@@ -807,6 +1142,14 @@ def main(argv=None):
                          help="with --machine: functions to compare (default: those whose code changed)")
     regress.add_argument("--target", choices=("aarch64", "x86_64", "i386"), default="aarch64",
                          help="with --machine: the Linux target to compile for (default: aarch64)")
+    regress.add_argument("--lang", choices=("auto", "rust", "joern"), default="auto",
+                         help="`rust` replays the base revision's Rust-oracle inputs at base, again at "
+                              "base (control) and at head, judged against the base Aeneas model "
+                              "(docs/rust.md); `auto` (default) does so when --base of a local checkout "
+                              "is a Cargo library crate; `joern` the source pipeline")
+    regress.add_argument("--rust-lean-project", type=Path,
+                         help="with the Rust leg: scratch Lake project with Aeneas' Lean library built "
+                              "(default: $AUTOFORM_RUST_LEAN_PROJECT)")
     pr = sub.add_parser("pr",
                         help="evidence level of every function changed since --base (hole / "
                              "translated / oracle-agreed / proved / refuted), as SARIF and Markdown")
@@ -820,11 +1163,21 @@ def main(argv=None):
                     help="a neutral AST the exporter produced for the head tree, used instead of "
                          "running Joern (recorded in the report as supplied)")
     pr.add_argument("--tests", type=Path, help="a test suite outside the source tree for the oracle")
-    pr.add_argument("--cases", type=int, default=5, help="random oracle cases per function (default: 5)")
+    _oracle_arguments(pr)
+    pr.add_argument("--cases", type=int,
+                    help="random oracle cases per function (default: $AUTOFORM_CASES, else 5; "
+                         "scripts/pr_mode.py reads the variable when the flag is absent)")
+    pr.add_argument("--behaviour-cases", type=int,
+                    help="oracle cases per function for the cross-revision behaviour comparison "
+                         "(default: 100)")
     pr.add_argument("--mutants", type=int, default=0,
                     help="mutants for the mutation gate over the proved theorems (default: 0 = skip)")
     pr.add_argument("--no-behaviour", dest="behaviour", action="store_false",
                     help="skip the cross-revision behaviour comparison (base model vs head runtime)")
+    pr.add_argument("--fail-on", action="append", default=[], choices=("behaviour-changed", "no-evidence"),
+                    help="behaviour-changed: also exit 1 when a changed function's behaviour changed (default: "
+                         "only a refutation fails). Either value exits 3 (inconclusive) when no changed "
+                         "non-test function was behaviour-compared; no-evidence applies only that rule")
     pr.add_argument("--sarif", type=Path, help="write SARIF 2.1.0 here, one result per changed function")
     pr.add_argument("--markdown", type=Path, help="write the review comment here")
     pr.add_argument("--stage-timeout", type=float, default=1800,
@@ -839,6 +1192,11 @@ def main(argv=None):
                    help="infer candidate claims, rank them with a SemIf judge, verify in Lean (formalize --help)")
     machine = sub.add_parser("machine", add_help=False, help="binary/assembly frontend (machine --help for options)")
     machine.add_argument("args", nargs=argparse.REMAINDER)
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
     # Let the machine frontend own its flags, including --help and --list-languages.
     values = list(sys.argv[1:] if argv is None else argv)
     if values[:1] == ['formalize']:
@@ -871,17 +1229,31 @@ def main(argv=None):
         parser.error('--files and --functions apply only with --machine')
     if args.command in ('assure', 'pr') and (not math.isfinite(args.stage_timeout) or args.stage_timeout <= 0):
         parser.error('--stage-timeout must be a finite positive number')
-    if args.command == 'pr' and (args.cases < 1 or args.mutants < 0):
+    if args.command == 'pr' and ((args.cases is not None and args.cases < 1) or args.mutants < 0):
         parser.error('--cases must be >= 1 and --mutants >= 0')
-    if args.command in ('source', 'regress', 'pr') and args.timeout is not None and (
+    if args.command == 'pr' and args.behaviour_cases is not None and args.behaviour_cases < 1:
+        parser.error('--behaviour-cases must be >= 1')
+    if args.command in ('source', 'assure', 'regress', 'pr') and args.timeout is not None and (
             not math.isfinite(args.timeout) or args.timeout <= 0):
         parser.error('--timeout must be a finite positive number')
     if getattr(args, 'shard_functions', 0) < 0:
         parser.error('--shard-functions must be >= 0')
+    if (getattr(args, 'max_file_bytes', None) or 0) < 0:
+        parser.error('--max-file-bytes must be >= 0')
     env = environment()
+    if getattr(args, 'max_file_bytes', None) is not None:
+        # Read by scripts/repository_inventory.py and scripts/source_context.py.
+        env['AUTOFORM_MAX_FILE_BYTES'] = str(args.max_file_bytes)
     if hasattr(args, 'shard_functions'):
         # Read by cartographer/render_lean.py in every pipeline that renders a model.
         env['AUTOFORM_SHARD_FUNCTIONS'] = str(args.shard_functions)
+    if getattr(args, 'python', None):
+        # Read by scripts/differential.py (it re-executes itself under this interpreter
+        # and records it) and validated by scripts/pr_mode.py. Not resolved through
+        # symlinks: a virtualenv's bin/python is a link to an interpreter without its packages.
+        env['AUTOFORM_ORACLE_PYTHON'] = os.path.abspath(os.path.expanduser(args.python))
+    if getattr(args, 'pytest_addopts', None):
+        env['AUTOFORM_ORACLE_PYTEST_ADDOPTS'] = args.pytest_addopts
     if args.command == "doctor":
         try:
             return doctor(env, strict=args.strict, as_json=args.json)

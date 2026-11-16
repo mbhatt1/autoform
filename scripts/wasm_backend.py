@@ -40,7 +40,7 @@ to the linker with `--allow-undefined` turns any missing compiler-rt helper into
 import instead of a hard link failure, and `wasm_run.mjs` records a call that actually
 needs one as `unsupported-import` rather than faking a return value.
 """
-import json, os, re, shutil, subprocess, sys
+import json, os, re, shutil, subprocess
 
 RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wasm_run.mjs")
 
@@ -341,7 +341,7 @@ def width_sensitive_functions(src_root):
     return names
 
 
-def classify_ub(fname, args, native, wasmv, src_text=None):
+def classify_ub(fname, args, native, wasmv):
     """A best-effort reading of WHICH undefined behaviour a disagreement smells like.
 
     This is a hint for a human, explicitly labelled as such in the output. The finding

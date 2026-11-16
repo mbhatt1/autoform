@@ -46,6 +46,28 @@ inputs:
   fail-on-refuted:
     description: 'Fail the step when a function is refuted (autoform exit 1).'
     default: 'true'
+  fail-on:
+    description: >-
+      Space-separated `autoform pr --fail-on` conditions: 'behaviour-changed' (exit 1 when a
+      changed function's behaviour changed), 'no-evidence' (exit 3 when no changed function
+      was compared). With either set, exit 3 also fails the step, and fail-on-refuted is ignored.
+    default: ''
+  python:
+    description: >-
+      Python interpreter to run the project's tests and functions under
+      (default: autoform's own). Must have the project's dependencies installed.
+    default: ''
+  pytest-addopts:
+    description: >-
+      'ignore' runs the project's tests without its pytest addopts (-o addopts=),
+      e.g. when they need a plugin the interpreter lacks (default: 'project').
+    default: ''
+  java-classpath:
+    description: 'JVM dependency classpath for the differential oracle (AUTOFORM_JAVA_CLASSPATH).'
+    default: ''
+  java-processorpath:
+    description: 'JVM annotation processor path for the differential oracle (AUTOFORM_JAVA_PROCESSORPATH).'
+    default: ''
 
 outputs:
   sarif:
@@ -54,6 +76,9 @@ outputs:
   markdown:
     description: Absolute path of the Markdown report.
     value: ${{ steps.run.outputs.markdown }}
+  exit-code:
+    description: Exit code from autoform pr (0 reported, 1 refuted/behaviour changed, 2 could not run, 3 inconclusive).
+    value: ${{ steps.run.outputs.exit-code }}
 
 runs:
   using: composite
@@ -108,24 +133,46 @@ runs:
           *) echo "::error::install-toolchain supports Linux x64 only; install Joern yourself and set install-toolchain: false" >&2; exit 1 ;;
         esac
         version="$(cat "$GITHUB_ACTION_PATH/joern-version")"
+        pins="$GITHUB_ACTION_PATH/joern-sha512"
         dl="$RUNNER_TEMP/joern-dl"
         mkdir -p "$dl/target" "$HOME/joern"
         base="https://github.com/joernio/joern/releases/download/v${version}"
         curl -fL "$base/$asset" -o "$dl/target/$asset"
-        curl -fL "$base/$asset.sha512" -o "$dl/$asset.sha512"
+        # The hash comes from the committed joern-sha512, as scripts/bootstrap.sh does. The
+        # release's own .sha512 is not downloaded: it only attests that the download matched
+        # itself, so a replaced release asset would have passed.
+        [ "$(sed -n 1p "$pins")" = "# joern $version" ] \
+          || { echo "::error::joern-sha512 does not pin joern $version; re-pin it together with joern-version" >&2; exit 1; }
+        grep "  target/$asset\$" "$pins" > "$dl/$asset.sha512"
         (cd "$dl" && sha512sum -c "$asset.sha512")
         unzip -q "$dl/target/$asset" -d "$HOME/joern"
 
-    - name: Cache key (content of the bundled Lean project)
+    - name: Cache key (content of the bundled runtime)
       id: key
       shell: bash
       # The workspace refuses to be reused when it differs from the package's bundled
       # resources, so the key is exact (no restore-keys): a stale workspace would fail.
+      # The bundle is whatever build_support.runtime_files() selects (the Lean project,
+      # scripts/, cartographer/, docs/, examples/, the pins and notices), so the digest is
+      # taken over that selection rather than a hand-kept file list: a commit touching
+      # only scripts/ changes the workspace manifest and must change the key too. The CLI
+      # sources are included as well, since they decide how the workspace is laid out.
       run: |
         set -euo pipefail
         cd "$GITHUB_ACTION_PATH"
-        digest=$( (find Autoform src/autoform -type f ! -name '*.pyc' -print0 | sort -z | xargs -0 sha256sum;
-                   sha256sum lakefile.toml lake-manifest.json lean-toolchain joern-version) | sha256sum | cut -d' ' -f1)
+        digest=$(python3 - <<'PY'
+        import hashlib, pathlib
+        from build_support import runtime_files
+        digest = hashlib.sha256()
+        entries = dict(runtime_files())
+        for path in sorted(pathlib.Path("src/autoform").rglob("*.py")):
+            if "__pycache__" not in path.parts:
+                entries[path.as_posix()] = path.read_bytes()
+        for name in sorted(entries):
+            digest.update(name.encode() + b"\0" + hashlib.sha256(entries[name]).digest())
+        print(digest.hexdigest())
+        PY
+        )
         echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -152,6 +199,11 @@ runs:
         MARKDOWN: ${{ inputs.markdown-path }}
         MUTANTS: ${{ inputs.mutants }}
         FAIL_ON_REFUTED: ${{ inputs.fail-on-refuted }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        ORACLE_PYTHON: ${{ inputs.python }}
+        ORACLE_PYTEST_ADDOPTS: ${{ inputs.pytest-addopts }}
+        JAVA_CLASSPATH: ${{ inputs.java-classpath }}
+        JAVA_PROCESSORPATH: ${{ inputs.java-processorpath }}
       run: |
         set -uo pipefail
         if [ -z "$BASE" ]; then
@@ -162,15 +214,33 @@ runs:
         git cat-file -e "${BASE}^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$BASE"
         args=(pr . "$MODULE" --base "$BASE" --mutants "$MUTANTS" --sarif "$SARIF" --markdown "$MARKDOWN")
         [ -n "$SUBDIR" ] && args+=(--subdir "$SUBDIR")
+        # Handle fail-on: space-separated list of conditions
+        if [ -n "$FAIL_ON" ]; then
+          for condition in $FAIL_ON; do
+            args+=(--fail-on "$condition")
+          done
+        fi
+        # Set optional environment variables for the oracle
+        [ -n "$ORACLE_PYTHON" ] && export AUTOFORM_ORACLE_PYTHON="$ORACLE_PYTHON"
+        [ -n "$ORACLE_PYTEST_ADDOPTS" ] && export AUTOFORM_ORACLE_PYTEST_ADDOPTS="$ORACLE_PYTEST_ADDOPTS"
+        [ -n "$JAVA_CLASSPATH" ] && export AUTOFORM_JAVA_CLASSPATH="$JAVA_CLASSPATH"
+        [ -n "$JAVA_PROCESSORPATH" ] && export AUTOFORM_JAVA_PROCESSORPATH="$JAVA_PROCESSORPATH"
         autoform --workspace "$AUTOFORM_WORKSPACE" "${args[@]}"
         code=$?
         echo "sarif=$(realpath -m "$SARIF")" >> "$GITHUB_OUTPUT"
         echo "markdown=$(realpath -m "$MARKDOWN")" >> "$GITHUB_OUTPUT"
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
         # Job summary only: no PR comment, so no pull-requests: write permission.
         [ -f "$MARKDOWN" ] && cat "$MARKDOWN" >> "$GITHUB_STEP_SUMMARY"
-        # 1 = a function was refuted; 2 = the run could not complete. The SARIF upload
-        # below still runs for 0 and 1; a run that could not complete is always a failure.
-        if [ "$code" = 1 ] && [ "$FAIL_ON_REFUTED" != "true" ]; then code=0; fi
+        # Exit code handling:
+        # 0 = reported, nothing refuted (or refuted but not in --fail-on)
+        # 1 = refuted, or behaviour changed under --fail-on behaviour-changed
+        # 2 = could not run (always fails)
+        # 3 = inconclusive (only fails under --fail-on behaviour-changed or --fail-on no-evidence)
+        # If fail-on was set, let the exit code through. Otherwise apply legacy fail-on-refuted logic.
+        if [ -z "$FAIL_ON" ] && [ "$code" = 1 ] && [ "$FAIL_ON_REFUTED" != "true" ]; then
+          code=0
+        fi
         exit "$code"
 
     - name: Upload SARIF to code scanning

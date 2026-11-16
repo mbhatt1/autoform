@@ -2,19 +2,20 @@
  "artifact": "ast-Cachetools.json",
  "artifact_bytes": 766819,
  "artifact_sha256": "94a3adb8d2d736dae922fc6bad0c00fe5ec9421abf2c40c31db7dc73a55fc60f",
- "command": "scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.7-sdist Cachetools",
+ "command": "(cd $WORK && joern-parse /tmp/w4kc/corpora/cachetools-7.1.7-sdist --output $WORK/cpg.bin) && (cd $WORK && joern --script cartographer/export_ast.sc --param cpgPath=$WORK/cpg.bin --param out=ast-Cachetools.json --param dataModel=lp64)",
  "cpg_schema_version": "1.7.70",
  "exporter": "cartographer/export_ast.sc",
  "exporter_sha256": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
  "exporter_sources": {
   "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
   "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
-  "cartographer/compiler/SourceCompiler.scala": "21383ac0c1c3bb8383a0eb4a743dea3510353bd8e89d3644cf5d9f05e306f63c",
+  "cartographer/compiler/SourceCompiler.scala": "5ed9256d0bea0b7f84448df845181b9853029d30e044ea845a4031987115c6ad",
   "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4"
  },
  "joern_version": "4.0.606",
+ "note": "Re-pinned 2026-10-22 after the Java array-length exporter change (sizeOf -> op:sizeOf:array-length, guarded to .java/.kt sources): the artifact was re-exported from a fresh parse of the recorded source and matched the recorded bytes exactly, so only the exporter digests and this note change. Previous note: Re-pinned 2026-10-21 after the wave-7 exporter merges (Go if-init flattening, Kotlin receiver threading at named calls, JVM boxed ==/!= lowering, Kotlin is/when type tests; SourceCompiler.scala 008ab3ef->85b279db). The artifact was re-exported 2026-10-20 from a fresh parse with the new exporter and compared byte-for-byte with the recorded artifact: identical, so the recorded bytes are kept unchanged. Previous note: Re-exported 2026-10-20 after the w5-oracle/w5-kotlin exporter edits (Kotlin-only lowering and a Kotlin cast guard): one fresh CPG of the recorded source tree, exported with this exporter, is byte-identical to the recorded artifact. Re-exported 2026-10-19 to re-pin the exporter after the industrial/w5-land merges (w4-python-node, w4-kotlin-control, w4-format-string: Python/Node/Kotlin/JS/TS lowering; w4-cpp-oracle: C++-only named-constant reads). One fresh CPG of the recorded source tree, exported with the exporter recorded here, is byte-identical to the artifact already recorded (sha256 94a3adb8d2d7...), so nothing downstream of it changed. The command recorded before the 2026-10-19 re-pins was: scripts/reland_corpus.sh /Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.7-sdist Cachetools",
  "recorded_by": "scripts/provenance.py record",
  "schema_version": 1,
- "source_path": "/Users/mbhatt/.cache/autoform/corpora/cachetools-7.1.7-sdist",
+ "source_path": "/private/tmp/w4kc/corpora/cachetools-7.1.7-sdist",
  "source_revision": "tree-sha256:49cb5656b594bd27bd84aa1508661bea0a02a65697a95349afb202f07c7f908f:9files"
 }

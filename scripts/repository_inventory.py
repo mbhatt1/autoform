@@ -2,8 +2,10 @@
 """Account for repository files without claiming unsupported language coverage.
 
 Discovery never follows repository symlinks or reads devices, sockets, or FIFOs.
-Only VCS metadata and explicitly excluded paths are omitted. A failed or unstable
-read remains visible in the inventory and makes ``scan_complete`` false.
+Only VCS metadata, explicitly excluded paths and, inside a Gradle or Maven build
+tree, build outputs, generated sources and test source sets are omitted; every
+omission is listed under ``excluded`` with its reason. A failed or unstable read
+remains visible in the inventory and makes ``scan_complete`` false.
 """
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import stat
 from typing import Any
@@ -80,7 +83,28 @@ _AUXILIARY_NAMES = frozenset({
     ".npmrc", ".nvmrc", ".python-version", "lean-toolchain", "codeowners",
 })
 _VCS_NAMES = frozenset({".git", ".hg", ".svn"})
+# A directory holding one of these files makes its subtree a JVM build tree. Gradle
+# subprojects configured from the root build need no build file of their own.
+BUILD_FILES = {"settings.gradle": "gradle", "settings.gradle.kts": "gradle",
+               "build.gradle": "gradle", "build.gradle.kts": "gradle", "pom.xml": "maven"}
+_GENERATED_NAMES = frozenset({"generated", "generated-src", "generated-sources"})
+_SOURCE_ROOT = re.compile(r"^(?:(.+?)/)?src/([^/]+)/(java|kotlin)/")
 _CHUNK_BYTES = 1024 * 1024
+# A supported source file above this size is almost always generated (an amalgamation,
+# a vendored bundle, a data table). It is kept in the population as an unsupported,
+# recorded exclusion rather than handed to a frontend that may exhaust its heap on it.
+# source_context.py tells Joern to skip the same files. 0 disables the cap.
+DEFAULT_MAX_FILE_BYTES = 16 * 1024 * 1024
+
+
+def max_file_bytes(environ=os.environ) -> int:
+    """The per-file cap from ``AUTOFORM_MAX_FILE_BYTES`` (bytes; 0 = no cap)."""
+    value = environ.get("AUTOFORM_MAX_FILE_BYTES", "").strip()
+    if not value:
+        return DEFAULT_MAX_FILE_BYTES
+    if not value.isdigit():
+        raise ValueError(f"AUTOFORM_MAX_FILE_BYTES must be a non-negative integer, not {value!r}")
+    return int(value)
 
 
 def _classification(name: str) -> tuple[str, str | None, bool]:
@@ -96,6 +120,61 @@ def _classification(name: str) -> tuple[str, str | None, bool]:
     return "unclassified", None, False
 
 
+def layout_exclusion(parts) -> str | None:
+    """Why a directory inside a Gradle or Maven build tree is not analysed, or None.
+
+    Compiler and annotation-processor output is a product of the sources, and test
+    source sets exercise them rather than define them, so neither belongs in the
+    model. ``build``/``target`` count only outside ``src``, where a package of that
+    name is ordinary source. Analysing a test source set means selecting it with
+    ``--subdir``, below the build file that triggers this rule.
+    """
+    name, parents = parts[-1], tuple(parts[:-1])
+    if name == ".gradle" or (name in ("build", "target") and "src" not in parents):
+        return "build_output"
+    if name in _GENERATED_NAMES:
+        return "generated_code"
+    if (parents and parents[-1] == "src" and "src" not in parents[:-1]
+            and (name.lower().startswith("test") or name.endswith("Test"))):
+        return "test_source_set"
+    return None
+
+
+def layout_reason(source, relative: str, cache=None) -> str | None:
+    """The layout exclusion ``discover`` applies to an ancestor of ``relative``.
+
+    Lets a frontend's AST be filtered exactly as the inventory was scanned, without
+    rescanning the tree. ``cache`` maps directories to whether they hold a build file.
+    """
+    cache = {} if cache is None else cache
+    parts = PurePosixPath(relative).parts
+    jvm = False
+    for depth in range(len(parts) - 1):
+        directory = os.path.join(os.fspath(source), *parts[:depth])
+        if directory not in cache:
+            cache[directory] = any(os.path.lexists(os.path.join(directory, name))
+                                   for name in BUILD_FILES)
+        jvm = jvm or cache[directory]
+        reason = jvm and layout_exclusion(parts[:depth + 1])
+        if reason:
+            return reason
+    return None
+
+
+def _layout(files) -> dict[str, Any]:
+    """Build systems, build-file directories and the source roots left for analysis."""
+    build = [(PurePosixPath(f["path"]), BUILD_FILES[PurePosixPath(f["path"]).name])
+             for f in files if PurePosixPath(f["path"]).name in BUILD_FILES]
+    roots = set()
+    for record in files:
+        match = _SOURCE_ROOT.match(record["path"])
+        if match and record["supported"]:
+            roots.add(match.group(0).rstrip("/"))
+    return {"build_systems": sorted({system for _, system in build}),
+            "modules": sorted({path.parent.as_posix() for path, _ in build}),
+            "source_roots": sorted(roots) if build else []}
+
+
 def _identity(info: os.stat_result) -> tuple[int, ...]:
     return (info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
@@ -104,21 +183,32 @@ def _canonical(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
-def discover(source: str | os.PathLike[str], exclude=()) -> dict[str, Any]:
+def discover(source: str | os.PathLike[str], exclude=(), max_bytes: int | None = None) -> dict[str, Any]:
     """Inventory a directory; caller exclusions are exact paths or subtrees.
 
     Absolute exclusions must lie inside ``source``. Relative exclusions use POSIX
     separators; globs are not interpreted. The content fingerprint intentionally
     excludes the absolute source location, so identical checkouts compare equally.
+    ``max_bytes`` (default: ``max_file_bytes()``; 0 = none) caps supported source
+    files: a larger one stays in ``files`` as unsupported and is listed in ``excluded``.
     """
     root = os.path.abspath(os.fspath(source))
     result: dict[str, Any] = {
         "schema_version": 1, "source": root, "scan_complete": True,
         "files": [], "languages": {}, "errors": [], "excluded": [], "counts": {},
+        "layout": {},
     }
 
     def error(path: str, reason: str) -> None:
         result["errors"].append({"path": path, "reason": reason})
+
+    if max_bytes is None:
+        try:
+            max_bytes = max_file_bytes()
+        except ValueError as exc:
+            error(".", str(exc))
+            max_bytes = 0
+    result["max_file_bytes"] = max_bytes or None
 
     exclusions: set[str] = set()
     if isinstance(exclude, (str, bytes, os.PathLike)):
@@ -144,12 +234,13 @@ def discover(source: str | os.PathLike[str], exclude=()) -> dict[str, Any]:
             return "caller_excluded"
         return None
 
-    def visit(fd: int, prefix: str, before: os.stat_result) -> None:
+    def visit(fd: int, prefix: str, before: os.stat_result, jvm: bool = False) -> None:
         try:
             names = sorted(os.listdir(fd))
         except OSError as exc:
             error(prefix or ".", f"cannot list directory: {exc.strerror or exc}")
             return
+        jvm = jvm or any(name in BUILD_FILES for name in names)
         for name in names:
             path = f"{prefix}/{name}" if prefix else name
             reason = exclusion(path, name)
@@ -162,6 +253,10 @@ def discover(source: str | os.PathLike[str], exclude=()) -> dict[str, Any]:
                 error(path, f"cannot stat entry: {exc.strerror or exc}")
                 continue
             if stat.S_ISDIR(info.st_mode):
+                reason = jvm and layout_exclusion(PurePosixPath(path).parts)
+                if reason:
+                    result["excluded"].append({"path": path, "reason": reason})
+                    continue
                 child = None
                 try:
                     child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
@@ -170,7 +265,7 @@ def discover(source: str | os.PathLike[str], exclude=()) -> dict[str, Any]:
                     if _identity(opened) != _identity(info):
                         error(path, "directory changed before traversal")
                     else:
-                        visit(child, path, opened)
+                        visit(child, path, opened, jvm)
                     if _identity(os.stat(name, dir_fd=fd, follow_symlinks=False)) != _identity(opened):
                         error(path, "directory changed during traversal")
                 except OSError as exc:
@@ -186,6 +281,9 @@ def discover(source: str | os.PathLike[str], exclude=()) -> dict[str, Any]:
                       "bytes": info.st_size if kind == "regular" else None,
                       "mode": stat.S_IMODE(info.st_mode)}
             result["files"].append(record)
+            if max_bytes and record["supported"] and info.st_size > max_bytes:
+                record["supported"] = False
+                result["excluded"].append({"path": path, "reason": "max_file_bytes"})
             if kind == "symlink":
                 try:
                     record["link_target"] = os.readlink(name, dir_fd=fd)
@@ -277,6 +375,7 @@ def discover(source: str | os.PathLike[str], exclude=()) -> dict[str, Any]:
     for group in result["languages"].values():
         group["extensions"] = sorted(set(group["extensions"]))
     files = result["files"]
+    result["layout"] = _layout(files)
     result["counts"] = {
         "files": len(files), "regular_files": sum(f["kind"] == "regular" for f in files),
         "symlinks": sum(f["kind"] == "symlink" for f in files),
@@ -320,8 +419,13 @@ def main(argv=None) -> int:
     parser.add_argument("source")
     parser.add_argument("--exclude", action="append", default=[], metavar="PATH")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--max-file-bytes", type=int, metavar="N",
+                        help="cap on a supported source file (default: $AUTOFORM_MAX_FILE_BYTES "
+                             f"or {DEFAULT_MAX_FILE_BYTES}; 0 = no cap)")
     args = parser.parse_args(argv)
-    inventory = discover(args.source, args.exclude)
+    if args.max_file_bytes is not None and args.max_file_bytes < 0:
+        parser.error("--max-file-bytes must be >= 0")
+    inventory = discover(args.source, args.exclude, args.max_file_bytes)
     serialized = json.dumps(inventory, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

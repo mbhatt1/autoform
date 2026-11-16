@@ -203,7 +203,13 @@ def record(ms: list[str], man: dict) -> int:
                 "render_bytes": os.path.getsize(fresh),
                 "render_sha256": sha256(fresh),
             })
-            if not tracked:
+            if tracked:
+                # A hint is the fallback for an AST that is NOT in the tree. Once the
+                # AST is tracked, a hint left over from the run that first produced it
+                # (a /tmp path) points at nothing the checker will ever read, and reads
+                # to a human as a second place the artifact came from.
+                entry.pop("ast_hint", None)
+            else:
                 entry.setdefault("ast_hint", ast)
                 entry.setdefault(
                     "provenance",
@@ -214,8 +220,10 @@ def record(ms: list[str], man: dict) -> int:
     man["policy"] = ("The AST is the tracked source of truth; Autoform/Generated/*.lean is a "
                      "build product and is not tracked. See docs/integrity.md. Hashes here "
                      "pin the identity of both halves; scripts/check_render.py verifies them.")
+    # Same shape as scripts/check_specs_fresh.py --record writes (indent=1, sorted keys,
+    # trailing newline), so the two recorders do not take turns re-indenting the file.
     with open(MANIFEST, "w") as f:
-        json.dump(man, f, indent=2, sort_keys=True)
+        json.dump(man, f, indent=1, sort_keys=True)
         f.write("\n")
     return bad
 

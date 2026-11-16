@@ -264,16 +264,6 @@ class LeanModel:
     notes: str = ''
 
 
-def entry_imports(translation) -> str:
-    """`import` lines for the entry modules a call_template names beyond the generated
-    module: `Autoform.NL.<M>` (initialized entry) or `Autoform.NLModel.<M>` (AI model)."""
-    import re
-    tmpl = (translation or {}).get('call_template', '') if isinstance(translation, dict) else \
-        getattr(translation, 'call_template', '')
-    mods = dict.fromkeys(re.findall(r'\b(Autoform\.(?:NLModel|NL)\.[A-Za-z0-9_]+)\.call[FH]?\b', tmpl or ''))
-    return ''.join(f'import {m}\n' for m in mods)
-
-
 def dump(obj, path: Path):
     def conv(o):
         if hasattr(o, '__dataclass_fields__'):

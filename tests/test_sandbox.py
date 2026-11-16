@@ -192,6 +192,32 @@ def test_unknown_policy_value_is_refused(sandbox, monkeypatch, tmp_path):
         sandbox.sandboxed(['true'], work=tmp_path / 'w')
 
 
+def test_strict_refuses_the_network_only_unshare_fallback(sandbox, monkeypatch, tmp_path):
+    """A Linux host without bwrap falls back to `unshare -rn`, which leaves writes outside
+    the work directory unrestricted; `strict` must refuse it rather than accept it."""
+    monkeypatch.setattr(sandbox.sys, 'platform', 'linux')
+    monkeypatch.setattr(sandbox, '_probe', lambda m: ('/usr/bin/unshare', '') if m == 'unshare'
+                        else (None, 'bwrap is not on PATH'))
+    launch = sandbox.sandboxed(['true'], work=tmp_path / 'w')
+    assert launch.record['mechanism'] == 'unshare'
+    assert 'unrestricted' in launch.record['filesystem']['elsewhere']   # the default says so
+    monkeypatch.setenv('AUTOFORM_SANDBOX', 'strict')
+    with pytest.raises(sandbox.SandboxUnavailable, match='unshare: refused by AUTOFORM_SANDBOX=strict'):
+        sandbox.sandboxed(['true'], work=tmp_path / 'w')
+    with pytest.raises(sandbox.SandboxUnavailable):
+        sandbox.require()
+    assert sandbox.report()['enforced'] is False
+    # An inherited unshare box does not satisfy strict either; a confining one does.
+    monkeypatch.setenv('AUTOFORM_SANDBOX_ACTIVE', json.dumps(launch.record))
+    with pytest.raises(sandbox.SandboxUnavailable, match='does not confine the filesystem'):
+        sandbox.sandboxed(['true'], work=tmp_path / 'w')
+    monkeypatch.setenv('AUTOFORM_SANDBOX_ACTIVE', json.dumps(dict(launch.record, mechanism='bwrap')))
+    assert sandbox.sandboxed(['true'], work=tmp_path / 'w').record['inherited'] is True
+    monkeypatch.delenv('AUTOFORM_SANDBOX_ACTIVE')
+    monkeypatch.setattr(sandbox, '_probe', lambda m: ('/usr/bin/bwrap', '') if m == 'bwrap' else (None, 'x'))
+    assert sandbox.sandboxed(['true'], work=tmp_path / 'w').record['mechanism'] == 'bwrap'
+
+
 def test_a_launch_inside_the_sandbox_is_passed_through_and_reported_as_inherited(sandbox, monkeypatch, tmp_path):
     inner = dict(mechanism='seatbelt', enforced=True, network='denied', filesystem={'writable': ['/x']})
     monkeypatch.setenv('AUTOFORM_SANDBOX_ACTIVE', json.dumps(inner))

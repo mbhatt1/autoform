@@ -343,7 +343,7 @@ def witness_constants(pre: str, inputs: dict, fn: dict, english: str) -> list:
     return bad
 
 
-def candidates(stmt: dict, prop: dict, check: dict, fn: dict, cls: str) -> tuple:
+def candidates(stmt: dict, prop: dict, check: dict, fn: dict) -> tuple:
     """(repair options, dropped): each option restates the English; none mentions a witness
     constant without evidence."""
     english = prop.get('text') or stmt.get('english') or ''
@@ -470,7 +470,7 @@ def adjudicate(translation: dict, statements: list, checks: list, out_dir, *, ju
             if round_no > rounds:
                 rec['disposition'] = 'repair_limit'
                 continue
-            options, dropped = candidates(stmt, prop, chk, fn, cls)
+            options, dropped = candidates(stmt, prop, chk, fn)
             prior = {o['id']: repair_prior(o, cls) for o in options}
             pres = [o for o in options if o['kind'] == 'precondition']
             rec['repair'] = dict(offered=[o['id'] for o in options], dropped=dropped)

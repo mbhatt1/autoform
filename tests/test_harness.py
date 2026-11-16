@@ -1,7 +1,7 @@
 """The formalization harness: generator → judge → verifier, with the judge outside the TCB.
 
 Most tests are pure Python. The Lean-backed end-to-end test runs with AUTOFORM_TEST_LEAN=1
-against the checked-in PipelineSecurityVulnerable model.
+against the PipelineSecurityVulnerable model built on demand from a fixture by the pipeline_model fixture.
 """
 from __future__ import annotations
 
@@ -300,14 +300,11 @@ def test_bench_labels_only_what_verification_settles():
 # --- end to end, Lean-backed ---------------------------------------------------------------
 
 @pytest.mark.skipif(os.environ.get('AUTOFORM_TEST_LEAN') != '1', reason='set AUTOFORM_TEST_LEAN=1')
-def test_harness_refutes_the_vulnerable_policy_with_a_kernel_witness(tmp_path):
+def test_harness_refutes_the_vulnerable_policy_with_a_kernel_witness(tmp_path, pipeline_model):
     from autoform.harness.pipeline import Harness, Options
-    src = tmp_path / 'src'
-    src.mkdir()
-    (src / 'policy.py').write_text('def authorize(owner, caller):\n    return True\n')
-    h = Harness(Options(root=ROOT, module='PipelineSecurityVulnerable', source=src, out=tmp_path / 'out',
-                        judge='heuristic', cache=None, top_k=20,
-                        ast=ROOT / 'ast-PipelineSecurityVulnerable.json'))
+    ast = pipeline_model('PipelineSecurityVulnerable', ROOT / 'tests/fixtures/harness/vulnerable')
+    h = Harness(Options(root=ROOT, module='PipelineSecurityVulnerable', source=ROOT / 'tests/fixtures/harness/vulnerable',
+                        out=tmp_path / 'out', judge='heuristic', cache=None, top_k=20, ast=ast))
     data = h.run()
     by_text = {r['text']: r for r in data['claims'] if r['selected']}
     owner_only = by_text['authorize: ∀ owner:int caller:int. ((true = result) ↔ (owner = caller))']

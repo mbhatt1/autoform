@@ -18,6 +18,7 @@ def _repo(tmp_path, *, version="9.9.9", changelog="9.9.9", init="9.9.9"):
     shutil.copy(SCRIPT, repo / "scripts/release_check.sh")
     (repo / "pyproject.toml").write_text(f'[project]\nname = "autoform-lean"\nversion = "{version}"\n')
     (repo / "src/autoform/__init__.py").write_text(f'__version__ = "{init}"\n')
+    (repo / "lakefile.toml").write_text(f'name = "autoform"\nversion = "{version}"\n')
     (repo / "CHANGELOG.md").write_text(f"# Changelog\n\n## [{changelog}] - x\n")
     env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
            "GIT_COMMITTER_EMAIL": "t@t"}

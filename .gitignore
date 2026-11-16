@@ -104,6 +104,7 @@ artifacts/pipeline/
 ast-Pipeline*.json
 ledger-Pipeline*.json
 Autoform/SpecsGen/Pipeline*.lean
+Autoform/SpecsGen/Pipeline*/
 # Products of `./autoform.sh <dir> Demo` and of `./autoform.sh <dir>` (module name
 # defaults to `Translated`): a hand-run of the checkout pipeline on an ad-hoc tree, not a
 # corpus. The checkout entry point writes beside the tracked corpora on purpose (that is
@@ -147,6 +148,7 @@ Autoform/Generated/*/Part*.lean
 # pr mode (scripts/pr_mode.py, `autoform pr`): the proof module it synthesizes for the
 # changed functions and its report directory are products of a run, never tracked.
 Autoform/SpecsGen/PullRequest*.lean
+Autoform/SpecsGen/PullRequest*/
 artifacts/pr/
 
 # CI scratch: generated ledger driver (ledger-*.json is the artifact)

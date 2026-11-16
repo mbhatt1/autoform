@@ -512,12 +512,6 @@ def python_point(plan: Plan, point):
     return tags
 
 
-def python_args(plan: Plan, point):
-    """Positional Python arguments in the order the binders are passed, or None."""
-    tags = python_point(plan, point)
-    return None if tags is None else [pv.untag(t) for t in tags]
-
-
 def run_runtime(translation: dict, fn: dict | None, plan: Plan, timeout=RUNTIME_TIMEOUT, work: Path | None = None):
     path, qual = runtime_target(translation, fn)
     if path is None:

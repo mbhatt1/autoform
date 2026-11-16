@@ -500,6 +500,82 @@ def strBuiltin (name : String) (args : List Val) : Option EResult :=
   | "format", [_, _]        => some (.exn (.str "TypeError"))
   | _, _                    => none
 
+/-! ## `range` in a `for` header
+
+`range(stop)`, `range(start, stop[, step])` is "an immutable sequence of numbers"
+(Library § Built-in Types, "Ranges"): for a positive step the elements are `start + step*i`
+with `i ≥ 0` and `r[i] < stop`, for a negative step those with `r[i] > stop`; a zero step
+raises `ValueError`; an argument that is not an integer is a `TypeError` (`bool` is an
+`int`). A range is NOT a list -- `range(3) == [0, 1, 2]` is False -- so `range` itself is
+not a builtin here. What the exporter hands this table is the reserved name
+`<python-range>`, which it emits only for the iterable of a `for` statement (the frontend
+evaluates it into a temporary only the loop reads, `SourceCompiler.rangeHeader`); there
+the object is never observed, only the integers it yields, in order, which is exactly the
+list below. Longer than `rangeLimit` elements is the hole `range:length` (the list would
+be materialised), and an object argument (which may define `__index__`) is `none`. -/
+
+/-- The longest range materialised for a loop header. -/
+def rangeLimit : Nat := 100000
+
+/-- An integer argument of `range`; `bool` is an `int`. -/
+def rangeArg : Val → Option Int
+  | .int i  => some i
+  | .bool b => some (if b then 1 else 0)
+  | _       => none
+
+/-- The elements of `range(start, stop, step)`, for a nonzero step. -/
+def rangeElems (start stop step : Int) : Nat × List Int :=
+  let count : Nat :=
+    if step > 0 then (if start < stop then ((stop - start - 1) / step + 1).toNat else 0)
+    else (if start > stop then ((start - stop - 1) / (-step) + 1).toNat else 0)
+  (count, (List.range count).map (fun j => start + (j : Int) * step))
+
+/-- `<python-range>`: see the section note. -/
+def rangeBuiltin (name : String) (args : List Val) : Option EResult :=
+  if name != "<python-range>" then none else
+  let bounds : Option (Option (Int × Int × Int)) :=
+    match args with
+    | [b] => some ((rangeArg b).map (fun e => (0, e, 1)))
+    | [a, b] => some (match rangeArg a, rangeArg b with
+                      | some s, some e => some (s, e, 1) | _, _ => none)
+    | [a, b, c] => some (match rangeArg a, rangeArg b, rangeArg c with
+                         | some s, some e, some st => some (s, e, st) | _, _, _ => none)
+    | _ => none
+  match bounds with
+  | none => some (.exn (.str "TypeError"))         -- arity: 0 or more than 3 arguments
+  | some none =>
+      if args.any (fun a => match a with
+          | .str _ | .float _ | .unit | .list _ | .tuple _ | .dict _ => true | _ => false)
+      then some (.exn (.str "TypeError")) else none
+  | some (some (s, e, st)) =>
+      if st == 0 then some (.exn (.str "ValueError")) else
+      let (n, xs) := rangeElems s e st
+      if n > rangeLimit then some (.hole "range:length")
+      else some (.val (.list (xs.map Val.int)))
+
+private def rangeShows (args : List Val) : String :=
+  match rangeBuiltin "<python-range>" args with
+  | some (.val (.list vs)) => toString (vs.map (fun v => match v with | .int i => i | _ => 0))
+  | some (.exn (.str n)) => "exn " ++ n
+  | some (.hole l) => "hole " ++ l
+  | _ => "none"
+
+-- Each is `list(range(...))` on CPython 3.14 (tests/test_python_str_methods.py runs them).
+#guard rangeShows [.int 3] == "[0, 1, 2]"
+#guard rangeShows [.int 0] == "[]"
+#guard rangeShows [.int (-2)] == "[]"
+#guard rangeShows [.int 2, .int 5] == "[2, 3, 4]"
+#guard rangeShows [.int 0, .int 10, .int 3] == "[0, 3, 6, 9]"
+#guard rangeShows [.int 5, .int 0, .int (-2)] == "[5, 3, 1]"
+#guard rangeShows [.int 5, .int 5, .int (-1)] == "[]"
+#guard rangeShows [.bool true] == "[0]"
+#guard rangeShows [.int 1, .int 2, .int 0] == "exn ValueError"
+#guard rangeShows [.str "3"] == "exn TypeError"
+#guard rangeShows [] == "exn TypeError"
+#guard rangeShows [.int 1, .int 2, .int 3, .int 4] == "exn TypeError"
+#guard rangeShows [.int 1000000] == "hole range:length"
+#guard (rangeBuiltin "range" [.int 3]).isNone
+
 /-- Guard helpers: `EResult` carries no `BEq`. -/
 private def fmtIs (r : EResult) (t : String) : Bool :=
   match r with | .val (.str u) => u == t | _ => false
@@ -625,7 +701,11 @@ private def raiseE (n : String) : EResult := .exn (.str n)
 /-- Construct the represented class of a builtin exception, validating constructor
 arguments before discarding its currently unmodeled payload. Python 3.10+ SyntaxError
 and IndentationError inspect the details iterable only at arity two. Four or six
-fields are accepted; five is not. Unknown object iterators remain holes. -/
+fields are accepted; five is not. Seven depends on the interpreter: 3.10-3.13 raise
+`TypeError` (at most 6), 3.14 accepts a seventh field. Core is not parameterised by the
+Python version, so that arity is a hole (`details-version-dependent`) rather than either
+answer. Eight or more is a `TypeError` on every supported version. Unknown object
+iterators remain holes. -/
 def makeException (name : String) (args : List Val) : EResult :=
   if !excNames.contains name then .hole s!"exception:{name}:unmodelled-class"
   else if name == "SyntaxError" || name == "IndentationError" then
@@ -638,6 +718,7 @@ def makeException (name : String) (args : List Val) : EResult :=
             match details.iterable with
             | some fields =>
                 if fields.length == 4 || fields.length == 6 then .val (.str name)
+                else if fields.length == 7 then .hole s!"exception:{name}:details-version-dependent"
                 else raiseE "TypeError"
             | none => raiseE "TypeError"
     | _ => .val (.str name)
@@ -826,7 +907,7 @@ def freeNames : List String :=
   excNames ++
   [ "len", "abs", "sum", "min", "max", "sorted", "bool", "str", "repr", "format", "int"
   , "ord", "chr", "callable", "isinstance", "getattr", "hasattr"
-  , "list", "tuple", "dict" ]
+  , "list", "tuple", "dict", "<python-range>" ]
 
 /-- Does `builtin` model this free-function name under this dialect?
 
@@ -843,11 +924,12 @@ def knowsFree (d : Dialect) (name : String) : Bool :=
 /-- The free builtins whose arguments the interpreter reads THROUGH a boxed container
 (`Val.unbox`) before calling `builtin`. Scalar observations preserve the container's
 identity. `tuple` makes an immutable sequence of the same elements: shallow unboxing
-preserves references to nested mutable objects. Mutable-container constructors need
-allocation and are not on this list. -/
+preserves references to nested mutable objects. `list` makes a NEW list of the same
+elements, which the interpreter allocates afterwards (`boxBuiltinResult`), so it reads
+through the box too. `dict` is not on this list. -/
 @[simp] def unboxesArgs (name : String) : Bool :=
   name == "len" || name == "sum" || name == "min" || name == "max" ||
-  name == "bool" || name == "any" || name == "all" || name == "tuple"
+  name == "bool" || name == "any" || name == "all" || name == "tuple" || name == "list"
 
 /-- The builtin bodies. Call `builtin`, not this: only `builtin` carries the `knowsFree`
 guard that keeps the ledger honest. -/
@@ -870,6 +952,9 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     -- hole `control:TRY-handler-binding`), so the ambiguity the old `str`-declines-on-str
     -- rule guarded against has no witness -- docs/languages.md §16.E.
     match strBuiltin name args with
+    | some r => ok r
+    | none =>
+    match rangeBuiltin name args with
     | some r => ok r
     | none =>
     match name, args with
@@ -926,7 +1011,14 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
         if opaqueRuntimeAttributes h r then none else (getAttr h r f).map (fun _ => (h, .val (.bool true)))
     -- Container constructors.
     | "list",  []  => v (.list [])
-    | "list",  [x] => (elems x).map (fun es => (h, .val (.list es)))
+    | "list",  [x] =>
+        -- `list()` of a plain non-iterable scalar is CPython's `TypeError` ("'int' object
+        -- is not iterable"). Only the four immediates can be classified without the class
+        -- table: a `.ref` may define `__iter__`, and a `.fn` may name a class a metaclass
+        -- makes iterable, so every other shape keeps the `call:list` hole.
+        match x with
+        | .int _ | .bool _ | .float _ | .unit => ok (raiseE "TypeError")
+        | _ => (elems x).map (fun es => (h, .val (.list es)))
     | "tuple", []  => v (.tuple [])
     | "tuple", [x] => (elems x).map (fun es => (h, .val (.tuple es)))
     | "dict",  []  => v (.dict [])
@@ -1084,14 +1176,205 @@ def javaStringMethod (s : String) (name : String) (args : List Val) : Option ERe
   | "endsWith", [.unit]    => some npe
   | _, _ => none
 
+/-! ### Python `str` methods (Library § Built-in Types, "String Methods")
+
+A Lean `String` is a sequence of Unicode scalar values and a CPython `str` is a sequence of
+code points; the two agree on every string Lean can hold (CPython's lone surrogates have no
+`Val`). Everything below that is a function of the code points alone -- splitting on an
+explicit separator, prefix and suffix tests, `replace`, `join`, stripping an explicit
+character set -- is therefore answered on EVERY string. Two things are not:
+
+* **Case mapping.** `str.lower`/`str.upper` apply the Unicode case tables (`'ß'.upper()` is
+  `'SS'`, `'İ'.lower()` has two code points). Core carries no case tables, so a receiver
+  with any character past U+007F is the hole `str:<m>:non-ascii`. On ASCII the mapping is
+  `A`-`Z` <-> `a`-`z` and the identity elsewhere.
+* **Whitespace.** `strip()`/`split()` with no (or a `None`) argument use `str.isspace`,
+  whose non-ASCII members (U+0085, U+00A0, U+1680, U+2000-U+200A, ...) are a Unicode
+  property Core does not carry: a receiver with any character past U+007F is the hole
+  `str:<m>:non-ascii-whitespace`. The ASCII whitespace of `str.isspace` is `\t \n \v \f \r`
+  (9-13), the separators `\x1c`-`\x1f` (28-31) and the space (32) -- the separators are
+  whitespace in CPython even though `string.whitespace` omits them.
+
+Arguments of a type CPython rejects outright (an `int`, `bool`, `None` or `float` where a
+`str` is required) are its `TypeError`; an object argument (which may be a `str` subclass,
+or define `__index__`) and every shape not listed are `none`, the caller's `mcall:` hole.
+Keyword arguments never reach this table (`mcall:<m>:keyword-to-builtin`).
+
+The old objection to modelling string methods at all -- an exception value and a string
+are the same `Val`, so `e.lower()` would answer -- is closed at the exporter: a method call
+on an `except ... as e` binding is the hole `exception:payload:<m>`, exactly like `e.args`
+and `str(e)` (docs/languages.md §16.E). -/
+
+/-- Every character is ASCII. -/
+def pyAscii (s : String) : Bool := s.toList.all (fun c => c.toNat < 0x80)
+
+/-- `str.isspace` on an ASCII character (see the section note). -/
+def pyAsciiSpace (c : Char) : Bool :=
+  let n := c.toNat
+  (9 ≤ n && n ≤ 13) || (28 ≤ n && n ≤ 32)
+
+/-- ASCII case mapping, one character. -/
+def pyLowerChar (c : Char) : Char :=
+  if 65 ≤ c.toNat && c.toNat ≤ 90 then Char.ofNat (c.toNat + 32) else c
+def pyUpperChar (c : Char) : Char :=
+  if 97 ≤ c.toNat && c.toNat ≤ 122 then Char.ofNat (c.toNat - 32) else c
+
+/-- Is `t` a contiguous run of `cs`? (`t in s`; the empty string is in every string.) -/
+def pyInfix (t : List Char) : List Char → Bool
+  | []     => t.isEmpty
+  | c :: r => t.isPrefixOf (c :: r) || pyInfix t r
+
+/-- `s.split(sep, k)` for a NONEMPTY `sep`: cut at each occurrence, left to right, at most
+`k` times (`none` = no limit). `fuel` is the receiver's length plus one: every step
+consumes at least one character, so it never runs out. -/
+def pySplitSep (sep : List Char) : Nat → List Char → List Char → Option Nat → List (List Char)
+  | 0,     cur, cs, _ => [cur ++ cs]
+  | _ + 1, cur, [], _ => [cur]
+  | n + 1, cur, c :: r, k =>
+      match k with
+      | some 0 => [cur ++ (c :: r)]
+      | _ =>
+        if sep.isPrefixOf (c :: r) then
+          cur :: pySplitSep sep n [] ((c :: r).drop sep.length) (k.map (· - 1))
+        else pySplitSep sep n (cur ++ [c]) r k
+
+/-- `s.split(None, k)`: runs of whitespace separate words, leading and trailing whitespace
+yields no empty word, and once `k` words are cut the rest -- with its leading whitespace
+skipped -- is the last item. This is CPython's `split_whitespace` (Objects/stringlib/
+split.h). -/
+def pySplitWs : Nat → List Char → Option Nat → List (List Char)
+  | 0,     cs, _ => if cs.isEmpty then [] else [cs]
+  | n + 1, cs, k =>
+      let cs := cs.dropWhile pyAsciiSpace
+      if cs.isEmpty then [] else
+      match k with
+      | some 0 => [cs]
+      | _ =>
+        (cs.takeWhile (fun c => !pyAsciiSpace c)) ::
+          pySplitWs n (cs.dropWhile (fun c => !pyAsciiSpace c)) (k.map (· - 1))
+
+/-- `s.replace(old, new, k)` for a NONEMPTY `old`: non-overlapping, left to right, at most
+`k` replacements (`none` = all). -/
+def pyReplaceSep (old new : List Char) : Nat → List Char → Option Nat → List Char
+  | 0,     cs, _ => cs
+  | _ + 1, [], _ => []
+  | n + 1, c :: r, k =>
+      match k with
+      | some 0 => c :: r
+      | _ =>
+        if old.isPrefixOf (c :: r) then
+          new ++ pyReplaceSep old new n ((c :: r).drop old.length) (k.map (· - 1))
+        else c :: pyReplaceSep old new n r k
+
+/-- `s.replace("", new, k)`: `new` is inserted in each of the `len(s) + 1` gaps, the first
+`k` of them (`none` = all) -- `"ab".replace("", "-")` is `"-a-b-"`. -/
+def pyReplaceEmpty (new : List Char) : List Char → Option Nat → List Char
+  | cs,     some 0 => cs
+  | [],     _      => new
+  | c :: r, k      => new ++ c :: pyReplaceEmpty new r (k.map (· - 1))
+
+/-- A Python `maxsplit`/`count` argument: negative means "no limit". -/
+def pyLimit (k : Int) : Option Nat := if k < 0 then none else some k.toNat
+
+/-- A value CPython rejects with `TypeError` where a `str` is required: a builtin scalar,
+which is certainly not a `str` (subclass). -/
+def pyNotStr : Val → Bool
+  | .int _ | .bool _ | .unit | .float _ => true
+  | _ => false
+
+/-- `strip`/`lstrip`/`rstrip` over a predicate on characters. -/
+def pyStripBy (p : Char → Bool) (left right : Bool) (cs : List Char) : List Char :=
+  let l := if left then cs.dropWhile p else cs
+  if right then (l.reverse.dropWhile p).reverse else l
+
+/-- `sep.join(items)`: every item a `str`. The FIRST item that is not one decides: a
+builtin non-`str` value is CPython's `TypeError` ("sequence item i: expected str
+instance"), an object or a builtin-based instance is unknown (`none`). -/
+def pyJoinStrs : List Val → Option (Except Unit (List String))
+  | []            => some (.ok [])
+  | .str s :: vs  => (pyJoinStrs vs).map (fun r => r.map (s :: ·))
+  | .int _ :: _ | .bool _ :: _ | .unit :: _ | .float _ :: _
+  | .list _ :: _ | .tuple _ :: _ | .dict _ :: _ => some (.error ())
+  | _ :: _        => none
+
+/-- `prefix` for `startswith`/`endswith`: a `str`, or a tuple of them ("prefix can also be
+a tuple of prefixes to look for"). -/
+def pyAffixes : Val → Option (List (List Char))
+  | .str t     => some [t.toList]
+  | .tuple ts  => (allStrs ts).map (·.map String.toList)
+  | _          => none
+
+/-- The Python `str` methods Core answers, on a `.str` receiver. See the section note for
+what is refused and why. `h` is only read: `join` looks through a boxed list or dict. -/
+def pyStringMethod (h : Heap) (s : String) (name : String) (args : List Val) : Option EResult :=
+  let cs := s.toList
+  let ok (t : List Char) : Option EResult := some (.val (.str (String.ofList t)))
+  let typeError : Option EResult := some (.exn (.str "TypeError"))
+  let strs (ts : List (List Char)) : Option EResult :=
+    some (.val (.list (ts.map (fun t => .str (String.ofList t)))))
+  let wsSplit (k : Option Nat) : Option EResult :=
+    if pyAscii s then strs (pySplitWs (cs.length + 1) cs k)
+    else some (.hole "str:split:non-ascii-whitespace")
+  let sepSplit (sep : String) (k : Option Nat) : Option EResult :=
+    if sep.isEmpty then some (.exn (.str "ValueError"))
+    else strs (pySplitSep sep.toList (cs.length + 1) [] cs k)
+  let strip (m : String) (left right : Bool) (as : List Val) : Option EResult :=
+    match as with
+    | [] | [.unit] =>
+        if pyAscii s then ok (pyStripBy pyAsciiSpace left right cs)
+        else some (.hole s!"str:{m}:non-ascii-whitespace")
+    | [.str chars] => ok (pyStripBy (fun c => chars.toList.contains c) left right cs)
+    | [x] => if pyNotStr x then typeError else none
+    | _ :: _ :: _ => typeError
+  let affix (isPrefix : Bool) (as : List Val) : Option EResult :=
+    match as with
+    | [p] =>
+        match pyAffixes p with
+        | some ts => some (.val (.bool (ts.any (fun t =>
+            if isPrefix then t.isPrefixOf cs else t.isSuffixOf cs))))
+        | none => if pyNotStr p then typeError else none
+    | _ => none
+  let replace (old new : String) (k : Option Nat) : Option EResult :=
+    if old.isEmpty then ok (pyReplaceEmpty new.toList cs k)
+    else ok (pyReplaceSep old.toList new.toList (cs.length + 1) cs k)
+  match name, args with
+  | "lower", [] =>
+      if pyAscii s then ok (cs.map pyLowerChar) else some (.hole "str:lower:non-ascii")
+  | "upper", [] =>
+      if pyAscii s then ok (cs.map pyUpperChar) else some (.hole "str:upper:non-ascii")
+  | "lower", _ :: _ | "upper", _ :: _ => typeError
+  | "strip",  as => strip "strip" true true as
+  | "lstrip", as => strip "lstrip" true false as
+  | "rstrip", as => strip "rstrip" false true as
+  | "split", []                     => wsSplit none
+  | "split", [.unit]                => wsSplit none
+  | "split", [.unit, .int k]        => wsSplit (pyLimit k)
+  | "split", [.str sep]             => sepSplit sep none
+  | "split", [.str sep, .int k]     => sepSplit sep (pyLimit k)
+  | "split", [x] => if pyNotStr x then typeError else none
+  | "startswith", as => affix true as
+  | "endswith",   as => affix false as
+  | "replace", [.str old, .str new]         => replace old new none
+  | "replace", [.str old, .str new, .int k] => replace old new (pyLimit k)
+  | "replace", [x, y] => if pyNotStr x || pyNotStr y then typeError else none
+  | "join", [it] =>
+      match elems (it.unbox h) with
+      | some items =>
+          match pyJoinStrs items with
+          | some (.ok ts)    => some (.val (.str (s.intercalate ts)))
+          | some (.error ()) => typeError
+          | none             => none
+      | none => if pyNotStr it then typeError else none
+  | _, _ => none
+
 /-- Methods on non-object receivers (`list`, `tuple`, `dict`).
 
 `none` means "not modelled": the caller keeps its `mcall:` hole. Note that this must be
 consulted **only after** the interpreter's own class dispatch fails, so a user class with
 a `get` or `pop` method always wins — those names are ambiguous by design.
 
-String methods are not modelled at all: an exception value and a string are the same
-`Val`, so `"KeyError".startswith(...)` and `e.startswith(...)` are indistinguishable. -/
+String methods are `pyStringMethod` (see "Python `str` methods" above for why the old
+exception-value objection no longer applies). -/
 def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Val) :
     Option (Heap × MethodResult) :=
   match d with
@@ -1116,6 +1399,13 @@ def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : Lis
         else p (.exn (.str "IndexOutOfBoundsException"))
     | .list vs, "size", []      => pv (.int vs.length)
     | .list vs, "isEmpty", []   => pv (.bool vs.isEmpty)
+    -- A `null` QUERY is collection-specific: `ArrayList`/`HashMap` answer it, the
+    -- `Set.of`/`Map.of` family (`java.util.ImmutableCollections`) throws
+    -- `NullPointerException`. Core's `.list`/`.dict` stand for both (a static `Set.of`
+    -- field is bound as an unboxed `.list`), so the query is a named gap, not a guess.
+    | .list _,  "contains", [.unit] => p (.hole "java:collection-null-query")
+    | .dict _,  "get", [.unit]      => p (.hole "java:collection-null-query")
+    | .dict _,  "containsKey", [.unit] => p (.hole "java:collection-null-query")
     | .list vs, "contains", [x] => pv (.bool (vs.any (fun v => Val.beq v x)))
     | .dict kvs, "put", [k, v]  => m (.val ((dictGet kvs k).getD .unit)) (.dict (dictSet kvs k v))
     | .dict kvs, "get", [k]     => pv ((dictGet kvs k).getD .unit)
@@ -1232,13 +1522,61 @@ def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : Lis
         | some k => match vs[k]? with
                     | some x => m (.val x) (.list (dropAt vs k))
                     | none   => p (raiseE "IndexError")
+    -- ── str, read-only (`pyStringMethod`) ────────────────────────────────────────
+    | .str s, _, _ =>
+        match pyStringMethod h s name args with
+        | some r => p r
+        | none   => none
     | _, _, _ => none
 
-/-- Every method name this file answers under `.python`. -/
+/-- The `str` method names `pyStringMethod` answers. -/
+def pyStrMethodNames : List String :=
+  [ "lower", "upper", "strip", "lstrip", "rstrip", "split", "startswith", "endswith"
+  , "replace", "join" ]
+
+/-- A `str` method name on a builtin scalar or a tuple: `int`, `bool`, `float`, `None` and
+`tuple` have none of `pyStrMethodNames` as an attribute in any CPython 3 release, so
+`(5).lower()` is CPython's `AttributeError` ("'int' object has no attribute 'lower'").
+Only these immediates: a list or dict reaches `Expr.mcall` boxed, and an instance's class
+may define the name. Everything else unanswered is the `mcall:<m>:non-object` hole. -/
+def missingMethod (d : Dialect) (recv : Val) (m : String) : EResult :=
+  let scalar : Bool := match recv with
+    | .int _ | .bool _ | .unit | .float _ | .tuple _ => true
+    | _ => false
+  if d == .python && scalar && pyStrMethodNames.contains m then .exn (.str "AttributeError")
+  else .hole s!"mcall:{m}:non-object"
+
+theorem missingMethod_excSafe {d : Dialect} {recv : Val} {m : String} {v : Val} :
+    missingMethod d recv m = .exn v → ExcSafe v := by
+  intro h
+  unfold missingMethod at h
+  dsimp only at h
+  repeat' split at h
+  all_goals first
+    | (cases h; done)
+    | (cases h; exact excSafe_str (by decide))
+
+#guard match missingMethod .python (.int 5) "lower" with
+       | .exn (.str "AttributeError") => true | _ => false
+#guard match missingMethod .python .unit "split" with
+       | .exn (.str "AttributeError") => true | _ => false
+#guard match missingMethod .python (.int 5) "bit_length" with
+       | .hole "mcall:bit_length:non-object" => true | _ => false
+#guard match missingMethod .javascript (.int 5) "lower" with
+       | .hole _ => true | _ => false
+
+/-- Every method name this file answers under `.python` (the last line is
+`pyStrMethodNames`, `methodNames_has_pyStrMethodNames`). Spelled out so the ledger's
+Python mirror (`scripts/ledger.py`) can be checked against it textually. -/
 def methodNames : List String :=
   [ "get", "keys", "values", "items", "copy", "count", "index"
   , "append", "insert", "extend", "clear", "remove", "pop", "popitem"
-  , "setdefault", "update", "add", "discard" ]
+  , "setdefault", "update", "add", "discard"
+  , "lower", "upper", "strip", "lstrip", "rstrip", "split", "startswith", "endswith"
+  , "replace", "join" ]
+
+theorem methodNames_has_pyStrMethodNames :
+    pyStrMethodNames.all methodNames.contains = true := by decide
 
 /-- The JavaScript array methods `methodCore` answers. Separate from `methodNames`
 because the two tables genuinely differ: `push` returns the new length, `pop` of an
@@ -1385,6 +1723,18 @@ theorem strBuiltin_excSafe {name : String} {args : List Val} {v : Val} :
     | (cases h; done)
     | (cases h; exact excSafe_str (by decide))
 
+/-- `<python-range>` raises only `TypeError` and `ValueError`. -/
+theorem rangeBuiltin_excSafe {name : String} {args : List Val} {v : Val} :
+    rangeBuiltin name args = some (.exn v) → ExcSafe v := by
+  intro h
+  unfold rangeBuiltin at h
+  dsimp only at h
+  repeat' split at h
+  all_goals first
+    | (cases h; done)
+    | (simp at h; done)
+    | (cases h; exact excSafe_str (by decide))
+
 theorem builtinCore_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : String)
     (args : List Val) (h₂ : Heap) (v : Val) :
     builtinCore d h name args = some (h₂, .exn v) → ExcSafe v := by
@@ -1398,7 +1748,10 @@ theorem builtinCore_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : 
     split at hb
     · rename_i r hsb
       exact strBuiltin_excSafe (hsb.trans (congrArg some (Prod.mk.inj (Option.some.inj hb)).2))
-    · repeat' split at hb
+    · split at hb
+      · rename_i r hsb
+        exact rangeBuiltin_excSafe (hsb.trans (congrArg some (Prod.mk.inj (Option.some.inj hb)).2))
+      repeat' split at hb
       all_goals first
         | (cases hb; done)
         | (simp at hb; done)
@@ -1413,6 +1766,18 @@ theorem builtin_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : Stri
   split at hb
   · exact builtinCore_excSafe hd _ _ _ _ _ hb
   · cases hb
+
+/-- `pyStringMethod` raises only `TypeError` and `ValueError`. -/
+theorem pyStringMethod_excSafe {h : Heap} {s name : String} {args : List Val} {v : Val} :
+    pyStringMethod h s name args = some (.exn v) → ExcSafe v := by
+  intro hm
+  unfold pyStringMethod at hm
+  dsimp only at hm
+  repeat' split at hm
+  all_goals first
+    | (cases hm; done)
+    | (simp at hm; done)
+    | (cases hm; exact excSafe_str (by decide))
 
 /-- A pure container-method result that is an exception names a represented class. The
 mutating results never carry one: every `.mutating` arm returns a `.val`. -/
@@ -1430,6 +1795,7 @@ theorem method_pure_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (recv : 
       | (cases hm; done)
       | (simp at hm; done)
       | (cases hm; exact excSafe_str (by decide))
+      | (cases hm; exact pyStringMethod_excSafe (by assumption))
   · cases hm
 
 /-- A mutating container-method result never carries an exception: the exception
@@ -1571,6 +1937,7 @@ private def freeWitness : String → List Val
   | "list"       => []
   | "tuple"      => []
   | "dict"       => []
+  | "<python-range>" => [.int 0]
   | _            => []
 
 /-- Receiver and arguments on which each method name is answered. -/
@@ -1593,6 +1960,16 @@ private def methodWitness : String → Val × List Val
   | "update"     => (.dict [], [.dict []])
   | "add"        => (.dict [], [.unit])
   | "discard"    => (.dict [], [.unit])
+  | "lower"      => (.str "", [])
+  | "upper"      => (.str "", [])
+  | "strip"      => (.str "", [])
+  | "lstrip"     => (.str "", [])
+  | "rstrip"     => (.str "", [])
+  | "split"      => (.str "", [.str ""])
+  | "startswith" => (.str "", [.str ""])
+  | "endswith"   => (.str "", [.str ""])
+  | "replace"    => (.str "", [.str "", .str ""])
+  | "join"       => (.str "", [.list []])
   | _            => (.unit, [])
 
 /-- Every name `knowsFree` accepts is genuinely answered by `builtin`. With
@@ -1736,6 +2113,126 @@ theorem javaStringMethod_length {s : String} (h : javaBmp s = true) :
     javaStringMethod s "length" [] = some (.val (.int s.toList.length)) := by
   simp [javaStringMethod, h]
 
+/-! ### Python `str` methods, by evaluation
+
+`pyShows recv m args expected` renders `method .python [] recv m args` as `val <repr>`,
+`exn <Name>`, `hole <label>` or `none`. Every `#guard pyShows` line below is ALSO run on
+CPython by `tests/test_python_str_methods.py`, which parses this block: an answered guard
+must be CPython's answer, and a `hole` guard must be a shape CPython answers that Core
+refuses by name. The expectations were taken from CPython 3.14, not from memory. -/
+
+/-- Render a method result for the guards below. -/
+def pyShows (recv : Val) (m : String) (args : List Val) (expected : String) : Bool :=
+  let shown := match method .python [] recv m args with
+    | some (_, .pure (.val v)) => "val " ++ (pyRepr v).getD "<unprintable>"
+    | some (_, .pure (.exn (.str n))) => "exn " ++ n
+    | some (_, .pure (.hole l)) => "hole " ++ l
+    | some _ => "other"
+    | none => "none"
+  shown == expected
+
+-- lower / upper: ASCII case mapping; past ASCII a named hole (no Unicode case tables)
+#guard pyShows (.str "Hello World") "lower" [] "val 'hello world'"
+#guard pyShows (.str "S3://Bucket-9_x") "lower" [] "val 's3://bucket-9_x'"
+#guard pyShows (.str "abc-XYZ_09") "upper" [] "val 'ABC-XYZ_09'"
+#guard pyShows (.str "") "upper" [] "val ''"
+#guard pyShows (.str "a") "lower" [.int 1] "exn TypeError"
+#guard pyShows (.str "Straße") "upper" [] "hole str:upper:non-ascii"
+#guard pyShows (.str "ÀB") "lower" [] "hole str:lower:non-ascii"
+-- strip / lstrip / rstrip: `str.isspace` on ASCII includes \x1c-\x1f
+#guard pyShows (.str "  \t hi \n") "strip" [] "val 'hi'"
+#guard pyShows (.str "\x1c\x1fhi\x0b\x0c") "strip" [] "val 'hi'"
+#guard pyShows (.str "  hi  ") "lstrip" [] "val 'hi  '"
+#guard pyShows (.str "  hi  ") "rstrip" [.unit] "val '  hi'"
+#guard pyShows (.str "xxhixyx") "strip" [.str "xy"] "val 'hi'"
+#guard pyShows (.str "..a.b..") "rstrip" [.str "."] "val '..a.b'"
+#guard pyShows (.str "abc") "strip" [.str ""] "val 'abc'"
+#guard pyShows (.str "a") "strip" [.int 1] "exn TypeError"
+#guard pyShows (.str "a") "strip" [.str "a", .str "b"] "exn TypeError"
+#guard pyShows (.str " é ") "strip" [] "hole str:strip:non-ascii-whitespace"
+-- split: explicit separator (any string), maxsplit, and whitespace runs (ASCII only)
+#guard pyShows (.str "a,b,,c") "split" [.str ","] "val ['a', 'b', '', 'c']"
+#guard pyShows (.str "hub:US:x") "split" [.str ":", .int 1] "val ['hub', 'US:x']"
+#guard pyShows (.str "a,b") "split" [.str ",", .int 0] "val ['a,b']"
+#guard pyShows (.str "a,b,c") "split" [.str ",", .int (-1)] "val ['a', 'b', 'c']"
+#guard pyShows (.str "abcabc") "split" [.str "bc"] "val ['a', 'a', '']"
+#guard pyShows (.str "") "split" [.str ","] "val ['']"
+#guard pyShows (.str "a b") "split" [.str ""] "exn ValueError"
+#guard pyShows (.str "  a  b\tc  ") "split" [] "val ['a', 'b', 'c']"
+#guard pyShows (.str "  a  b c  ") "split" [.unit, .int 1] "val ['a', 'b c  ']"
+#guard pyShows (.str "   ") "split" [] "val []"
+#guard pyShows (.str "") "split" [] "val []"
+#guard pyShows (.str "x") "split" [.int 1] "exn TypeError"
+#guard pyShows (.str "a b") "split" [] "hole str:split:non-ascii-whitespace"
+-- startswith / endswith: a str or a tuple of str
+#guard pyShows (.str "s3://bucket") "startswith" [.str "s3://"] "val True"
+#guard pyShows (.str "S3://bucket") "startswith" [.str "s3://"] "val False"
+#guard pyShows (.str "abc") "startswith" [.str ""] "val True"
+#guard pyShows (.str "abc") "endswith" [.tuple [.str "x", .str "bc"]] "val True"
+#guard pyShows (.str "abc") "endswith" [.tuple []] "val False"
+#guard pyShows (.str "abc") "endswith" [.str "abcd"] "val False"
+#guard pyShows (.str "abc") "startswith" [.int 1] "exn TypeError"
+-- replace: non-overlapping, left to right, optional count; "" inserts into every gap
+#guard pyShows (.str "aaa") "replace" [.str "a", .str "b"] "val 'bbb'"
+#guard pyShows (.str "aaa") "replace" [.str "a", .str "b", .int 2] "val 'bba'"
+#guard pyShows (.str "aaaa") "replace" [.str "aa", .str "x"] "val 'xx'"
+#guard pyShows (.str "aaa") "replace" [.str "aa", .str "x"] "val 'xa'"
+#guard pyShows (.str "ab") "replace" [.str "", .str "-"] "val '-a-b-'"
+#guard pyShows (.str "ab") "replace" [.str "", .str "-", .int 2] "val '-a-b'"
+#guard pyShows (.str "") "replace" [.str "", .str "x"] "val 'x'"
+#guard pyShows (.str "abc") "replace" [.str "b", .str ""] "val 'ac'"
+#guard pyShows (.str "abc") "replace" [.str "b", .int 1] "exn TypeError"
+-- join: every item a str; a dict joins its keys, a str its characters
+#guard pyShows (.str ",") "join" [.list [.str "a", .str "b"]] "val 'a,b'"
+#guard pyShows (.str "-") "join" [.str "abc"] "val 'a-b-c'"
+#guard pyShows (.str ",") "join" [.list []] "val ''"
+#guard pyShows (.str ",") "join" [.tuple [.str "x"]] "val 'x'"
+#guard pyShows (.str "+") "join" [.dict [(.str "k", .int 1), (.str "j", .int 2)]] "val 'k+j'"
+#guard pyShows (.str ",") "join" [.list [.str "a", .int 1]] "exn TypeError"
+#guard pyShows (.str ",") "join" [.int 1] "exn TypeError"
+-- not modelled: the caller's `mcall:` hole
+#guard pyShows (.str "abc") "count" [.str "a"] "none"
+#guard pyShows (.str "abc") "startswith" [.str "a", .int 1] "none"
+
+-- `join` reads a BOXED list through the heap, as the interpreter hands it over.
+#guard match method .python [{ cls := "list", fields := [], payload := .list [.str "p", .str "q"] }]
+         (.str "/") "join" [.ref 0] with
+       | some (_, .pure (.val (.str "p/q"))) => true | _ => false
+
+/-! ### `list(...)`, by evaluation
+
+`listShows x expected` renders `builtin .python [] "list" [x]` as `val <repr>`, `exn
+<Name>` or `none` -- `none` being the caller's `call:list` hole, which the interpreter
+reports for every value `builtin` declines. Every `#guard listShows` line below is ALSO
+run on CPython by `tests/test_core_in_list.py`, which parses this block: an answered
+guard must be CPython's answer, and a `none` guard must be a shape CPython answers
+deterministically -- a refusal, never a disagreement. The expectations were taken from
+CPython 3.14, not from memory. -/
+
+/-- Render a `list(...)` call for the guards below. -/
+def listShows (x : Val) (expected : String) : Bool :=
+  let shown := match builtin .python [] "list" [x] with
+    | some (_, .val v)       => "val " ++ (pyRepr v).getD "<unprintable>"
+    | some (_, .exn (.str n)) => "exn " ++ n
+    | none                   => "none"
+    | _                      => "other"
+  shown == expected
+
+-- the four plain non-iterables: CPython's `TypeError`, which `list()` now raises instead
+-- of leaving the `call:list` hole
+#guard listShows (.int 5) "exn TypeError"
+#guard listShows (.bool true) "exn TypeError"
+#guard listShows (.float (Fl.ofBits 0x4014000000000000)) "exn TypeError"   -- 5.0
+#guard listShows .unit "exn TypeError"
+-- iterables, unchanged: a shallow copy, a tuple's items, a string's code points
+#guard listShows (.list [.int 1, .int 2]) "val [1, 2]"
+#guard listShows (.tuple [.int 1]) "val [1]"
+#guard listShows (.str "ab") "val ['a', 'b']"
+-- what the model still cannot classify: a `.ref` may define `__iter__` and a `.fn` may
+-- name a class a metaclass makes iterable, so those stay the caller's `call:list` hole
+#guard listShows (.fn "len") "none"
+#guard listShows (.ref 0) "none"
+
 /-- Every name `knowsMethod .javascript` accepts is genuinely answered. -/
 theorem knowsMethod_javascript_complete :
     jsMethodNames.all (fun n =>
@@ -1767,7 +2264,10 @@ theorem builtin_heap_unchanged {d : Dialect} {h h' : Heap} {n : String} {as : Li
     simp only at hb
     split at hb
     · simp_all
-    · -- the string-conversion table (one opaque `Option`), then the main match
+    · -- the string-conversion table (one opaque `Option`), `<python-range>`, then the
+      -- main match
+      split at hb
+      · simp_all
       split at hb
       · simp_all
       · split at hb <;> simp_all [Option.map_eq_some_iff, builtinCore.minMax] <;>
@@ -1959,7 +2459,8 @@ private def Mth (r : Val) (n : String) (as : List Val) : Option MethodResult :=
 #eval Mth (.dict [(.str "a", .int 1)]) "update" [.dict [(.str "a", .int 5), (.str "b", .int 6)]]
                                                                -- mutating unit {a:5, b:6}  (order kept)
 -- not modelled
-#eval Mth (.str "ab") "startswith" [.str "a"]                  -- none
+#eval Mth (.str "ab") "startswith" [.str "a"]                  -- pure (val true)
+#eval Mth (.str "ab") "count" [.str "a"]                       -- none  (str.count: not modelled)
 #eval Mth (.list []) "sort" []                                 -- none
 
 -- the ledger's name predicates

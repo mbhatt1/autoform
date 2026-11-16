@@ -1,13 +1,21 @@
 {
  "ast": "ast-Requests.json",
- "astSha256": "c3169319ceec6b78e033341bf0547af2907c5c54ca02eeaba6a3424093e17e8b",
+ "astSha256": "3b40439fe9a0cc68d830326b07e765825cd8a2ed2e9ce7cb9af43da81ec8fe57",
  "ledger": {
-  "closedByContract": 0,
+  "closedByContract": 1,
   "closedByTranslation": 134,
   "contractsUsed": [
    {
+    "callee": ".split",
+    "sites": 3
+   },
+   {
     "callee": ".copy",
     "sites": 3
+   },
+   {
+    "callee": ".startswith",
+    "sites": 2
    },
    {
     "callee": ".get",
@@ -15,6 +23,10 @@
    },
    {
     "callee": ".items",
+    "sites": 1
+   },
+   {
+    "callee": ".replace",
     "sites": 1
    }
   ],
@@ -94,7 +106,7 @@
    }
   ],
   "module": "Requests",
-  "nodes": 16610,
+  "nodes": 16608,
   "verifiableCore": 134
  },
  "module": "Requests",

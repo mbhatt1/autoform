@@ -180,10 +180,15 @@ Missing required arguments to otherwise ordinary functions remain a known Core b
 limitation. Review the exact signature and modeled call domain before relying on a
 property; source-language calling conventions are part of the security claim.
 
-The recorded [Linux experiment](../artifacts/linux-fix/REPORT.md) exercised portable
-helpers on the host, not a configured kernel. It confirmed no Linux vulnerability.
-Its scoped conformance proofs are evidence that the pipeline can produce and
-replay claims; they do not establish Linux security.
+The recorded Linux experiment ([`evidence-linux-lcm.md`](evidence-linux-lcm.md), with
+the native-build and conformance logs under
+[`artifacts/defect/LinuxLcm/`](../artifacts/defect/LinuxLcm/)) exercised portable
+`lib/math` helpers on the host, not a configured kernel (`scripts/source_context.py`
+states that boundary). It caught one already-fixed overflow bug by comparing the pre-fix
+model against the post-fix native code; it did not find a Linux vulnerability. Its
+scoped conformance proofs are evidence that the pipeline can produce and replay claims;
+they do not establish Linux security. (An earlier revision of this paragraph linked
+`artifacts/linux-fix/REPORT.md`, a local run product that was never tracked.)
 
 See [the trust model](trust-model.md) for the proof boundaries and
 [language coverage](languages.md) for source-specific limitations.

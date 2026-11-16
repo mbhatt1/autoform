@@ -39,10 +39,31 @@ of the claim is the subject of the mutations.
 Usage:
     mutate.py <lean-file> <module-name> [--theorems a,b,c] [--decls d,e,f]
               [--spec-file PATH] [--spec-module MOD] [--generated]
-              [--max-mutants N] [--timeout S] [--json PATH] [--seed N]
+              [--max-mutants N] [--timeout S] [--restore-timeout S]
+              [--json PATH] [--seed N]
+    mutate.py <lean-file> --recover
 
 Only definitions (`def`/`abbrev`/`instance`) are mutated; theorems are left alone --
 mutating the proof would prove nothing about the specification.
+
+Interruption and recovery. Before the first mutant is written, every file of the model
+gets a `<file>.mutate-backup` sibling holding its original text; the backup is the
+exclusive marker that a run owns the module (a second run refuses to start, and
+`scripts/differential.py` reports `mutation_in_progress`). SIGINT, SIGTERM and SIGHUP
+are all turned into `KeyboardInterrupt` so that the restore path runs and the marker is
+removed on a `kill` or a CI cancel, not only on Ctrl-C. If a run was killed harder than
+that (SIGKILL, power loss) the mutant and the marker are still on disk; `--recover`
+copies each `.mutate-backup` back over its file, removes the marker, and exits 0 --
+or 1 when there is no backup to recover. Either way, rebuild (`lake build <module>`)
+before trusting any `.olean` that was produced while the mutant was live.
+
+After the last mutant the original source is rebuilt, bounded by `--restore-timeout`
+(default: three times `--timeout`). The report's `status` distinguishes a restore build
+that FAILED (`RESTORE_FAILED`: the restored source does not compile, which should be
+impossible and means the tree is not what the baseline built) from one that TIMED OUT
+(`RESTORE_TIMEOUT`: the source is restored and every verdict stands, but the tree's
+build state is unverified until the operator runs `lake build <module>`). Neither lets
+the gate exit 0.
 """
 from __future__ import annotations
 
@@ -51,14 +72,11 @@ import json
 import os
 import random
 import re
-import shutil
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 
-import proof_artifacts
 import generated_module
 import vacuity_rank
 
@@ -568,6 +586,87 @@ def find_root(path):
     return os.getcwd()
 
 
+def lean_module(root, p):
+    """The lake module name of a source file under the package root."""
+    return os.path.splitext(os.path.relpath(p, root))[0].replace(os.sep, ".")
+
+
+# Signals an operator's `kill`, a CI cancel or a closed terminal deliver. Python turns
+# only SIGINT into KeyboardInterrupt by default; a bare SIGTERM ended the process with a
+# mutant on disk and the `.mutate-backup` marker still set, so the next run refused to
+# start and `differential.py` kept reporting `mutation_in_progress` with no path out.
+INTERRUPT_SIGNALS = ("SIGTERM", "SIGHUP")
+
+
+def _interrupt_on(signum, frame):
+    raise KeyboardInterrupt(signal.Signals(signum).name)
+
+
+def install_signal_handlers():
+    """Route INTERRUPT_SIGNALS through KeyboardInterrupt so the `finally` blocks in
+    `main` restore the source. Returns the previous handlers for `restore_signal_handlers`;
+    off the main thread (where the interpreter forbids installing handlers) it installs
+    nothing and returns an empty map."""
+    previous = {}
+    for name in INTERRUPT_SIGNALS:
+        signum = getattr(signal, name, None)
+        if signum is None:
+            continue
+        try:
+            previous[signum] = signal.signal(signum, _interrupt_on)
+        except ValueError:
+            pass
+    return previous
+
+
+def restore_signal_handlers(previous):
+    for signum, handler in previous.items():
+        signal.signal(signum, handler)
+
+
+def recover(model):
+    """Put each `<file>.mutate-backup` of `model` back and remove the marker.
+
+    Returns `[(path, action)]` for every file that HAD a backup: action is "restored"
+    when the backup differed from the file (a mutant was live), or "marker-removed"
+    when the text already matched and only the stale marker was blocking the next run.
+    Files with no backup are not listed; an empty result means nothing to recover."""
+    done = []
+    for p in model:
+        backup = p + ".mutate-backup"
+        if not os.path.exists(backup):
+            continue
+        with open(backup, "rb") as f:
+            saved = f.read()
+        current = None
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                current = f.read()
+        if saved != current:
+            with open(p, "wb") as f:
+                f.write(saved)
+            done.append((p, "restored"))
+        else:
+            done.append((p, "marker-removed"))
+        os.remove(backup)
+    return done
+
+
+def restore_status(exit_code, timed_out, inconclusive):
+    """The report's top-level `status` after the restore build.
+
+    A restore build that timed out is not a restore build that failed: the restored
+    source may well compile, it just did not finish inside the bound. Conflating the two
+    under RESTORE_FAILED told the operator the tree was broken when it was merely
+    unverified, so the timeout gets its own status. `exit_code` is consulted only when
+    `timed_out` is false, because `run_build` reports 1 for a timeout as well."""
+    if timed_out:
+        return "RESTORE_TIMEOUT"
+    if exit_code:
+        return "RESTORE_FAILED"
+    return "INCONCLUSIVE" if inconclusive else "OK"
+
+
 def rank_survivors(report, args, root, file_lines, file_decls, path):
     """Annotate every surviving mutant with `difference_rate`, `sample`, `domain`.
 
@@ -646,9 +745,29 @@ def rank_survivors(report, args, root, file_lines, file_decls, path):
 
 
 def main():
+    # Installed before anything is parsed or written so that no window exists in which
+    # a SIGTERM can bypass the restore path; put back on the way out so a caller that
+    # imports this module (the test suite) keeps its own handlers.
+    previous = install_signal_handlers()
+    try:
+        return _main()
+    finally:
+        restore_signal_handlers(previous)
+
+
+def _main():
     ap = argparse.ArgumentParser(description="Lean source-level mutation gate")
     ap.add_argument("lean_file")
-    ap.add_argument("module")
+    ap.add_argument("module", nargs="?", default=None,
+                    help="module that was mutated (required unless --recover)")
+    ap.add_argument("--recover", action="store_true",
+                    help="no mutation: copy each <file>.mutate-backup left by an interrupted "
+                         "run back over its file, remove the marker, and exit 0 (1 if there "
+                         "is nothing to recover). Rebuild afterwards.")
+    ap.add_argument("--restore-timeout", type=int, default=None,
+                    help="seconds allowed for the restore build of the original source after "
+                         "the last mutant (default: 3x --timeout). A timeout is reported as "
+                         "status RESTORE_TIMEOUT, not RESTORE_FAILED.")
     ap.add_argument("--theorems", default=None, help="comma-separated theorem names")
     ap.add_argument("--spec-file", default=None,
                     help="file holding the THEOREMS, if different from the file being "
@@ -674,6 +793,12 @@ def main():
     ap.add_argument("--generated", action="store_true",
                     help="force the translated-module operators (auto-enabled for files "
                          "under Autoform/Generated/)")
+    ap.add_argument("--targeted-parts", action="store_true",
+                    help="per mutant of decl F, build only the spec part module(s) holding the "
+                         "theorems whose --subject is F (serially, one `lake build` each) "
+                         "instead of --spec-module. Measures the on-subject score only; "
+                         "cross-subject coverage is not measured. Baseline and restore still "
+                         "build --spec-module. Needs --subject or --spec-report.")
     ap.add_argument("--max-mutants", type=int, default=20)
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--json", dest="json_path", default="mutation.json")
@@ -696,11 +821,14 @@ def main():
     args = ap.parse_args()
     if (args.rank_survivors or args.rank_existing) and not args.rank_domain:
         ap.error("--rank-survivors/--rank-existing need at least one --rank-domain file")
+    if args.module is None and not args.recover:
+        ap.error("the module name is required unless --recover is given")
+    if args.restore_timeout is None:
+        args.restore_timeout = 3 * args.timeout
 
     random.seed(args.seed)
     path = os.path.abspath(args.lean_file)
     root = find_root(path)
-    base = os.path.basename(path)
 
     # A sharded translated module (`render_lean.py --shard-functions`) keeps its
     # definitions in part files the root imports; the mutation population is all of them.
@@ -709,13 +837,26 @@ def main():
     else:
         model = [path]
     sharded = len(model) > 1
+
+    if args.recover:
+        done = recover(model)
+        for p, action in done:
+            print(f"restored {p} from its .mutate-backup" if action == "restored" else
+                  f"{p} already matched its .mutate-backup; removed the stale marker")
+        if not done:
+            print("nothing to recover: no .mutate-backup beside " + ", ".join(model))
+            return 1
+        print("recovered. Any .olean built while the mutant was live is suspect: run "
+              "`lake build <module>` before trusting the tree.")
+        return 0
+
     originals = {}
     for p in model:
         with open(p, "r", encoding="utf-8") as f:
             originals[p] = f.read()
     file_lines = {p: originals[p].splitlines(keepends=True) for p in model}
     file_decls = {p: parse_decls(file_lines[p]) for p in model}
-    original, lines, decls = originals[path], file_lines[path], file_decls[path]
+    decls = file_decls[path]
     model_decls = [d for p in model for d in file_decls[p]]
 
     if args.rank_existing:
@@ -739,7 +880,7 @@ def main():
     spec_paths = [os.path.abspath(str(p)) for p in generated_module.spec_files(spec_path)]
     spec_file_decls = {}
     if spec_path == path:
-        spec_lines, spec_decls = lines, decls
+        spec_decls = decls
         spec_file_decls[spec_path] = decls
     else:
         spec_decls = []
@@ -749,6 +890,14 @@ def main():
             spec_decls += spec_file_decls[sp]
     build_module = args.spec_module or args.module
     generated = args.generated or ("Autoform/Generated/" in path.replace(os.sep, "/"))
+    # Which file holds each theorem, so a targeted run can name the part module to build.
+    thm_file = {d.name: sp for sp, ds in spec_file_decls.items()
+                for d in ds if d.kind in THEOREM_KINDS}
+    # Part module names are derived from file paths; if the umbrella's own derived name
+    # is not the module the baseline builds, the derived part names cannot be trusted
+    # either, and every targeted build would fail as an unattributable missing module.
+    if args.targeted_parts and lean_module(root, spec_path) != build_module:
+        ap.error("--targeted-parts needs --spec-module to be the module of --spec-file")
 
     if args.spec_report:
         with open(args.spec_report, encoding="utf-8") as stream:
@@ -786,6 +935,41 @@ def main():
     targets = [t for t in targets if t in tmap]
     if not targets:
         return 2
+
+    subject = {}
+    if args.subject:
+        for entry in args.subject.split(";"):
+            if "=" in entry:
+                t, ds = entry.split("=", 1)
+                subject[t.strip()] = [d.strip() for d in ds.split("+") if d.strip()]
+    if args.targeted_parts and not subject:
+        ap.error("--targeted-parts needs --subject or --spec-report: without a subject map "
+                 "there is no way to know which part a mutant's theorems live in")
+    # Targeted mode builds, for a mutant of F, exactly the part modules holding a theorem
+    # about F, in spec import order, each once. Every part's theorems evaluate callees
+    # through the full program table, so a mutant of G CAN kill a theorem about F in
+    # another part; targeted mode deliberately does not observe those cross-subject kills.
+    # They feed only coverage, which is therefore reported as not measured. The on-subject
+    # score stays complete, because every part holding a theorem about F is built for
+    # every mutant of F.
+    modules_of = {}
+    for t in targets:
+        for d in subject.get(t, []):
+            module = lean_module(root, thm_file[t])
+            if module not in modules_of.setdefault(d, []):
+                modules_of[d].append(module)
+    order = {lean_module(root, sp): i for i, sp in enumerate(spec_paths)}
+    for d in modules_of:
+        modules_of[d].sort(key=lambda m: order.get(m, len(order)))
+    if args.targeted_parts:
+        # A theorem with no subject would be scored over every mutant, but targeted mode
+        # builds its part only when it happens to share one with some subject's theorem;
+        # whatever score came out would describe that accident, not the theorem.
+        for t in [t for t in targets if t not in subject]:
+            print(f"warning: --targeted-parts: theorem {t!r} has no --subject entry; not gated")
+        targets = [t for t in targets if t in subject]
+        if not targets:
+            return 2
 
     # Safety net: a mutation run that is interrupted (or killed by an impatient operator)
     # otherwise leaves a mutant on disk, where a concurrent commit can capture it. The
@@ -833,6 +1017,14 @@ def main():
             missing = keep - {m.decl for m in all_mutants}
             for d in sorted(missing):
                 print(f"warning: no mutant generated for declaration {d!r}")
+        if args.targeted_parts:
+            # A mutant of a declaration no gated theorem is about has nothing to build in
+            # targeted mode, so it would survive by construction and say nothing.
+            unbuilt = sorted({m.decl for m in all_mutants if m.decl not in modules_of})
+            for d in unbuilt:
+                print(f"warning: --targeted-parts: no gated theorem has subject {d!r}; "
+                      f"its mutants are dropped")
+            all_mutants = [m for m in all_mutants if m.decl in modules_of]
         random.shuffle(all_mutants)
         # Spend the first round on distinct subjects. A global shuffle let a large
         # function consume the entire budget while other proved subjects went untested.
@@ -851,7 +1043,9 @@ def main():
         if spec_path != path:
             print(f"spec file : {spec_path}" + (
                 f" (+ {len(spec_paths) - 1} split part file(s))" if len(spec_paths) > 1 else ""))
-            print(f"built     : {build_module}")
+            print(f"built     : {build_module}" + (
+                " (baseline and restore; each mutant builds only its subject's parts)"
+                if args.targeted_parts else ""))
         print(f"theorems  : {', '.join(targets)}")
         print(f"mutants   : {len(mutants)} of {len(all_mutants)} generated\n")
 
@@ -889,15 +1083,35 @@ def main():
                 with open(mut.file, "w", encoding="utf-8") as f:
                     f.write("".join(new_lines))
 
-                rc, out, timed_out = run_build(root, build_module, args.timeout)
-                # A failure that names no source position is not a verdict: it is lock
-                # contention, a half-written dependency, or a missing `.olean` from a
-                # concurrent build. Retry before believing it — otherwise the gate reports a
-                # kill for a theorem that was never even elaborated.
-                for _ in range(2):
-                    if rc == 0 or timed_out or all_error_lines(out):
+                # One `lake build` per module, never several targets in one invocation:
+                # lake would build them in parallel, which is the memory pressure targeted
+                # mode exists to avoid. Default mode is the single umbrella build.
+                modules = modules_of[mut.decl] if args.targeted_parts else [build_module]
+                outputs, codes, built, any_timeout = [], [], [], False
+                for module in modules:
+                    rc, out, timed_out = run_build(root, module, args.timeout)
+                    # A failure that names no source position is not a verdict: it is lock
+                    # contention, a half-written dependency, or a missing `.olean` from a
+                    # concurrent build. Retry before believing it — otherwise the gate reports a
+                    # kill for a theorem that was never even elaborated.
+                    for _ in range(2):
+                        if rc == 0 or timed_out or all_error_lines(out):
+                            break
+                        rc, out, timed_out = run_build(root, module, args.timeout)
+                    built.append(module)
+                    outputs.append(out)
+                    codes.append(rc)
+                    any_timeout = any_timeout or timed_out
+                    # A timeout is already inconclusive, and an error in the mutated file
+                    # means the mutant itself is ill-typed: no further part can change
+                    # either verdict, so building one would only cost time.
+                    if timed_out or error_lines(out, mut.file, root):
                         break
-                    rc, out, timed_out = run_build(root, build_module, args.timeout)
+                # The attribution below reads positions per file, so the concatenated
+                # output of several part builds attributes exactly as one umbrella build.
+                rc = next((c for c in codes if c), 0)
+                out = "\n".join(outputs)
+                timed_out = any_timeout
                 # Keep every mutant's full build output when asked: a run where every
                 # mutant "survives" is indistinguishable from a build that never saw the
                 # mutant unless the output is on disk (AUTOFORM_MUTATE_LOG_DIR).
@@ -939,6 +1153,7 @@ def main():
                 pin_only = bool(spec_errs) and not hit_thms
 
                 rec = mut.to_json()
+                rec["built_modules"] = built
                 if timed_out or (rc != 0 and (foreign or not hit_defs and not hit_thms)):
                     rec["verdict"] = "inconclusive"
                     rec["timeout"] = timed_out
@@ -964,7 +1179,14 @@ def main():
                     if pin_only:
                         rec["caught_by_pins"] = True
                         pinned += 1
+                    # A theorem whose module was not built neither noticed nor missed the
+                    # mutant; it is recorded as such and counted in neither column.
+                    built_thms = {t for t in targets if not args.targeted_parts
+                                  or lean_module(root, thm_file[t]) in built}
                     for t in targets:
+                        if t not in built_thms:
+                            rec["verdict"][t] = "not-built"
+                            continue
                         # Only a diagnostic in this theorem establishes a detected
                         # mutation. A timeout or infrastructure failure proves nothing.
                         dead = t in hit_thms
@@ -974,8 +1196,20 @@ def main():
                             stats[t]["survived"] += 1
                             stats[t]["survivors"].append(mut.to_json())
                         rec["verdict"][t] = "killed" if dead else "survived"
-                    tag = ",".join(f"{t}={v}" for t, v in rec["verdict"].items())
-                    mark = "KILLED " if all(v == "killed" for v in rec["verdict"].values()) else "SURVIVED"
+                    tag = ",".join(f"{t}={v}" for t, v in rec["verdict"].items()
+                                   if v != "not-built")
+                    # With a subject map the gate holds theorems about OTHER subjects,
+                    # which a mutant of this one is not expected to kill; the mark says
+                    # whether the mutant's own gate caught it, as the on-subject score
+                    # does. (The CommonsLang3 log read 47 KILLED of 161 while 96 theorems
+                    # scored HAS TEETH, because every part-mate's survival was counted
+                    # against it.) This applies whenever a subject map exists, not only
+                    # under --targeted-parts: the default umbrella build with --subject
+                    # printed the same misleading mark for the same reason.
+                    gated = ([t for t in built_thms if mut.decl in subject.get(t, [])]
+                             if subject else built_thms)
+                    mark = "KILLED " if gated and all(rec["verdict"][t] == "killed"
+                                                      for t in gated) else "SURVIVED"
                     print(f"[{i}/{len(mutants)}] {mark} {mut.op:22s} L{mut.line} ({mut.decl}) {tag}")
                 records.append(rec)
         finally:
@@ -984,38 +1218,51 @@ def main():
             # another compiler while unwinding would delay cancellation and leak a new
             # process session if an outer deadline escalates to SIGKILL.
             if sys.exc_info()[0] is None:
-                restored_code, restored_output, restored_timeout = run_build(root, build_module, args.timeout)
+                # The restore build gets its own bound: it rebuilds the whole umbrella from
+                # a cold cache, which with --targeted-parts no mutant build ever did, so the
+                # per-mutant --timeout is the wrong yardstick for it.
+                restored_code, restored_output, restored_timeout = run_build(
+                    root, build_module, args.restore_timeout)
 
         print("\n=== mutation score ===")
         # `module` is the module that was MUTATED, not the one that was rebuilt: scripts/sacm.py
         # attributes G4 (specification non-vacuity) by this field, and the claim being supported
         # is a claim about the subject of the mutations.
+        status = restore_status(restored_code, restored_timeout, inconclusive)
         report = {"file": path, "module": args.module, "seed": args.seed,
-                  "status": "RESTORE_FAILED" if restored_code else "INCONCLUSIVE" if inconclusive else "OK",
+                  "status": status,
                   "restored_build": {"exit_code": restored_code, "timeout": restored_timeout,
+                                     "timeout_s": args.restore_timeout,
+                                     "status": status if status.startswith("RESTORE_") else "OK",
                                      "build_tail": restored_output[-2000:] if restored_code else ""},
                   "operators": "generated-ast" if generated else "lean-def",
                   "spec_file": spec_path if spec_path != path else None,
                   "spec_module": build_module,
+                  "build_scope": "targeted-parts" if args.targeted_parts else "spec-module",
                   "decls": sorted({m.decl for m in mutants}),
                   "mutants_generated": len(all_mutants), "mutants_run": len(mutants),
                   "invalid": invalid, "inconclusive": inconclusive,
                   "theorems": {}, "mutants": records}
-        subject = {}
+        if args.targeted_parts:
+            report["targeted_modules"] = {d: modules_of[d] for d in sorted({m.decl for m in mutants})}
         if args.subject:
-            for entry in args.subject.split(";"):
-                if "=" in entry:
-                    t, ds = entry.split("=", 1)
-                    subject[t.strip()] = [d.strip() for d in ds.split("+") if d.strip()]
             report["subject_map"] = subject
+        # Cross-subject kills were never observed in targeted mode (see `modules_of`), so a
+        # coverage figure would be a lower bound passed off as a measurement.
+        coverage_note = ("not measured (build_scope targeted-parts: only the mutated "
+                         "subject's own part(s) were built)") if args.targeted_parts else None
+        if coverage_note:
+            print(f"(coverage {coverage_note})")
 
-        exit_code = 2 if inconclusive or restored_code else 0
+        exit_code = 2 if inconclusive or restored_code or restored_timeout else 0
         for t in targets:
             k, s = stats[t]["killed"], stats[t]["survived"]
-            coverage = (k / (k + s)) if (k + s) else 0.0
+            coverage = None if coverage_note else (k / (k + s)) if (k + s) else 0.0
             if t in subject:
+                # "not-built" is excluded so that a record can only count against a theorem
+                # whose module actually saw the mutant (default mode never writes it).
                 on = [r for r in records if isinstance(r.get("verdict"), dict)
-                      and r["decl"] in subject[t]]
+                      and r["decl"] in subject[t] and r["verdict"][t] != "not-built"]
                 ok = sum(1 for r in on if r["verdict"][t] == "killed")
                 k, s = ok, len(on) - ok
             score = (k / (k + s)) if (k + s) else 0.0
@@ -1031,7 +1278,8 @@ def main():
                 verdict = "HAS TEETH" if score == 1.0 else ("WEAK" if score > 0 else "VACUOUS")
             scope = "on-subject" if t in subject else "all-mutants"
             print(f"{t}: killed {k}, survived {s}  score {score:.2%} ({scope})  "
-                  f"[{verdict}]" + (f"  coverage {coverage:.2%}" if t in subject else ""))
+                  f"[{verdict}]" + (f"  coverage {coverage:.2%}" if t in subject
+                                    and coverage is not None else ""))
             if t in subject:
                 stats[t]["survivors"] = [r for r in stats[t]["survivors"]
                                          if r["decl"] in subject[t]]
@@ -1043,6 +1291,8 @@ def main():
                                      "inconclusive": unknown,
                                      "scope": scope, "coverage_score": coverage,
                                      "verdict": verdict, "survivors": stats[t]["survivors"]}
+            if coverage_note:
+                report["theorems"][t]["coverage_reason"] = coverage_note
             if s:
                 exit_code = 1
         if invalid:
@@ -1071,7 +1321,12 @@ def main():
                 exit_code = 3
             elif status == "unavailable":
                 print(f"(could not calibrate the diagnostic format: {detail.splitlines()[0]})")
-        if restored_code:
+        if restored_timeout:
+            print(f"RESTORE TIMED OUT: the original source was restored, but its build did not "
+                  f"finish within --restore-timeout {args.restore_timeout}s. The verdicts above "
+                  f"stand; the tree's build state is unverified until you run "
+                  f"`lake build {build_module}`.")
+        elif restored_code:
             print("RESTORE FAILED: the original source was restored, but its build did not pass.")
         if pinned:
             print(f"({pinned} mutant(s) were caught by a `#guard_msgs` pin rather than by any "
@@ -1095,6 +1350,10 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except KeyboardInterrupt:
-        print("\ninterrupted", file=sys.stderr)
-        sys.exit(130)
+    except KeyboardInterrupt as exc:
+        # `_interrupt_on` names the signal; a real Ctrl-C carries no argument.
+        name = exc.args[0] if exc.args and isinstance(exc.args[0], str) else None
+        print("\ninterrupted" + (f" ({name})" if name else "") +
+              ": a live mutant, if any, was put back from its .mutate-backup", file=sys.stderr)
+        signum = getattr(signal, name, None) if name else None
+        sys.exit(128 + int(signum) if signum is not None else 130)

@@ -75,6 +75,47 @@ def test_url_detection_preserves_scp_and_local_paths():
     assert repository.display_url('https://secret@example.com/p.git?token=secret') == 'https://example.com/p.git'
 
 
+@pytest.mark.parametrize('url, shown', [
+    ('https://user:tok-1@example.com/p.git', 'https://example.com/p.git'),
+    ('HTTP://tok-1@example.com:8080/p.git#tok-1', 'http://example.com:8080/p.git'),
+    ('ssh://user@example.com/p.git', 'ssh://example.com/p.git'),
+    ('ssh://user:tok-1@example.com:2222/p.git', 'ssh://example.com:2222/p.git'),
+    ('git::https://user:tok-1@example.com/p.git?private_token=tok-1', 'git::https://example.com/p.git'),
+    ('hg::https://tok-1@example.com/repo', 'hg::https://example.com/repo'),
+    ('git@example.com:owner/p.git', 'git@example.com:owner/p.git'),   # scp form: a user, no secret
+])
+def test_display_url_removes_every_credential_form(url, shown):
+    assert repository.display_url(url) == shown
+    assert 'tok-1' not in repository.redact_git_output(f'fatal: {url}\n', url)
+
+
+@pytest.mark.parametrize('source', ['git::https://user:tok-1@example.invalid/p.git',
+                                    'hg::https://tok-1@example.invalid/p',
+                                    'https://user:tok-1@example.invalid/p.git?access_token=tok-1'])
+def test_cli_acquisition_records_hold_no_url_credential_or_secret_environment(
+        tmp_path, monkeypatch, capsys, source):
+    """Every file the CLI writes for a failed acquisition, and its console output, is free of
+    the URL credential and of secret-shaped environment values (SECURITY.md)."""
+    from autoform import cli
+    secrets = {'GIT_TOKEN': 'planted-token-2', 'SOME_API_KEY': 'planted-key-3',
+               'CLOUD_SECRET_ACCESS_KEY': 'planted-secret-4', 'DB_PASSWORD': 'planted-password-5'}
+    for name, value in secrets.items():
+        monkeypatch.setenv(name, value)
+
+    def failed_git(command, **kwargs):   # no network: git echoes the URL it was given, then fails
+        return subprocess.CompletedProcess(command, 128, stdout=f'fatal: unable to access {command[-2]}\n')
+
+    monkeypatch.setattr(repository.subprocess, 'run', failed_git)
+    workspace = cli.prepare_workspace(tmp_path / 'workspace')
+    assert cli.main(['--workspace', str(workspace), 'assure', source, 'Check']) == 2
+    report = workspace / 'artifacts/pipeline/Check'
+    assert (report / 'run.json').is_file() and (report / 'repository.json').is_file()
+    output = capsys.readouterr()
+    recorded = output.out + output.err + ''.join(p.read_text() for p in report.iterdir() if p.is_file())
+    for secret in ('tok-1', *secrets.values()):
+        assert secret not in recorded
+
+
 def test_concurrent_cli_run_preserves_existing_evidence(tmp_path, capsys):
     import fcntl
     from autoform import cli
@@ -501,3 +542,11 @@ def test_source_symlink_loop_has_a_failed_acquisition_record(tmp_path):
         repository.resolve_source(str(source), workspace, 'Check')
     record = json.loads((workspace / 'artifacts/pipeline/Check/repository.json').read_text())
     assert record['status'] == 'failed'
+
+
+def test_pr_sarif_origin_carries_no_url_credential(tmp_path):
+    from conftest import SCRIPTS, load
+    pr_mode = load(str(Path(SCRIPTS) / 'pr_mode.py'), 'af_pr_mode_origin')
+    subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)
+    git(tmp_path, 'remote', 'add', 'origin', 'https://user:tok-1@example.invalid/p.git?private_token=tok-1')
+    assert pr_mode._origin(tmp_path) == 'https://example.invalid/p.git'

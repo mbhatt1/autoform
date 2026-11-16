@@ -1441,6 +1441,19 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             c.code == m.code && c.lineNumber == m.lineNumber && c.columnNumber == m.columnNumber
           case _ => false
         }
+      // jssrc2cpg does the same for the `push` calls it synthesises for an array literal
+      // (`[a, b]` is `_tmp_0 = __ecma.Array.factory(); _tmp_0.push(a); ...`): a METHOD_REF
+      // `_tmp_0:push` at order -1 with an argument index past the real ones. Taken as an
+      // argument it was pushed into the array, so `[s]` evaluated to `[<fn>, s]`.
+      case m: MethodRef if m.order < 0 && jsLikeFile =>
+        val dotted = m.code.lastIndexOf(':') match {
+          case -1 => m.code
+          case i  => m.code.substring(0, i) + "." + m.code.substring(i + 1)
+        }
+        kids.exists {
+          case c: Call => callName(c) == "<operator>.fieldAccess" && c.code == dotted
+          case _ => false
+        }
       case _ => false
     }
   }
@@ -3531,6 +3544,239 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       scala.io.Source.fromFile(resolved).getLines().toList
     } catch { case _: Exception => Nil }
   })
+
+  // ------------------------------------------------------------ C++ named constants
+  /** C++ only. A named integer constant -- a `static const`/`static constexpr` data
+    * member with an in-class initializer, or a `const`/`constexpr` variable at namespace
+    * scope -- has a value fixed at compile time, but c2cpg gives the translated body no
+    * binding to read it from: a member is a TYPE_DECL MEMBER, a namespace variable a
+    * LOCAL of a `<global>` method whose namespace body the exporter does not translate.
+    * Every read was an unbound name (`Double::kSignificandSize` became
+    * `field:kSignificandSize:non-object`, a bare `kDenormalExponent` an unbound operand)
+    * and holed at runtime. Such a read is replaced by the constant's value, evaluated
+    * from its single-line declaration under C++'s integer rules (literal types, integral
+    * promotion, the usual arithmetic conversions, unsigned wrap-around). Anything this
+    * cannot evaluate exactly -- a macro, a multi-line or non-integer declaration, a
+    * member that is not both static and const, a signed overflow, a shift out of range,
+    * more than one candidate declaration -- is left exactly as it was. C files never
+    * reach this (`cxxFileName`); C file-scope globals keep their `setGlobal` model. */
+  /** A corpus is C++ when it has no C translation unit and either a C++ source or
+    * header, or -- a header-only library -- a `.h` with a C++-only declaration
+    * (`namespace n {`, `template <`, `class C {`/`:`). `native_c.cpp_corpus` is the
+    * same rule for the native oracle. Only in a C++ corpus is a `.h` read as C++. */
+  lazy val cxxCorpus: Boolean = {
+    val names = cpg.file.name.l
+    val lower = names.map(_.toLowerCase)
+    val token = """^\s*(?:namespace\s+\w+\s*\{|template\s*<|class\s+\w+\s*(?:final\s*)?[:{])""".r
+    if (lower.exists(_.endsWith(".c"))) false
+    else if (lower.exists(n => List(".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx").exists(e => n.endsWith(e)))) true
+    else names.filter(_.toLowerCase.endsWith(".h")).exists(f => fileLines(f).exists(l => token.findFirstIn(l).isDefined))
+  }
+  def cxxFileName(f: String): Boolean = {
+    val l = f.toLowerCase
+    List(".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx").exists(e => l.endsWith(e)) || (l.endsWith(".h") && cxxCorpus)
+  }
+  lazy val cxxTypeDecls: Map[String, TypeDecl] =
+    cpg.typeDecl.isExternal(false).l.filter(t => cxxFileName(t.filename)).map(t => t.fullName -> t).toMap
+  lazy val cxxGlobalLocals: Map[String, List[(Local, String)]] =
+    cpg.method.nameExact("<global>").l.filter(m => cxxFileName(m.filename))
+      .flatMap(m => m.local.l.map(l => (l, m.filename))).groupBy(_._1.name)
+
+  final case class CxxConst(v: BigInt, t: String)
+
+  /** `(type tag, initializer text)` of `name`'s declaration on `line` of `file`: the
+    * specifiers must include `const` or `constexpr` (and `static`, for a member), and
+    * the rest must be one integer type. */
+  def cxxDeclaration(file: String, line: Option[Int], name: String, member: Boolean): Option[(String, String)] = {
+    val text = line.flatMap(n => fileLines(file).lift(n - 1)).getOrElse("")
+    val re = ("""(?:^|[;{}])\s*([A-Za-z_][\w\s]*?)\s*\b""" + java.util.regex.Pattern.quote(name) +
+              """\s*=\s*([^;{}]+);""").r
+    re.findFirstMatchIn(text).flatMap { mt =>
+      val words = mt.group(1).trim.split("\\s+").toList
+      val ty = words.filterNot(Set("static", "const", "constexpr", "inline").contains).mkString(" ")
+      val const = words.contains("const") || words.contains("constexpr")
+      if (!const || (member && !words.contains("static")) || ty.isEmpty ||
+          words.exists(w => w == "volatile" || w == "mutable" || w == "extern")) None
+      else resolveIntType(ty).map(tag => (tag, mt.group(2).trim))
+    }
+  }
+
+  def cxxBits(t: String): Int = t.drop(1).toInt
+  def cxxFits(v: BigInt, t: String): Boolean =
+    if (t.startsWith("i")) v >= -(BigInt(1) << (cxxBits(t) - 1)) && v < (BigInt(1) << (cxxBits(t) - 1))
+    else v >= 0 && v < (BigInt(1) << cxxBits(t))
+  /** An integral conversion: modular into an unsigned type; refused when a signed
+    * target cannot hold the value (implementation-defined before C++20). */
+  def cxxConvert(v: BigInt, t: String): Option[CxxConst] =
+    if (cxxFits(v, t)) Some(CxxConst(v, t))
+    else if (t.startsWith("u")) Some(CxxConst(v.mod(BigInt(1) << cxxBits(t)), t))
+    else None
+  /** An arithmetic result in type `t`: wraps if unsigned; a signed overflow is UB. */
+  def cxxResult(v: BigInt, t: String): Option[CxxConst] =
+    if (t.startsWith("u")) cxxConvert(v, t) else Some(CxxConst(v, t)).filter(c => cxxFits(c.v, t))
+
+  /** Evaluate an integer constant expression; `lookup` resolves its identifiers. */
+  def cxxEval(src: String, lookup: String => Option[CxxConst]): Option[CxxConst] = {
+    val tok = """\s*(0[xXbB][0-9a-fA-F']+[uUlL]*|\d[\d']*[uUlL]*|[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*|<<|>>|[-+*/%&|^~()])""".r
+    val toks = scala.collection.mutable.ArrayBuffer.empty[String]
+    var rest = src
+    while (rest.trim.nonEmpty) {
+      tok.findPrefixMatchOf(rest) match {
+        case Some(m) => toks += m.group(1).replaceAll("\\s+", ""); rest = rest.substring(m.end)
+        case None    => return None
+      }
+    }
+    var pos = 0
+    def peek = if (pos < toks.size) toks(pos) else ""
+    val levels = List(Set("|"), Set("^"), Set("&"), Set("<<", ">>"), Set("+", "-"), Set("*", "/", "%"))
+    def unary(): Option[CxxConst] = peek match {
+      case "-" | "+" | "~" =>
+        val op = toks(pos); pos += 1
+        unary().flatMap { a =>
+          val t = promoteInt(a.t)
+          op match {
+            case "+" => Some(CxxConst(a.v, t))
+            case "-" => cxxResult(-a.v, t)
+            case _   => cxxResult(if (t.startsWith("u")) (BigInt(1) << cxxBits(t)) - 1 - a.v else -a.v - 1, t)
+          }
+        }
+      case "(" =>
+        pos += 1
+        val v = level(0)
+        if (peek == ")") { pos += 1; v } else None
+      case t if t.nonEmpty && t.head.isDigit =>
+        pos += 1
+        for (v <- parseIntLiteral(t); ty <- cIntegerLiteralType(t)) yield CxxConst(v, ty)
+      case t if t.nonEmpty && (t.head.isLetter || t.head == '_') => pos += 1; lookup(t)
+      case _ => None
+    }
+    def level(i: Int): Option[CxxConst] =
+      if (i == levels.size) unary()
+      else {
+        var acc = level(i + 1)
+        while (acc.isDefined && levels(i).contains(peek)) {
+          val op = toks(pos); pos += 1
+          acc = for (a <- acc; b <- level(i + 1); r <- cxxBinary(op, a, b)) yield r
+        }
+        acc
+      }
+    val out = level(0)
+    if (pos == toks.size) out else None
+  }
+
+  def cxxBinary(op: String, a: CxxConst, b: CxxConst): Option[CxxConst] =
+    if (op == "<<" || op == ">>") {
+      val t = promoteInt(a.t)
+      if (b.v < 0 || b.v >= cxxBits(t) || (t.startsWith("i") && a.v < 0)) None
+      else if (op == ">>") Some(CxxConst(a.v >> b.v.toInt, t))
+      else cxxResult(a.v << b.v.toInt, t)
+    } else {
+      val t = commonInt(a.t, b.t)
+      for (x <- cxxConvert(a.v, t); y <- cxxConvert(b.v, t);
+           r <- op match {
+             case "+" => cxxResult(x.v + y.v, t)
+             case "-" => cxxResult(x.v - y.v, t)
+             case "*" => cxxResult(x.v * y.v, t)
+             // BigInt `/` and `%` truncate toward zero, as C++ does.
+             case "/" => if (y.v == 0) None else cxxResult(x.v / y.v, t)
+             case "%" => if (y.v == 0) None else cxxResult(x.v % y.v, t)
+             case "&" => cxxResult(x.v & y.v, t)
+             case "|" => cxxResult(x.v | y.v, t)
+             case "^" => cxxResult(x.v ^ y.v, t)
+             case _   => None
+           }) yield r
+    }
+
+  /** The classes lexically enclosing `fullName`'s scope, innermost first. */
+  def cxxClassChain(fullName: String): List[TypeDecl] = {
+    val segs = fullName.split(":", 2)(0).split('.').toList
+    (segs.length to 1 by -1).toList.flatMap(k => cxxTypeDecls.get(segs.take(k).mkString(".")))
+  }
+
+  val cxxConstCache = scala.collection.mutable.Map.empty[(String, String), Option[CxxConst]]
+  def cxxCached(key: (String, String))(compute: => Option[CxxConst]): Option[CxxConst] =
+    cxxConstCache.get(key) match {
+      case Some(v) => v
+      case None => val v = compute; cxxConstCache(key) = v; v
+    }
+
+  /** `name` read in the scope of `classes` (innermost first): a class that declares a
+    * member of that name decides it (a member that is not a constant shadows any
+    * namespace constant); otherwise the one namespace-scope constant of that name. */
+  def cxxLookup(classes: List[TypeDecl], name: String, depth: Int): Option[CxxConst] =
+    if (depth > 16) None
+    else if (name.contains("::")) {
+      val parts = name.split("::").toList
+      cxxNamedClass(parts.init.mkString("."), classes.headOption.map(_.fullName).getOrElse(""))
+        .flatMap(td => cxxMemberConst(td, parts.last, depth))
+    } else classes.find(_.member.nameExact(name).nonEmpty) match {
+      case Some(td) => cxxMemberConst(td, name, depth)
+      case None => cxxNamespaceConst(name, depth)
+    }
+
+  def cxxMemberConst(td: TypeDecl, name: String, depth: Int): Option[CxxConst] =
+    cxxCached((td.fullName, name))(td.member.nameExact(name).l match {
+      case List(mem) =>
+        cxxDeclaration(td.filename, mem.lineNumber, name, member = true).flatMap { case (tag, init) =>
+          cxxEval(init, n => cxxLookup(cxxClassChain(td.fullName), n, depth + 1))
+            .flatMap(v => cxxConvert(v.v, tag))
+        }
+      case _ => None
+    })
+
+  def cxxNamespaceConst(name: String, depth: Int): Option[CxxConst] =
+    cxxCached(("<namespace>", name))(cxxGlobalLocals.getOrElse(name, Nil) match {
+      case List((l, file)) =>
+        cxxDeclaration(file, l.lineNumber, name, member = false).flatMap { case (tag, init) =>
+          cxxEval(init, n => cxxLookup(Nil, n, depth + 1)).flatMap(v => cxxConvert(v.v, tag))
+        }
+      case _ => None
+    })
+
+  /** The class a qualifier `A` (or `A.B`) names from `fromScope`: the innermost
+    * enclosing namespace or class that declares it, as C++ name lookup finds it. */
+  def cxxNamedClass(qualifier: String, fromScope: String): Option[TypeDecl] = {
+    val segs = fromScope.split(":", 2)(0).split('.').toList.filter(_.nonEmpty)
+    (segs.length to 0 by -1).iterator
+      .map(k => cxxTypeDecls.get((segs.take(k) :+ qualifier).mkString(".")))
+      .collectFirst { case Some(t) => t }
+  }
+
+  /** Does `i` name a declared local or parameter? c2cpg also gives every name it could
+    * not resolve a LOCAL of its own, whose code is the bare name (`kDenormalExponent`,
+    * or `Double` in `Double::kSignificandSize`); a real declaration's code carries its
+    * declarator (`const int kSignificandSize`), and a namespace variable's is
+    * `<global> name`. */
+  def cxxDeclaredLocal(i: Identifier): Boolean = i.refsTo.l.exists {
+    // A namespace variable is reached through a `<global> name` LOCAL (closure-bound to
+    // the file scope); a lambda's other captured variables are declared locals.
+    case l: Local => val code = l.code.trim
+      !code.startsWith("<global>") && (l.closureBindingId.nonEmpty || code != l.name)
+    case _: MethodParameterIn => true
+    case _ => false
+  }
+
+  /** The named C++ constant a bare read denotes, if it is one. */
+  def cxxConstOf(i: Identifier): Option[CxxConst] = {
+    val m = i.method
+    if (!cxxFileName(m.filename) || i.name == "this" || cxxDeclaredLocal(i)) None
+    else cxxLookup(cxxClassChain(m.fullName), i.name, 0)
+  }
+
+  /** A bare read of a named C++ constant, as its value; None leaves the read as it was. */
+  def cxxConstRead(i: Identifier): Option[ujson.Obj] = cxxConstOf(i).map(c => intLit(c.v))
+
+  /** The constant `A::k` (a fieldAccess on a class name `A`) denotes, if it is one. */
+  def cxxConstFieldOf(c: Call): Option[CxxConst] = kidsOf(c) match {
+    case (base: Identifier) :: (f: FieldIdentifier) :: Nil
+        if callName(c) == "<operator>.fieldAccess" && cxxFileName(c.method.filename) &&
+           !cxxDeclaredLocal(base) =>
+      cxxNamedClass(base.name, c.method.fullName).flatMap(td => cxxMemberConst(td, f.canonicalName, 0))
+    case _ => None
+  }
+
+  /** `A::k` read as the constant's value. */
+  def cxxConstField(c: Call): Option[ujson.Obj] = cxxConstFieldOf(c).map(v => intLit(v.v))
 
   /** The real, untruncated source text of a TypeDecl's own declaration --
     * `TypeDecl.code` is not reliable for this (see `fileLines`'s own doc
@@ -6758,6 +7004,289 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     }
   }
 
+  /** Kotlin source. Gates the string-template lowering below for the same reason
+    * `pyFile` gates f-strings: the frontends share the operator name, not its shape. */
+  def kotlinFile: Boolean = List(".kt", ".kts").exists(currentFile.toLowerCase.endsWith)
+
+  /** A template (JS/TS template literal, Kotlin string template) as a left fold of a
+    * dialect-specific append operator over its parts, seeded with the first literal
+    * segment: `acc op part`, where `op` converts `part` to a string THE WAY THE SOURCE
+    * LANGUAGE DOES and appends it to the string `acc` (`Semantics.languageBinop`'s
+    * `js:tpl` / `kt:tpl` / `kt:tpl:integral` arms). A literal segment is a `str` part,
+    * which every arm appends as itself; an empty one is dropped. The fold evaluates each
+    * substitution and converts it before the next is evaluated, which is the order both
+    * languages specify (ECMA-262 §13.2.8.6 evaluates `Expression`, then `ToString`, then
+    * the remaining spans; Kotlin appends part by part). */
+  def templateFold(first: String, parts: List[(String, ujson.Obj)]): ujson.Obj =
+    parts.foldLeft(ujson.Obj("k" -> "str", "v" -> first)) { case (acc, (op, p)) =>
+      ujson.Obj("k" -> "binop", "op" -> op, "a" -> acc, "b" -> p)
+    }
+
+  /** ECMA-262 §12.9.6 TV ("template value") of one template segment, from its RAW text
+    * (jssrc2cpg's segment literal is the raw source between the delimiters, wrapped in
+    * double quotes -- `\n` arrives as backslash + `n`). Line terminators: CR LF and CR
+    * are LF (TV of LineTerminatorSequence); LS/PS are themselves. Escapes: the single
+    * escape characters `' " \ b f n r t v`; `\0` not followed by a digit; `\xHH`;
+    * `\uHHHH` and `\u{H...}`; a backslash before a line terminator (LineContinuation) is
+    * nothing; any other character after a backslash is itself (NonEscapeCharacter --
+    * this is how `` \` ``, `\$` and `\{` read). `None`, never a guess, for what is a
+    * SyntaxError in an untagged template (`\1`..`\9`, `\0` before a digit, a malformed
+    * hex/unicode escape) and for a surrogate code unit, which a Core string (Unicode
+    * scalar values) cannot hold. */
+  def jsTemplateCooked(raw: String): Option[String] = {
+    val out = new StringBuilder
+    var i = 0
+    def isHex(ch: Char) = Character.digit(ch, 16) >= 0
+    def scalar(cp: Int): Boolean =
+      if (cp < 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) false
+      else { out.appendAll(Character.toChars(cp)); true }
+    while (i < raw.length) {
+      val c = raw.charAt(i)
+      if (c == '\r') {
+        out.append('\n'); i += 1
+        if (i < raw.length && raw.charAt(i) == '\n') i += 1
+      } else if (c != '\\') {
+        if (Character.isSurrogate(c)) {
+          // A well-formed pair in the source is one scalar value; a lone half is not.
+          if (Character.isHighSurrogate(c) && i + 1 < raw.length && Character.isLowSurrogate(raw.charAt(i + 1))) {
+            out.append(c).append(raw.charAt(i + 1)); i += 2
+          } else return None
+        } else { out.append(c); i += 1 }
+      } else if (i + 1 >= raw.length) return None
+      else {
+        val e = raw.charAt(i + 1)
+        i += 2
+        e match {
+          case '\'' => out.append('\'')
+          case '"'  => out.append('"')
+          case '\\' => out.append('\\')
+          case 'b'  => out.append('\b')
+          case 'f'  => out.append('\f')
+          case 'n'  => out.append('\n')
+          case 'r'  => out.append('\r')
+          case 't'  => out.append('\t')
+          case 'v'  => out.append('\u000b')
+          case '0' if !(i < raw.length && raw.charAt(i).isDigit) => out.append('\u0000')
+          case d if d.isDigit => return None
+          case 'x' =>
+            if (i + 2 <= raw.length && isHex(raw.charAt(i)) && isHex(raw.charAt(i + 1))) {
+              out.append(Integer.parseInt(raw.substring(i, i + 2), 16).toChar); i += 2
+            } else return None
+          case 'u' =>
+            if (i < raw.length && raw.charAt(i) == '{') {
+              val close = raw.indexOf('}', i)
+              val hex = if (close < 0) "" else raw.substring(i + 1, close)
+              if (hex.isEmpty || hex.length > 8 || !hex.forall(isHex)) return None
+              if (!scalar(Integer.parseInt(hex, 16))) return None
+              i = close + 1
+            } else if (i + 4 <= raw.length && raw.substring(i, i + 4).forall(isHex)) {
+              if (!scalar(Integer.parseInt(raw.substring(i, i + 4), 16))) return None
+              i += 4
+            } else return None
+          case '\r' => if (i < raw.length && raw.charAt(i) == '\n') i += 1
+          case '\n' | '\u2028' | '\u2029' => ()   // LineContinuation: LF, LS, PS
+          case other =>
+            if (Character.isSurrogate(other)) return None
+            out.append(other)
+        }
+      }
+    }
+    Some(out.toString)
+  }
+
+  /** A JavaScript/TypeScript template literal. jssrc2cpg emits `<operator>.formatString`
+    * over the alternating parts `seg0, e1, seg1, ..., en, segn`: n+1 segment literals
+    * (raw text, see `jsTemplateCooked`) around n substitutions. ECMA-262 §13.2.8.6: the
+    * value is the concatenation of each segment's TV and each substitution's
+    * `ToString(value)` (§7.1.17) -- the `js:tpl` arm, which reproduces ToString exactly
+    * on strings, booleans and integral Numbers below 10^21 and is a NAMED run-time hole
+    * on everything else (`op:formatString:js-float` etc.), since a float's shortest
+    * round-trip spelling, `null` vs `undefined` (one `Val.unit` in Core) and an
+    * object's `toString` are not modelled. Any other part shape is a static hole. */
+  def jsTemplate(kids: List[AstNode]): ujson.Obj = {
+    val ks = kids.sortBy(_.order)
+    val segs = ks.zipWithIndex.collect { case (k, i) if i % 2 == 0 => k }
+    val subs = ks.zipWithIndex.collect { case (k, i) if i % 2 == 1 => k }
+    val segText: List[Option[String]] = segs.map {
+      case l: Literal if l.code.length >= 2 && l.code.head == '"' && l.code.last == '"' =>
+        jsTemplateCooked(l.code.substring(1, l.code.length - 1))
+      case _ => None
+    }
+    val wellShaped = ks.size % 2 == 1 && segs.forall {
+      case l: Literal => l.code.length >= 2 && l.code.head == '"' && l.code.last == '"'
+      case _ => false
+    }
+    if (!wellShaped) hole("op:formatString:shape")
+    else if (segText.exists(_.isEmpty)) hole("op:formatString:escape")
+    else {
+      val texts = segText.map(_.get)
+      val parts = subs.zip(texts.tail).flatMap { case (e, t) =>
+        ("js:tpl", expr(e)) ::
+          (if (t.isEmpty) Nil else List(("js:tpl", ujson.Obj("k" -> "str", "v" -> t))))
+      }
+      templateFold(texts.head, parts)
+    }
+  }
+
+  /** The body of a Kotlin string literal, split into literal text (escapes decoded) and
+    * template-entry source text, from the literal's own `code` -- the Kotlin frontend
+    * records only the substitutions as children (`<operator>.formattedValue`), never the
+    * literal segments. Kotlin grammar (§ "String templates"): in an ordinary `"..."` the
+    * escapes are `\t \b \n \r \' \" \\ \$` and `\uXXXX`; a `"""..."""` raw string has no
+    * escapes at all. `$` followed by an identifier is a simple entry `$name`; `${` opens
+    * an expression entry closed by its matching `}` (nested braces, string and char
+    * literals inside it are skipped as units); any other `$` is a literal dollar.
+    * `None` for anything else -- the caller then keeps a hole. */
+  def ktTemplateSplit(code: String): Option[List[Either[String, String]]] = {
+    val raw = code.length >= 6 && code.startsWith("\"\"\"") && code.endsWith("\"\"\"")
+    if (!raw && !(code.length >= 2 && code.head == '"' && code.last == '"')) return None
+    val body = if (raw) code.substring(3, code.length - 3) else code.substring(1, code.length - 1)
+    // A raw string's CR is whatever the file's line endings were; not guessed at.
+    if (body.contains('\r')) return None
+    // End (exclusive) of a string literal starting at `j` (on its opening quote), or -1.
+    def skipString(j: Int): Int = {
+      val triple = body.startsWith("\"\"\"", j)
+      var k = j + (if (triple) 3 else 1)
+      while (k < body.length) {
+        if (triple && body.startsWith("\"\"\"", k)) {
+          var e = k + 3
+          while (e < body.length && body.charAt(e) == '"') e += 1   // `""""` closes late
+          return e
+        }
+        val ch = body.charAt(k)
+        if (!triple && ch == '\\') k += 2
+        else if (!triple && ch == '"') return k + 1
+        else if (ch == '$' && k + 1 < body.length && body.charAt(k + 1) == '{') {
+          val e = skipBraces(k + 2); if (e < 0) return -1; k = e
+        } else k += 1
+      }
+      -1
+    }
+    // Index just past the `}` closing an expression entry whose text starts at `j`, or -1.
+    def skipBraces(j: Int): Int = {
+      var depth = 1
+      var k = j
+      while (k < body.length) {
+        body.charAt(k) match {
+          case '{' => depth += 1; k += 1
+          case '}' => depth -= 1; k += 1; if (depth == 0) return k
+          case '"' => val e = skipString(k); if (e < 0) return -1; k = e
+          case '\'' =>
+            val close = body.indexOf('\'', k + (if (k + 1 < body.length && body.charAt(k + 1) == '\\') 3 else 2))
+            if (close < 0) return -1; k = close + 1
+          case _ => k += 1
+        }
+      }
+      -1
+    }
+    val parts = scala.collection.mutable.ListBuffer.empty[Either[String, String]]
+    val lit = new StringBuilder
+    def flush(): Unit = { parts += Left(lit.toString); lit.clear() }
+    var i = 0
+    while (i < body.length) {
+      val c = body.charAt(i)
+      if (c == '$' && i + 1 < body.length && body.charAt(i + 1) == '{') {
+        val end = skipBraces(i + 2)
+        if (end < 0) return None
+        flush(); parts += Right(body.substring(i + 2, end - 1).trim); i = end
+      } else if (c == '$' && i + 1 < body.length && body.charAt(i + 1) == '`') return None
+      else if (c == '$' && i + 1 < body.length &&
+               (Character.isLetter(body.charAt(i + 1)) || body.charAt(i + 1) == '_')) {
+        var k = i + 1
+        while (k < body.length && (Character.isLetterOrDigit(body.charAt(k)) || body.charAt(k) == '_')) k += 1
+        flush(); parts += Right(body.substring(i + 1, k)); i = k
+      } else if (!raw && c == '\\') {
+        if (i + 1 >= body.length) return None
+        body.charAt(i + 1) match {
+          case 't'  => lit.append('\t'); i += 2
+          case 'b'  => lit.append('\b'); i += 2
+          case 'n'  => lit.append('\n'); i += 2
+          case 'r'  => lit.append('\r'); i += 2
+          case '\'' => lit.append('\''); i += 2
+          case '"'  => lit.append('"'); i += 2
+          case '\\' => lit.append('\\'); i += 2
+          case '$'  => lit.append('$'); i += 2
+          case 'u' if i + 6 <= body.length &&
+                      body.substring(i + 2, i + 6).forall(ch => Character.digit(ch, 16) >= 0) =>
+            val u = Integer.parseInt(body.substring(i + 2, i + 6), 16)
+            if (u >= 0xD800 && u <= 0xDFFF) return None
+            lit.append(u.toChar); i += 6
+          case _ => return None
+        }
+      } else if (Character.isSurrogate(c)) {
+        if (Character.isHighSurrogate(c) && i + 1 < body.length && Character.isLowSurrogate(body.charAt(i + 1))) {
+          lit.append(c).append(body.charAt(i + 1)); i += 2
+        } else return None
+      } else { lit.append(c); i += 1 }
+    }
+    flush()
+    Some(parts.toList)
+  }
+
+  /** Static types whose Kotlin `toString()` is the decimal spelling of the integer Core
+    * holds (`kotlin.Int`/`Long`/`Short`/`Byte`, as the frontend names them). `Char` is
+    * NOT here: Core holds a Kotlin char as its code point (`charLiteralIsNumeric`), and
+    * `"$c"` prints the character, not the number. */
+  lazy val ktIntegralTypes = Set("int", "long", "short", "byte", "java.lang.Integer", "java.lang.Long",
+    "java.lang.Short", "java.lang.Byte", "kotlin.Int", "kotlin.Long", "kotlin.Short", "kotlin.Byte")
+  lazy val ktCharTypes = Set("char", "java.lang.Character", "kotlin.Char")
+
+  /** A Kotlin string template (`"a $x ${f(y)}"`). The literal segments come from the
+    * literal's source text (`ktTemplateSplit`); every template entry found there must
+    * be, in order, exactly the source text of the matching `formattedValue` child, or
+    * the split is not trusted and the whole template stays a hole. Each entry is
+    * `String.valueOf(value)` (Kotlin compiles a template to `StringBuilder.append` of
+    * each part): the `kt:tpl` arm appends strings and booleans as Kotlin spells them,
+    * `kt:tpl:integral` (a part statically typed as an integer) also integers; a float
+    * (`Double.toString` is not modelled), `null`, an object (its `toString()`) and an
+    * integer of unknown static type (it may be a `Char`'s code point) are named
+    * run-time holes. A char-typed entry is a static hole unless it is a plain character
+    * literal (`${'$'}`, the raw-string idiom), which is that character. */
+  def ktTemplate(c: Call, kids: List[AstNode]): ujson.Obj = {
+    val fvs = kids.sortBy(_.order)
+    val split = ktTemplateSplit(c.code.trim)
+    val entries = split.map(_.collect { case Right(t) => t }).getOrElse(Nil)
+    val fvOk = fvs.forall {
+      case f: Call => callName(f) == "<operator>.formattedValue" && kidsOf(f).size == 1
+      case _ => false
+    }
+    // Not a `"..."`/`"""..."""` literal this reads (e.g. a multi-dollar `$$"..."`), or an
+    // escape it does not decode.
+    if (split.isEmpty) hole("op:formatString:kt-literal")
+    else if (!fvOk || entries.size != fvs.size ||
+             entries.zip(fvs).exists { case (t, f) => t != f.code.trim })
+      hole("op:formatString:shape")
+    else {
+      val items = split.get
+      val first = items.headOption match { case Some(Left(t)) => t; case _ => "" }
+      val rest = items match { case Left(_) :: tl => tl; case all => all }
+      var fvIt = fvs
+      val parts: List[Either[String, (String, ujson.Obj)]] = rest.flatMap {
+        case Left(t) => if (t.isEmpty) Nil else List(Right(("kt:tpl", ujson.Obj("k" -> "str", "v" -> t))))
+        case Right(_) =>
+          val f = fvIt.head; fvIt = fvIt.tail
+          val v = kidsOf(f).head
+          val ty = bareType(staticTypeOf(v))
+          v match {
+            case l: Literal if ktCharTypes.contains(ty) || l.code.trim.startsWith("'") =>
+              val t = l.code.trim
+              if (t.length == 3 && t.head == '\'' && t.last == '\'' && t(1) != '\\' && !Character.isSurrogate(t(1)))
+                List(Right(("kt:tpl", ujson.Obj("k" -> "str", "v" -> t(1).toString))))
+              else List(Left("kt-char"))
+            case _ if ktCharTypes.contains(ty) || ktCharTypes.contains(bareType(nodeType(f))) =>
+              List(Left("kt-char"))
+            case _ =>
+              val op = if (ktIntegralTypes.contains(ty)) "kt:tpl:integral" else "kt:tpl"
+              List(Right((op, expr(v))))
+          }
+      }
+      parts.collectFirst { case Left(r) => r } match {
+        case Some(r) => hole("op:formatString:" + r)
+        case None    => templateFold(first, parts.collect { case Right(p) => p })
+      }
+    }
+  }
+
   /** C++'s receiver is spelled `this`; Core's — the name `applyFunc` binds a method's
     * receiver to — is `self`. Without this rename `this->f` translated to a read of an
     * unbound name, which is the vacuous outcome: an `Expr.field` on `unit`, holing at run
@@ -6860,6 +7389,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   }
 
   def expr(n: AstNode): ujson.Obj = unwrapMacro(n) match {
+    // A Kotlin `?.` receiver already evaluated into a temporary (`ktSafeCallV`).
+    case x if ktReceiverTemp.nonEmpty && ktReceiverTemp.contains(x.id()) => ktReceiverTemp(x.id())
+    case c: Call if ktFile && ktSafeCallReceiver(c) != Right(None) => ktSafeCallPure(c)
     case l: Literal =>
       val c0 = l.code.trim
       // String-literal prefixes: L"x" (wide), u8"x", u"x", U"x". The prefix selects an
@@ -7014,6 +7546,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       ujson.Obj("k" -> "fnref", "v" -> ("$pythonExceptionClass$" + pythonSourceInfo(i, "class_refs").get.str))
     case i: Identifier if pythonGlobalBinding(i).isDefined =>
       pythonModuleRead(pythonGlobalBinding(i).get)
+    case i: Identifier if cppFile && cxxConstRead(i).isDefined => cxxConstRead(i).get
     case i: Identifier        => ujson.Obj("k" -> "name", "v" -> localName(i.name))
     case p: MethodParameterIn if boxedLocals.contains(p.name) => boxField(p.name)
     case p: MethodParameterIn => ujson.Obj("k" -> "name", "v" -> p.name)
@@ -7265,9 +7798,95 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * statement would reorder it past the arguments evaluated before it, so anything that
     * does not fit the inlinable shape — generator expressions, most notably — stays a hole
     * with a label naming what defeated it. */
+  /** A JavaScript array or object LITERAL, which jssrc2cpg lowers into a block on a fresh
+    * `_tmp_N`:
+    *
+    *     [a, b]       =>  { _tmp_0 = __ecma.Array.factory(); _tmp_0.push(a); _tmp_0.push(b); _tmp_0 }
+    *     {k: a, j: b} =>  { _tmp_1.k = a; _tmp_1.j = b; _tmp_1 }          (no allocation at all)
+    *
+    * The array form evaluated in statement position (a boxed empty list, then in-place
+    * pushes) but was the hole `expr:BLOCK-impure` anywhere else -- a ternary branch, an
+    * argument; the object form wrote fields of a name that was never bound
+    * (`setField:<k>:non-object`). Both fold to the one expression they denote:
+    * `Expr.listE [a, b]` / `Expr.dictE [("k", a), ("j", b)]`, which under `.javascript`
+    * allocate a boxed list / dict (`Dialect.boxesContainers`) whose reads are
+    * `jsContainerField`. ECMA-262 §13.2.4.1 (ArrayAccumulation) and §13.2.5.4
+    * (PropertyDefinitionEvaluation) evaluate the elements left to right, exactly as
+    * `evalList`/`evalPairs` do; the temporary is the frontend's, so allocating it before
+    * or after its elements is unobservable. A duplicate key keeps its first position and
+    * takes the last value (`Stdlib.dictOfPairs`, §10.1.9 OrdinaryDefineOwnProperty).
+    * NOT folded (the block keeps its old translation): an integer-like key (JS orders
+    * those first, ascending, `Object.keys({b: 1, 2: 0})` is `["2", "b"]`), `__proto__`,
+    * a computed or spread member, an accessor or method, an array push of anything but
+    * one plain element. */
+  def jsLiteral(b: Block): Option[ujson.Obj] = if (!jsLikeFile) None else {
+    val ks = kidsOf(b).filterNot(_.isInstanceOf[Local])
+    val tmpName = "_tmp_\\d+"
+    def onTmp(n: AstNode, t: String): Boolean = n match {
+      case i: Identifier => i.name == t
+      case _             => false
+    }
+    ks.lastOption match {
+      case Some(last: Identifier) if last.name.matches(tmpName) =>
+        val t = last.name
+        val body = ks.init
+        val code = b.code.trim
+        body match {
+          // [a, b, ...]
+          case (asg: Call) :: pushes
+              if code.startsWith("[") && callName(asg) == "<operator>.assignment" &&
+                 (kidsOf(asg) match {
+                   case (i: Identifier) :: (f: Call) :: Nil =>
+                     i.name == t && (callName(f) == "__ecma.Array.factory" ||
+                       f.name == "__ecma.Array.factory") && kidsOf(f).forall(aidx(_) < 1)
+                   case _ => false
+                 }) =>
+            val elems = pushes.map {
+              // The synthesised push has an EMPTY call name; its callee is `_tmp_N.push`.
+              case p: Call if kidsOf(p).exists(k => aidx(k) == -1 &&
+                                 isOp(k, "<operator>.fieldAccess") && k.code == t + ".push") =>
+                val pk = kidsOf(p)
+                val recvOk = pk.find(aidx(_) == 0).exists(onTmp(_, t))
+                val real = pk.filter(aidx(_) >= 1)
+                if (recvOk && real.size == 1 && !isOp(real.head, "<operator>.spread")) Some(real.head)
+                else None
+              case _ => None
+            }
+            if (elems.forall(_.isDefined))
+              Some(ujson.Obj("k" -> "listE", "items" -> ujson.Arr.from(elems.flatten.map(expr))))
+            else None
+          // {k: a, ...}
+          case members if code.startsWith("{") =>
+            val pairs = members.map {
+              case a: Call if callName(a) == "<operator>.assignment" =>
+                kidsOf(a) match {
+                  case (fa: Call) :: v :: Nil if callName(fa) == "<operator>.fieldAccess" =>
+                    kidsOf(fa) match {
+                      case r :: (f: FieldIdentifier) :: Nil if onTmp(r, t) =>
+                        val key = f.canonicalName
+                        if (key.isEmpty || key == "__proto__" || key.forall(_.isDigit)) None
+                        else Some((key, v))
+                      case _ => None
+                    }
+                  case _ => None
+                }
+              case _ => None
+            }
+            if (pairs.forall(_.isDefined))
+              Some(ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr.from(pairs.flatten.map {
+                case (key, v) => ujson.Arr(ujson.Obj("k" -> "str", "v" -> key), expr(v))
+              })))
+            else None
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
   def blockExpr(b: Block): ujson.Obj = {
     val ks = kidsOf(b).filterNot(_.isInstanceOf[Local])
     if (ks.isEmpty) hole("expr:empty-block")
+    else if (jsLiteral(b).isDefined) jsLiteral(b).get
     else if (ctorAlloc(ks).isDefined) ctorAlloc(ks).get
     else {
       var subst = Map.empty[String, ujson.Value]
@@ -7483,6 +8102,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       case c: Call if numericFamily == "c" && !c.methodFullName.startsWith("<operator>") &&
           primitiveInt(staticTypeOf(n)).isEmpty && methodByName.contains(c.methodFullName) =>
         primitiveInt(methodByName(c.methodFullName).methodReturn.typeFullName)
+      // A C++ named constant has its declared type, which c2cpg leaves unknown when the
+      // declaration is a class member or namespace variable (`cxxConstOf`).
+      case i: Identifier if cppFile && primitiveInt(staticTypeOf(n)).isEmpty && cxxConstOf(i).isDefined =>
+        cxxConstOf(i).map(_.t)
+      case c: Call if cppFile && fieldOps.contains(callName(c)) && primitiveInt(staticTypeOf(n)).isEmpty &&
+          cxxConstFieldOf(c).isDefined =>
+        cxxConstFieldOf(c).map(_.t)
       case _ => primitiveInt(staticTypeOf(n))
     }
   }
@@ -7987,7 +8613,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         cStringUnsafe.contains(mfn) && !isNullCheck)
       hole(cStringUnsafe(mfn))
     else if (binops.contains(mfn) && kids.size == 2)
-      typedBinop(binopFor(c), kids(0), kids(1), expr(kids(0)), expr(kids(1)))
+      jvmEqualityExpr(binopFor(c), kids(0), kids(1), c.typeFullName)
+        .getOrElse(typedBinop(binopFor(c), kids(0), kids(1), expr(kids(0)), expr(kids(1))))
     else if (rightShiftOps.contains(mfn) && kids.size == 2)
       sourceRightShift(c) match {
         case Some(op) => typedBinop(op, kids(0), kids(1), expr(kids(0)), expr(kids(1)))
@@ -8020,6 +8647,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case Some(_) if pyFile => hole("op:slice-shape")
         case _                 => hole("op:slice:dialect")
       }
+    else if (fieldOps.contains(mfn) && cppFile && cxxConstField(c).isDefined)
+      cxxConstField(c).get
+    // Kotlin `E.X`, an entry of an analysed enum: the entry's own value (`ktEnumEntryOf`).
+    else if (ktFile && fieldOps.contains(mfn) && ktEnumEntryOf(c).isDefined)
+      typeValue(ktEnumEntryOf(c).get)
+    // Kotlin `s.length` / `xs.size`: properties of `kotlin.String` and of the collection
+    // types, which the JVM compiles to the Java methods `length()` / `size()` (`ktProperty`).
+    else if (ktFile && fieldOps.contains(mfn) && ktPropertyMethod(c).isDefined)
+      ujson.Obj("k" -> "mcall", "recv" -> expr(ktSorted(c).head), "m" -> ktPropertyMethod(c).get,
+                "args" -> ujson.Arr())
     else if (fieldOps.contains(mfn))
       resolvedRef(c).map(expr) getOrElse (asField(c) match {
         // `e.args`, `e.errno`, `e.__class__` on an `except ... as e` binding: the exception
@@ -8029,6 +8666,28 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case Some((r, f)) => ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)
         case None         => hole("op:fieldAccess-shape")
       })
+    // Kotlin `x is T` / `x !is T` is a TYPE test, not Python's identity `is`: as `isOp`
+    // it compared `x` with the class value `fnref T`, false for `"a" is String`. The
+    // type is the call's TYP_REF (`t.code` keeps the `?` kotlin2cpg erases from type
+    // names); which tests Core can decide, and which types stay named, is `ktTypeTest`'s.
+    else if (ktFile && (mfn == "<operator>.is" || mfn == "<operator>.isNot"))
+      ktSorted(c) match {
+        // kotlin2cpg spells `!is` as `<operator>.is` too; the operator is read from the
+        // text between the subject and the type (a search of the whole text would read
+        // `a!! is T` as `!is`). A text that is not `<subject> is|!is <type>` is named.
+        case (subjN: AstNode) :: (t: TypeRef) :: Nil
+            if c.code.startsWith(subjN.code) && c.code.endsWith(t.code) &&
+               c.code.length >= subjN.code.length + t.code.length &&
+               Set("is", "!is")(c.code.drop(subjN.code.length).dropRight(t.code.length).trim) =>
+          val neg = c.code.drop(subjN.code.length).dropRight(t.code.length).trim == "!is"
+          if (mfn == "<operator>.isNot" && !neg) hole("op:is-type-test")
+          else ktTypeTest(subjN, expr(subjN), pureNode(subjN), neg,
+                          Some(t.typeFullName), t.code, "op:is-type-test", "op:is:unknown-type") match {
+            case Right(e) => e
+            case Left(label) => hole(label)
+          }
+        case _ => hole("op:is-type-test")
+      }
     else if ((mfn == "<operator>.is" || mfn == "<operator>.isNot") && kids.size == 2)
       relationValue(mfn, expr(kids(0)), expr(kids(1)))
     else if ((mfn == "<operator>.in" || mfn == "<operator>.notIn") && kids.size == 2)
@@ -8106,6 +8765,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     //
     //   A cast to `void*` is not this; it is a pointer cast, and `isPointerType` sends it
     //   to the address hole.
+    // Kotlin `x as T` / `x as? T` is a checked reference cast (it throws
+    // ClassCastException, or yields null), not a C conversion: the C rules below read
+    // the operand's spelling (`m[k] as T` has brackets, so it looked like an array
+    // type) and labelled Kotlin casts `op:cast:pointer:int-to-pointer`. A named hole.
+    else if (mfn == "<operator>.cast" && kids.size == 2 && kotlinFile) hole("op:cast:kotlin-as")
     else if (mfn == "<operator>.cast" && kids.size == 2) {
       val tty = staticTypeOf(kids(0))
       // `009-reduce-remaining-holes-4`: casting a FUNCTION REFERENCE to another
@@ -8455,6 +9119,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       ujson.Obj("k" -> "unit")
     // f-strings. Python only — see `pyFile`.
     else if (mfn == "<operator>.formatString" && pyFile) fstring(kids)
+    // Template literals (JS/TS) and string templates (Kotlin): `jsTemplate`/`ktTemplate`.
+    else if (mfn == "<operator>.formatString" && jsLikeFile) jsTemplate(kids)
+    else if (mfn == "<operator>.formatString" && kotlinFile) ktTemplate(c, kids)
     // `004-function-pointer-tracking`: a call through a function-pointer-valued
     // variable Joern itself could not statically resolve (`<operator>.pointerCall`,
     // research.md §1). When the callee names a variable this method's own
@@ -8528,6 +9195,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // unspecified model -- falls through to a hole, labelled with the exact same
     // taxonomy `<operator>.cast` already uses just above (research.md §5), not the
     // single generic `op:sizeOf`.
+    //
+    // Java has no `sizeof`: javasrc2cpg lowers an array's `arr.length` to this same
+    // operator, and JLS §10.7 makes that the array's number of COMPONENTS, not a byte
+    // count. The C fold below read the operand's `int[]` type through the data model
+    // and emitted its byte size -- `NumberUtils.max(int[])` looped `j < 8`, and
+    // `CharUtils.toString` tested `ch < 8` against a 128-entry table -- well-typed,
+    // hole-free and silently wrong. Neither language has a byte-count `sizeof`, so
+    // under `.java` and `.kt`/`.kts` every `sizeOf` is a named hole (a JVM array's
+    // length is its component count either way); the C arm below is unchanged.
+    else if (mfn == "<operator>.sizeOf" && (javaFile || kotlinFile)) hole("op:sizeOf:array-length")
     else if (mfn == "<operator>.sizeOf" && kids.size == 1) {
       // `010-reach-90pct-hole-free` US2: two real, live-CPG-confirmed shapes where
       // Joern's own type inference silently drops the operand's pointer-ness,
@@ -8609,6 +9286,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       hole("op:new:unfolded")
     else if (jsLikeFile && mfn == "<operator>.void" && kids.size == 1)
       (if (pureNode(kids(0))) ujson.Obj("k" -> "unit") else hole("op:void:impure-operand"))
+    // Kotlin `when (s) { ... }` and `a ?: b` where there is no prelude; see `ktWhenV`.
+    else if (ktFile && mfn == "<operator>.when") ktWhenPure(c)
+    else if (ktFile && mfn == "<operator>.elvis") ktElvisPure(c)
     else if (mfn.startsWith("<operator>"))
       hole("op:" + opLabel(mfn))
     // `import x` / `from p import x`: a binding, not a call. See `importValue`.
@@ -8626,6 +9306,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       importValue(kids(1).asInstanceOf[Literal].code.trim,
                   kids(2).asInstanceOf[Literal].code.trim,
                   aliased = kids.length == 4)
+    // Kotlin standard-library extensions with a Java-method meaning (`ktStdlibCall`).
+    else if (ktFile && ktStdlibCall(c).isDefined) ktStdlibCall(c).get
     else {
       // A real call. Arguments are the children with argumentIndex >= 1; the callee sits
       // at -1 and the Python frontend repeats the receiver at 0.
@@ -8681,6 +9363,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                     "args" -> argExprs(args, kwArgs))
         case None =>
           callee.flatMap(asField) match {
+            // `e.lower()`, `e.with_traceback(tb)` on an `except ... as e` binding: the
+            // binding holds the exception's CLASS NAME (a `str` in Core), so a method call
+            // on it would run a `str` method on the name -- `"KeyError".lower()` where
+            // CPython raises AttributeError. A payload hole, like `e.args` and `str(e)`.
+            case Some((recv, m)) if pyFile && isExcBinding(recv) =>
+              hole("exception:payload:" + m)
             case Some((recv, m)) =>
               ujson.Obj("k" -> "mcall", "recv" -> expr(recv), "m" -> m,
                         "args" -> argExprs(args, kwArgs))
@@ -8922,6 +9610,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * into a BLOCK whose last child is the value. Split it into prelude statements and
     * the value expression rather than losing it to a hole. */
   def valueOf(n: AstNode): (List[ujson.Obj], ujson.Obj) = n match {
+    case x if ktReceiverTemp.nonEmpty && ktReceiverTemp.contains(x.id()) => (Nil, ktReceiverTemp(x.id()))
+    case b: Block if jsLiteral(b).exists(holeFreeJson) => (Nil, jsLiteral(b).get)
     case b: Block =>
       val all = kidsOf(b)
       // C++ stack construction reaches here whenever the constructed object is the value
@@ -8992,10 +9682,31 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           case _ => ("", false)
         }
         if ok
-      } yield seqOf(src._1 :+ ujson.Obj(
-        "k" -> "forIn", "x" -> x, "e" -> src._2, "body" -> seqOf(bk.tail.map(stmt))))
+        (prelude, iterable) = rangeHeader(src._1, src._2)
+      } yield seqOf(prelude :+ ujson.Obj(
+        "k" -> "forIn", "x" -> x, "e" -> iterable, "body" -> seqOf(bk.tail.map(stmt))))
     case _ => None
   }
+
+  /** `for x in range(...)`: the frontend evaluates the iterable into a temporary
+    * (`tmp = range(n)`) that only the loop reads, so the `range` object itself is never
+    * observable -- only the integers it yields, in order. That sequence is exactly what
+    * the reserved builtin `<python-range>` (`Stdlib.rangeBuiltin`) computes, so the
+    * header is rewritten to it. Anywhere else `range(...)` stays the `call:range` hole:
+    * a range is a lazy immutable sequence (`range(3) == [0, 1, 2]` is False), not a list.
+    * Only the builtin name is rewritten: a module function named `range` is called under
+    * its qualified name and never reaches this shape. */
+  def rangeHeader(prelude: List[ujson.Obj], e: ujson.Obj): (List[ujson.Obj], ujson.Obj) =
+    (prelude.lastOption, e.value.get("k").map(_.str), e.value.get("v")) match {
+      case (Some(a), Some("name"), Some(tmp))
+          if a.value.get("k").exists(_.str == "assign") && a.value.get("x").contains(tmp) &&
+             a("e").objOpt.exists(c => c.get("k").exists(_.str == "call") &&
+               c.get("f").exists(_.str == "range") &&
+               c.get("args").exists(_.arr.forall(_.objOpt.exists(_.get("k").exists(k =>
+                 !Set("kwargE", "starred", "dstarred").contains(k.str)))))) =>
+        (prelude.init, ujson.Obj("k" -> "call", "f" -> "<python-range>", "args" -> a("e")("args")))
+      case _ => (prelude, e)
+    }
 
   /** Run `f` with `gotoAsBreak` cleared, and restore it afterwards.
     *
@@ -9922,10 +10633,31 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * bump statement (`Env.set` binds any name; no prior declaration is needed). */
   def freshExprVTemp(): String = { val n = "$exprV$" + exprVTempCounter; exprVTempCounter += 1; n }
 
+  /** The part of a method full name before its name: its owner -- the package of a
+    * top-level function, the class/object/enum/companion a member belongs to. The name
+    * stops at the first `:`, where the signature starts: the signature's types carry
+    * dots of their own (`via:int(r.Sums)`, `twice:int(java.lang.String)`), so the last
+    * dot of the whole full name would land inside one. */
+  def ownerOf(fn: String): Option[String] = {
+    val head = fn.takeWhile(_ != ':')
+    val i = head.lastIndexOf('.')
+    if (i > 0) Some(head.substring(0, i)) else None
+  }
+
   // jssrc2cpg retains the implicit `this` parameter on ordinary functions and
   // provides its argument at index 0. Keep that slot at resolved named calls;
   // dropping it shifts every explicit argument into the preceding parameter.
   // Method/constructor calls retain their separate receiver convention.
+  // kotlin2cpg materializes the implicit receiver the same way: `one(by)` and
+  // `this.one(by)` are both a `this` identifier at argument index 0, so the same
+  // threading fills the callee's `this` parameter for a member of the exported
+  // method's own class, object, enum or companion, however the source spelled the
+  // call (an explicit `o.one(by)` passes `o`). The resolved-call branch keeps only
+  // index >= 1, so without this the callee bound `this` to the first real argument.
+  // Everything else is unchanged: the owner check keeps a class reaching its companion
+  // out (the frontend puts the class instance there, not the singleton), a qualified
+  // `Obj.one()` has a TYPE_REF there, not an identifier, and top-level and extension
+  // calls have no index-0 child at all.
   def namedCallReceiver(c: Call): Option[AstNode] =
     // `this` is no longer a parameter of the exported function (see `exportName`'s
     // `params`), so argument 0 must NOT be threaded in as a positional any more: it
@@ -9936,6 +10668,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     else if (numericFamily == "js" && methodByName.get(c.methodFullName).exists(
           _.parameter.exists(p => p.index == 0 && p.name == "this")))
       kidsOf(c).find(aidx(_) == 0)
+    else if (ktFile && methodByName.get(c.methodFullName).exists(_.name != "<init>") &&
+             ownerOf(c.methodFullName).exists(o => ownerOf(c.method.fullName).contains(o)))
+      kidsOf(c).find(k => aidx(k) == 0 && k.isInstanceOf[Identifier])
     else None
 
   /** The receiver of a Java INSTANCE call to a method outside the corpus
@@ -9951,7 +10686,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * `super.m()` (also `STATIC_DISPATCH`), constructors and calls that resolve to a corpus
     * method (`methodByName`, emitted by their exact signature as before) are unchanged. */
   def javaReceiver(c: Call): Option[AstNode] =
-    if (javaFile && c.dispatchType == "DYNAMIC_DISPATCH" && c.name.nonEmpty &&
+    // Kotlin too: kotlin2cpg gives a member call on a platform or library type
+    // (`xs.isEmpty()`, `x.toString()`, `m.get(k)`) the same shape, and it was `call "isEmpty" []`
+    // -- the receiver dropped, the name resolved as a free function. The JVM runs the
+    // member of the receiver's class (`kotlin.collections.List` IS `java.util.List`,
+    // `kotlin.String` IS `java.lang.String`), which is what `mcall` dispatches to.
+    if ((javaFile || ktFile) && c.dispatchType == "DYNAMIC_DISPATCH" && c.name.nonEmpty &&
         !c.name.startsWith("<") && !methodByName.contains(c.methodFullName))
       kidsOf(c).find(aidx(_) == 0)
     else None
@@ -10082,7 +10822,129 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       "pythonTruthCache" -> ujson.Obj("k" -> "name", "v" -> state)))
   }
 
-  def binopValue(op: String, a: AstNode, b: AstNode): (List[ujson.Obj], ujson.Obj) = {
+  // ---- JVM boxed `==` / `!=` -------------------------------------------------------
+  //
+  // A boxed value spells in Core as its primitive's value, and the two JVM
+  // languages give `==` on boxes the opposite meaning: Kotlin's is `equals`
+  // (value equality, null-safe; Language Reference, "Equality"), Java's is
+  // reference identity (JLS §15.21.3) -- equal by value only inside the box
+  // cache. Java's box-against-primitive form unboxes (JLS §15.21.1/§15.21.2,
+  // §5.1.8), so a null box raises `NullPointerException`, which Core spells as
+  // it spells `ArithmeticException` (`javaThrowNew`). kotlin2cpg erases
+  // nullability (`Int?` types as `int`), so every Kotlin numeric comparison is
+  // guarded, not only the provably nullable one, as `ktEquals` does for `when`.
+  private def jvmBoxWidth(t: String): Option[String] = t match {
+    case "java.lang.Integer" => Some("i32")
+    case "java.lang.Long" => Some("i64")
+    case "java.lang.Short" => Some("i16")
+    case "java.lang.Byte" => Some("i8")
+    case "java.lang.Character" => Some("u16")
+    case _ => None
+  }
+
+  private def jvmNullLiteral(n: AstNode): Boolean = n match {
+    case l: Literal => l.code.trim == "null"
+    case _ => false
+  }
+
+  // The width a JVM operand compares at: a primitive's own width, or the width
+  // of the number inside a box. None for booleans, floats, `null` and the untyped.
+  private def jvmValueWidth(n: AstNode): Option[String] =
+    if (jvmNullLiteral(n)) None
+    else numericType(n).orElse(jvmBoxWidth(bareType(staticTypeOf(n))))
+
+  private def jvmBoxed(n: AstNode): Boolean = {
+    val t = bareType(staticTypeOf(n))
+    !jvmNullLiteral(n) && (jvmBoxWidth(t).isDefined ||
+      Set("java.lang.Boolean", "java.lang.Float", "java.lang.Double").contains(t))
+  }
+
+  private def jvmPrimitive(n: AstNode): Boolean =
+    !jvmBoxed(n) && !jvmNullLiteral(n) &&
+      (numericType(n).isDefined || Set("boolean", "float", "double").contains(bareType(staticTypeOf(n))))
+
+  /** `==`/`!=` on boxed/nullable JVM values, prelude-aware, or None to keep the
+    * generic lowering. Kotlin's `===` compiles to the same call name as `==` but
+    * is typed ANY where `==` is typed boolean; `callTfn` carries that from the
+    * call node so referential equality does not take this path. */
+  private def jvmEqualityValue(op: String, a: AstNode, b: AstNode,
+                               callTfn: String): Option[(List[ujson.Obj], ujson.Obj)] = {
+    if (!Set("==", "!=").contains(op) || !(javaFile || ktFile) || (ktFile && callTfn == "ANY"))
+      return None
+    val wA = jvmValueWidth(a); val wB = jvmValueWidth(b)
+    // The shapes below read an operand more than once, so an impure one is stored
+    // in a temp; so is a left operand whose read the right one's effects could
+    // otherwise overtake. A pure right operand is re-read for free.
+    def stored(pv: (List[ujson.Obj], ujson.Obj)): (List[ujson.Obj], ujson.Obj) = {
+      val t = freshExprVTemp()
+      (pv._1 :+ ktAssign(t, pv._2), ktName(t))
+    }
+    def operands(keepA: Boolean, keepB: Boolean) = {
+      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+      val storeB = !keepB && !pureNode(b)
+      val left = if (keepA || (pureNode(a) && pb.isEmpty && !storeB)) (pa, ae) else stored((pa, ae))
+      (left, if (storeB) stored((pb, be)) else (pb, be))
+    }
+    def npe(v: ujson.Obj): ujson.Obj =
+      ktIf(ktIsNull(v), ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "str", "v" -> "NullPointerException")), skip)
+    if (ktFile) {
+      if (jvmNullLiteral(b) && wA.isDefined) {
+        val (pa, ae) = exprV(a)
+        val v = ktIsNull(ae)
+        Some((pa, if (op == "==") v else ktNot(v)))
+      } else if (jvmNullLiteral(a) && wB.isDefined) {
+        val (pb, be) = exprV(b)
+        val v = ktIsNull(be)
+        Some((pb, if (op == "==") v else ktNot(v)))
+      } else if (wA.isDefined && wB.isDefined && !(jvmBoxed(a) && jvmBoxed(b)) &&
+                 !(a.isInstanceOf[Literal] && b.isInstanceOf[Literal])) {
+        // `a == b` is `a == null ? b == null : a.equals(b)`, with `equals` as
+        // the typed comparison. A literal operand is provably non-null, so
+        // only the other side needs a guard. A box against a box of its own
+        // type is also value equality here, and the generic `==` (null-safe
+        // structural) already gives exactly that.
+        val litA = a.isInstanceOf[Literal]; val litB = b.isInstanceOf[Literal]
+        val ((pa, ae), (pb, be)) = operands(litA, litB)
+        val cmp = ktBin("num:java:" + commonInt(wA.get, wB.get) + ":==", ae, be)
+        val eq = if (litA || litB) {
+          val other = if (litA) be else ae
+          ktBin("&&", ktNot(ktIsNull(other)), cmp)
+        } else ktCond(ktIsNull(ae), ktIsNull(be), ktBin("&&", ktNot(ktIsNull(be)), cmp))
+        Some((pa ++ pb, if (op == "==") eq else ktNot(eq)))
+      } else None
+    } else {
+      val boxedA = jvmBoxed(a); val boxedB = jvmBoxed(b)
+      if (boxedA && boxedB) {
+        // Reference identity is not modelled, so the comparison is a named
+        // hole; both operands are still evaluated, in source order.
+        val ((pa, _), (pb, _)) = operands(false, false)
+        Some((pa ++ pb, hole("numeric:java-box-identity")))
+      } else if ((boxedA && jvmPrimitive(b)) || (boxedB && jvmPrimitive(a))) {
+        // Unboxing: javac unboxes an operand as soon as it is evaluated, so a
+        // null left box raises before the right operand runs, a null right box
+        // after it; then the values compare, after binary numeric promotion
+        // when both are integral (JLS §5.6.2), else as the generic `==` does.
+        val ((pa, ae), (pb, be)) = operands(false, boxedA)
+        val value = if (wA.isDefined && wB.isDefined)
+          ktBin("num:java:" + commonInt(wA.get, wB.get) + ":" + op, ae, be)
+        else ktBin(op, ae, be)
+        Some((if (boxedA) (pa :+ npe(ae)) ++ pb else pa ++ pb :+ npe(be), value))
+      } else None
+    }
+  }
+
+  /** `jvmEqualityValue` where no prelude can be placed (`expr`): the value when the
+    * shape needs none, else a named hole rather than the generic lowering. */
+  def jvmEqualityExpr(op: String, a: AstNode, b: AstNode, callTfn: String): Option[ujson.Obj] =
+    jvmEqualityValue(op, a, b, callTfn).map {
+      case (Nil, v) => v
+      case _ => hole("numeric:jvm-equality-prelude")
+    }
+
+  def binopValue(op: String, a: AstNode, b: AstNode,
+                 callTfn: String = ""): (List[ujson.Obj], ujson.Obj) = {
+    val jvm = jvmEqualityValue(op, a, b, callTfn)
+    if (jvm.isDefined) return jvm.get
     val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
     if (pyFile && (op == "&&" || op == "||")) pythonLogicalValues(op, (pa, ae), (pb, be))
     else if (pb.isEmpty) (pa, typedBinop(op, a, b, ae, be))
@@ -10140,7 +11002,975 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     (prelude, vals)
   }
 
+  // ---- Kotlin `when` and `?:` ------------------------------------------------------
+  //
+  // Kotlin spec, "When expressions": the subject is evaluated once; the entries are
+  // tried in order and the first whose condition holds is taken; an entry condition is
+  // an expression compared with the subject by `==`, an `in`/`!in` membership test, or
+  // an `is`/`!is` type test; `else` takes whatever is left. A `when` used as an
+  // expression without `else` is exhaustive, and the JVM backend throws
+  // `NoWhenBranchMatchedException` from the impossible default. "Elvis operator
+  // expressions": `a ?: b` evaluates `a`; if it is not null that is the value, and only
+  // otherwise is `b` evaluated.
+  //
+  // What kotlin2cpg gives for them:
+  //   * `when (s) { ... }` in expression position is a call `<operator>.when`. Its first
+  //     argument is a BLOCK holding the subject (or `val y = e`); each further argument
+  //     is a BLOCK per entry: the condition expressions, then the body as the LAST child.
+  //     The condition KINDS are not kept: `is T` leaves no node at all, `in e` leaves an
+  //     UNKNOWN node `in` before `e`, and `else` leaves nothing -- so `1, is String -> a`
+  //     and `1 -> a` are the same tree. Each entry's source text (from the BLOCK's
+  //     line/column) is therefore read back, and must agree with the tree condition for
+  //     condition, or the entry is the named hole `op:when:branch-unread`.
+  //   * `when (s) { ... }` in statement position is a SWITCH whose body holds one
+  //     JUMP_TARGET per entry, with the entry's text as its code, and NO condition nodes.
+  //     `ktWhenStmt` reads literal conditions from that text; others are named holes.
+  //     (Before this, the generic switch lowering consumed those JUMP_TARGETs with no
+  //     value, so no entry ever matched and every such `when` was silently skipped.)
+  //   * a `when` without a subject is already nested `<operator>.conditional`.
+  //   * `a ?: b` is `<operator>.elvis(a, b)`; `b` may be `return`, `throw`, `break` or
+  //     `continue` (type `Nothing`). `?.` is spelled exactly like `.`, so a safe call is
+  //     recognised from its own code (`ktSafeReceiver`).
+  // Conditions Core cannot decide faithfully stay named holes, at the entry they belong
+  // to: `op:when:is-type-test` (a type `ktTypeTest` classifies but Core cannot test),
+  // `op:when:is:unknown-type` (a type it cannot classify: a type parameter, a platform
+  // or generic type), `op:when:in-non-range`, `op:when:equality-type` (Kotlin `==` is
+  // `equals`; only the types whose `equals` Core has are compared), `op:when:guard`,
+  // `op:when:stmt-label-unread`.
+
+  def ktFile: Boolean = { val f = currentFile.toLowerCase; f.endsWith(".kt") || f.endsWith(".kts") }
+
+  private def ktName(v: String): ujson.Obj = ujson.Obj("k" -> "name", "v" -> v)
+  private def ktAssign(x: String, e: ujson.Value): ujson.Obj = ujson.Obj("k" -> "assign", "x" -> x, "e" -> e)
+  private def ktUnit: ujson.Obj = ujson.Obj("k" -> "unit")
+  private def ktIsNull(e: ujson.Value): ujson.Obj = ujson.Obj("k" -> "binop", "op" -> "==", "a" -> e, "b" -> ktUnit)
+  private def ktNot(e: ujson.Value): ujson.Obj = ujson.Obj("k" -> "unop", "op" -> "!", "a" -> e)
+  private def ktBin(op: String, a: ujson.Value, b: ujson.Value): ujson.Obj =
+    ujson.Obj("k" -> "binop", "op" -> op, "a" -> a, "b" -> b)
+  private def ktIf(c: ujson.Value, t: ujson.Obj, e: ujson.Obj): ujson.Obj =
+    ujson.Obj("k" -> "ifte", "c" -> c, "t" -> t, "e" -> e)
+  private def ktCond(c: ujson.Value, t: ujson.Value, e: ujson.Value): ujson.Obj =
+    ujson.Obj("k" -> "cond", "c" -> c, "t" -> t, "e" -> e)
+  private def ktSorted(n: AstNode): List[AstNode] = kidsOf(n).sortBy(_.order)
+
+  // ---- Kotlin enum entries -------------------------------------------------------
+  //
+  // The model's one spelling of an enum entry is the function value `fnref "<E>$<X>"`:
+  // kotlin2cpg gives a bare `X` inside the enum as a TYPE_REF to `<E>$<X>`, which the
+  // export already reads that way, and the JVM oracle encodes an entry the same way
+  // (scripts/differential.py, `Val.fn "<enum>$<ENTRY>"`). The qualified `E.X` is a
+  // different tree -- `<operator>.fieldAccess(TYPE_REF E, FIELD_IDENTIFIER X)` -- and
+  // was read as a field of the function value `E`, which has none (`field:X:non-object`
+  // at run time, `op:when:enum-entry` as a `when` condition). It now denotes the same
+  // value. Kotlin's `==` on an enum is `Enum.equals`, which is final and is identity, and
+  // two entries are the same object exactly when their names are equal, so Core's `==` on
+  // the two `Val.fn` spellings (equal names) is that `equals`; `null == E.X` is false.
+  //
+  // Only enums declared in the analysed code are known: an enum class whose declaration
+  // reads `enum class <Name>` and whose entry `X` has its own TYPE_DECL `<E>$<X>` (the one
+  // kotlin2cpg emits per entry). An entry of a dependency's enum reaches here as an
+  // IDENTIFIER receiver with no declaration, and stays the hole it was.
+
+  /** Enum classes of the analysed Kotlin code: full name -> entry names. */
+  lazy val ktEnumEntries: Map[String, Set[String]] = {
+    val decls = cpg.typeDecl.isExternal(false).l
+    val names = decls.map(_.fullName).toSet
+    decls.filter { td =>
+      val f = td.filename.toLowerCase
+      (f.endsWith(".kt") || f.endsWith(".kts")) && td.lineNumber.isDefined && {
+        val simple = td.name.split('$').last.split('.').last
+        val header = typeDeclSourceWindow(td).take(2000).takeWhile(_ != '{')
+        ("\\benum\\s+class\\s+" + java.util.regex.Pattern.quote(simple) + "\\b").r
+          .findFirstIn(header).isDefined
+      }
+    }.map { td =>
+      td.fullName -> td.member.name.l.filter(m => names.contains(td.fullName + "$" + m)).toSet
+    }.filter(_._2.nonEmpty).toMap
+  }
+
+  /** The types the analysed Kotlin code declares, except an enum's entries (they have
+    * their own TYPE_DECLs; the enum class itself is in). kotlin2cpg also emits a
+    * TYPE_DECL per function (`s.f:boolean(java.lang.Object)`) and one `<global>` per
+    * file (`Is.kt:Is.kt:s`), whose names carry `(` or `:`; a type's name carries
+    * neither. */
+  lazy val ktAnalysedTypes: Set[String] = {
+    val entries = ktEnumEntries.toSeq.flatMap { case (e, xs) => xs.map(x => e + "$" + x) }.toSet
+    cpg.typeDecl.isExternal(false).l
+      .filter { td =>
+        val f = td.filename.toLowerCase
+        (f.endsWith(".kt") || f.endsWith(".kts")) && td.lineNumber.isDefined &&
+          !td.fullName.contains("(") && !td.fullName.contains(":")
+      }
+      .map(_.fullName).toSet -- entries
+  }
+
+  /** `(package, explicit imports by the name they bind, star-imported packages)` of a
+    * Kotlin file, read from its header text. */
+  def ktImportScope(file: String): (String, Map[String, String], List[String]) = {
+    val pkgRe = "\\s*package\\s+([\\w.`]+).*".r
+    val impRe = "\\s*import\\s+([\\w.`]+?)(\\.\\*)?(?:\\s+as\\s+(\\w+))?\\s*;?\\s*(//.*)?".r
+    var pkg = ""
+    val explicit = collection.mutable.Map.empty[String, String]
+    val stars = collection.mutable.ListBuffer.empty[String]
+    fileLines(file).foreach {
+      case pkgRe(p) => pkg = p.replace("`", "")
+      case impRe(p, star, as, _) =>
+        val q = p.replace("`", "")
+        if (star != null) stars += q
+        else explicit(Option(as).getOrElse(q.split('.').last)) = q
+      case _ =>
+    }
+    (pkg, explicit.toMap, stars.toList)
+  }
+
+  /** `<E>$<X>` when `n` is the qualified entry `E.X` of an analysed enum (`ktEnumEntries`),
+    * or the bare `X` kotlin2cpg resolves to the entry's own type. */
+  def ktEnumEntryOf(n: AstNode): Option[String] = n match {
+    case c: Call if ktFile && fieldOps.contains(callName(c)) => ktSorted(c) match {
+      case (t: TypeRef) :: (f: FieldIdentifier) :: Nil
+          if ktEnumEntries.get(t.typeFullName).exists(_.contains(f.canonicalName)) &&
+             (c.typeFullName.isEmpty || c.typeFullName == "ANY" || c.typeFullName == t.typeFullName) =>
+        Some(t.typeFullName + "$" + f.canonicalName)
+      case _ => None
+    }
+    case t: TypeRef if ktFile && t.typeFullName.contains("$") =>
+      val (e, x) = (t.typeFullName.substring(0, t.typeFullName.lastIndexOf('$')),
+                    t.typeFullName.substring(t.typeFullName.lastIndexOf('$') + 1))
+      if (ktEnumEntries.get(e).exists(_.contains(x))) Some(t.typeFullName) else None
+    case _ => None
+  }
+
+  /** The entry a `when` condition's TEXT names, for a subject of the analysed enum
+    * `enumType`: `Q.X` where `Q` spells the enum (its simple name, or a dotted suffix of
+    * its full name: `Outer.Mode`, `p.Outer.Mode`) and `X` is one of its entries. A bare
+    * `X` is not read: it may be a constant of the enum's type that is not the entry. */
+  def ktEnumEntryText(enumType: String, text: String): Option[String] =
+    ktEnumEntries.get(enumType).flatMap { entries =>
+      val t = text.filterNot(_.isWhitespace)
+      val dot = t.lastIndexOf('.')
+      if (dot <= 0) None
+      else {
+        val (q, x) = (t.substring(0, dot), t.substring(dot + 1))
+        val dotted = enumType.replace('$', '.')
+        if (entries.contains(x) && (dotted == q || dotted.endsWith("." + q))) Some(enumType + "$" + x)
+        else None
+      }
+    }
+
+  /** The conditions of one `when` entry, from its source text: everything up to the
+    * entry's top-level `->`, split at top-level commas, comments removed, trimmed.
+    * Strings (escapes, `${}` templates, raw `"""` strings), character literals,
+    * backquoted names and comments (nested, as Kotlin has them) are skipped; `( [ {`
+    * nest. `None` when the text ends, or a bracket closes, before an `->`. */
+  def ktConditionsAt(text: String): Option[List[String]] = {
+    val n = text.length
+    def skipQuoted(i0: Int, q: Char): Int = {
+      var i = i0 + 1
+      while (i < n && text.charAt(i) != q && text.charAt(i) != '\n') {
+        if (text.charAt(i) == '\\') i += 1
+        i += 1
+      }
+      if (i < n && text.charAt(i) == q) i + 1 else -1
+    }
+    def skipComment(i0: Int): Int =
+      if (text.startsWith("//", i0)) { val e = text.indexOf('\n', i0); if (e < 0) n else e }
+      else {
+        var depth = 0
+        var i = i0
+        var end = -1
+        while (end < 0 && i < n) {
+          if (text.startsWith("/*", i)) { depth += 1; i += 2 }
+          else if (text.startsWith("*/", i)) { depth -= 1; i += 2; if (depth == 0) end = i }
+          else i += 1
+        }
+        end
+      }
+    def skipString(i0: Int): Int = {
+      val raw = text.startsWith("\"\"\"", i0)
+      var i = i0 + (if (raw) 3 else 1)
+      var end = -1
+      while (end < 0 && i >= 0 && i < n) {
+        if (raw && text.startsWith("\"\"\"", i)) {
+          var j = i + 3
+          while (j < n && text.charAt(j) == '"') j += 1
+          end = j
+        } else if (!raw && text.charAt(i) == '"') end = i + 1
+        else if (!raw && text.charAt(i) == '\n') i = -1
+        else if (!raw && text.charAt(i) == '\\') i += 2
+        else if (text.startsWith("${", i)) i = skipCode(i + 2)
+        else i += 1
+      }
+      end
+    }
+    // Code up to and including the `}` closing a `${`; the index after it, or -1.
+    def skipCode(i0: Int): Int = {
+      var i = i0
+      var depth = 0
+      var end = -1
+      while (end < 0 && i >= 0 && i < n) {
+        val ch = text.charAt(i)
+        if (ch == '"') i = skipString(i)
+        else if (ch == '\'' || ch == '`') i = skipQuoted(i, ch)
+        else if (text.startsWith("//", i) || text.startsWith("/*", i)) i = skipComment(i)
+        else if (ch == '(' || ch == '[' || ch == '{') { depth += 1; i += 1 }
+        else if (ch == ')' || ch == ']' || ch == '}') {
+          if (depth == 0) { if (ch == '}') end = i + 1 else i = -1 }
+          else { depth -= 1; i += 1 }
+        } else i += 1
+      }
+      end
+    }
+    val parts = scala.collection.mutable.ListBuffer.empty[String]
+    val cur = new StringBuilder
+    var i = 0
+    var depth = 0
+    var result: Option[List[String]] = None
+    var failed = false
+    while (result.isEmpty && !failed && i < n) {
+      val ch = text.charAt(i)
+      def take(j: Int): Unit = if (j < 0) failed = true else { cur ++= text.substring(i, j); i = j }
+      if (ch == '"') take(skipString(i))
+      else if (ch == '\'' || ch == '`') take(skipQuoted(i, ch))
+      else if (text.startsWith("//", i) || text.startsWith("/*", i)) {
+        val j = skipComment(i)
+        if (j < 0) failed = true else { cur += ' '; i = j }
+      }
+      else if (ch == '(' || ch == '[' || ch == '{') { depth += 1; cur += ch; i += 1 }
+      else if (ch == ')' || ch == ']' || ch == '}') {
+        if (depth == 0) failed = true else { depth -= 1; cur += ch; i += 1 }
+      }
+      else if (depth == 0 && ch == ',') { parts += cur.toString.trim; cur.clear(); i += 1 }
+      else if (depth == 0 && text.startsWith("->", i)) {
+        // Kotlin allows a trailing comma after the last condition (`A, B, ->`).
+        val last = cur.toString.trim
+        if (last.nonEmpty || parts.isEmpty) parts += last
+        if (parts.exists(_.isEmpty)) failed = true else result = Some(parts.toList)
+      }
+      else { cur += ch; i += 1 }
+    }
+    result
+  }
+
+  /** `else`, `is`, `in`, `!in`, `guard` or `expr` for one condition's text. */
+  def ktConditionKind(t: String): String = {
+    def word(w: String) = t.startsWith(w) &&
+      (t.length == w.length || !(t.charAt(w.length).isLetterOrDigit || t.charAt(w.length) == '_'))
+    if (t == "else") "else"
+    else if ("\\bif\\b".r.findFirstIn(t).isDefined) "guard"
+    else if (word("is") || word("!is")) "is"
+    else if (word("in")) "in"
+    else if (word("!in")) "!in"
+    else "expr"
+  }
+
+  /** Does the CPG node's code spell the same condition as the source text? Whitespace
+    * is ignored, and so are parentheses around the whole text. */
+  def ktSameText(text: String, node: AstNode): Boolean = {
+    def norm(s: String) = s.filterNot(_.isWhitespace)
+    var t = norm(text)
+    val c = norm(node.code)
+    while (t != c && t.startsWith("(") && t.endsWith(")")) t = t.drop(1).dropRight(1)
+    t == c
+  }
+
+  /** One entry's conditions, each its kind, its text and (except `is`/`else`) its CPG
+    * node. A reading that does not match the tree node for node is a `Left`. */
+  def ktEntryConditions(entry: AstNode, condNodes: List[AstNode]): Either[String, List[(String, String, Option[AstNode])]] = {
+    val lines = fileLines(currentFile)
+    val texts = (entry.lineNumber.map(_.intValue), entry.columnNumber.map(_.intValue)) match {
+      case (Some(l), Some(c)) if l >= 1 && l <= lines.size && c >= 0 && c <= lines(l - 1).length =>
+        ktConditionsAt((lines(l - 1).drop(c) :: lines.drop(l).take(400)).mkString("\n"))
+      case _ => None
+    }
+    texts match {
+      case None => Left("op:when:branch-unread")
+      case Some(ts) =>
+        val kinds = ts.map(ktConditionKind)
+        if (kinds.contains("guard")) Left("op:when:guard")
+        else if (kinds.contains("else"))
+          (if (ts.size == 1 && condNodes.isEmpty) Right(List(("else", "", None))) else Left("op:when:branch-unread"))
+        else {
+          var rest = condNodes
+          var bad = false
+          val out = ts.zip(kinds).map { case (t, k) =>
+            k match {
+              case "is" => (k, t, None)
+              case "in" | "!in" =>
+                rest match {
+                  case (u: Unknown) :: (e: AstNode) :: more if u.code.trim == k && !e.isInstanceOf[Unknown] &&
+                      ktSameText(t.drop(k.length), e) =>
+                    rest = more; (k, t, Some(e))
+                  case _ => bad = true; (k, t, None)
+                }
+              case _ =>
+                rest match {
+                  case (e: AstNode) :: more if !e.isInstanceOf[Unknown] && ktSameText(t, e) =>
+                    rest = more; (k, t, Some(e))
+                  case _ => bad = true; (k, t, None)
+                }
+            }
+          }
+          if (bad || rest.nonEmpty) Left("op:when:branch-unread") else Right(out)
+        }
+    }
+  }
+
+  /** Kotlin `subject == v`, for the types whose `equals` Core has: integers and
+    * characters (typed `==`), booleans, a string literal (`String.equals`, which is
+    * false against `null`), and `null` itself. Anything else (a data class, a
+    * collection, an enum entry...) is `op:when:equality-type`: Core's `==` there is
+    * reference or structural equality, not the class's `equals`. */
+  def ktEquals(subjNode: AstNode, subj: ujson.Obj, v: AstNode): Either[String, (List[ujson.Obj], ujson.Obj)] = {
+    val boolTy = Set("boolean", "java.lang.Boolean")
+    v match {
+      case l: Literal if l.code.trim == "null" => Right((Nil, ktIsNull(subj)))
+      case l: Literal if l.code.trim.startsWith("\"") =>
+        val lv = expr(l)
+        if (lv("k").str != "str") Left("op:when:equality-type")
+        else Right((Nil, ujson.Obj("k" -> "mcall", "recv" -> lv, "m" -> "equals", "args" -> ujson.Arr(subj))))
+      // kotlin2cpg may give `Long?` the primitive's name, so the subject can still be
+      // null here: Kotlin's `null == 1L` is false, which the guard says.
+      case _ if numericType(subjNode).isDefined && numericType(v).isDefined =>
+        val (p, ve) = exprV(v)
+        Right((p, ktBin("&&", ktNot(ktIsNull(subj)), typedBinop("==", subjNode, v, subj, ve))))
+      // An integer or character LITERAL against a subject whose type the CPG does not
+      // give as a primitive (`Long?`, or unresolved): Kotlin's type check only admits a
+      // subject of an integer (resp. `Char`) type or its nullable form here, so the
+      // subject is null or an integer within its own range, and exact comparison at the
+      // widest width is its `==`.
+      case _ if ktIntLiteral(v).isDefined =>
+        Right((Nil, ktBin("&&", ktNot(ktIsNull(subj)), ktBin("num:java:i64:==", subj, intLit(ktIntLiteral(v).get)))))
+      case l: Literal if l.code.trim == "true" || l.code.trim == "false" =>
+        Right((Nil, ktBin("==", subj, expr(l))))
+      case _ if boolTy.contains(bareType(staticTypeOf(subjNode))) && bareType(staticTypeOf(v)) == "boolean" =>
+        val (p, ve) = exprV(v)
+        Right((p, ktBin("==", subj, ve)))
+      // An entry of an analysed enum (`ktEnumEntryOf`): `Enum.equals` is identity, and
+      // identity of two entries is equality of their `Val.fn` names.
+      case _ if ktEnumEntryOf(v).isDefined =>
+        Right((Nil, ktBin("==", subj, typeValue(ktEnumEntryOf(v).get))))
+      // `Type.ENTRY` of any other type: an entry of a dependency's enum (it arrives with
+      // an IDENTIFIER receiver) or another static member, whose `equals` Core does not
+      // know, so it is named rather than compared.
+      case c: Call if fieldOps.contains(callName(c)) && ktSorted(c).headOption.exists {
+            case _: TypeRef => true
+            case i: Identifier => i.name.headOption.exists(_.isUpper)
+            case _ => false
+          } =>
+        Left("op:when:enum-entry")
+      case _ => Left("op:when:equality-type")
+    }
+  }
+
+  /** The value of an integer or character literal, or of `-` applied to one. */
+  def ktIntLiteral(v: AstNode): Option[BigInt] = v match {
+    case l: Literal if numericType(l).isDefined =>
+      expr(l) match {
+        case o if o("k").str == "int" => scala.util.Try(BigInt(o("v") match {
+          case ujson.Str(s) => s
+          case ujson.Num(d) => d.toLong.toString
+          case other => other.toString
+        })).toOption
+        case _ => None
+      }
+    case c: Call if callName(c) == "<operator>.minus" && kidsOf(c).size == 1 =>
+      ktIntLiteral(kidsOf(c).head).map(-_)
+    case _ => None
+  }
+
+  /** `(!is, the written type)` of one `is`/`!is` condition's text: `is Mode`, `!is Int`. */
+  def ktIsText(text: String): (Boolean, String) = {
+    val neg = text.startsWith("!is")
+    (neg, text.drop(if (neg) 3 else 2).trim)
+  }
+
+  /** The Core test for Kotlin `subj is T`, negated for `!is T`. `jvm` is the TYP_REF's
+    * `typeFullName` when the CPG holds one (a plain expression), `spelling` the written
+    * type otherwise (a `when` entry, or a TYP_REF kotlin2cpg left `ANY`); kotlin2cpg erases `?` from every CPG type name,
+    * so nullability is read from the spelling, and only the target's matters (a `T?`
+    * target admits null as well). Three tests are faithful in Core: a subject whose
+    * static type already is the target holds null or the target, so the test is a null
+    * check (`true` for a `T?` target, which admits null too); `Any`/`Object` is every
+    * non-null value (`true` for `Any?`); an analysed enum is final, so its values are
+    * exactly its entries and the test is their disjunction (`null` too for `T?`). A
+    * type the JVM names but Core has no `.java`-dialect test op for -- the Kotlin value
+    * types (`Int` and `Long` share the width-free `.int`, where the JVM's `1L is Int`
+    * is false), an analysed class (a `.ref` carries its class, but not the hierarchy an
+    * `open`/`sealed`/interface `T` needs) -- is `typeLabel`. A subject whose value is
+    * not pure is refused that disjunction (`op:is:value-position`): it would re-read
+    * the subject once per entry, and a plain expression has no prelude for a temporary.
+    * A type the CPG only erases to `Object` (a type parameter) or spells without a
+    * declaration here (a platform type) is `unknownLabel`. */
+  def ktTypeTest(subjNode: AstNode, subj: ujson.Obj, subjPure: Boolean, negated: Boolean,
+                 jvm: Option[String], spelling: String,
+                 typeLabel: String, unknownLabel: String): Either[String, ujson.Obj] = {
+    val trueLit = ujson.Obj("k" -> "bool", "v" -> true)
+    def test(t: ujson.Obj) = Right(if (negated) ktNot(t) else t)
+    val subjT = bareType(staticTypeOf(subjNode)).stripSuffix("?")
+    val nullable = spelling.endsWith("?")
+    val name = spelling.stripSuffix("?").trim
+    val builtin = Map("String" -> "java.lang.String", "Int" -> "int", "Long" -> "long",
+                      "Boolean" -> "boolean", "Char" -> "char", "Short" -> "short",
+                      "Byte" -> "byte", "Double" -> "double", "Float" -> "float")
+    // A written simple name resolves as Kotlin resolves it (Kotlin spec, "Linked
+    // scopes"): an explicit import, then the file's own package, then star imports, then
+    // the default imports. Only the analysed types are known in the middle two, so a
+    // default-imported name is read only when no star import can shadow it: none, or
+    // only the standard library's own packages, which declare no type of these names.
+    // (`ktAnalysedTypes` by suffix matched any package's `T`, an imported namesake too.)
+    val target = jvm.filter(t => t.nonEmpty && t != "ANY").orElse {
+      val (pkg, explicit, stars) = ktImportScope(currentFile)
+      def analysedIn(p: String) = Some(if (p.isEmpty) name else p + "." + name).filter(ktAnalysedTypes)
+      val starred = stars.flatMap(analysedIn)
+      val stdStars = stars.forall(p => Seq("kotlin", "java", "javax").exists(s => p == s || p.startsWith(s + ".")))
+      if (name.contains('.')) Some(name)
+      else explicit.get(name)
+        .orElse(analysedIn(pkg))
+        .orElse(starred match { case List(t) => Some(t); case _ => None })
+        .orElse(if (starred.nonEmpty || !stdStars) None
+                else builtin.get(name).orElse(
+                  if (name == "Any" || name == "Object") Some("java.lang.Object") else None))
+    }
+    target match {
+      case Some("java.lang.Object") =>
+        // Not `Any`/`Object` itself: the CPG erased something else to `Object` -- a
+        // type parameter -- and there is no type to test.
+        if (name == "Any" || name == "Object")
+          test(if (nullable) trueLit else ktNot(ktIsNull(subj)))
+        else Left(unknownLabel)
+      case Some(t) if t == subjT && subjT.nonEmpty && subjT != "ANY" =>
+        test(if (nullable) trueLit else ktNot(ktIsNull(subj)))
+      case Some(t) if ktEnumEntries.contains(t) =>
+        if (!subjPure) Left("op:is:value-position")
+        else {
+          val eqs = ktEnumEntries(t).toList.sorted.map(x => ktBin("==", subj, typeValue(t + "$" + x)))
+          test((if (nullable) ktIsNull(subj) :: eqs else eqs).reduceLeft((a, b) => ktBin("||", a, b)))
+        }
+      case Some(t) if builtin.values.toSet(t) || ktAnalysedTypes.contains(t) => Left(typeLabel)
+      case _ => Left(unknownLabel)
+    }
+  }
+
+  /** The test of one condition against the subject. */
+  def ktSubjectTest(subjNode: AstNode, subj: ujson.Obj, kind: String, text: String,
+                    v: Option[AstNode]): Either[String, (List[ujson.Obj], ujson.Obj)] = kind match {
+    case "is" =>
+      val (neg, spelling) = ktIsText(text)
+      ktTypeTest(subjNode, subj, true, neg, None, spelling,
+                 "op:when:is-type-test", "op:when:is:unknown-type").map(e => (Nil, e))
+    case "in" | "!in" => v match {
+      // `lo..hi` and `lo until hi` over integers or characters, with pure bounds: the
+      // range is built when the entry is tried, so re-reading pure bounds is the same.
+      case Some(r: Call) if (callName(r) == "<operator>.range" ||
+                             r.methodFullName.startsWith("kotlin.ranges.until:")) &&
+          ktSorted(r).size == 2 && ktSorted(r).forall(pureNode) &&
+          numericType(subjNode).isDefined && ktSorted(r).forall(k => numericType(k).isDefined) =>
+        val List(lo, hi) = ktSorted(r)
+        val upper = if (callName(r) == "<operator>.range") "<=" else "<"
+        val t = ktBin("&&", ktNot(ktIsNull(subj)),
+                      ktBin("&&", typedBinop("<=", lo, subjNode, expr(lo), subj),
+                                  typedBinop(upper, subjNode, hi, subj, expr(hi))))
+        Right((Nil, if (kind == "!in") ktNot(t) else t))
+      // Literal bounds against a subject the CPG gives no primitive type: as for a
+      // literal entry in `ktEquals`, the subject is then an integer of its own range.
+      case Some(r: Call) if (callName(r) == "<operator>.range" ||
+                             r.methodFullName.startsWith("kotlin.ranges.until:")) &&
+          ktSorted(r).size == 2 && ktSorted(r).forall(k => ktIntLiteral(k).isDefined) =>
+        val List(lo, hi) = ktSorted(r).map(k => intLit(ktIntLiteral(k).get))
+        val upper = if (callName(r) == "<operator>.range") "num:java:i64:<=" else "num:java:i64:<"
+        val t = ktBin("&&", ktNot(ktIsNull(subj)),
+                      ktBin("&&", ktBin("num:java:i64:<=", lo, subj), ktBin(upper, subj, hi)))
+        Right((Nil, if (kind == "!in") ktNot(t) else t))
+      case _ => Left("op:when:in-non-range")
+    }
+    case _ => ktEquals(subjNode, subj, v.get)
+  }
+
+  def ktIsJump(n: AstNode): Boolean = n match {
+    case _: Return => true
+    case cs: ControlStructure => Set("THROW", "BREAK", "CONTINUE").contains(cs.controlStructureType)
+    case _ => false
+  }
+
+  /** A `when` body or the right side of `?:`: its prelude and its value, or no value
+    * when it is a jump (`return`, `throw`, `break`, `continue`: Kotlin's `Nothing`), which
+    * leaves before any value is needed. A block's value is its last expression; an
+    * assignment there is a statement, and the block's value is `Unit`. */
+  def ktBranchV(n: AstNode): (List[ujson.Obj], Option[ujson.Obj]) = n match {
+    case j if ktIsJump(j) => (List(stmt(j)), None)
+    case b: Block if ctorAlloc(kidsOf(b)).isDefined =>
+      val (p, v) = valueOf(b)
+      (p, Some(v))
+    case b: Block =>
+      kidsOf(b).filterNot(_.isInstanceOf[Local]) match {
+        case Nil => (Nil, Some(ktUnit))
+        case ks =>
+          val (p, v) = ktBranchV(ks.last)
+          (stmts(ks.init) ++ p, v)
+      }
+    case c: Call if callName(c) == "<operator>.assignment" || augOps.contains(callName(c)) =>
+      (List(stmt(c)), Some(ktUnit))
+    case other =>
+      val (p, v) = exprV(other)
+      (p, Some(v))
+  }
+
+  /** `Right(Some(r))` when `n` is a member access through `?.` with receiver `r`,
+    * `Right(None)` when it is not one, `Left` when its code cannot be read. kotlin2cpg
+    * spells `r?.f` and `r?.m()` exactly as `r.f` and `r.m()`; what follows the
+    * receiver's own text in the node's code is the only record of the operator. A
+    * property of the implicit receiver (`v?.length` in a class with `val v`) has the
+    * receiver `this.v`, whose code is not a prefix of the node's: its own field name is. */
+  def ktSafeReceiver(n: AstNode): Either[String, Option[AstNode]] = n match {
+    case c: Call if fieldOps.contains(callName(c)) || !callName(c).startsWith("<operator>") =>
+      val recv =
+        if (fieldOps.contains(callName(c))) ktSorted(c).headOption
+        else ktSorted(c).find(aidx(_) == 0).orElse(ktSorted(c).find(aidx(_) == 1))
+      def norm(s: String) = s.filterNot(_.isWhitespace)
+      val code = norm(c.code)
+      if (!fieldOps.contains(callName(c)) && code.startsWith(norm(c.name) + "(")) Right(None)
+      else recv match {
+        case Some(r) =>
+          val rc = norm(r.code)
+          val implicitThis = r match {
+            case f: Call if fieldOps.contains(callName(f)) && rc.startsWith("this.") =>
+              asField(f).collect { case (_: Identifier, name) if rc == "this." + name => name }
+            case _ => None
+          }
+          if (rc.nonEmpty && (code.startsWith(rc + "?.") || code.startsWith("(" + rc + ")?."))) Right(Some(r))
+          else if (rc.nonEmpty && (code.startsWith(rc) || code.startsWith("(" + rc + ")"))) Right(None)
+          else if (implicitThis.exists(f => code.startsWith(f + "?."))) Right(Some(r))
+          else if (implicitThis.exists(f => code.startsWith(f + "."))) Right(None)
+          else if (ktTopLevelSafe(c.code)) Left("op:elvis:safe-call-unread")
+          else Right(None)
+        case None => if (ktTopLevelSafe(c.code)) Left("op:elvis:safe-call-unread") else Right(None)
+      }
+    case _ => Right(None)
+  }
+
+  /** Does `code` contain `?.` outside every bracket, string and comment? One that occurs
+    * only inside an argument list or a lambda (`runCatching { a?.b }`, `f(x?.y)`) belongs
+    * to a nested node, not to this one. */
+  def ktTopLevelSafe(code: String): Boolean = {
+    val n = code.length
+    var i = 0
+    var depth = 0
+    var found = false
+    while (!found && i < n) {
+      val ch = code.charAt(i)
+      if (ch == '"') {
+        // A string, raw or not, with `${...}` templates: skipped whole.
+        val raw = code.startsWith("\"\"\"", i)
+        i += (if (raw) 3 else 1)
+        var tpl = 0
+        var done = false
+        while (!done && i < n) {
+          if (tpl == 0 && raw && code.startsWith("\"\"\"", i)) { i += 3; done = true }
+          else if (tpl == 0 && !raw && code.charAt(i) == '"') { i += 1; done = true }
+          else if (tpl == 0 && !raw && code.charAt(i) == '\\') i += 2
+          else if (code.startsWith("${", i)) { tpl += 1; i += 2 }
+          else if (tpl > 0 && code.charAt(i) == '{') { tpl += 1; i += 1 }
+          else if (tpl > 0 && code.charAt(i) == '}') { tpl -= 1; i += 1 }
+          else i += 1
+        }
+      } else if (ch == '\'') {
+        i += 1
+        while (i < n && code.charAt(i) != '\'') i += (if (code.charAt(i) == '\\') 2 else 1)
+        i += 1
+      } else if (code.startsWith("//", i)) {
+        val e = code.indexOf('\n', i); i = if (e < 0) n else e
+      } else if (code.startsWith("/*", i)) {
+        val e = code.indexOf("*/", i + 2); i = if (e < 0) n else e + 2
+      } else if (ch == '(' || ch == '[' || ch == '{') { depth += 1; i += 1 }
+      else if (ch == ')' || ch == ']' || ch == '}') { depth = (depth - 1).max(0); i += 1 }
+      else if (depth == 0 && code.startsWith("?.", i)) found = true
+      else i += 1
+    }
+    found
+  }
+
+  // ---- Kotlin properties and extensions of String and the collections ----------------
+  //
+  // `s.length` and `xs.size` are PROPERTIES in Kotlin, a fieldAccess in the CPG, and were
+  // read as fields of a value with none (`field:length:non-object`). Kotlin compiles them
+  // to `String.length()` / `Collection.size()` / `Map.size()` (Kotlin spec, "Mapped
+  // types": `kotlin.String` is `java.lang.String`, `kotlin.collections.List` is
+  // `java.util.List`), which is what `mcall` reaches on a `.str` / `.list` / `.dict`
+  // (`Stdlib.javaStringMethod`: UTF-16 code units, a hole outside the BMP). Only a
+  // receiver whose static type is one of those types is read this way; a property of
+  // any other class stays a field. `isEmpty()` / `isNotEmpty()` on a `CharSequence`,
+  // `Collection` or `Map` are standard-library EXTENSIONS (`kotlin.text.isEmpty`, ...),
+  // defined as `length == 0` / `!isEmpty()`, and are lowered to that.
+
+  private val ktStringTypes = Set("java.lang.String", "java.lang.CharSequence", "kotlin.String",
+                                  "kotlin.CharSequence")
+  private val ktCollectionTypes = Set(
+    "java.util.List", "java.util.ArrayList", "java.util.LinkedList", "java.util.Collection",
+    "java.util.Set", "java.util.HashSet", "java.util.LinkedHashSet", "java.util.SortedSet",
+    "java.util.TreeSet", "java.util.Map", "java.util.HashMap", "java.util.LinkedHashMap",
+    "java.util.SortedMap", "java.util.TreeMap",
+    "kotlin.collections.List", "kotlin.collections.MutableList", "kotlin.collections.Collection",
+    "kotlin.collections.MutableCollection", "kotlin.collections.Set", "kotlin.collections.MutableSet",
+    "kotlin.collections.Map", "kotlin.collections.MutableMap", "kotlin.collections.ArrayList",
+    "kotlin.collections.HashMap", "kotlin.collections.LinkedHashMap", "kotlin.collections.HashSet",
+    "kotlin.collections.LinkedHashSet")
+
+  private def ktReceiverType(n: AstNode): String = {
+    val t = bareType(staticTypeOf(n)).stripSuffix("?")
+    if (t.contains("<")) t.substring(0, t.indexOf('<')) else t
+  }
+
+  /** `length` / `size` for `s.length` / `xs.size` on a String / collection receiver. */
+  def ktPropertyMethod(c: Call): Option[String] = ktSorted(c) match {
+    case recv :: (f: FieldIdentifier) :: Nil =>
+      val t = ktReceiverType(recv)
+      f.canonicalName match {
+        case "length" if ktStringTypes.contains(t) => Some("length")
+        case "size" if ktCollectionTypes.contains(t) => Some("size")
+        case _ => None
+      }
+    case _ => None
+  }
+
+  /** `kotlin.text.isEmpty(s)`, `kotlin.text.isNotEmpty(s)`, `kotlin.collections.isNotEmpty(xs)`
+    * (static extension calls, the receiver at argument index 1). */
+  def ktStdlibCall(c: Call): Option[ujson.Obj] = {
+    val recv = ktSorted(c).filter(aidx(_) == 1)
+    val m = c.methodFullName
+    val isExt = c.dispatchType == "STATIC_DISPATCH" && recv.size == 1 && kidsOf(c).size == 1 &&
+      (m.startsWith("kotlin.text.") || m.startsWith("kotlin.collections."))
+    if (!isExt) None
+    else {
+      val t = ktReceiverType(recv.head)
+      val known = ktStringTypes.contains(t) || ktCollectionTypes.contains(t)
+      def isEmpty = ujson.Obj("k" -> "mcall", "recv" -> expr(recv.head), "m" -> "isEmpty", "args" -> ujson.Arr())
+      m.takeWhile(_ != ':') match {
+        case "kotlin.text.isEmpty" | "kotlin.collections.isEmpty" if known => Some(isEmpty)
+        case "kotlin.text.isNotEmpty" | "kotlin.collections.isNotEmpty" if known => Some(ktNot(isEmpty))
+        case _ => None
+      }
+    }
+  }
+
+  // ---- Kotlin `?.` in any position -------------------------------------------------
+  //
+  // Kotlin spec, "Navigation operators": `r?.m(args)` / `r?.f` evaluates `r` once; when
+  // it is null the whole expression is null and neither the member nor the arguments are
+  // evaluated, otherwise it is `r.m(args)` / `r.f` on that value. The export used to read
+  // `?.` as `.` everywhere except the left of `?:` -- a member of `null` evaluated
+  // anyway: a hole for a field or method, and for a call that takes the receiver as its
+  // first argument (an extension function) a run of that function on `null`.
+  //
+  // With a prelude (`ktSafeCallV`), `r` is evaluated into a temporary, and the member
+  // access is lowered with `r`'s value READ FROM that temporary (`ktReceiverTemp`, which
+  // `expr`/`exprV`/`valueOf` consult before anything else): one evaluation, however `r`
+  // is shaped. The lowering must actually read the temporary -- one that rebuilt `r`
+  // from the tree, or dropped it, would evaluate `r` twice or not at all -- so a result
+  // that does not mention it is the hole `op:safe-call:receiver-unread`. Without a
+  // prelude (`ktSafeCallPure`) only a re-readable receiver is guarded (it is read for the
+  // test and again for the member); any other is `op:safe-call:value-position`.
+
+  /** Node ids whose `?.` is being lowered right now, so the member access is not taken
+    * for a safe call again. */
+  val ktSafeActive = collection.mutable.Set.empty[Long]
+  /** Receiver node id -> the temporary that holds its value. */
+  val ktReceiverTemp = collection.mutable.Map.empty[Long, ujson.Obj]
+
+  def ktSafeCallReceiver(c: Call): Either[String, Option[AstNode]] =
+    if (ktSafeActive.contains(c.id())) Right(None) else ktSafeReceiver(c)
+
+  private def ktLowering[T](c: Call)(body: => T): T = {
+    ktSafeActive += c.id()
+    try body finally ktSafeActive -= c.id()
+  }
+
+  private def ktMentions(v: ujson.Value, name: String): Boolean = v match {
+    case o: ujson.Obj => (o.value.get("k").contains(ujson.Str("name")) && o.value.get("v").contains(ujson.Str(name))) ||
+                         o.value.values.exists(ktMentions(_, name))
+    case a: ujson.Arr => a.value.exists(ktMentions(_, name))
+    case _ => false
+  }
+
+  def ktSafeCallV(c: Call): (List[ujson.Obj], ujson.Obj) = ktSafeCallReceiver(c) match {
+    case Left(label) => (Nil, hole(label))
+    case Right(None) => ktLowering(c)(exprV(c))
+    // A re-readable receiver is read for the test and again for the member, which needs
+    // no temporary, so a position without a prelude stays one.
+    case Right(Some(r)) if pureNode(r) =>
+      val (np, nv) = ktLowering(c)(exprV(c))
+      if (np.isEmpty) (Nil, ktCond(ktIsNull(expr(r)), ktUnit, nv))
+      else {
+        val out = freshExprVTemp()
+        (List(ktIf(ktIsNull(expr(r)), ktAssign(out, ktUnit), seqOf(np :+ ktAssign(out, nv)))), ktName(out))
+      }
+    case Right(Some(r)) =>
+      val (rp, rv) = exprV(r)
+      val t = freshExprVTemp()
+      val out = freshExprVTemp()
+      ktReceiverTemp(r.id()) = ktName(t)
+      val (np, nv) = try ktLowering(c)(exprV(c)) finally ktReceiverTemp -= r.id()
+      if (!ktMentions(ujson.Arr.from(np :+ nv), t)) (Nil, hole("op:safe-call:receiver-unread"))
+      else (rp ++ List(ktAssign(t, rv),
+                       ktIf(ktIsNull(ktName(t)), ktAssign(out, ktUnit), seqOf(np :+ ktAssign(out, nv)))),
+            ktName(out))
+  }
+
+  def ktSafeCallPure(c: Call): ujson.Obj = ktSafeCallReceiver(c) match {
+    case Left(label) => hole(label)
+    case Right(None) => ktLowering(c)(expr(c))
+    case Right(Some(r)) =>
+      if (!pureNode(r)) hole("op:safe-call:value-position")
+      else ktCond(ktIsNull(expr(r)), ktUnit, ktLowering(c)(expr(c)))
+  }
+
+  /** The value of `n` with Kotlin's `?.` short-circuit made explicit (`ktSafeCallV`). */
+  def ktSafeValue(n: AstNode): Either[String, (List[ujson.Obj], ujson.Obj)] =
+    ktSafeReceiver(n).map(_ => exprV(n))
+
+  /** The value of a re-readable `n` -- a name, a field chain, or such a chain through
+    * `?.` -- with its short-circuits explicit; `Left` for anything else. */
+  def ktPureSafe(n: AstNode): Either[String, ujson.Obj] =
+    ktSafeReceiver(n).flatMap { _ =>
+      if (pureNode(n)) Right(expr(n)) else Left("op:elvis:safe-call-receiver")
+    }
+
+  /** `a ?: b`, in a position with a prelude. */
+  def ktElvisV(c: Call): (List[ujson.Obj], ujson.Obj) = ktSorted(c) match {
+    case left :: right :: Nil =>
+      ktSafeValue(left) match {
+        case Left(label) => (Nil, hole(label))
+        case Right((lp, lv)) =>
+          val (rp, rv) = ktBranchV(right)
+          val t = freshExprVTemp()
+          (lp ++ List(ktAssign(t, lv),
+                      ktIf(ktIsNull(ktName(t)), seqOf(rp ++ rv.map(ktAssign(t, _)).toList), skip)),
+           ktName(t))
+      }
+    case _ => (Nil, hole("op:elvis:arity"))
+  }
+
+  /** `a ?: b` where there is no prelude: `a` is read twice, so it must be pure. */
+  def ktElvisPure(c: Call): ujson.Obj = ktSorted(c) match {
+    case left :: right :: Nil =>
+      val lv = ktPureSafe(left)
+      val (rp, rv) = ktBranchV(right)
+      (lv, rv) match {
+        case (Right(l), Some(r)) if rp.isEmpty => ktCond(ktIsNull(l), r, l)
+        case (Left(label), _) if label != "op:elvis:safe-call-receiver" => hole(label)
+        case _ => hole("op:elvis:value-position")
+      }
+    case _ => hole("op:elvis:arity")
+  }
+
+  /** Entries, tried in order. `tests` empty means `else`. */
+  case class KtEntry(tests: Option[List[Either[String, (List[ujson.Obj], ujson.Obj)]]], body: List[AstNode])
+
+  /** The statements that try `entries` in order, run the first matching body through
+    * `onBody`, and run `noMatch` when none matches. A condition with a prelude is
+    * evaluated only once the conditions before it have failed (`a, b ->` is `a || b`). */
+  def ktChain(entries: List[KtEntry], onBody: List[AstNode] => List[ujson.Obj],
+              noMatch: List[ujson.Obj]): List[ujson.Obj] = entries match {
+    case Nil => noMatch
+    case KtEntry(None, body) :: _ => onBody(body)
+    case KtEntry(Some(tests), body) :: rest =>
+      val ts = tests.map(_.fold(l => (List.empty[ujson.Obj], hole(l)), identity))
+      val (tp, te) =
+        if (ts.forall(_._1.isEmpty)) (Nil, ts.map(_._2).reduceLeft((a, b) => ktBin("||", a, b)))
+        else {
+          val m = freshExprVTemp()
+          val first = ts.head._1 :+ ktAssign(m, ts.head._2)
+          val more = ts.tail.map { case (p, t) => ktIf(ktNot(ktName(m)), seqOf(p :+ ktAssign(m, t)), skip) }
+          (first ++ more, ktName(m))
+        }
+      tp :+ ktIf(te, seqOf(onBody(body)), seqOf(ktChain(rest, onBody, noMatch)))
+  }
+
+  /** `when (s) { ... }` as `<operator>.when`: the subject's prelude and node, then each
+    * entry's tests against `subj` and its body node. */
+  def ktWhenParts(c: Call, subjValue: ujson.Obj => ujson.Obj)
+      : Either[String, (List[ujson.Obj], ujson.Obj, List[KtEntry])] = ktSorted(c) match {
+    case (subjB: Block) :: entries if entries.nonEmpty && entries.forall(_.isInstanceOf[Block]) =>
+      val subject: Option[(List[ujson.Obj], AstNode, ujson.Obj)] =
+        kidsOf(subjB).filterNot(_.isInstanceOf[Local]) match {
+          case List(asg: Call) if callName(asg) == "<operator>.assignment" =>
+            ktSorted(asg) match {
+              case (i: Identifier) :: _ :: Nil => Some((List(stmt(asg)), i, expr(i)))
+              case _ => None
+            }
+          case List(e) if !e.isInstanceOf[Block] => val (p, v) = exprV(e); Some((p, e, v))
+          case _ => None
+        }
+      subject match {
+        case None => Left("op:when:subject-shape")
+        case Some((sp, sNode, sv)) =>
+          val subj = subjValue(sv)
+          val parsed = entries.map { e =>
+            val eks = ktSorted(e)
+            if (eks.isEmpty) KtEntry(Some(List(Left("op:when:branch-unread"))), Nil)
+            else ktEntryConditions(e, eks.init) match {
+              case Left(label) => KtEntry(Some(List(Left(label))), List(eks.last))
+              case Right(List(("else", _, None))) => KtEntry(None, List(eks.last))
+              case Right(conds) =>
+                KtEntry(Some(conds.map { case (k, t, v) => ktSubjectTest(sNode, subj, k, t, v) }), List(eks.last))
+            }
+          }
+          Right((sp, sv, parsed))
+      }
+    case _ => Left("op:when:subject-shape")
+  }
+
+  /** What an expression `when` with no `else` does when nothing matches. Kotlin only
+    * allows that for an exhaustive subject, and the JVM backend's default branch throws
+    * `kotlin.NoWhenBranchMatchedException`; a `when` whose value is not visibly used may
+    * be a statement, where nothing happens, so that case is a named hole instead. */
+  def ktNoMatch(c: Call): List[ujson.Obj] =
+    if (ktValueUsed(c, 0))
+      List(ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "str", "v" -> "NoWhenBranchMatchedException")))
+    else List(holeS("op:when:no-match"))
+
+  /** Is `n`'s value visibly used: returned, assigned, passed to a call, or the body of
+    * an entry of a `when` (or a branch of `?:`/`if`) whose own value is used? */
+  def ktValueUsed(n: AstNode, depth: Int): Boolean = depth < 32 && (n.astParent match {
+    case _: Return => true
+    case p: Call if callName(p) == "<operator>.assignment" => ktSorted(p).lastOption.contains(n)
+    case p: Call if callName(p) == "<operator>.elvis" || callName(p) == "<operator>.conditional" =>
+      ktValueUsed(p, depth + 1)
+    case p: Call if !callName(p).startsWith("<operator>") => true
+    case b: Block => b.astParent match {
+      case w: Call if callName(w) == "<operator>.when" && ktSorted(b).lastOption.contains(n) &&
+                      !ktSorted(w).headOption.contains(b) => ktValueUsed(w, depth + 1)
+      case _ => false
+    }
+    case _ => false
+  })
+
+  def ktWhenV(c: Call): (List[ujson.Obj], ujson.Obj) = {
+    val t = freshExprVTemp()
+    val r = freshExprVTemp()
+    ktWhenParts(c, _ => ktName(t)) match {
+      case Left(label) => (Nil, hole(label))
+      case Right((sp, sv, entries)) =>
+        val onBody = (body: List[AstNode]) => {
+          val (p, v) = ktBranchV(body.head)
+          p ++ v.map(ktAssign(r, _)).toList
+        }
+        (sp ++ (ktAssign(t, sv) :: ktChain(entries, onBody, ktNoMatch(c))), ktName(r))
+    }
+  }
+
+  /** `<operator>.when` where there is no prelude: only when the subject is a plain local
+    * no condition can change, every test and body is prelude-free, and there is an
+    * `else`. Otherwise `op:when:value-position`. */
+  def ktWhenPure(c: Call): ujson.Obj = {
+    val label = "op:when:value-position"
+    val subjectOk = ktSorted(c).headOption.toList.flatMap(kidsOf) match {
+      case List(i: Identifier) => !isBoxed(localName(i.name))
+      case List(_: Literal) => true
+      case _ => false
+    }
+    if (!subjectOk) return hole(label)
+    ktWhenParts(c, sv => sv) match {
+      case Left(l) => hole(l)
+      case Right((sp, _, entries)) if sp.isEmpty =>
+        val rendered = entries.map { e =>
+          val (p, v) = ktBranchV(e.body.head)
+          val tests = e.tests.map(_.map(_.fold(l => (List.empty[ujson.Obj], hole(l)), identity)))
+          (tests, p, v)
+        }
+        val pure = rendered.forall { case (ts, p, v) => p.isEmpty && v.isDefined && ts.forall(_.forall(_._1.isEmpty)) }
+        val elseAt = rendered.indexWhere(_._1.isEmpty)
+        if (!pure || elseAt < 0) hole(label)
+        else rendered.take(elseAt).foldRight(rendered(elseAt)._3.get) { case ((ts, _, v), acc) =>
+          ktCond(ts.get.map(_._2).reduceLeft((a, b) => ktBin("||", a, b)), v.get, acc)
+        }
+      case _ => hole(label)
+    }
+  }
+
+  /** Statement `when (s) { ... }`: a SWITCH whose body is JUMP_TARGET-per-entry, the
+    * entry's text as the JUMP_TARGET's code, and no condition nodes. Conditions are read
+    * from that text when they are literals -- decimal integers, characters, simple
+    * strings, `true`/`false`, `null`, integer `a..b`/`a until b` ranges, `is T` type
+    * tests (`ktTypeTest`) -- and are `op:when:stmt-label-unread` otherwise (a bare entry
+    * name, a constant, a call). An entry `E.X` of the subject's own analysed enum is
+    * read too (`ktEnumEntryText`). */
+  def ktWhenStmt(cs: ControlStructure): ujson.Obj = ktSorted(cs) match {
+    case subjN :: (body: Block) :: Nil if !subjN.isInstanceOf[Block] && !subjN.isInstanceOf[JumpTarget] =>
+      val bodyKids = ktSorted(body)
+      if (bodyKids.isEmpty || !bodyKids.head.isInstanceOf[JumpTarget]) return holeS("op:when:stmt-shape")
+      val (sp, sv) = exprV(subjN)
+      val t = freshExprVTemp()
+      val subj = ktName(t)
+      val st = numericType(subjN)
+      val boolSubject = bareType(staticTypeOf(subjN)) == "boolean"
+      val subjType = bareType(staticTypeOf(subjN)).stripSuffix("?")
+      val decimal = "(-?)(0|[1-9][0-9]*)([lL]?)".r
+      def intTest(op: String, lit: String): Option[ujson.Obj] = lit match {
+        case decimal(neg, digits, suffix) if st.isDefined =>
+          val ty = if (suffix.nonEmpty || promoteInt(st.get) == "i64") "i64" else "i32"
+          val v = BigInt(digits) * (if (neg.nonEmpty) -1 else 1)
+          Some(ktBin(s"num:java:$ty:$op", subj, intLit(v)))
+        case _ => None
+      }
+      def literalTest(text: String): Either[String, ujson.Obj] = {
+        val k = ktConditionKind(text)
+        if (k == "is") {
+          val (neg, spelling) = ktIsText(text)
+          ktTypeTest(subjN, subj, true, neg, None, spelling,
+                     "op:when:is-type-test", "op:when:is:unknown-type")
+        }
+        else if (k == "guard") Left("op:when:guard")
+        else if (k == "in" || k == "!in") {
+          val range = "(?s)\\s*(\\S+?)\\s*(\\.\\.|\\buntil\\b)\\s*(\\S+)\\s*".r
+          text.drop(k.length) match {
+            case range(lo, op, hi) =>
+              (intTest(">=", lo), intTest(if (op == "..") "<=" else "<", hi)) match {
+                case (Some(a), Some(b)) =>
+                  val r = ktBin("&&", ktNot(ktIsNull(subj)), ktBin("&&", a, b))
+                  Right(if (k == "!in") ktNot(r) else r)
+                case _ => Left("op:when:stmt-label-unread")
+              }
+            case _ => Left("op:when:stmt-label-unread")
+          }
+        }
+        else if (ktEnumEntryText(subjType, text).isDefined)
+          Right(ktBin("==", subj, typeValue(ktEnumEntryText(subjType, text).get)))
+        else if (text == "null") Right(ktIsNull(subj))
+        else if (boolSubject && (text == "true" || text == "false"))
+          Right(ktBin("==", subj, ujson.Obj("k" -> "bool", "v" -> (text == "true"))))
+        else if (text.length >= 2 && text.head == '"' && text.last == '"' &&
+                 !text.drop(1).dropRight(1).exists(ch => ch == '"' || ch == '\\' || ch == '$'))
+          Right(ujson.Obj("k" -> "mcall", "recv" -> ujson.Obj("k" -> "str", "v" -> text.drop(1).dropRight(1)),
+                          "m" -> "equals", "args" -> ujson.Arr(subj)))
+        else if (st.contains("u16") && text.length >= 3 && text.head == '\'' && text.last == '\'' &&
+                 charLiteralValue(text.drop(1).dropRight(1)).isDefined)
+          Right(ktBin("&&", ktNot(ktIsNull(subj)),
+            ktBin("num:java:i32:==", subj, intLit(BigInt(charLiteralValue(text.drop(1).dropRight(1)).get)))))
+        else intTest("==", text).map(e => ktBin("&&", ktNot(ktIsNull(subj)), e)).toRight("op:when:stmt-label-unread")
+      }
+      // Segments: each JUMP_TARGET and the statements up to the next one.
+      def segments(ks: List[AstNode]): List[(JumpTarget, List[AstNode])] = ks match {
+        case (j: JumpTarget) :: rest =>
+          val (mine, more) = rest.span(!_.isInstanceOf[JumpTarget])
+          (j, mine) :: segments(more)
+        case _ => Nil
+      }
+      val entries = segments(bodyKids).map { case (j, mine) =>
+        ktConditionsAt(j.code) match {
+          case None => KtEntry(Some(List(Left("op:when:branch-unread"))), mine)
+          case Some(List("else")) => KtEntry(None, mine)
+          case Some(ts) if ts.contains("else") => KtEntry(Some(List(Left("op:when:branch-unread"))), mine)
+          case Some(ts) => KtEntry(Some(ts.map(text => literalTest(text).map(e => (List.empty[ujson.Obj], e)))), mine)
+        }
+      }
+      seqOf(sp ++ (ktAssign(t, sv) :: ktChain(entries, mine => stmts(mine), Nil)))
+    case _ => holeS("op:when:stmt-shape")
+  }
+
   def exprV(n: AstNode): (List[ujson.Obj], ujson.Obj) = unwrapMacro(n) match {
+    case x if ktReceiverTemp.nonEmpty && ktReceiverTemp.contains(x.id()) => (Nil, ktReceiverTemp(x.id()))
+    // Kotlin `r?.m(..)` / `r?.f`: `r` once, then the member only when it is not null.
+    case c: Call if ktFile && ktSafeCallReceiver(c) != Right(None) => ktSafeCallV(c)
     // pysrc2cpg uses RETURN for both `return` and `yield`, including an assignment
     // RHS (`sent = yield value`). Keep suspension explicit for the generator pass;
     // treating this node as a return executes the body too early and loses the frame.
@@ -10150,6 +11980,30 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       val kind = if (r.code.trim.startsWith("yield from ")) "yieldFromS" else "yieldS"
       (prelude :+ ujson.Obj("k" -> kind, "e" -> value, "target" -> target),
        ujson.Obj("k" -> "name", "v" -> target))
+    // Kotlin `when (s) { ... }`, `a ?: b`, and `if (c) a else <jump>`: see `ktWhenV`.
+    case c: Call if ktFile && callName(c) == "<operator>.when" => ktWhenV(c)
+    case c: Call if ktFile && callName(c) == "<operator>.elvis" => ktElvisV(c)
+    case c: Call if ktFile && callName(c) == "<operator>.conditional" && kidsOf(c).size == 3 &&
+                    ktSorted(c).tail.exists(ktIsJump) =>
+      val List(condN, trueN, falseN) = ktSorted(c)
+      val (cp, ce) = exprV(condN)
+      val (tp, tv) = ktBranchV(trueN)
+      val (ep, ev) = ktBranchV(falseN)
+      val tmp = freshExprVTemp()
+      (cp :+ ujson.Obj("k" -> "ifte", "c" -> ce,
+                       "t" -> seqOf(tp ++ tv.map(v => ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> v)).toList),
+                       "e" -> seqOf(ep ++ ev.map(v => ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> v)).toList)),
+       ujson.Obj("k" -> "name", "v" -> tmp))
+    // `if (c) a` with no `else` (kotlin2cpg gives a subjectless `when` entry without an
+    // `else` this shape too): the branch runs for its effects, and the value is `Unit`.
+    case c: Call if ktFile && callName(c) == "<operator>.conditional" && kidsOf(c).size == 2 =>
+      val List(condN, thenN) = ktSorted(c)
+      val (cp, ce) = exprV(condN)
+      val (tp, tv) = ktBranchV(thenN)
+      (cp :+ ujson.Obj("k" -> "ifte", "c" -> ce,
+                       "t" -> seqOf(tp ++ tv.map(v => ujson.Obj("k" -> "exprS", "e" -> v)).toList),
+                       "e" -> skip),
+       ujson.Obj("k" -> "unit"))
     case c: Call if callName(c) == "<operator>.assignment" =>
       kidsOf(c) match {
         case lhs :: rhs :: Nil => assignAsValue(lhs, rhs, None, "op:assignment")
@@ -10206,7 +12060,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case c: Call if binops.contains(callName(c)) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(callName(c))) =>
       val List(a, b) = kidsOf(c)
-      binopValue(binops(callName(c)), a, b)
+      binopValue(binops(callName(c)), a, b, c.typeFullName)
     case c: Call if unops.contains(callName(c)) && kidsOf(c).size == 1 =>
       val (pa, ae) = exprV(kidsOf(c).head)
       (pa, typedUnop(unops(callName(c)), kidsOf(c).head, ae))
@@ -10226,6 +12080,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       val (recv, bounds) = asSlice(c).get
       val (prelude, vals) = threadValuesInOrder(exprV(recv) :: bounds.map(sliceBoundV))
       (prelude, sliceValue(vals(0), vals(1), vals(2), vals(3)))
+    // `A::k` naming a C++ constant: its value, as in `callExpr` (`cxxConstField`).
+    case c: Call if fieldOps.contains(callName(c)) && cppFile && cxxConstField(c).isDefined =>
+      (Nil, cxxConstField(c).get)
     case c: Call if fieldOps.contains(callName(c)) && resolvedRef(c).isEmpty &&
                     asField(c).isDefined =>
       val (r, f) = asField(c).get
@@ -10235,6 +12092,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       // ordinary object is `unit` rather than a hole. This is the path a plain
       // `return c.prop` actually takes.
       if (isPythonProperty(f)) (pr, hole("call:python-property-access"))
+      // Kotlin: an analysed enum's entry, and String/collection properties, as in `callExpr`.
+      else if (ktFile && ktEnumEntryOf(c).isDefined) (Nil, typeValue(ktEnumEntryOf(c).get))
+      else if (ktFile && ktPropertyMethod(c).isDefined)
+        (pr, ujson.Obj("k" -> "mcall", "recv" -> re, "m" -> ktPropertyMethod(c).get, "args" -> ujson.Arr()))
       else (pr, ujson.Obj("k" -> "field", "a" -> re, "f" -> f))
     // Every operand of a call-shaped expression -- a NAMED call's positionals, a method
     // call's RECEIVER and arguments, a computed CALLEE, a class allocation's arguments, and the KEYWORD
@@ -10333,7 +12194,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // `a in b` / `a is b`: two operands, left before right (§6.16); the left is completed
     // into a temporary when the right carries a prelude.
     case c: Call if Set("<operator>.in", "<operator>.notIn", "<operator>.is", "<operator>.isNot").contains(callName(c)) &&
-                    kidsOf(c).size == 2 =>
+                    kidsOf(c).size == 2 && !(ktFile && callName(c).startsWith("<operator>.is")) =>
       val (prelude, vals) = threadInOrder(kidsOf(c))
       if (prelude.isEmpty) (Nil, expr(c))   // byte-identical when nothing hoists
       else (prelude, relationValue(callName(c), vals(0), vals(1)))
@@ -10399,9 +12260,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                     !pureExpr(kidsOf(c)(1)) =>
       exprV(kidsOf(c)(1))
     // A comprehension in a position that can preserve its evaluation prelude.
+    case b: Block if jsLiteral(b).exists(holeFreeJson) => (Nil, jsLiteral(b).get)
     case b: Block =>
       comprehensionLowering(b).getOrElse(blockExprV(b))
     case other => (Nil, expr(other))
+  }
+
+  /** No `hole`/`holeS` anywhere inside. A prelude-capable position folds a JS literal
+    * (`jsLiteral`) only when its elements translate without one: an element that needs a
+    * prelude of its own keeps the old statement-by-statement translation, which runs each
+    * element's prelude in order. */
+  def holeFreeJson(v: ujson.Value): Boolean = v match {
+    case o: ujson.Obj =>
+      !o.value.get("k").exists(k => k.str == "hole" || k.str == "holeS") &&
+        o.value.values.forall(holeFreeJson)
+    case a: ujson.Arr => a.value.forall(holeFreeJson)
+    case _            => true
   }
 
   /** `blockExpr` for a position that HAS a prelude (`exprV`: an argument, an assigned
@@ -10742,6 +12616,48 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     }
   }
 
+  /** gosrc2cpg puts an `if`'s init clause (`if v := f(); v > 0`) in its own BLOCK,
+    * the sibling just before the IF and at the IF's own source position -- also
+    * when there is no init, as an empty block. `Some(the IF)` when `b` is one. */
+  def goIfInitOf(b: Block): Option[ControlStructure] =
+    if (!goFile) None else parentOf(b) match {
+      case Some(p: Block) => p.astChildren.collect {
+        case cs: ControlStructure if cs.order == b.order + 1 && cs.controlStructureType == "IF" &&
+            cs.lineNumber == b.lineNumber && cs.columnNumber == b.columnNumber => cs
+      }.headOption
+      case _ => None
+    }
+
+  /** Can a variable the init block `init` declares not be flattened into the enclosing
+    * scope? Go scopes it to the `if` and its branches; gosrc2cpg does not. Inside the
+    * `if`, a same-named outer local or parameter is what the identifier refers to, and
+    * a same-named package variable is read as a field of the package, so the
+    * condition and branches would read the wrong variable, and the flattened init
+    * would overwrite the outer one (`v := 1; if v := x; v > 0 { v = v + 10 }; return v`
+    * returns 1 in Go). Any other same-named declaration in the function counts too: a
+    * later `var v int` lowers without its zero value and would read the leftover init.
+    * The one exception is another `if`'s init outside this one: it is assigned before
+    * every read of it, like this one. */
+  def goIfInitShadows(init: Block, cs: ControlStructure): Boolean = {
+    val names = init.astChildren.collect { case l: Local => l.name }.toSet - "_"
+    val enclosing = Iterator.iterate(parentOf(init))(_.flatMap(parentOf))
+      .takeWhile(_.isDefined).flatten.toSet
+    val m = init.method
+    names.nonEmpty && (m.parameter.name.l.exists(names) ||
+      m.ast.isLocal.l.exists { l =>
+        names(l.name) && (parentOf(l) match {
+          case Some(pb: Block) => goIfInitOf(pb).forall(enclosing)
+          case _ => true
+        })
+      } ||
+      cs.ast.isFieldIdentifier.l.exists { f =>
+        names(f.canonicalName) && parentOf(f).exists(p => kidsOf(p).headOption.exists {
+          case i: Identifier => i.refsTo.isEmpty
+          case _ => false
+        })
+      })
+  }
+
   def stmt(n: AstNode): ujson.Obj = unwrapMacro(n) match {
     case b: Block =>
       val kids = kidsOf(b)
@@ -10754,7 +12670,19 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       // on the floor": on the SQLite CPG, 15%+ of core-file functions hit the
       // latter, each exporting as a hole-free `skip` that in fact translated
       // nothing of the function's real body.
-      if (kids.isEmpty && stripBlockCode(b.code).nonEmpty) holeS("stmt:empty-ast-children")
+      // gosrc2cpg lowers `if [init;] cond {..}` into the enclosing block as two
+      // siblings: a BLOCK holding the init clause's statements, then the IF. It
+      // records no code on that block, so `.code` reads back as Joern's `<empty>`
+      // placeholder, which the strip above takes for dropped source text: every Go
+      // `if` written without an init exported with this hole beside its `ifte` (a
+      // `clamp` on the Go pr fixture). An init block with no children is the absent
+      // init -- exactly `skip`. One with children runs once, ahead of the `ifte`,
+      // which is the init's order of evaluation; it is flattened into the enclosing
+      // scope, exact unless an init variable's name is bound elsewhere in the
+      // function (see `goIfInitShadows`), which keeps the named hole.
+      if (goIfInitOf(b).isDefined && kids.isEmpty && b.code.trim == "<empty>") skip
+      else if (goIfInitOf(b).exists(goIfInitShadows(b, _))) holeS("stmt:go-if-init")
+      else if (kids.isEmpty && stripBlockCode(b.code).nonEmpty) holeS("stmt:empty-ast-children")
       else forPattern(kids).getOrElse(seqOf(stmts(kids)))
     case l: Local => skip   // declarations carry no behaviour here
     case td: TypeDecl => skip   // a struct/union/typedef/class decl carries no behaviour either
@@ -10951,6 +12879,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case "FOR"      => forStmt(cs)
         // `007-reduce-remaining-holes-2` US4: see `switchStmt`'s own doc comment for the
         // lowering and why `Stmt.breakBlock` is required, not merely convenient.
+        // A Kotlin `when` statement: its JUMP_TARGETs carry no condition nodes, so the
+        // C/Java lowering below would match no entry at all. See `ktWhenStmt`.
+        case "SWITCH" if ktFile && cs.parserTypeName == "KtWhenExpression" => ktWhenStmt(cs)
         case "SWITCH" if kids.size >= 2 && !goFile => switchStmt(kids(0), kids(1), Some(cs))
         // `goto L` where `L` has been proved to be the single forward exit label of this
         // function, and this `goto` is not inside any loop or switch: see `methodBody`.
@@ -10984,7 +12915,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // Java `throw new C(args)` with `C` outside the corpus -- `throw new
         // IllegalArgumentException("...")`, the single largest hole on commons-lang3
         // (70 `expr:BLOCK-impure`, every one of them this shape). See `javaThrowNew`.
-        case "THROW" if javaFile && kids.size == 1 && javaThrowNew(kids.head).isDefined =>
+        // Kotlin's `throw C(args)` has the same CPG shape (kotlin2cpg lowers the
+        // constructor call to the same alloc/`<init>`/temp BLOCK) and the same JVM meaning.
+        case "THROW" if (javaFile || ktFile) && kids.size == 1 && javaThrowNew(kids.head).isDefined =>
           javaThrowNew(kids.head).get
         case "THROW" if (jsLikeFile || javaFile) && kids.size == 1 =>
           val (prelude, value) = exprV(kids.head)

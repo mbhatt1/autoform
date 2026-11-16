@@ -98,6 +98,16 @@ def pinned_rust_toolchain(env=None, pins=None):
     return (pins or load_pins())["rust_toolchain"]
 
 
+def toolchain_present(toolchain, env=None):
+    """rustc AND cargo resolve `+toolchain`. A rustc or cargo not managed by rustup (a distro or
+    Homebrew build) ignores or rejects `+toolchain`: that is not the pinned toolchain."""
+    rc, cargo = run(["rustc", "+" + toolchain, "-V"], env=env, timeout=120), \
+        run(["cargo", "+" + toolchain, "-V"], env=env, timeout=120)
+    if rc.returncode or cargo.returncode or not (rc.stdout or "").startswith("rustc "):
+        return False
+    return "nightly" in rc.stdout or not toolchain.startswith("nightly")
+
+
 def missing(env=None):
     """Names of absent prerequisites (cargo, charon, aeneas, lake)."""
     return [n for n in ("cargo", "charon", "aeneas", "lake") if not tool(n, env)]
@@ -1002,6 +1012,49 @@ def run_harness(launch_for, n, per_case_timeout=10.0):
     return results, notes
 
 
+def rustdoc_json(crate, work, offline, writable, meta):
+    """The crate's rustdoc JSON (sandboxed, offline) -> (doc, sandbox record)."""
+    launch = boxed(["cargo", "rustdoc", "-q", "--lib", "--", "-Z", "unstable-options",
+                    "--output-format", "json"], work, offline, writable, cwd=crate)
+    r = launch.run(capture_output=True, text=True, timeout=1800)
+    doc_path = os.path.join(offline.get("CARGO_TARGET_DIR") or os.path.join(work, "target"),
+                            "doc", meta["lib"] + ".json")
+    if r.returncode or not os.path.exists(doc_path):
+        raise RustPathError("rustdoc-failed", "cargo rustdoc --output-format json failed: "
+                            + "\n".join(clean_log(r.stderr).strip().splitlines()[-5:]))
+    with open(doc_path) as fh:
+        return json.load(fh), launch.record
+
+
+def native_results(cases, crate, meta, hdir, work, env, offline, writable, profile="debug"):
+    """Build the harness for `cases` [(callee, rust arg literals)] against the crate at
+    `crate` in `hdir` (sandboxed, offline) and run it.
+    -> ({i: "ok ..."|"panic"|None}, {i: note}, sandbox record)"""
+    os.makedirs(os.path.join(hdir, "src"))
+    prof = ("[profile.dev]\nopt-level = 0\ndebug-assertions = true\noverflow-checks = true\n"
+            "[profile.release]\nopt-level = 3\ndebug-assertions = false\noverflow-checks = false\n")
+    with open(os.path.join(hdir, "Cargo.toml"), "w") as fh:
+        fh.write('[package]\nname = "autoform_rust_harness"\nversion = "0.0.0"\nedition = "2021"\n'
+                 '[dependencies]\n%s = { path = %s }\n%s[workspace]\n'
+                 % (json.dumps(meta["name"]), json.dumps(crate), prof))
+    with open(os.path.join(hdir, "src", "main.rs"), "w") as fh:
+        fh.write(harness_source(cases))
+    henv = dict(offline, CARGO_TARGET_DIR=os.path.join(hdir, "target"))
+    launch = boxed(["cargo", "build", "-q"] + (["--release"] if profile == "release" else []),
+                   work, henv, writable, cwd=hdir)
+    r = launch.run(capture_output=True, text=True, timeout=3600)
+    if r.returncode:
+        raise RustPathError("harness-build-failed", "the cargo harness did not build:\n"
+                            + clean_log(r.stderr)[-3000:])
+    exe = os.path.join(hdir, "target", "release" if profile == "release" else "debug",
+                       "autoform_rust_harness")
+
+    def launch_for(start):
+        return boxed([exe, str(start)], os.path.join(work, "run"), env, (), cwd=hdir)
+    res, notes = run_harness(launch_for, len(cases))
+    return res, notes, launch_for(0).record
+
+
 def eval_source(module_import, cases):
     """cases: [(lean fq name, lean arg literals, lean printer lambda)] -> (source, first case line)."""
     lines = ["import %s" % module_import, "import AutoformRust.Eval",
@@ -1303,6 +1356,8 @@ def main(argv=None):
                     "(the figures docs may bind; see evidence_summary)")
     ap.add_argument("--crate-sha256", help="sha256 of the .crate archive the source was unpacked from, "
                     "recorded in the evidence summary")
+    ap.add_argument("--cases-out", help="also write every oracle case (inputs, native and Aeneas "
+                    "results, verdict) as JSON here; scripts/rust_regress.py replays them")
     a = ap.parse_args(argv)
     out = os.path.abspath(a.out)
     os.makedirs(out, exist_ok=True)
@@ -1313,6 +1368,8 @@ def main(argv=None):
                     "rust-provenance.json", "rust-theorems.json", "charon.log", "aeneas.log") or \
                 re.fullmatch(r"(ledger-.*\.json|aeneas-.*\.lean|rust-cases-.*\.lean)", name):
             os.remove(os.path.join(out, name))
+    if a.cases_out and os.path.exists(a.cases_out):
+        os.remove(a.cases_out)
     try:
         return pipeline(a, out)
     except RustPathError as exc:
@@ -1338,8 +1395,9 @@ def pipeline(a, out):
                             "see `autoform doctor`; charon and aeneas come from the pinned Aeneas "
                             "release %s (set AENEAS_HOME to its unpacked directory)" % pins["aeneas_release"])
     toolchain = pinned_rust_toolchain(env, pins)
-    if run(["rustc", "+" + toolchain, "-V"], env=env, timeout=120).returncode:
-        raise RustPathError("rust-toolchain-missing", "rust toolchain %s is not installed" % toolchain,
+    if not toolchain_present(toolchain, env):
+        raise RustPathError("rust-toolchain-missing", "rust toolchain %s is not installed (or rustc/cargo "
+                            "on PATH are not rustup's proxies)" % toolchain,
                             "rustup toolchain install %s --profile minimal -c rustc-dev -c llvm-tools -c rust-src"
                             % toolchain)
     if not a.lean_project:
@@ -1388,15 +1446,7 @@ def run_stages(a, out, pins, env, toolchain, lp, crate_src, meta, module, work):
     writable = [cargo_home, work]
 
     # 1. the public API, from rustdoc
-    launch = boxed(["cargo", "rustdoc", "-q", "--lib", "--", "-Z", "unstable-options",
-                    "--output-format", "json"], work, offline, writable, cwd=crate)
-    r = launch.run(capture_output=True, text=True, timeout=1800)
-    build_sandbox = launch.record
-    doc_path = os.path.join(work, "target", "doc", meta["lib"] + ".json")
-    if r.returncode or not os.path.exists(doc_path):
-        raise RustPathError("rustdoc-failed", "cargo rustdoc --output-format json failed: "
-                            + "\n".join(clean_log(r.stderr).strip().splitlines()[-5:]))
-    doc = json.load(open(doc_path))
+    doc, build_sandbox = rustdoc_json(crate, work, offline, writable, meta)
     funcs, decl_listing = public_functions(doc)
     stages["rustdoc"] = {"status": "ok", "functions": len(funcs), "format_version": doc.get("format_version")}
 
@@ -1491,31 +1541,9 @@ def run_stages(a, out, pins, env, toolchain, lp, crate_src, meta, module, work):
         plan += [(f, arg_tys, ret_ty, callee, v) for v in cs]
     rust_res, rust_notes, lean_res, lean_notes, harness_sandbox = {}, {}, {}, {}, None
     if plan:
-        hdir = os.path.join(work, "harness")
-        os.makedirs(os.path.join(hdir, "src"))
-        prof = ("[profile.dev]\nopt-level = 0\ndebug-assertions = true\noverflow-checks = true\n"
-                "[profile.release]\nopt-level = 3\ndebug-assertions = false\noverflow-checks = false\n")
-        with open(os.path.join(hdir, "Cargo.toml"), "w") as fh:
-            fh.write('[package]\nname = "autoform_rust_harness"\nversion = "0.0.0"\nedition = "2021"\n'
-                     '[dependencies]\n%s = { path = %s }\n%s[workspace]\n'
-                     % (json.dumps(meta["name"]), json.dumps(crate), prof))
-        with open(os.path.join(hdir, "src", "main.rs"), "w") as fh:
-            fh.write(harness_source([(callee, [rust_lit(t, x) for t, x in zip(arg_tys, v)])
-                                     for _, arg_tys, _, callee, v in plan]))
-        henv = dict(offline, CARGO_TARGET_DIR=os.path.join(hdir, "target"))
-        launch = boxed(["cargo", "build", "-q"] + (["--release"] if a.profile == "release" else []),
-                       work, henv, writable, cwd=hdir)
-        r = launch.run(capture_output=True, text=True, timeout=3600)
-        if r.returncode:
-            raise RustPathError("harness-build-failed", "the cargo harness did not build:\n"
-                                + clean_log(r.stderr)[-3000:])
-        exe = os.path.join(hdir, "target", "release" if a.profile == "release" else "debug",
-                           "autoform_rust_harness")
-
-        def launch_for(start):
-            return boxed([exe, str(start)], os.path.join(work, "run"), env, (), cwd=hdir)
-        rust_res, rust_notes = run_harness(launch_for, len(plan))
-        harness_sandbox = launch_for(0).record
+        rust_res, rust_notes, harness_sandbox = native_results(
+            [(callee, [rust_lit(t, x) for t, x in zip(arg_tys, v)]) for _, arg_tys, _, callee, v in plan],
+            crate, meta, os.path.join(work, "harness"), work, env, offline, writable, a.profile)
         lcases = [(classes[f["id"]]["lean"], [lean_lit(t, x) for t, x in zip(arg_tys, v)],
                    "(fun (v : %s) => %s)" % (lean_type(ret_ty), lean_show(ret_ty, "v")))
                   for f, arg_tys, ret_ty, _, v in plan]
@@ -1548,6 +1576,16 @@ def run_stages(a, out, pins, env, toolchain, lp, crate_src, meta, module, work):
                 o["status"] = "compared"
             else:
                 o["status"], o["reason"] = "inconclusive", "no case was adjudicated"
+    if a.cases_out:
+        # Every planned case with both sides' results: what `rust_regress.py` replays at
+        # another revision of the crate against this (base) model.
+        with open(a.cases_out, "w") as fh:
+            json.dump({"crate": meta["name"], "profile": a.profile, "seed": a.seed,
+                       "cases": [{"function": classes[f["id"]]["rust"], "callee": callee,
+                                  "arg_types": arg_tys, "ret_type": ret_ty, "args": list(v),
+                                  "rust": rust_res.get(i), "aeneas": lean_res.get(i),
+                                  "verdict": per_case[i][1]}
+                                 for i, (f, arg_tys, ret_ty, callee, v) in enumerate(plan)]}, fh, indent=1)
 
     # 5. kernel-checked case theorems for every compared function
     partial = reaches_partial_fixpoint(decls, ns)

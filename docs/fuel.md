@@ -43,8 +43,9 @@ principle hold at `FUEL` for the wrong reason.
 
 ## Fuel monotonicity
 
-`Autoform/FuelMono.lean` closes the obligation. The statement, for each of the seven
-mutually recursive interpreter functions:
+`Autoform/FuelMono.lean` closes the obligation. The statement, for each of the eight
+mutually recursive interpreter functions (the `mutual` block of `Semantics.lean`;
+`FuelMono.lean` calls it "the eight-way simultaneous statement"):
 
 > raising the budget cannot change a result that did not run out of fuel.
 
@@ -54,13 +55,14 @@ theorem applyFunc_fuel_mono_all {ctx} {k k'} … (hk : k ≤ k')
     applyFunc ctx k' h ρ … = (h', r)
 ```
 
-Proved by a single induction on fuel over a seven-way conjunction covering
-`evalExpr`, `evalList`, `evalPairs`, `execStmt`, `execFor`, `applyFunc` and
+Proved by a single induction on fuel over an eight-way conjunction covering
+`evalExpr`, `evalList`, `evalPairs`, `execStmt`, `execFor`, `execForRef`, `applyFunc` and
 `applyClosure` — every recursive call is at `k`, so one induction hypothesis serves all
-seven. Each function has a `_fuel_succ_all` form (`k` to `k+1`) and a `_fuel_mono_all` corollary
+eight (`execForRef` is the boxed-container iteration case that re-reads the container
+each step). Each function has a `_fuel_succ_all` form (`k` to `k+1`) and a `_fuel_mono_all` corollary
 (`k ≤ k'`). The out-of-fuel spelling differs per function and is documented at each:
 `EResult.outOfFuel` for `evalExpr`/`applyFunc`/`applyClosure`, `Sum.inl .outOfFuel` for
-`evalList`/`evalPairs`, and a `Ctl` constructor for `execStmt`/`execFor`.
+`evalList`/`evalPairs`, and a `Ctl` constructor for `execStmt`/`execFor`/`execForRef`.
 
 Axiom basis: `[propext, Classical.choice, Quot.sound]`. No `sorry`, no `native_decide`.
 

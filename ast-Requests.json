@@ -55872,379 +55872,286 @@
       "b": {
        "k": "seq",
        "a": {
-        "k": "seq",
-        "a": {
-         "k": "assign",
-         "x": "tmp1",
-         "e": {
-          "k": "call",
-          "f": "range",
-          "args": [
-           {
-            "k": "int",
-            "v": "1"
-           },
-           {
-            "k": "call",
-            "f": "len",
-            "args": [
-             {
-              "k": "name",
-              "v": "parts"
-             }
-            ]
-           }
-          ]
-         }
+        "k": "forIn",
+        "x": "i",
+        "e": {
+         "k": "call",
+         "f": "<python-range>",
+         "args": [
+          {
+           "k": "int",
+           "v": "1"
+          },
+          {
+           "k": "call",
+           "f": "len",
+           "args": [
+            {
+             "k": "name",
+             "v": "parts"
+            }
+           ]
+          }
+         ]
         },
-        "b": {
-         "k": "forIn",
-         "x": "i",
-         "e": {
-          "k": "name",
-          "v": "tmp1"
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "h",
+          "e": {
+           "k": "slice",
+           "a": {
+            "k": "index",
+            "a": {
+             "k": "name",
+             "v": "parts"
+            },
+            "b": {
+             "k": "name",
+             "v": "i"
+            }
+           },
+           "lo": {
+            "k": "int",
+            "v": "0"
+           },
+           "hi": {
+            "k": "int",
+            "v": "2"
+           },
+           "st": {
+            "k": "unit"
+           }
+          }
          },
-         "body": {
+         "b": {
           "k": "seq",
           "a": {
            "k": "assign",
-           "x": "h",
+           "x": "$exprV$1349",
            "e": {
-            "k": "slice",
+            "k": "binop",
+            "op": "==",
             "a": {
-             "k": "index",
-             "a": {
-              "k": "name",
-              "v": "parts"
-             },
-             "b": {
-              "k": "name",
-              "v": "i"
-             }
+             "k": "call",
+             "f": "len",
+             "args": [
+              {
+               "k": "name",
+               "v": "h"
+              }
+             ]
             },
-            "lo": {
-             "k": "int",
-             "v": "0"
-            },
-            "hi": {
+            "b": {
              "k": "int",
              "v": "2"
-            },
-            "st": {
-             "k": "unit"
             }
            }
           },
           "b": {
            "k": "seq",
            "a": {
-            "k": "assign",
-            "x": "$exprV$1349",
-            "e": {
-             "k": "binop",
-             "op": "==",
+            "k": "ifte",
+            "c": {
+             "k": "name",
+             "v": "$exprV$1349"
+            },
+            "t": {
+             "k": "seq",
              "a": {
-              "k": "call",
-              "f": "len",
-              "args": [
-               {
+              "k": "assign",
+              "x": "$exprV$1350",
+              "e": {
+               "k": "mcall",
+               "recv": {
                 "k": "name",
                 "v": "h"
-               }
-              ]
+               },
+               "m": "isalnum",
+               "args": []
+              }
              },
              "b": {
-              "k": "int",
-              "v": "2"
+              "k": "assign",
+              "x": "$exprV$1351",
+              "e": {
+               "k": "int",
+               "v": 0
+              }
+             }
+            },
+            "e": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "$exprV$1350",
+              "e": {
+               "k": "name",
+               "v": "$exprV$1349"
+              }
+             },
+             "b": {
+              "k": "assign",
+              "x": "$exprV$1351",
+              "e": {
+               "k": "int",
+               "v": 1
+              }
              }
             }
            },
            "b": {
-            "k": "seq",
-            "a": {
-             "k": "ifte",
-             "c": {
+            "k": "ifte",
+            "c": {
+             "k": "name",
+             "v": "$exprV$1350",
+             "pythonTruthCache": {
               "k": "name",
-              "v": "$exprV$1349"
-             },
-             "t": {
-              "k": "seq",
-              "a": {
-               "k": "assign",
-               "x": "$exprV$1350",
-               "e": {
-                "k": "mcall",
-                "recv": {
-                 "k": "name",
-                 "v": "h"
-                },
-                "m": "isalnum",
-                "args": []
-               }
-              },
-              "b": {
-               "k": "assign",
-               "x": "$exprV$1351",
-               "e": {
-                "k": "int",
-                "v": 0
-               }
-              }
-             },
-             "e": {
-              "k": "seq",
-              "a": {
-               "k": "assign",
-               "x": "$exprV$1350",
-               "e": {
-                "k": "name",
-                "v": "$exprV$1349"
-               }
-              },
-              "b": {
-               "k": "assign",
-               "x": "$exprV$1351",
-               "e": {
-                "k": "int",
-                "v": 1
-               }
-              }
+              "v": "$exprV$1351"
              }
             },
-            "b": {
-             "k": "ifte",
-             "c": {
-              "k": "name",
-              "v": "$exprV$1350",
-              "pythonTruthCache": {
-               "k": "name",
-               "v": "$exprV$1351"
-              }
-             },
-             "t": {
-              "k": "seq",
-              "a": {
-               "k": "tryCatch",
-               "body": {
-                "k": "assign",
-                "x": "c",
-                "e": {
-                 "k": "call",
-                 "f": "chr",
-                 "args": [
-                  {
-                   "k": "call",
-                   "f": "int",
-                   "args": [
-                    {
-                     "k": "name",
-                     "v": "h"
-                    },
-                    {
-                     "k": "int",
-                     "v": "16"
-                    }
-                   ]
-                  }
-                 ]
-                }
-               },
-               "x": "$exprV$1352",
-               "handler": {
-                "k": "ifte",
-                "c": {
-                 "k": "inOp",
-                 "neg": false,
-                 "a": {
-                  "k": "name",
-                  "v": "$exprV$1352"
-                 },
-                 "b": {
-                  "k": "tupleE",
-                  "items": [
+            "t": {
+             "k": "seq",
+             "a": {
+              "k": "tryCatch",
+              "body": {
+               "k": "assign",
+               "x": "c",
+               "e": {
+                "k": "call",
+                "f": "chr",
+                "args": [
+                 {
+                  "k": "call",
+                  "f": "int",
+                  "args": [
                    {
-                    "k": "str",
-                    "v": "ValueError"
+                    "k": "name",
+                    "v": "h"
+                   },
+                   {
+                    "k": "int",
+                    "v": "16"
                    }
                   ]
                  }
-                },
-                "t": {
-                 "k": "exprS",
-                 "e": {
-                  "k": "unop",
-                  "op": "py:raise",
-                  "a": {
-                   "k": "callV",
-                   "f": {
-                    "k": "field",
-                    "a": {
-                     "k": "name",
-                     "v": "<module>requests/utils.py"
-                    },
-                    "f": "InvalidURL"
-                   },
-                   "args": [
-                    {
-                     "k": "binop",
-                     "op": "+",
-                     "a": {
-                      "k": "binop",
-                      "op": "+",
-                      "a": {
-                       "k": "str",
-                       "v": "Invalid percent-escape sequence: '"
-                      },
-                      "b": {
-                       "k": "call",
-                       "f": "str",
-                       "args": [
-                        {
-                         "k": "name",
-                         "v": "h"
-                        }
-                       ]
-                      }
-                     },
-                     "b": {
-                      "k": "str",
-                      "v": "'"
-                     }
-                    }
-                   ]
-                  }
-                 }
-                },
-                "e": {
-                 "k": "raise",
-                 "e": {
-                  "k": "name",
-                  "v": "$exprV$1352"
-                 }
-                }
+                ]
                }
               },
-              "b": {
+              "x": "$exprV$1352",
+              "handler": {
                "k": "ifte",
                "c": {
                 "k": "inOp",
                 "neg": false,
                 "a": {
                  "k": "name",
-                 "v": "c"
+                 "v": "$exprV$1352"
                 },
                 "b": {
-                 "k": "field",
-                 "a": {
-                  "k": "name",
-                  "v": "<module>requests/utils.py"
-                 },
-                 "f": "UNRESERVED_SET"
+                 "k": "tupleE",
+                 "items": [
+                  {
+                   "k": "str",
+                   "v": "ValueError"
+                  }
+                 ]
                 }
                },
                "t": {
-                "k": "setIndex",
-                "r": {
-                 "k": "name",
-                 "v": "parts"
-                },
-                "i": {
-                 "k": "name",
-                 "v": "i"
-                },
-                "v": {
-                 "k": "binop",
-                 "op": "+",
+                "k": "exprS",
+                "e": {
+                 "k": "unop",
+                 "op": "py:raise",
                  "a": {
-                  "k": "name",
-                  "v": "c"
-                 },
-                 "b": {
-                  "k": "slice",
-                  "a": {
-                   "k": "index",
+                  "k": "callV",
+                  "f": {
+                   "k": "field",
                    "a": {
                     "k": "name",
-                    "v": "parts"
+                    "v": "<module>requests/utils.py"
                    },
-                   "b": {
-                    "k": "name",
-                    "v": "i"
-                   }
+                   "f": "InvalidURL"
                   },
-                  "lo": {
-                   "k": "int",
-                   "v": "2"
-                  },
-                  "hi": {
-                   "k": "unit"
-                  },
-                  "st": {
-                   "k": "unit"
-                  }
-                 }
-                }
-               },
-               "e": {
-                "k": "setIndex",
-                "r": {
-                 "k": "name",
-                 "v": "parts"
-                },
-                "i": {
-                 "k": "name",
-                 "v": "i"
-                },
-                "v": {
-                 "k": "binop",
-                 "op": "+",
-                 "a": {
-                  "k": "str",
-                  "v": "%"
-                 },
-                 "b": {
-                  "k": "call",
-                  "f": "str",
                   "args": [
                    {
-                    "k": "index",
+                    "k": "binop",
+                    "op": "+",
                     "a": {
-                     "k": "name",
-                     "v": "parts"
+                     "k": "binop",
+                     "op": "+",
+                     "a": {
+                      "k": "str",
+                      "v": "Invalid percent-escape sequence: '"
+                     },
+                     "b": {
+                      "k": "call",
+                      "f": "str",
+                      "args": [
+                       {
+                        "k": "name",
+                        "v": "h"
+                       }
+                      ]
+                     }
                     },
                     "b": {
-                     "k": "name",
-                     "v": "i"
+                     "k": "str",
+                     "v": "'"
                     }
                    }
                   ]
                  }
                 }
+               },
+               "e": {
+                "k": "raise",
+                "e": {
+                 "k": "name",
+                 "v": "$exprV$1352"
+                }
                }
               }
              },
-             "e": {
-              "k": "setIndex",
-              "r": {
-               "k": "name",
-               "v": "parts"
-              },
-              "i": {
-               "k": "name",
-               "v": "i"
-              },
-              "v": {
-               "k": "binop",
-               "op": "+",
+             "b": {
+              "k": "ifte",
+              "c": {
+               "k": "inOp",
+               "neg": false,
                "a": {
-                "k": "str",
-                "v": "%"
+                "k": "name",
+                "v": "c"
                },
                "b": {
-                "k": "call",
-                "f": "str",
-                "args": [
-                 {
+                "k": "field",
+                "a": {
+                 "k": "name",
+                 "v": "<module>requests/utils.py"
+                },
+                "f": "UNRESERVED_SET"
+               }
+              },
+              "t": {
+               "k": "setIndex",
+               "r": {
+                "k": "name",
+                "v": "parts"
+               },
+               "i": {
+                "k": "name",
+                "v": "i"
+               },
+               "v": {
+                "k": "binop",
+                "op": "+",
+                "a": {
+                 "k": "name",
+                 "v": "c"
+                },
+                "b": {
+                 "k": "slice",
+                 "a": {
                   "k": "index",
                   "a": {
                    "k": "name",
@@ -56254,9 +56161,91 @@
                    "k": "name",
                    "v": "i"
                   }
+                 },
+                 "lo": {
+                  "k": "int",
+                  "v": "2"
+                 },
+                 "hi": {
+                  "k": "unit"
+                 },
+                 "st": {
+                  "k": "unit"
                  }
-                ]
+                }
                }
+              },
+              "e": {
+               "k": "setIndex",
+               "r": {
+                "k": "name",
+                "v": "parts"
+               },
+               "i": {
+                "k": "name",
+                "v": "i"
+               },
+               "v": {
+                "k": "binop",
+                "op": "+",
+                "a": {
+                 "k": "str",
+                 "v": "%"
+                },
+                "b": {
+                 "k": "call",
+                 "f": "str",
+                 "args": [
+                  {
+                   "k": "index",
+                   "a": {
+                    "k": "name",
+                    "v": "parts"
+                   },
+                   "b": {
+                    "k": "name",
+                    "v": "i"
+                   }
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            },
+            "e": {
+             "k": "setIndex",
+             "r": {
+              "k": "name",
+              "v": "parts"
+             },
+             "i": {
+              "k": "name",
+              "v": "i"
+             },
+             "v": {
+              "k": "binop",
+              "op": "+",
+              "a": {
+               "k": "str",
+               "v": "%"
+              },
+              "b": {
+               "k": "call",
+               "f": "str",
+               "args": [
+                {
+                 "k": "index",
+                 "a": {
+                  "k": "name",
+                  "v": "parts"
+                 },
+                 "b": {
+                  "k": "name",
+                  "v": "i"
+                 }
+                }
+               ]
               }
              }
             }

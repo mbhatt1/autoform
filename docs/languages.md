@@ -6,8 +6,10 @@ tests/test_source_pipeline.py -q` to translate them through Joern, compare with 
 real runtimes and compile the resulting conformance theorems. This validates the
 fixture operations; it is not whole-language or arbitrary-repository equivalence.
 
-This is a historical source-frontend measurement. Some recorded defects have since
-been fixed (including the JavaScript dialect and JSX/TSX recognition); it is not a
+The support matrix below was rebuilt on 2026-11-13 from the artifacts on disk and is
+current to their dates; the rest of this document's early sections are the historical
+source-frontend measurement of 2026-10. Some recorded defects have since been fixed
+(including the JavaScript dialect and JSX/TSX recognition); those sections are not a
 current capability registry. The binary/assembly path, its tested architectures,
 and its outstanding limitations are documented in [machine-code.md](machine-code.md).
 The current Joern numeric changes and their native-runtime checks are documented
@@ -22,7 +24,11 @@ pipeline (`./autoform.sh`) did when pointed at real code in the other languages.
 Nothing was tuned. No pipeline file was modified. Figures move with every change to the
 pipeline; where a document and an artifact disagree, the artifact wins.
 
-## Corpora
+## Corpora (historical 2026-10 run)
+
+The corpora of the 2026-10 run; the measured rows of the support matrix name their own
+corpora (the in-repo `examples/source/*` fixtures, the tracked ASTs and the 2026-10-22
+open-source corpora).
 
 | Language | Corpus | Files | Why |
 |---|---|---|---|
@@ -35,56 +41,179 @@ pipeline; where a document and an artifact disagree, the artifact wins.
 | Kotlin | `Kotlin/kotlinx-datetime` `core/common/src` | 20 | real Kotlin, 7.4k lines |
 | Kotlin (toy) | hand-written `gcd`/`addAll` | 1 | control experiment |
 | Python (baseline) | `cachetools` | — | the previously measured corpus |
-| Java (re-landed 2026-10-10) | Apache Commons Lang 3.17.0, `org/apache/commons/lang3/{StringUtils,CharUtils,BooleanUtils,CharSequenceUtils,RegExUtils,Validate,CharRange,math/NumberUtils,math/IEEE754rUtils}.java` | 9 | a real, pure utility library: static methods over primitives, `String` and `CharSequence`; source release verified by its Apache SHA-512, `provenance/ast-CommonsLang3.json.prov.json` |
+| Java (re-landed 2026-10-21) | Apache Commons Lang 3.17.0, `org/apache/commons/lang3/{StringUtils,CharUtils,BooleanUtils,CharSequenceUtils,RegExUtils,Validate,CharRange,math/NumberUtils,math/IEEE754rUtils}.java` | 9 | a real, pure utility library: static methods over primitives, `String` and `CharSequence`; source release verified by its Apache SHA-512, `provenance/ast-CommonsLang3.json.prov.json` |
 
 Joern 4.0.606, `joern-cli/frontends/` has `c2cpg`, `javasrc2cpg`, `jimple2cpg`,
 `jssrc2cpg`, `gosrc2cpg`, `kotlin2cpg`, `pysrc2cpg`, `ghidra2cpg`, and others.
 Binaries (`ghidra2cpg`), C#, PHP, Ruby and Swift were **not tested**. Rust has no Joern frontend; it goes through rustdoc, Charon and Aeneas instead (`docs/rust.md`, row below).
 
+Java and Kotlin projects built with Gradle or Maven (multi-module included) are run
+from the project root: build outputs, generated sources and test source sets are
+excluded and recorded, never modelled
+([repository-analysis.md](repository-analysis.md#gradle-and-maven-projects)).
+
 ## Support matrix
+
+Rebuilt 2026-11-13 (`d8a7b74`) from the artifacts on disk, not from memory of earlier
+runs. Each measured row reads three run products: `ledger-<M>.json` (functions, hole-free,
+verifiable core, holes / nodes), `.autoform-work/reland/<M>/conformance.json` (functions
+compared, cases agree / total, divergences, inconclusive, `measurement_basis`) and
+`.autoform-work/reland/<M>/specs.json` (`conform` theorems emitted and proved by the
+kernel). `.autoform-work/` and `ledger-*.json` are **gitignored**, so a clone does not
+have them: the "Regenerating each row" table names the `scripts/reland_corpus.sh`
+invocation (the `command` field of the tracked `provenance/ast-<M>.json.prov.json`) that
+rewrites all three. `scripts/check_docs.py` pins the Python, Java (commons-lang3) and Rust
+rows and the BitJS / AlgosTS / AlgosKt ledger lines in "First real open-source corpora";
+every other cell is quoted from the file named and is as current as that file (LangC
+2026-10-21, the rest 2026-10-22). No cell uses a glyph: where the old table had ⚠️ or ❌
+it now says in words what the mark meant.
+
+Every row below that says "yes" under *Translates* says "yes" under *Differential oracle*,
+with the counts the oracle recorded; a row that cannot say that is in one of the two
+later tables, not here.
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 209 | 97% | 150 (71%) | 0.08% | **yes** (CPython) |
-| C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
-| Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| Python | yes | yes | yes | `.python` (own constructor) | 209 | 204 (97%) | 150 (71%) | 5 / 6,625 (0.08%) | **yes** (CPython): the README "Fidelity, measured" row quotes the last run; the root `conformance.json` is whichever corpus ran last (AlgosGo at this snapshot), so no case counts are quoted here -- re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools --tests <tests>` |
+| C (in-repo fixture `LangC`, `examples/source/c`) | yes | yes | yes | `.cLike` (own constructor) | 13 | 13 (100%) | 13 (100%) | 0 / 77 | **yes** (`cc`, `c-native-typed-boundary-v4`): 12 of 13 hole-free functions compared, 56/56 cases agree, 0 divergences, 4 inconclusive (named UB: shift count out of range 3, signed overflow 1); 12/12 `conform` theorems proved |
+| Java (in-repo fixture `LangJava`, `examples/source/java`) | yes | yes | yes | `.java` (own constructor, `#guard`) | 7 | 7 (100%) | 7 (100%) | 0 / 37 | **yes** (`jvm`, `jvm-signatures-statics-v5`): 7 of 7 hole-free functions compared, 35/35 cases agree, 0 divergences, 0 inconclusive; 7/7 `conform` theorems proved |
+| Java (commons-lang3 3.17.0, tracked `ast-CommonsLang3.json`) | yes | yes | yes | `.java` (own constructor) | 488 | 365 (75%) | 174 (36%) | 1.4% | **yes** (JVM, `jvm-signatures-statics-v5+literal-inputs-v1`, 2026-10-22, after the Java `String` model and the array-length hole, every built case compared, strings drawn from the corpus's own literals): 153 functions compared, 961/961 cases agree, 0 divergences, 1432 inconclusive on named dynamic holes (`evidence-CommonsLang3.json`) |
 | Rust (gcd 2.3.0, `evidence-RustGcd.json`) | no Joern frontend: rustdoc JSON gives the public API, Charon + Aeneas emit the Lean | yes (Aeneas) | yes, in a separate Lake project on Lean v4.31.0 (Aeneas' pin, not Autoform's v4.30.0-rc1) | n/a (Aeneas' own `Result` monad) | 60 | 12 (20%) | 12 (20%) | 48 holes under 7 labels, all named from Charon/Aeneas/Lean | **yes** (native cargo harness, debug profile, sandboxed): 12 functions compared, 1178/1178 cases agree, 0 divergences; 121/144 case theorems kernel-checked (the 23 unproved all usize: the kernel cannot evaluate `System.Platform.numBits`). Re-derived by the Rust CI job from the digest-verified crate; see [rust.md](rust.md) |
-| Java (commons-lang3 3.17.0, tracked `ast-CommonsLang3.json`) | yes | yes | yes | `.java` ✅ | 488 | 421 (86%) | 196 (40%) | 0.9% | **yes** (JVM, `jvm-primitive-static-v2`, 2026-10-10, after the Java `String` model): 83 functions compared, 196/196 cases agree, 0 divergences, 404 inconclusive on named dynamic holes (`evidence-CommonsLang3.json`) |
-| Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
-| TypeScript | yes | yes | yes | `.javascript` ✅ | 86 | 44 (51%) | 18 (20%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
-| JavaScript | yes | yes | yes | `.javascript` ✅ | 14 | 5 (35%) | 1 (7%) | 5% | Node backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
-| JavaScript (lodash) | yes | **no** | n/a | `.cLike` ⚠️ | 693 | 419 (60%) | — | 1.8% | Node backend present; nothing to compare until it translates |
-| Kotlin (real repo) | **no** | n/a | n/a | n/a | — | — | — | — | **none** |
-| Kotlin (toy) | yes | yes | yes | `.java` ⚠️ | 3 | 2 (66%) | 2 (66%) | 4% | **none** |
-| `.tsx` / `.jsx` | yes | yes | yes | `.javascript` ✅ (was `.python` ❌, §2) | — | — | — | — | none |
+| Go (in-repo fixture `LangGo`, `examples/source/go`) | yes | yes | yes | `.go` (own constructor, `#guard`) | 9 | 9 (100%) | 9 (100%) | 0 / 40 | **yes** (`go`, `go-package-func-v1`): 9 of 9 hole-free functions compared, 45/45 cases agree, 0 divergences, 0 inconclusive; 9/9 `conform` theorems proved |
+| Go (`AlgosGo`, TheAlgorithms/Go `math/binary`) | yes | yes | yes | `.go` (own constructor, `#guard`) | 3 (from `conformance.json`; no ledger on disk) | 2 (66%) | no ledger on disk | no ledger on disk | **yes** (`go`, `go-package-func-v1`): 2 of 2 hole-free functions compared, 24/24 cases agree, 0 divergences, 0 inconclusive; 2/2 `conform` theorems proved |
+| JavaScript (in-repo fixture `LangJS`, `examples/source/js`) | yes | yes | yes | `.javascript` (own constructor) | 10 | 10 (100%) | 10 (100%) | 0 / 68 | **yes** (`node`, `node-numeric-pool-v2`): 9 of 10 hole-free functions compared, 45/45 cases agree, 0 divergences, 0 inconclusive; 9/9 `conform` theorems proved |
+| JavaScript (`BitJS`, TheAlgorithms/JavaScript bit-manipulation) | yes | yes | yes | `.javascript` (own constructor) | 10 | 9 (90%) | 9 (90%) | 1 / 124 (0.8%) | **yes** (`node`, `node-numeric-pool-v2`): 4 of 9 hole-free functions compared, 48/48 cases agree, 0 divergences, 0 inconclusive; 4/4 `conform` theorems proved |
+| TypeScript (in-repo fixture `LangTS`, `examples/source/ts`) | yes | yes | yes | `.javascript` (own constructor; `.ts` routes to it) | 4 | 4 (100%) | 4 (100%) | 0 / 19 | **yes** (`node`, `node-numeric-pool-v2`): 3 of 4 hole-free functions compared, 15/15 cases agree, 0 divergences, 0 inconclusive; 3/3 `conform` theorems proved |
+| TypeScript (`AlgosTS`, TheAlgorithms/TypeScript maths) | yes | yes | yes | `.javascript` (own constructor; `.ts` routes to it) | 4 | 4 (100%) | 4 (100%) | 0 / 42 | **yes** (`node`, `node-numeric-pool-v2`): 2 of 4 hole-free functions compared, 24/24 cases agree, 0 divergences, 0 inconclusive; 2/2 `conform` theorems proved |
+| Kotlin (in-repo fixture `LangKt`, `examples/source/kotlin`) | yes | yes | yes | `.java` -- Kotlin/JVM shares Java's constructor by design (note below) | 4 | 4 (100%) | 4 (100%) | 0 / 15 | **yes** (`kotlin`, `jvm-kotlin-receivers-v4`): 3 of 4 hole-free functions compared, 15/15 cases agree, 0 divergences, 0 inconclusive; 3/3 `conform` theorems proved |
+| Kotlin (`AlgosKt`, `corpus-algokt`) | yes | yes | yes | `.java` -- Kotlin/JVM shares Java's constructor by design (note below) | 16 | 16 (100%) | 10 (62%) | 0 / 288 | **yes** (`kotlin`, `jvm-kotlin-receivers-v4`): 5 of 16 hole-free functions compared, 22/22 cases agree, 0 divergences, 3 inconclusive (`field:PI:non-object` 2, `outOfFuel` 1); 5/5 `conform` theorems proved |
+
+### Regenerating each row
+
+| Row(s) | Artifacts read | Regenerate (rewrites the ledger, `conformance.json` and `specs.json`) |
+|---|---|---|
+| Python | `ledger-Cachetools.json` (CI regenerates it from the built module before `check_docs.py`) | `scripts/reland_corpus.sh <cachetools-7.1.7 sdist> Cachetools`; the pinned tree hash is `provenance/ast-Cachetools.json.prov.json` |
+| C, Java, Go, JavaScript, TypeScript, Kotlin in-repo fixtures (`Lang*`) | `ledger-Lang{C,Java,Go,JS,TS,Kt}.json`, `.autoform-work/reland/Lang*/{conformance,specs}.json` | `scripts/reland_corpus.sh examples/source/c LangC` (and `java LangJava`, `go LangGo`, `js LangJS`, `ts LangTS`, `kotlin LangKt`): the sources are tracked, so these six rows are reproducible from a clone |
+| Java (commons-lang3) | `ledger-CommonsLang3.json`, tracked `evidence-CommonsLang3.json` | see the reproduce block under "Java at scale" below: `scripts/reland_corpus.sh` alone gives the fixed-pool run; the headline oracle, its synthesized module and the mutation gate are the `--literal-inputs` steps that follow it there |
+| Rust | tracked `evidence-RustGcd.json` | the Rust CI job re-derives it from the digest-verified crate ([rust.md](rust.md)) |
+| `AlgosGo`, `BitJS`, `AlgosTS`, `AlgosKt` | `.autoform-work/reland/<M>/{conformance,specs}.json`, `ledger-{BitJS,AlgosTS,AlgosKt}.json` (AlgosGo wrote no ledger) | `scripts/reland_corpus.sh <checkout> <M>`; the checkouts (`/private/tmp/af-corpora/{algos-go,bitjs-clean,ts-maths,corpus-algokt}`) are gone, and the `source_revision` tree hash in `provenance/ast-<M>.json.prov.json` is what identifies the files to check out -- see "First real open-source corpora" below |
+
+### Historical rows (2026-10 run; sources not on disk, not reproducible from this tree)
+
+What the unmodified pipeline did on real repositories in 2026-10, kept as the record of
+that run. No ledger, conformance or specs artifact for any of these rows is on disk,
+nothing pins them, and three of the corpora (envconfig, p-queue, p-map) were re-exported
+on 2026-10-22 with different populations (next table). Words replace the ⚠️ / ❌ marks the
+rows used to carry.
+
+| Language (corpus) | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
+|---|---|---|---|---|---|---|---|---|---|
+| C (`antirez/sds`) | yes | yes | yes | `.cLike` | 59 | 17 (29%) | 8 (13%) | 11% | crashed in that run (segfault on `char *` arguments, "Failures observed" below, which also records the 2026-10-19 re-measurement without a crash) |
+| Java (`google/gson` `internal/**`) | yes | yes | yes | `.java` | 669 | 350 (52%) | 191 (28%) | 6% | not run on this corpus; the JVM backend had run on the in-repo fixture only |
+| Go (`kelseyhightower/envconfig`) | yes | yes | yes | `.go` | 83 | 21 (25%) | 6 (7%) | 4% | not run on this corpus then; re-exported 2026-10-22, next table |
+| TypeScript (`sindresorhus/p-queue`) | yes | yes | yes | `.javascript` | 86 | 44 (51%) | 18 (20%) | 4% | not run on this corpus then; re-exported 2026-10-22, next table |
+| JavaScript (`sindresorhus/p-map`) | yes | yes | yes | `.javascript` | 14 | 5 (35%) | 1 (7%) | 5% | not run on this corpus then; re-exported 2026-10-22, next table |
+| JavaScript (`lodash/lodash.js`) | yes | no (renderer `RecursionError`, below) | not reached | `.cLike` -- misrouted: JavaScript had no dialect of its own then, it has `.javascript` now | 693 | 419 (60%) | not rendered | 1.8% | nothing to compare: it did not translate |
+| Kotlin (`Kotlin/kotlinx-datetime`) | no (`joern-parse` exit 1, below) | not reached | not reached | not reached | not exported | — | — | — | none |
+| Kotlin (hand-written `gcd` / `addAll`) | yes | yes | yes | `.java` -- Kotlin rode Java's constructor, as it still does (note below) | 3 | 2 (66%) | 2 (66%) | 4% | none in that run; the `LangKt` and `AlgosKt` rows above supersede this |
+| `.tsx` / `.jsx` | yes | yes | yes | `.javascript` -- was `.python`, the §2 defect, since fixed | — | — | — | — | none |
+
+### Re-exported 2026-10-22: the oracle ran and compared nothing
+
+Six more open-source corpora went through `scripts/reland_corpus.sh` on 2026-10-22 and
+stopped at the oracle. Their `.autoform-work/reland/<M>/conformance.json` is on disk with
+0 cases compared; no ledger and no specs were written. These rows do **not** meet
+milestone 8's exit criterion (they translate, and the oracle column is not "yes"), and
+they are listed so that "the oracle refused" and "never run" stay distinguishable.
+Populations are the `functions_total` / `functions_hole_free` fields of each
+`conformance.json`; no `provenance/` record exists for them, so the only identity of the
+source is the `corpus_commit` field. Regenerate: `scripts/reland_corpus.sh <checkout> <M>`
+with the checkouts named below, all of which are gone from this machine.
+
+| Module (source) | Lean compiles | Functions | Hole-free | Differential oracle (`backend_status`, `backend_skipped_by_reason`) |
+|---|---|---|---|---|
+| `EnvConfig` (`kelseyhightower/envconfig` `7834011`) | yes (`build_stable`) | 82 | 38 (46%) | ran (`go-package-func-v1`): 1 function reached, 5 cases built, all 5 inconclusive on `isTrue`'s `call:ParseBool`; 0 compared. Skips: source file unavailable 18, not a callable package function 11, return type 5, argument type 2, receiver fixture required 1 |
+| `Humanize` (`corpus-humanize`, `tree-sha256:9caf4c4b…`) | not recorded | 36 | 19 (52%) | `UNSUPPORTED: no testable surface`; skips: `go test` failed 11, not a callable package function 8 |
+| `KotlinResult` (`michaelbull/kotlin-result` `aed7438`, `commonMain`) | not recorded | 282 | 228 (80%) | `UNSUPPORTED: no testable surface`; skips: non-primitive signature 114, lambda 72, constructor 10, `kotlinc` failed 5 (`@ExperimentalContracts` opt-in) |
+| `Leven` (`corpus-leven`, `tree-sha256:6b1230ea…`) | not recorded | 6 | 3 (50%) | `UNSUPPORTED: no testable surface`; skips: module binding `Math` 2, module binding `codes` 1 |
+| `PMap` (`sindresorhus/p-map`, `tree-sha256:18fc8d05…`) | not recorded | 44 | 28 (63%) | `UNSUPPORTED: no testable surface`; skips: not a module-scope callable or static method 18, node driver failed 10 |
+| `PQueue` (`sindresorhus/p-queue` `7f272ab`, `source/`) | not recorded | 105 | 77 (73%) | `UNSUPPORTED: no testable surface`; skips: not a module-scope callable or static method 56, class `PriorityQueue` not accessible at module scope 4, constructor 2, getter/setter 1 |
 
 **On the "Differential oracle" column.** `scripts/differential.py` now carries a runtime
-backend for Node (JS/TS), the JVM (Java, and Kotlin through a `@JvmStatic` thunk) and Go,
-each with its own recorded `measurement_basis` (`node-numeric-pool-v1`,
-`jvm-primitive-static-v2`, `go-package-func-v1`) and `runtime_version`, selectable with
-`--language`. "Backend present; ran on the fixture" means exactly that: the oracle was
-executed end to end -- runtime, `lake build`, Lean evaluation, comparison -- on a
-three-function fixture per language and agreed with Core with 0 divergences. It is NOT a
-statement about the corpora in this table, whose sources are not in the repository; the
-day one is re-exported with `scripts/reland_corpus.sh` its conformance row goes here with
-the counts, and until then the column says "not yet on this corpus". The first such row is
-the commons-lang3 one (2026-10-10): a tracked AST, a provenance record, a ledger, a JVM
+backend for Node (JS/TS), the JVM (Java, and Kotlin: a `@JvmStatic` thunk per top-level
+function, members on their receiver) and Go,
+each with its own recorded `measurement_basis` (`node-numeric-pool-v2`,
+`jvm-signatures-statics-v5` for Java, `jvm-kotlin-receivers-v4` for Kotlin, `go-package-func-v1`)
+and `runtime_version`, selectable with
+`--language`. The JVM basis for the commons-lang3 evidence below is
+`jvm-signatures-statics-v5`; the 2026-10-20 run was `jvm-signatures-statics-v4` and the
+2026-10-10 run `jvm-primitive-static-v2` (static methods only). v3 also calls Java instance methods with a
+primitive-or-String or `void` signature, on a receiver built by the class's own
+non-private no-arg constructor. The JVM reports that receiver's instance fields (JLS
+defaults included), Lean starts from exactly that object, and the fields after the call
+are compared as well as the result; a receiver holding a non-null non-String reference,
+or that cannot be built, is a named refusal (`tests/test_java_receivers.py`). v4 also
+attempts boxed parameters (drawn inside the JVM box cache, never null) and results, corpus enums as parameters (each constant,
+or null) and results, and a `null` Java String parameter; and it gives Core the static
+fields a call tree reads, read from the JVM just before the call and bound in the globals
+frame under `javaStaticKey` (`Ctx.readClassAttribute`): scalars, Strings, enum constants
+(heap cells, compared by identity), cached boxes and read-only `Set.of`/`Map.of`/
+`Collections.unmodifiable*` collections of String or enum elements as unboxed
+`.list`/`.dict` values. A `null` query on a Java collection is the named hole
+`java:collection-null-query` (`Set.of` throws where `HashSet` answers). Anything else a
+static holds is left unbound and counted, so its read is a hole
+(`tests/test_java_signatures.py`). v5 also compares static `void` methods (a return
+against an exception, `Validate.isTrue` and friends) and a `CharSequence` result that is a
+String (any other `CharSequence` is refused per case, by name); its case cap seats min(n, 2)
+cases per function, byte-identical duplicates dropped first, before any function gets
+more, where v4 took one random draw that could drop a function's every case; and
+`backend_skipped_by_reason` counts every skip, where v4's figures were read off the
+40-entry `backend_skipped` sample. These are Java's (basis `jvm-signatures-statics-v5`). Kotlin runs
+on its own basis, `jvm-kotlin-receivers-v4`: a Kotlin member is called on the receiver the
+driver finds for its class -- an `object`'s `INSTANCE`, a companion object, the enum's
+entries, or a non-private no-arg constructor's object (Kotlin generates one when every
+primary-constructor parameter has a default) -- and its state is read where Kotlin keeps
+it (an `object`'s properties are static fields of its class, a companion's of the class
+declaring it, an entry's `name`/`ordinal` through its accessors). A Kotlin enum value is
+the model's own spelling `Val.fn "<enum>$<ENTRY>"`, not a heap cell as in Java: the two
+exports spell an enum constant differently, so each language keeps its own encoding. A
+singleton whose body uses `this` only as a value is passed in that spelling (a sibling
+member called on the same receiver, `one(by)` or `this.one(by)`, counts its uses too). A
+body that needs both spellings, a companion used as a value, a member that calls a
+sibling through a qualified name (the export drops that receiver) and a non-enum class in
+a signature are named refusals; Kotlin binds no static state and draws no null String
+(`tests/test_kotlin_receivers.py`). Every oracle cell in the measured table was produced that way: the oracle was executed
+end to end -- runtime, `lake build`, Lean evaluation, comparison -- on that row's corpus,
+and the cell quotes the counts its `conformance.json` recorded. The historical rows never
+had an oracle run on their corpora, which is why they are kept in a table of their own.
+The first corpus row to get one was the commons-lang3 one (2026-10-10; re-landed 2026-10-20 and 2026-10-21; oracle re-run
+2026-10-22 with every built case compared, then again with `--literal-inputs`): a tracked AST, a provenance
+record, a ledger, a JVM
 oracle run and a synthesized specification module (`Autoform/SpecsGen/CommonsLang3.lean`,
 imported from `Autoform.lean` and `Autoform/CI.lean`). See "Java at scale" below for what
-the 404 inconclusive cases are and why the compared count is 83 of 421 hole-free functions.
+the 1432 inconclusive cases are, why the compared count is 153 of 365 hole-free functions,
+and why the hole-free count fell from 420.
 
-Percentages are from the ledger the pipeline printed (`ledger-Lang*.json`);
-`scripts/lang_matrix.py` recomputes them from the exported AST independently and agrees
-to within the ledger's slightly different node-counting.
+Percentages in the measured table are from `ledger-<M>.json`; `scripts/lang_matrix.py`
+recomputes them from the exported AST independently and agrees to within the ledger's
+slightly different node-counting. Percentages in the historical table are from the
+ledgers that run printed, which are no longer on disk.
 
-⚠️ = the dialect *is* in `render_lean.py`'s `DIALECT` map, but the language rides another
-language's constructor: Kotlin/JVM runs as `.java` (same integer model and boolean
-operators; its structural string `==` lands on Java's `str:reference-equality` hole).
-✅ (`#guard`) = the language has its own `Dialect` constructor and the numeric claims in
-§5 are `#guard`s in `Semantics.lean`/`Numeric.lean`, checked on every build — which is
-NOT a differential oracle: the last column is still **none** for both. See below.
+**On the dialect column.** "Own constructor" means the language has its own `Dialect`
+constructor in `Syntax.lean`; "`#guard`" adds that the numeric claims in §5 are `#guard`s
+in `Semantics.lean`/`Numeric.lean`, checked on every build -- which is a build-time check,
+not a differential oracle, and the oracle column stands on its own. Kotlin/JVM runs as
+`.java` by design: the dialect *is* in `render_lean.py`'s `DIALECT` map, but the language
+rides Java's constructor (same integer model and boolean operators; its structural string
+`==` lands on Java's `str:reference-equality` hole). That used to be marked ⚠️; it is a
+documented modelling decision, not a defect, and the Kotlin rows above carry an oracle
+run of their own on the `jvm-kotlin-receivers-v4` basis.
 
-### Failures observed, verbatim
+### Failures observed in the 2026-10 run, verbatim (historical)
+
+These are the failures the historical rows record, kept as written at the time. Each is
+superseded for the current state by the measured table above (every language in it has a
+running oracle); the C and Kotlin items carry their own later re-measurement notes.
 
 * **Kotlin, real repo — does not parse.** `joern-parse` exits `1`:
   `ReachingDefPass failed … java.util.NoSuchElementException: key not found: MethodRef`.
@@ -92,7 +221,10 @@ NOT a differential oracle: the last column is still **none** for both. See below
   run stops after `==> [1/6] parsing` printing **no error at all**. A CPG file is still
   written; running `export_ast.sc` on it crashes with the same exception. A hand-written
   two-function Kotlin file goes end to end, so this is the frontend on real Kotlin, not
-  the corpus.
+  the corpus. When `joern-parse` fails in exactly this overlay, `autoform.sh` and
+  `autoform pr` re-parse with `--nooverlays`, apply the other overlays with
+  `cartographer/prepare_cpg.sc` (the exporter reads no dataflow) and record
+  `"overlays": "dataflowOss skipped: …"` in `pipeline.json` / `pr.json`'s `exporter`.
 * **JavaScript at scale — does not render.** lodash exports 693 functions (25 MB of AST)
   and then `render_lean.py` dies:
   `RecursionError: maximum recursion depth exceeded while decoding a JSON object`.
@@ -105,6 +237,12 @@ NOT a differential oracle: the last column is still **none** for both. See below
   and calls hole-free functions with random *integers*; `sds` functions take `char *`, so
   the harness dereferences small integers as pointers. `autoform.sh` swallows this
   (`|| true`) and continues to the ledger.
+  *Re-measured 2026-10-19 (`scripts/pr_mode.py` on `antirez/sds` 6fa721c, the
+  `sdsnewlen` NULL-check fix):* no crash. The oracle now calls only scalar fixed-width
+  entry points (`native_c.py`), each in a sandboxed worker process; the `char *`
+  functions are not called, and `sdsnewlen` (pointer signature, translation holes) is
+  `not-compared`, so that change gets no behaviour evidence (exit 3 under
+  `--fail-on behaviour-changed`).
 * **Java/Go/TS/JS differential oracle — does not exist.** `scripts/differential.py`
   chooses its runtime with one line: `runtime = "cc" if is_c else "cpython"`, where
   `is_c` tests for a `.c`/`.h` suffix. Everything that is not C is handed to CPython,
@@ -123,7 +261,7 @@ translation. They are not the same set across languages, which is direct evidenc
 |---|---|
 | C | `op:indirection` 28, `op:cast` 18, `control:SWITCH` 14, `assign:lhs:indirectIndexAccess` 12, `op:indirectIndexAccess` 12, `assign:lhs:indirection` 12, `cstr:address-equality` 11, `op:postIncrement` 11, `op:postDecrement` 8, `control:FOR` 7, `control:GOTO` 5, `op:sizeOf` 5 |
 | Java | `op:alloc` 166, `control:THROW` 125, `op:cast` 123, `op:instanceOf` 90, `op:arrayInitializer` 43, `control:FOR` 30, `expr:BLOCK-impure` 20, `control:SWITCH` 15, `op:postIncrement` 15, `op:sizeOf` 13, `control:TRY-multiCatch` 4 |
-| Java (commons-lang3, current exporter, `ledger-CommonsLang3.json`) | `op:alloc:ctor-shape` 26, `op:alloc:array-decl` 20, `op:instanceOf` 18, `op:cast:opaque-type` 17, `op:alloc:ctor-unresolved-class` 15, `control:TRY-handler-language` 13, `lit:unquoted` 8, `expr:BLOCK-impure` 7, `stmt:empty-ast-children` 6, `op:cast:object` 1 (131 holes in 67 functions; the 16 more than before the Java `String` model are receivers that are now exported -- `((String) x).length()` used to drop its cast receiver, now the cast is translated or named) |
+| Java (commons-lang3, current exporter, `ledger-CommonsLang3.json`) | `op:sizeOf:array-length` 76, `op:alloc:ctor-shape` 26, `op:alloc:array-decl` 20, `op:instanceOf` 18, `op:cast:opaque-type` 17, `op:alloc:ctor-unresolved-class` 15, `control:TRY-handler-language` 13, `lit:unquoted` 8, `expr:BLOCK-impure` 7, `stmt:empty-ast-children` 6, `numeric:java-box-identity` 1, `op:cast:object` 1 (208 holes in 123 functions; the 76 more than the 2026-10-20 export's 132, in 65 functions, are every Java array `.length` read, which the exporter used to fold to the literal `8` -- the C `sizeof` of a reference under lp64 -- so those functions counted hole-free with a wrong body, "Java at scale" below; the 1 more than the 131 before the 2026-10-20 re-export is `BooleanUtils.toBoolean(String)`'s `toBooleanObject(str) == Boolean.TRUE`, now named `numeric:java-box-identity` where the pre-lowering export compiled a reference-equality binop; the 16 more than before the Java `String` model are receivers that are now exported -- `((String) x).length()` used to drop its cast receiver, now the cast is translated or named) |
 | Go | `op:addressOf` 44, `stmt:IMPORT` 39, `lit:unquoted` 17, `stmt:TYPE_DECL` 13, `op:indirection` 12, `assign:arity` 7 (multi-return `a, b := f()`), `control:FOR` 6 |
 | TypeScript | `op:assignment` 26, `op:notNullAssert` 11, `control:THROW` 10, `stmt:TYPE_DECL` 9, `op:alloc` 7, `op:await` 7, `op:instanceOf` 5, `op:spread` 2 |
 | JavaScript (lodash) | `op:assignment` 111, `op:instanceOf` 100, `op:preIncrement` 91, `expr:BLOCK-impure` 44, `op:postIncrement` 44, `op:alloc` 27, `op:and` 23, `control:THROW` 16, `op:iterator` 6 |
@@ -358,9 +496,10 @@ change. Recorded as a known defect rather than silently carried.
 ### 9. Predicted, unverified
 
 * Java boxed `Integer` comparison: `Integer a=1000, b=1000; a==b` is `false` in Java
-  (reference equality) but Core's `Val.beq` on two `.int`s gives `true`. Core has no
-  boxing, so this is a wrong answer waiting for a corpus that boxes. Not measured because
-  `op:alloc` holes most boxing paths first.
+  (reference equality) but Core's `Val.beq` on two `.int`s gives `true`. Now the named
+  hole `numeric:java-box-identity` for two boxes; a box against a primitive unboxes,
+  raising `NullPointerException` on a null box. Kotlin `==` on numbers is `equals`, so it
+  is lowered as null-safe value equality (`tests/test_java_boxed_eq.py`).
 * Java `char` arithmetic (16-bit unsigned) under a 32-bit signed config.
 * Go `&^` (and-not) and unsigned `uint` arithmetic under a signed config.
 
@@ -767,7 +906,7 @@ The cheapest change to the verdict is not more front ends. It is
 (c) a `java`/`node`/`go run` backend for `differential.py` — after which the oracle can
 find the rest of this list without a human predicting it.
 
-## Java at scale — commons-lang3 (2026-10-10)
+## Java at scale — commons-lang3 (2026-10-10, re-landed 2026-10-20 and 2026-10-21)
 
 The first non-Python corpus through the whole chain, chosen because Java is the language
 with its own `Dialect` constructor, 64-bit `long` modelled, and a JVM backend already
@@ -780,13 +919,100 @@ same-package references (`ArrayUtils`, `ObjectUtils`, ...) against the full rele
 
 What the chain produced, each figure bound by `scripts/check_docs.py`:
 
-* Ledger (`ledger-CommonsLang3.json`): 488 functions, 421 hole-free (86%), 196 in the
-  verifiable core, 131 holes in 67 functions (table above).
-* Oracle (`evidence-CommonsLang3.json`, basis `jvm-primitive-static-v2`, OpenJDK 17
+* Ledger (`ledger-CommonsLang3.json`): 488 functions, 365 hole-free (75%), 174 in the
+  verifiable core, 208 holes in 123 functions (table above), 76 of them
+  `op:sizeOf:array-length`.
+* Oracle (`evidence-CommonsLang3.json`, basis `jvm-signatures-statics-v5+literal-inputs-v1`,
+  OpenJDK 21 locally and in CI; run of 2026-10-22 with `--literal-inputs`): 254 static
+  primitive-or-String candidates (9 primitive-instance, 36 boxed-or-enum-signature, 2
+  collection-signature), 10 inputs per function, 2393 cases built and **every one of them
+  compared** (`AUTOFORM_CASE_CAP`; `case_cap.limit` 100000, `case_cap.dropped` 0), 249
+  functions exercised,
+  **153 functions compared, 961/961 cases agree, 0 divergences, 1432 cases inconclusive**
+  (agree plus inconclusive is the 2393 built). The backend skipped 176 functions
+  (`backend_skipped_total`): 62 `returned null`, 61 `array signature`, 39 `non-primitive
+  signature`, 9 `receiver not built`, 2 `argument not built`, 2 constructors and 1 `JVM
+  driver error` (`backend_skipped_by_reason`, counted over every skip; the conformance
+  file keeps 40 of the per-function reasons as a sample). `--literal-inputs` changes the
+  sample, and the basis records it: a String-typed or unannotated parameter also draws
+  strings built from the literals of the function and its file (and integers next to its
+  integer literals), seeded per function so the same export yields the same inputs. The
+  961 agreeing cases carry 138 distinct `String` arguments; the wide run's 1015 carried 8.
+  The static-field binding is unchanged (122 candidate functions read statics; 1034 built
+  cases carried static state), and 11 `Validate` void statics (`isTrue`, `validState`,
+  `inclusiveBetween`, `exclusiveBetween` overloads) are among the 153 that agree. Against
+  the wide run of the same day (next bullet), 147 functions are compared in both. The 14
+  the wide run compared and this run does not -- among them the 4-argument
+  `StringUtils.replaceIgnoreCase` and `StringUtils.strip(String)` -- all ended with every
+  input inconclusive on a dynamic hole (`coverage.by_status`: `blocked
+  (semantics/transpiler): runtime holes`; `strip` on `call:isWhitespace`,
+  `replaceIgnoreCase` and `removeIgnoreCase` on `mcall:toLowerCase:non-object`,
+  `contains`, `countMatches` and two `indexOf` overloads on `op:instanceOf`): the mined
+  strings reach branches the fixed pool never did, and some of those branches are holes.
+  Six are compared for the first time: `StringUtils.isAlpha(CharSequence)`,
+  `isAllLowerCase(CharSequence)`, `compareIgnoreCase(String,String,boolean)`,
+  `CharUtils.toIntValue(char)`, `Validate.inclusiveBetween(long,long,long)` and
+  `exclusiveBetween(long,long,long)`.
+* The wide run of 2026-10-22 (basis `jvm-signatures-statics-v5`, same export, same lifted
+  cap, the fixed input pool only; its figures were this page's headline until the
+  literal-inputs run): 2405 cases built and every one compared, 251 functions exercised,
+  161 functions compared, 1015/1015 cases agree, 0 divergences, 1390 cases inconclusive.
+  The backend skipped 172 functions: 61 `array signature`, 58 `returned null`, 39
+  `non-primitive signature`, 9 `receiver not built`, 2 `argument not built`, 2
+  constructors and 1 `JVM driver error`; `returned null` grew from the 2026-10-21 run's 36
+  because more inputs reach more `null` returns, which the basis does not compare. The v5
+  basis compares static `void` methods and `CharSequence` results that are Strings: 9
+  `Validate` void statics and `StringUtils.defaultIfEmpty(CharSequence,CharSequence)` were
+  among the 161 that agreed. 1048 built cases carried static state. The input draw is
+  random per run: two functions the 2026-10-21 run compared,
+  `StringUtils.isAlpha(CharSequence)` and `StringUtils.substringAfterLast(String,int)`,
+  were not among the 161 because all ten of their inputs ended inconclusive, and 38
+  functions were compared for the first time. The fixed pool is eight strings (`""`,
+  `"0"`, `"11"`, `"17.0.1"`, `"1.8.0_281"`, `"java.lang.String"`, `"com.example.Foo"`,
+  `"android.os.Bundle"`) plus `null`, and sixteen boundary integers, so ten inputs per
+  function were ten combinations of the same eight strings -- no whitespace, no mixed
+  case, no needle that occurs in a haystack. Lifting the cap added cases, not diversity;
+  `--literal-inputs` was the next measurement, and the bullet above is it.
+* The 2026-10-21 run (same basis and export, 5 inputs per function, 600-case cap): 1205
+  cases built -- the cap kept 600: 115 byte-identical duplicates went first, every
+  function was seated up to 2 cases before any function got more, the rest was a random
+  fill, so 605 were dropped and no function lost all its cases (`case_cap.functions_dropped`
+  0) --, 249 functions exercised, 125 functions compared, 252/252 cases agree, 0
+  divergences, 348 cases inconclusive. The backend skipped 150 functions: 61 `array
+  signature`, 39 `non-primitive signature`, 36 `returned null`, 9 `receiver not built`, 2
+  `argument not built`, 2 constructors and 1 `JVM driver error`; 8 `Validate` void statics
+  were among the 125; 521 built cases carried static state. Its 125 specification theorems
+  stood on domains of one or two cases each (252 agreeing cases over 125 functions), which
+  is what the mutation gate measured (below).
+* The hole-free count fell from 420 to 365 and the core from 195 to 174 because the
+  exporter had been mistranslating, not because a translation regressed. Java and Kotlin
+  array `.length` went through the C `sizeof` fold, which answers 8 for a reference under
+  lp64, so every `.length` read was exported as the literal `8` (`NumberUtils.max(int[])`
+  looped to `j < 8`) and its function counted hole-free with a wrong body. It is now
+  the named hole `op:sizeOf:array-length`: 76 sites in 65 functions, 55 of which had no
+  other hole. The drop is that disclosure. The JVM oracle did not catch it because it
+  did not run those functions: array signatures are skipped, and of the 65 the oracle
+  cache (`.autoform-work/oracle/CommonsLang3/`) holds a 2026-10-20 verdict for only one,
+  `CharUtils.toString(char)`, inconclusive on `field:CHAR_STRING_ARRAY:non-object`.
+  Whether a 2026-10-20 agreement passed through a folded length in a callee is not
+  recorded (the callers' cache entries were overwritten by this run); in this run a
+  reached `op:sizeOf:array-length` is inconclusive, so none of the 252 agreements can.
+* The 2026-10-20 run (basis `jvm-signatures-statics-v4`, on the export before the
+  array-length change: 420 hole-free, 195 in the core, 132 holes in 68 functions): 234
+  static primitive-or-String candidates, 1087 cases built of which the cap dropped 487
+  at random, 224 functions exercised, 114 functions compared, 252/252 cases agree, 0
+  divergences, 348 inconclusive. This page reported that run's skips as 25 `array
+  signature`, 13 `non-primitive signature` and 2 constructors. Those figures were wrong:
+  they were tallied from the 40-entry `backend_skipped` sample, not from the skips
+  themselves (`skip_record` in `scripts/differential.py` records that run as 232 skips),
+  and v5 counts every skip. The v4 basis was the first to bind the static fields a call
+  tree reads (111 candidate functions; 455 built cases carried static state), so the
+  `field:*:non-object` reads
+  that dominated the 2026-10-10 run's 404 inconclusive (`field:EMPTY:non-object` alone
+  was 53 cases) now agree. The 2026-10-10 run (basis `jvm-primitive-static-v2`, OpenJDK 17
   locally; CI installs 21): 198 static primitive-or-String candidates, 976 cases built,
-  195 functions exercised, **83 functions compared, 196/196 cases agree, 0 divergences,
-  404 cases inconclusive**. 35 hole-free functions were skipped as `non-primitive
-  signature` (arrays, `Boolean`, `Object`...) and 5 as instance methods. Before the Java
+  195 functions exercised, 83 functions compared, 196/196 cases agree, 404 inconclusive.
+  Before the Java
   `String` model (same corpus, previous exporter): 32 functions compared, 87/87 agree,
   513 inconclusive, of which `call:length` was 299 cases in 102 functions,
   `call:toString` 8 and `call:charAt` 7; after it `call:length` and `call:charAt` are 0
@@ -799,8 +1025,81 @@ What the chain produced, each figure bound by `scripts/check_docs.py`:
   holed first. Fixed (classic switches lowered, arrow-form and non-literal labels named
   holes, `tests/test_java_switch.py` against the JVM); the run above is after the fix.
 * Specification module: `Autoform/SpecsGen/CommonsLang3.lean` (split into
-  `CommonsLang3/Base.lean` + parts), 83 observation theorems from the agreeing cases,
-  elaborated in `lake build Autoform.CI`.
+  `CommonsLang3/Base.lean` + 106 parts), 153 observation theorems from the agreeing cases,
+  one per compared function, each over every distinct agreeing observation of its function
+  up to `--domain 10`: 863 cases in all (98 of the 961 agreeing cases repeat an input),
+  median 6 per theorem, 50 theorems still on one or two (`specs.json` of the 2026-10-22
+  literal-inputs synthesis: 153 candidates, 0 refuted, 153 emitted, 153 proved, 0 open
+  obligations, 153 fuel-independent; the synthesis wall time is not recorded -- the run
+  log was lost to a reboot -- and the only timing `specs.json` keeps is `memory_profile`,
+  whose per-theorem probe seconds sum to 1787 s), elaborated in `lake build Autoform.CI`.
+  On the 147 subjects the wide run also proved, the median domain moved from 5 to 7
+  cases; the 6 new subjects stand on one or two cases each. The wide run's module (same
+  day) had 161 theorems in 100 parts on 815 cases (200 of its 1015 agreeing cases repeated
+  an input), median 5, 50 on one or two: 161 candidates, 0 refuted, 161 emitted, 161
+  proved, 0 open obligations, 161 fuel-independent, 2570 s on a 32 GB laptop; the
+  2026-10-21 module had 125 theorems in 84 parts on 252 cases, one or two per theorem,
+  and the 2026-10-20 module 114. The first synthesis against the wide run refuted
+  one candidate, and the refutation was right about a defect in the synthesizer, not in
+  Core: `render_lean.ident` cuts a Lean identifier at 120 characters and the renderer
+  resolves the collisions that cut produces with a trailing prime, while `synth_specs.py`
+  re-derived the identifier from the function name and could not see the prime, so the
+  4-argument `StringUtils.replaceIgnoreCase` -- compared for the first time in the wide
+  run -- had its law evaluated against the 3-argument overload's definition and refuted on
+  its own agreeing cases. The synthesizer now reads the identifiers the module declares
+  (`rendered_definitions`, `tests/test_synth_specs_definitions.py`); three definitions in
+  the module carry a prime, that overload was the only compared one (the literal-inputs
+  run does not compare it), and none of the 2026-10-21 module's 125 theorems was
+  mis-bound.
+* Mutation gate (`mutation-SpecsGenCommonsLang3.json`, tracked; `scripts/mutate.py
+  --targeted-parts --spec-report`, one mutant per proved subject, seed 20260819,
+  `AUTOFORM_PROBE_JOBS=1`; run of 2026-11-13 on the literal-inputs module): **93 of the
+  153 theorems have teeth, 60 are vacuous** (60.8 %) on the one mutant of their own
+  function that was drawn (on-subject; coverage against the whole population is not
+  measured in targeted mode). 153 mutants of the 2559 generatable for the 153 subjects
+  (11008 for the module), 0 invalid, 0 inconclusive, 0 timeouts. `/usr/bin/time` put the
+  wall at 46091 s; the wide run's gate took 6541 s. Both gates rebuild the Generated part
+  and `Base` for every mutant, and neither report records per-mutant timings, so the
+  difference is stated here, not explained. The report's `status` is `RESTORE_FAILED`
+  with `restored_build.timeout` true: after the last mutant, the rebuild of the restored
+  module was killed at the 600 s build timeout (`--timeout`'s default, which the
+  `mutate.py` of that run also applied to the restore) after 100 of 171 modules
+  (`restored_build.build_tail`), not because the restored source failed to compile -- the
+  restored `Autoform/Generated/CommonsLang3.lean` hashes to the oracle's
+  `generated_sha256` (`e092c0cf…`, the `render_sha256` in `artifact-manifest.json`).
+  `scripts/mutate.py` in this tree reports that case as `RESTORE_TIMEOUT` and takes
+  `--restore-timeout` (default three times `--timeout`).
+  The restored module was rebuilt clean afterwards with `lake build` (2026-11-13).
+  On the 147 subjects both gates drew a mutant for, 70 stayed teeth, 34 stayed vacuous, 22
+  moved from vacuous to teeth and 21 from teeth to vacuous -- each run draws a different
+  single mutant per subject, so single-mutant verdicts move in both directions and the
+  honest comparison is the rate, 59.6 % to 60.8 %; 6 subjects are gated for the first
+  time and 14 are no longer gated. Theorems with teeth stand on larger domains than
+  vacuous ones (median 8 cases against 4; 6 against 4 in the wide run). By operator,
+  killed of run: `ast-name` 41 of 62, `ast-int` 8 of 20, `ast-binop` 8 of 19,
+  `ast-ret->expr` 12 of 16, `ast-field` 8 of 9, `ast-seq-delete` 5 of 8, `ast-bool` 2 of
+  7, `ast-unop` 5 of 7, `ast-assign` 4 of 4, `ast-expr->ret` 0 of 1 (the wide run:
+  `ast-name` 42 of 66, `ast-int` 10 of 25, `ast-binop` 7 of 20, `ast-ret->expr` 23 of
+  28, `ast-seq-delete` 8 of 12, `ast-bool` 1 of 4, `ast-field` 2 of 2, `ast-expr->ret` 2
+  of 2, `ast-unop` 1 of 2). The 60 survivors (`survivors` in the report, one per vacuous
+  theorem: operator, line, `before`, `after`) are 21 name substitutions, 12 literal
+  shifts, 11 operator swaps, 5 boolean flips, 4 `return e` to `e`, 3 statement deletions,
+  2 unary swaps, 1 field rename and 1 `e` to `return e`; 43 are in `StringUtils`, 6 in
+  `Validate`, 4 in `NumberUtils`, 3 each in `BooleanUtils` and `CharUtils`, 1 in
+  `CharSequenceUtils`. A survivor is a mutant that still reproduces every recorded case
+  of its theorem, so the recorded domain does not separate the two programs. Named: `<`
+  to `<=` in the loop heads of `StringUtils.isNumeric` and `isWhitespace`, in
+  `indexOfIgnoreCase`'s `startPos < 0` and in `NumberUtils.min(byte,byte,byte)`; `||` to
+  `&&` in `CharUtils.isAsciiAlphanumeric` and `StringUtils.substringAfterLast`; `127` to
+  `126` in `CharUtils.isAsciiPrintable`; the padding space `32` to `33` and `pads <= 0`
+  to `<= -1` in `StringUtils.center`; `length() == 0` to `== 1` in `StringUtils.isEmpty`;
+  the bound names and comparison of `Validate.inclusiveBetween` / `exclusiveBetween`
+  (`value` to `start`, `end` to `start`, `>` to `>=`); the `INDEX_NOT_FOUND` field rename
+  in `StringUtils.lastIndexOf`; the deleted `throw` in `Validate.isTrue(boolean,String,long)`
+  and the deleted `return false` in `NumberUtils.isParsable`. Literal inputs widened the
+  string pool (138 distinct `String` arguments against 8) and the compared domains
+  (median 5 to 7 on the shared subjects) and did not move the vacuity rate (59.6 % to
+  60.8 %): the survivors above are the branches the recorded domains still do not take.
 
 Two exporter and two backend gaps were closed on the way, each with a test:
 
@@ -819,31 +1118,65 @@ Two exporter and two backend gaps were closed on the way, each with a test:
   `CharSequence`-typed); the measurement basis moved to `jvm-primitive-static-v2` because
   the attempted population changed. `AUTOFORM_JAVA_SOURCEPATH` for subset corpora.
 
-What is still open, by name and count (the "inconclusive" column), all of them *dynamic*
+What is still open, by name and count (the "inconclusive" column; this run's 1432 cases,
+`evidence-CommonsLang3.json` `inconclusive_by_label`; the wide run's 1390 cases were the
+same labels within a few cases of each count, except that its `field:EMPTY_CHAR_ARRAY:non-object`
+2 and `field:EMPTY_STRING_ARRAY:non-object` 1 do not occur here and `mcall:charAt:non-object`
+4 is new; the 2026-10-21 run's 348 cases were the same labels at roughly a quarter of the
+count, as its 600-case cap would predict), all
+of them *dynamic*
 holes -- the function translated without a static hole and the interpreter reached a
 construct Core does not model under `.java`:
 
+* `op:instanceOf` 214 cases / 33 functions is the largest (187 / 32 in the wide run, 46 /
+  27 in the 2026-10-21 run, 61 / 31 in the 2026-10-20 run):
+  the static label of the same name reached at run time through callees (`op:instanceOf`
+  grew from 15 in the 2026-10-10 run because calls that used to stop at `call:length` now
+  run on into it). `control:TRY-handler-language` 50 and the `op:alloc` labels
+  (`ctor-unresolved-class` 19, `ctor-shape` 17, `array-decl` 4) are the same: static hole
+  labels the interpreter reaches through a call.
 * `call:length` (was 299 cases / 102 functions) is gone: `String`/`CharSequence`
   `length`, `charAt`, `isEmpty`, `substring`, `equals`, `indexOf`, `startsWith`,
   `endsWith` and `toString` are modelled with UTF-16 code-unit semantics on BMP strings
   (`Stdlib.javaStringMethod`, docs/java-strings.md). The other `String` methods the corpus
-  calls are now named per method: `mcall:toCharArray:non-object` 14, `mcall:toLowerCase`
-  12, `mcall:trim` 10, `mcall:replaceFirst` 8, `mcall:lastIndexOf` 7, `mcall:concat` 4
-  (cases).
-* `field:EMPTY:non-object` 53, `field:INDEX_NOT_FOUND:non-object` 29,
-  `field:PAD_LIMIT:non-object` 11, `field:ROOT:non-object` 6, `field:TRUE:non-object` 5:
-  reads of `static final` constants (`StringUtils.EMPTY`) -- Java class initializers
-  (`<clinit>`) are not exported as module initializers.
-* `call:isNaN` 26, `call:isWhitespace` 15, `call:isDigit` 11, `mcall:anyNull` 11,
-  `call:max` 6, `call:requireNonNull` 4: static calls into
-  `java.lang.Float/Character/Math/Objects` and into `ObjectUtils`, outside the subset.
-* `str:reference-equality` 25: `==` on two `String`s is identity in Java and a hole on
+  calls are named per method: `mcall:toLowerCase:non-object` 39, `mcall:toCharArray` 35,
+  `mcall:replaceFirst` 30, `mcall:trim` 29, `mcall:lastIndexOf` 22, `mcall:replace` 9,
+  `mcall:toUpperCase` 9, `mcall:concat` 9, `mcall:charAt` 4 (new in this run, in
+  `CharSequenceUtils.checkLaterThan1` and `NumberUtils.getMantissa`), `mcall:length` 2
+  (cases), and `mcall:subSequence` 8 in
+  `CharSequenceUtils.subSequence`, a `CharSequence`-returning function the v5 basis now
+  attempts.
+* The `field:*:non-object` reads of `static final` constants (`StringUtils.EMPTY` and
+  friends) are gone too: the v4 basis began binding the static fields a call tree reads,
+  so the 2026-10-10 run's `field:EMPTY:non-object` 53, `field:INDEX_NOT_FOUND:non-object`
+  29, `field:PAD_LIMIT:non-object` 11 and `field:TRUE:non-object` 5 now agree. What
+  remains is what the binding does not carry (`backend_info.static_fields_not_bound`):
+  `field:ROOT:non-object` 17 (a `java.util.Locale`) and `field:HEX_DIGITS:non-object` 10
+  (a `char[]`) -- arrays, `Locale` and classes outside the loadable set stay holes. The
+  wide run's `field:EMPTY_CHAR_ARRAY:non-object` 2 and `field:EMPTY_STRING_ARRAY:non-object`
+  1 do not occur in this run's 2393 cases, and neither does the 2026-10-20 run's
+  `field:CHAR_STRING_ARRAY:non-object` 3: `CharUtils.toString(char)`, which read it, now
+  carries the static `op:sizeOf:array-length` hole and is not run.
+* `mcall:booleanValue:non-object` 100, `mcall:equals:non-object` 60,
+  `mcall:isEmpty:non-object` 47, `mcall:charValue:non-object` 40 and
+  `mcall:intValue:non-object` 10 came with the v4 basis, which draws boxed parameters
+  (`Boolean`, `Integer`) inside the JVM box cache: a method call on a drawn box is a hole
+  because Core's `Boolean`/`Integer` is a value, not an object.
+* `call:isNaN` 100, `call:isWhitespace` 72, `mcall:anyNull:non-object` 71, `call:valueOf`
+  65, `call:requireNonNull` 50, `call:isDigit` 32, `call:min` 23, `call:max` 20,
+  `call:toString` 20, `call:isUpperCase` 19, `call:decode` 18, `call:isLetter` 16,
+  `call:isLetterOrDigit` 16, `call:isLowerCase` 8 and `mcall:allNotNull:non-object` 1: static
+  calls into
+  `java.lang.Float/Character/Integer/Math/Objects` and into `ObjectUtils`, outside the subset.
+  New with the v5 basis, which runs the `Validate` void statics: `call:format` 28
+  (`String.format` building the failure message in `Validate.inclusiveBetween` /
+  `exclusiveBetween`) and `call:matches` 10 (`Pattern.matches` in
+  `Validate.matchesPattern`).
+* `str:reference-equality` 63: `==` on two `String`s is identity in Java and a hole on
   purpose (§6 above).
-* `control:TRY-handler-language` 20 and `op:instanceOf` 64 are the static labels of the
-  same name reached at run time through callees (`op:instanceOf` grew from 15 because
-  calls that used to stop at `call:length` now run on into it).
-* Java `String + int` (JLS §5.1.11 string conversion) is a `binop:+` hole; it did not
-  occur in this corpus's compared cases and is named in `tests/test_source_java_throw.py`.
+* Java `String + int` (JLS §5.1.11 string conversion) is a `binop:+` hole; it now occurs
+  in 16 cases across 2 functions (reached through callees) and is named in
+  `tests/test_source_java_throw.py`.
 
 **The export is not byte-stable, and the pin says so.** Re-exporting the same CPG three
 times gave three different ASTs in three functions: Joern's overload resolution for one
@@ -851,10 +1184,31 @@ call alternates between `join(byte[],char,int,int)` and `join(short[],char,int,i
 (`StringUtils.join`, `Validate.notEmpty`, `Validate.validIndex`). The 2026-10-10 re-land
 measured it again: a second export of the same tree differed from the tracked one in five
 functions (`StringUtils.join(boolean[],char)`, `join(double[],char)` and the three
-`Validate.notEmpty` overloads). None of them is among the 83 compared functions (all five
-are "hole-free, no case built") and none of the 83 specification theorems mentions them,
-so the oracle figures above do not depend on the choice; the tracked AST carries one of the
-two resolutions, and a fresh export may carry the other. The same happens on Jinja2: the
+`Validate.notEmpty` overloads). The 2026-10-20 re-land re-exported the tree again (the
+JVM boxed `==`/`!=` lowering reaches `.java`, so the tracked artifact could not be kept):
+besides that deterministic exporter change -- it names `BooleanUtils.toBoolean(String)`'s
+boxed `==` and shifts the exporter's expression-temp counter by three, renumbering
+`$exprV$52` onward in twelve downstream functions -- the new draw shifted the resolved
+target of five calls: three to the overload Java selects (`StringUtils.join(boolean[],char)`
+now calls `join(boolean[],char,int,int)`, `Validate.notEmpty(CharSequence)` calls
+`notEmpty(CharSequence,…)`, `Validate.validIndex(CharSequence,int)` calls
+`validIndex(CharSequence,int,…)`), one regressed (`StringUtils.join(long[],char)` now
+calls the `float[]` overload), and one swapped wrong-for-wrong (`Validate.notEmpty(Map)`,
+where neither draw picks the `Map` overload Java selects). None of the five functions was
+among that run's 114 compared functions (all five were "hole-free, no case built") and
+none of its 114 specification theorems mentioned them. The 2026-10-21 re-land re-exported
+once more (the array-length change): besides the 76 `op:sizeOf:array-length` holes, the
+only difference from the 2026-10-20 artifact is the resolved target of three calls -- one
+to the overload Java selects (`Validate.validIndex(Collection,int)` now calls
+`validIndex(Collection,int,…)`, not the `CharSequence` one) and two regressed to the `Map`
+overload (`Validate.notEmpty(Collection)`'s call to `notEmpty(Collection,…)` and
+`CharUtils.toChar(String)`'s call to `notEmpty(CharSequence,…)`). None of the three, and
+none of the five above, is among the 153 compared functions or reached from one through
+the call graph (re-checked over the 2026-10-22 literal-inputs run's 153 and, before it,
+the wide run's 161), and none of the 153
+specification theorems names them, so the oracle
+figures above do not depend on the choice; the tracked AST carries one of the
+resolutions, and a fresh export may carry another. The same happens on Jinja2: the
 first export of a fresh CPG reorders two `fnref` arguments in `TemplateModule.__init__`
 (seen again in the 2026-10-10 re-land: two exports gave `f01eacec…`, the third, which is
 the tracked artifact and the one the oracle and specs ran on, gave `5524fe8e…`; its
@@ -864,11 +1218,167 @@ name the command; they do not promise a byte-identical regeneration, and that is
 item (the fix belongs in the frontend pass that orders overload candidates, not in the
 renderer).
 
-Reproduce (the command is the provenance record's `command` field):
+Reproduce. The first command is the provenance record's `command` field; it exports,
+renders, type-checks and writes the ledger, and its own oracle and specs steps are the
+fixed-pool run. `scripts/reland_corpus.sh` has no literal-inputs knob, so the headline
+oracle, the module synthesized from it and the mutation gate are the three commands after
+it (the flags are those scripts' own; `differential.py` writes `conformance.json` into
+the directory it runs in, and reads `AUTOFORM_CASE_CAP` and `AUTOFORM_JAVA_SOURCEPATH`
+from the environment):
 
 ```sh
 AUTOFORM_JAVA_SOURCEPATH=~/.cache/autoform/corpora/commons-lang3-3.17.0/src/commons-lang3-3.17.0-src/src/main/java \
   scripts/reland_corpus.sh ~/.cache/autoform/corpora/commons-lang3-3.17.0/subset CommonsLang3
+mkdir -p .autoform-work/reland/CommonsLang3-lit
+(cd .autoform-work/reland/CommonsLang3-lit && \
+  AUTOFORM_CASE_CAP=100000 \
+  AUTOFORM_JAVA_SOURCEPATH=~/.cache/autoform/corpora/commons-lang3-3.17.0/src/commons-lang3-3.17.0-src/src/main/java \
+  python3 "$OLDPWD/scripts/differential.py" "$OLDPWD/ast-CommonsLang3.json" \
+    ~/.cache/autoform/corpora/commons-lang3-3.17.0/subset CommonsLang3 10 --literal-inputs)
+python3 -u scripts/synth_specs.py ast-CommonsLang3.json \
+  ~/.cache/autoform/corpora/commons-lang3-3.17.0/subset CommonsLang3 \
+  --conformance .autoform-work/reland/CommonsLang3-lit/conformance.json --conformance-only \
+  --domain 10 --sample-subjects 0 --json .autoform-work/reland/CommonsLang3-lit/specs.json
+lake build Autoform.SpecsGen.CommonsLang3
+AUTOFORM_PROBE_JOBS=1 scripts/mutate.py Autoform/Generated/CommonsLang3.lean Autoform.Generated.CommonsLang3 \
+  --spec-file Autoform/SpecsGen/CommonsLang3.lean --spec-module Autoform.SpecsGen.CommonsLang3 \
+  --spec-report .autoform-work/reland/CommonsLang3-lit/specs.json --targeted-parts \
+  --max-mutants 153 --json mutation-SpecsGenCommonsLang3.json
+```
+
+## First real open-source corpora for Go, JavaScript, TypeScript and Kotlin (2026-10-22)
+
+Verdict point 3 above recorded the differential oracle as producing *zero cases* for Go,
+JavaScript, TypeScript and Kotlin: the safety net was Python-and-C only, and the
+mistranslations listed earlier in this document were found by hand because nothing checked
+those four languages against their runtimes. "Java at scale" closed that gap for Java. This
+section closes it for the remaining four. Each now has one measured open-source repository
+that ran the whole chain — export, provenance, render, type-check, differential oracle
+against the real runtime, and synthesized `conform` specifications proved by computation —
+not a hand-written fixture. The runs are small and deliberately so (see the exclusion note
+below); the point is that the number of oracle-compared functions is no longer zero and no
+longer a fixture.
+
+All four were exported with Joern 4.0.606 and landed through `scripts/reland_corpus.sh`.
+The `source_revision` recorded in each `provenance/ast-<M>.json.prov.json` is the tree hash
+the AST was built from; those are the revisions this section names.
+
+| Module | Language | Source | `source_revision` (provenance) | Oracle (step 7) | `conform` specs (step 8) |
+|---|---|---|---|---|---|
+| `AlgosGo` | Go | TheAlgorithms/Go `math/binary` (`BitCounter`, `MeanUsingAndXor`, `MeanUsingRightShift`); Go-repo HEAD `5ba447ec5ff3d1213de65b92e726ee74c5d5cc19` | `tree-sha256:25c92c4e92db…:3files` | 24 agree, 0 divergences, 0 inconclusive; 2 of 2 hole-free functions compared against `go test` | 2 candidates, 2 proved, 0 refuted |
+| `BitJS` | JavaScript | TheAlgorithms/JavaScript bit-manipulation (`IsPowerOfTwo`, `isPowerOfFour`, `nextPowerOfTwo`, `setBit`) | `tree-sha256:1cfcd3d1de6e…:5files` | 48 agree, 0 divergences, 0 inconclusive; 4 of 9 hole-free functions compared against Node | 4 candidates, 4 proved, 0 refuted |
+| `AlgosTS` | TypeScript | TheAlgorithms/TypeScript maths (`isPowerOfTwo`, `isPowerOfFour`) | `tree-sha256:abcdac6e29f7…:2files` | 24 agree, 0 divergences, 0 inconclusive; 2 of 4 hole-free functions compared against Node (the other two are module-scope IIFE wrappers) | 2 candidates, 2 proved, 0 refuted |
+| `AlgosKt` | Kotlin | TheAlgorithms-style Kotlin corpus `corpus-algokt` @ `b913c1d` | `tree-sha256:369a2af2f19e…:5files` | 22 agree, 0 divergences, 3 inconclusive; 5 of 16 hole-free functions compared through the `@JvmStatic` JVM thunk | 5 candidates, 5 proved, 0 refuted |
+
+Ledger (`ledger-BitJS.json`): 10 functions, 9 hole-free, 9 in the verifiable core.
+Ledger (`ledger-AlgosTS.json`): 4 functions, 4 hole-free, 4 in the verifiable core.
+Ledger (`ledger-AlgosKt.json`): 16 functions, 16 hole-free, 10 in the verifiable core.
+`AlgosGo` carries no tracked ledger (its run retained `conformance.json` and `specs.json`
+under `.autoform-work/reland/AlgosGo/` only); its population is 3 functions, 2 hole-free.
+The four `ledger-*.json` are gitignored run products, as `ledger-Django.json` is, so
+`check_docs.py` re-derives these counts when the file is present and names them UNBOUND
+otherwise rather than passing silently. These four rows also appear in the support matrix
+at the top of this document, rebuilt on 2026-11-13 from the same `conformance.json`,
+`specs.json` and ledger files.
+
+**Why these functions and not the rest of each repository.** Three of the four cores —
+BitJS, AlgosTS and AlgosGo — are integer- and `bool`-returning bit-manipulation functions.
+AlgosKt's five are different: the geometry members (`areaOfACircle`, `areaOfARectangle`,
+`areaOfASquare`, `areaOfATriangle`) return `double` and `getFactorial` returns `long`, and
+they proved anyway because the oracle only ever sampled positive inputs that never produce a
+`NaN`. That distinction is the whole point. The obstacle is not the oracle but a genuine
+disagreement between two notions of float equality that only a real run exposes:
+`differential.py` (step 7) compares floats *structurally* by bit pattern, so
+`abs(NaN) = NaN` **agrees**; `synth_specs.py` (step 8) checks the generated `conform` law
+with Lean's `Float` *decidable* equality, under which `nan ≠ nan`, so `f(nan) = nan` is
+**false**. A hole-free float-returning function is therefore *refuted* at synth time exactly
+when one of its sampled runs actually yields `NaN` — not merely for returning a float, which
+is why `areaOfACircle(double)` survives synth but the identity-shaped float members do not.
+So the `NaN`-producing members (`FastInverseSqrt`/`Sqrt` in Go, `absoluteValue`/`signum` in
+TS, …), the slice- and receiver-shaped members the backends decline to bind, the
+negative-shift-panicking members
+(`Abs`, `ReverseBits`), the one that loops forever on `maxuint` (`IsPowerOfTwoLeftShift`,
+which would also exceed the 30 s `go test` timeout), and `LogBase2` (whose `uint32 |=`
+renders as a hole, so it is inconclusive, not comparable) are all excluded. The functions
+that remain are exactly the ones a real runtime and the Core evaluator both evaluate without
+hitting that boundary. This is the honest shape of the result: the oracle
+reach for these languages is now positive and measured, not deep.
+
+**Mutation gate, measured on all four of these corpora (2026-10-22).** The full mutation gate
+had been reported as unrun on the large corpora — estimated at ~38 h on this machine, mechanism
+validated but coverage not measured. These small real corpora are the serialized-per-mutant run that was
+"worth a real run": `scripts/mutate.py` was run against the generated AST-literal module of
+each, rebuilding the tracked spec module per mutant (~8–12 s each, `LEAN_NUM_THREADS=2`), with
+on-subject score (vacuity w.r.t. mutants of the functions each theorem is *about*) reported
+separately from whole-population coverage. The run products are JSON under `/tmp`, not committed
+artifacts, so nothing in `check_docs.py` binds to the figures below.
+
+* **AlgosGo** (Go, full population, 14 mutants). The two proved laws are both clean:
+  `conform_algos_local_binary_MeanUsingAndXor` (8 killed, 0 survived) and
+  `conform_algos_local_binary_MeanUsingRightShift` (6 killed, 0 survived) are each
+  **100 % on-subject, has teeth** — no survivors anywhere in the run. These are two integer-mean
+  functions computed with bitwise operators, so they belong with the TS/JS bit-manipulation
+  group rather than the Kotlin
+  geometry one; unlike the TS/JS guards below, nothing here collapses to a lower bound the
+  sampled domain cannot separate, so every on-subject mutant was caught. This is the cleanest of
+  the four corpora.
+* **AlgosTS** (TypeScript, full population, 29 mutants). `conform_is_power_of_2`: 11 killed, 0
+  survived — **100 % on-subject, has teeth**. `conform_is_power_of_4`: 16 killed, 2 survived —
+  88.89 % on-subject, **weak**. Both survivors are at the `is_power_of_4` domain guard
+  `n > 0`: one weakens it to `n > -1` (`ast-int:0->-1`), the other to `n >= 0`
+  (`ast-binop:>->>=`).
+* **BitJS** (JavaScript, full population, 114 mutants). `conform_IsPowerOfTwo` (11 killed, 0
+  survived) and `conform_setBit` (5/0) are each **100 % on-subject, has teeth**.
+  `conform_isPowerOfFour`: 16 killed, 2 survived — 88.89 % on-subject, **weak**; both survivors
+  weaken its `n > 0` guard — one to `n > -1` (`ast-int:0->-1`), one to `n >= 0`
+  (`ast-binop:>->>=`), the same lower-bound sampling gap the TS `is_power_of_4` law shows.
+  `conform_nextPowerOfTwo`: 35 killed, 1 survived — 97.22 % on-subject, **weak**. This law was
+  reported *has teeth* (7/0) under the earlier bounded sample of 20; running the full population
+  of 36 on-subject mutants surfaced one survivor the sample had skipped — a `.name n -> result`
+  substitution inside `n = n >> 1` that is observationally equivalent on the witnessed traces.
+  The full run demoting a bounded-sample "has teeth" to "weak" is exactly why the complete
+  population is worth measuring, not just a sample.
+* **AlgosKt** (Kotlin, full population). This corpus is the sobering one, and the gate earns
+  its keep by saying so. `conform_math_areaOfACircle`: 0 killed, 1 survived — **0 % on-subject,
+  VACUOUS**; the survivor *deletes* the `"Radius must be positive"` validation statement and
+  the proof still goes through, so the law does not constrain that guard at all. The other four
+  are **weak**: `areaOfARectangle` 1/2 (33.33 %), `areaOfASquare` 1/1 (50 %), `areaOfATriangle`
+  2/5 (28.57 %), `getFactorial` 5/2 (71.43 %). Their survivors are more varied than the TS/JS
+  guard-weakenings — `length`→`width` and `height`→`base` substitutions that coincide on the
+  sampled square/degenerate inputs, `&&`→`||`, and a `$exprV$20`→`number` rename — because these
+  geometry bodies carry validation and multi-argument structure the handful of sampled witnesses
+  never exercises.
+
+So the dominant recurring survivor class is a TypeScript-and-JavaScript guard story:
+on a positive-integer sampled domain `n > 0`, `n > -1` and `n >= 0` all agree, so those
+witnesses cannot separate them — a lower-bound sampling gap, not a hole in the law. Go is
+bit-manipulation too but left no survivors at all, so it sits cleaner than either. JavaScript
+is not purely that class, though: the full BitJS population also surfaced one `nextPowerOfTwo`
+name-substitution survivor, the same under-witnessing shape as Kotlin's argument swaps below —
+so the guard class is the most common survivor, not the only one.
+Kotlin breaks the tidiness furthest: one law is outright vacuous with respect to a deletable
+validation statement, and the rest are under-witnessed on inputs where distinct arguments
+happen to be equal. That is the mutation gate doing its job as a gate — it found real vacuity
+and shallowness that a green build hid across three of the four languages (TypeScript,
+JavaScript, Kotlin), while confirming full teeth with no survivors in the fourth (Go), rather
+than flattering any of them. The full sweep on the large corpora remains machine-infeasible
+here, and the estimate was optimistic: on CommonsLang3 a full-module rebuild per mutant is
+6--9 min (measured 2026-10-22), so its 11008 generatable mutants are 1100--1650 h, not
+~38 h. What the large Java corpus does have is a measured *targeted* gate -- one mutant per
+proved subject, each rebuilding only its own part: 93 of 153 theorems with teeth, 60
+vacuous, and a diagnosis of the survivors (the branches the recorded domains do not take;
+drawing strings from the corpus's own literals widened the pool from 8 to 138 distinct
+`String` arguments and moved the rate from 59.6 % to 60.8 %) -- see "Java at scale"
+above.
+
+Reproduce (the command is each provenance record's `command` field; sources are the
+TheAlgorithms checkouts under `/tmp/af-corpora/`):
+
+```sh
+scripts/reland_corpus.sh /tmp/af-corpora/algos-go  AlgosGo
+scripts/reland_corpus.sh /tmp/af-corpora/bitjs-clean BitJS
+scripts/reland_corpus.sh /tmp/af-corpora/ts-maths  AlgosTS
+scripts/reland_corpus.sh /tmp/af-corpora/corpus-algokt AlgosKt
 ```
 
 ## Reproducing
@@ -1092,6 +1602,64 @@ language's own specification, cited beside the rule in `cartographer/export_ast.
   enclosing function and never by the local function; otherwise
   `kotlin:local-fn-capture-mutated`. Top-level functions in the `.kt` file initialiser
   were already `skip` (separate exports); the tracked `ast-LangKt.json` predates that.
+* **Kotlin `when` and `?:`.** The specification ("When expressions", "Elvis operator
+  expressions"): the subject is evaluated once, entries are tried in order and the first
+  match wins, an expression `when` without `else` is exhaustive (the JVM backend throws
+  `NoWhenBranchMatchedException` from the impossible default), and `a ?: b` evaluates `b`
+  only when `a` is null. kotlin2cpg keeps a subject `when`'s condition expressions but not
+  their kinds (`is T` leaves no node, `in e` an UNKNOWN marker, `else` nothing), so each
+  entry's source text is read back and must agree with the tree condition for condition
+  (`op:when:branch-unread` otherwise). The statement form has no condition nodes at all,
+  and the C/Java switch lowering used to read it as "no entry matches" -- every Kotlin
+  `when` statement was silently skipped; its literal conditions are now read from the
+  entry text. Still named holes: `op:when:is-type-test` (a type `ktTypeTest` classifies
+  but Core cannot test -- see "Kotlin `is`"), `op:when:is:unknown-type` (a type it cannot
+  classify: a platform or erased type), `op:when:enum-entry` (an entry of a dependency's
+  enum), `op:when:equality-type` (Kotlin `==` is `equals`; only integers, characters,
+  booleans, string literals, `null` and entries of analysed enums are compared),
+  `op:when:in-non-range`, `op:when:stmt-label-unread`, and `try`/`catch` (the catch type
+  needs the JVM exception hierarchy). `tests/test_kotlin_control.py` compares the lowering
+  with kotlinc-compiled code on the JVM.
+* **Kotlin enum entries.** An entry's one value in the model is `fnref "<E>$<X>"`: the
+  spelling a bare `X` inside the enum already had (kotlin2cpg resolves it to the entry's
+  own type) and the one the JVM oracle passes an entry in. The qualified `E.X` was a
+  field read of the class value `E` (`field:X:non-object`, `op:when:enum-entry` in a
+  `when`); for an enum declared in the analysed code (`enum class`, one TYPE_DECL per
+  entry) it is now that same value, in every position, and `==` with it is
+  `Enum.equals` (final, identity: equal names). A statement `when` reads `E.X` from the
+  entry text when the subject's type is that enum; a bare `X` there is not read (it may
+  be another constant of the enum's type).
+* **Kotlin `?.` in every position.** `r?.m(args)` / `r?.f` (spec, "Navigation
+  operators") evaluates `r` once and is null, with nothing else evaluated, when `r` is.
+  The CPG spells it like `.`, and outside the left of `?:` it was translated as `.` --
+  a member of null evaluated anyway (an extension function run on `null`). It is now
+  recognised from the node's code everywhere (including `v?.x` on a property of the
+  implicit receiver): with a prelude, `r` goes into a temporary that the member access
+  reads (`op:safe-call:receiver-unread` if the lowering did not read it); without one,
+  only a re-readable `r` is guarded (`op:safe-call:value-position` otherwise).
+* **Kotlin `is`.** `x is T` was exported as Python's identity `is` against the class
+  value `T` -- false for `"a" is String`. The type is readable (the call's TYP_REF, or
+  the `when` entry's text, where kotlin2cpg drops the node but keeps the `?` its type
+  names erase; a written name resolves as Kotlin resolves it, through the file's imports
+  and package), so the tests Core can decide faithfully are lowered: a subject whose
+  static type already is `T` holds null or the target, so `x != null` (`true` for `T?`,
+  which admits null too); `Any`/`Object` is every non-null value, the same test; an
+  analysed enum is final, so its values are exactly its entries and the test is their
+  disjunction. The types Core has no test op for stay named (`op:is-type-test`,
+  `op:when:is-type-test` in an entry): the Kotlin value types (`Int` and `Long` share
+  the width-free `.int`, where the JVM's `1L is Int` is false) and an analysed class
+  (a `.ref` carries its class but not the hierarchy an `open`/`sealed`/interface `T`
+  needs). A type with no declaration here to read (a platform type, a type parameter
+  the CPG erases to `Object`) is `op:is:unknown-type` / `op:when:is:unknown-type`.
+  `tests/test_kotlin_control.py` compares the lowering with kotlinc-compiled code.
+* **Kotlin String and collection members.** `s.length` and `xs.size` are properties,
+  fieldAccess in the CPG, and were read as fields of a value with none
+  (`field:length:non-object`). On a receiver whose static type is `String`/`CharSequence`
+  or a `List`/`Collection`/`Set`/`Map` they are the Java methods Kotlin compiles them to,
+  `length()`/`size()`, as `mcall`; so are the extensions `isEmpty()`/`isNotEmpty()`
+  (`length == 0`, its negation). A member call on a type outside the analysed code
+  (`xs.isEmpty()`, `x.toString()`, `m.get(k)`) kept no receiver at all (`call "isEmpty" []`);
+  it is now an `mcall` on its receiver, as for Java (`javaReceiver`).
 * **TS `x!`** was already `x` in both `expr` and `exprV` (ECMA-262 has no such operator;
   TypeScript erases it); the tracked AST predates the rule.
 * **TS `op:assignment` (26) is NOT closed here.** `if`/`while` conditions and `return`
@@ -1386,6 +1954,116 @@ Checked against CPython 3.11 by the `#guard` table in `Stdlib.lean`; the former 
 `'vx!'`. Exception safety is a theorem (`strBuiltin_excSafe`: only `ValueError` and
 `TypeError`, both represented), and the builtins still leave the heap unchanged
 (`builtin_heap_unchanged`).
+
+#### 16.K `str` methods, `in`, `list()` and `for … in range(…)` (Python, 2026-10-19)
+
+Measured gap: on a 103-file Python planner every seeded regression stayed not-compared
+behind `mcall:lower:non-object`, `mcall:split:non-object`, `in:non-container` and
+`call:list`. Now modelled (Library § Built-in Types):
+
+* `Stdlib.pyStringMethod`: `lower`, `upper`, `strip`/`lstrip`/`rstrip`, `split` (with and
+  without a separator, with `maxsplit`), `startswith`/`endswith` (a `str` or a tuple of
+  them), `replace` (with `count`; `""` inserts into every gap) and `join` (through a boxed
+  list/dict/str). Exact on every string for everything that is a function of the code
+  points; case mapping past ASCII is `str:<m>:non-ascii` and default-whitespace
+  `strip`/`split` past ASCII is `str:<m>:non-ascii-whitespace` (Core carries no Unicode
+  case or whitespace tables). A builtin scalar where a `str` is required is CPython's
+  `TypeError`; an object argument is the `mcall:` hole. `split` allocates its list
+  (`boxStrMethodResult`). A method call on an `except … as e` binding is
+  `exception:payload:<m>`, so the class name standing in for the exception never runs a
+  `str` method.
+* `in` (`valIn`): the empty string is in every string (`"" in "abc"` used to be `False`:
+  Lean's `"abc".splitOn ""` is `["abc"]`); a builtin scalar on the right, or a builtin
+  non-`str` left operand of a string, is `TypeError`.
+* `list(iterable)` reads through a boxed list/dict/str and allocates a new list
+  (`boxBuiltinResult`), a shallow copy.
+* `for x in range(…)`: the frontend's iterable temporary is never observable, so the
+  exporter rewrites it to the reserved `<python-range>` (`Stdlib.rangeBuiltin`), which
+  yields the integers of `range`; `range` anywhere else is still `call:range` (a range is
+  not a list). More than 100 000 elements is `range:length`.
+
+Checked against CPython by `tests/test_python_str_methods.py`: every `#guard pyShows`,
+`#guard inShows` and `#guard rangeShows` line, a ~1 900-case grid of receivers ×
+methods × arguments (ASCII, Latin-1, CJK, NBSP, emoji), and the Joern pipeline on
+`examples/python_control/strings.py`. `pyStringMethod_excSafe`, `rangeBuiltin_excSafe` and
+`valIn_excSafe` keep the try/except invariant; `FuelMono` is unchanged.
+
+**JavaScript arrays and objects (Node oracle, `node-numeric-pool-v2`).** jssrc2cpg lowers
+`[a, b]` to pushes onto `__ecma.Array.factory()` and `{k: v}` to field writes on an
+unallocated `_tmp_N`; `SourceCompiler.jsLiteral` folds both to `Expr.listE`/`Expr.dictE`
+(boxed under `.javascript`), in every position, and drops the `METHOD_REF` jssrc2cpg
+attached to each synthesised `push` (it was pushed into the array as an element). The
+Node driver encodes a dense Array / plain object result structurally, and the Lean
+harness reads a JavaScript result through its payloads (`unboxDeep`). The module-level
+bindings a call tree reads (`node_reads`) are read from Node immediately before each call
+and bound in Core's globals frame (a list or object as a boxed cell); a binding the wire
+cannot carry refuses the case by name. Refused, by name: class instances, array
+subclasses, sparse arrays or arrays with extra properties, cycles, accessors, symbol or
+non-enumerable keys, and integer-like keys (JavaScript orders them first).
+
+#### 16.L `in` on a JavaScript primitive, `list()` of a non-iterable (Core, 2026-10-20)
+
+Two answers that were plausible rather than modelled, one per dialect:
+
+* `valIn` read no dialect, so `"x" in "str"` answered the substring check under
+  `.javascript` too -- but JavaScript's `in` requires an Object on the right and throws
+  on a primitive (Node: "Cannot use 'in' operator to search for 'x' in str"; ECMA-262
+  *The in Operator*). `valIn` now takes the dialect. Under `.javascript` a `str` or
+  scalar right operand raises `TypeError`, and an Object is asked what JavaScript asks
+  of it -- property presence, not Python's element/key membership, which the
+  `.javascript` reading used to share (`0 in [5]` is `true` in Node; it answered
+  `False`). An array answers an integer index (in range or not); any other key
+  (`"0"`, `"length"`, a prototype method) is the hole `in:javascript-property`. A
+  `.dict` may be a plain object or a `Map` (`new Map()` reaches Core as one, and `in`
+  never sees a `Map` entry), and either inherits from its prototype, so it is the hole
+  `in:javascript-object-property`. Python (and every other dialect) is unchanged.
+* `builtinCore`'s `list` answered every non-iterable with the caller's `call:list` hole,
+  so `list(5)` was a refusal where CPython raises `TypeError` ("'int' object is not
+  iterable"; Library § Built-in Types). The `list` arm now raises `TypeError` for the
+  four immediates (`int`, `bool`, `float`, `None`) -- the only shapes the value alone
+  can classify: a `.ref` may define `__iter__`, and a `.fn` may name a class a
+  metaclass makes iterable, so every other shape keeps the hole.
+
+Checked: the `#guard inShows` block states both dialects of the same expression
+(`.python` answers the substring check; `.javascript` raises `TypeError`, as it does
+for a right operand of every scalar kind) and the `.javascript` array and object
+answers, `tests/test_python_str_methods.py` runs the
+`.python` lines on CPython while the `.javascript` lines state Node's answers, and the
+new `tests/test_core_in_list.py` runs every `#guard listShows` line on CPython (a
+`none` guard must be a shape CPython answers deterministically -- a refusal, never a
+disagreement). `valIn_excSafe` now quantifies the dialect and still closes every raise
+through `TypeError` alone; `builtinCore_excSafe` and `builtin_heap_unchanged` are
+unchanged in statement and still hold; `FuelMono` is unchanged.
+
+#### 16.E.2 Template literals (JS/TS) and string templates (Kotlin)
+
+`<operator>.formatString` is also what jssrc2cpg emits for an untagged template literal
+and what the Kotlin frontend emits for a string template; outside Python it used to be
+the bare hole `op:formatString`. The exporter (`jsTemplate`, `ktTemplate`, gated by file
+extension like `fstring`) now lowers it to a left fold of one append operator over the
+parts, seeded with the first literal segment, and `Semantics.languageBinop` gives each
+operator the source language's own to-string conversion:
+
+* `js:tpl` — ECMA-262 §13.2.8.6 applies `ToString` (§7.1.17) to each substitution:
+  strings as themselves, booleans as `true`/`false`, integral Numbers below 10^21 as
+  their decimal digits. Literal segments are cooked from jssrc2cpg's raw text by the TV
+  rules (§12.9.6: escapes, `\u{…}`, line continuations, CR LF → LF). Refused at run time,
+  by name: `op:formatString:js-float` (shortest round-trip spelling not modelled),
+  `js-number-exponent` (10^21 and up), `js-nullish` (`null` and `undefined` are one
+  `Val.unit`, and they print differently), `js-object` (`toString` may be user code).
+* `kt:tpl` / `kt:tpl:integral` — Kotlin appends `String.valueOf(part)`: strings,
+  booleans, and integers only where the part is statically integer-typed, because Core
+  holds a Kotlin `Char` as its code point while `"$c"` prints the character
+  (`kt-int-or-char` otherwise). Refused at run time: `kt-float`, `kt-null` (one
+  `Val.unit` with `Unit`), `kt-object`. The frontend records only the substitutions, so
+  the literal segments are read off the literal's source text; each template entry
+  found there must equal the matching substitution's own source text, or the template
+  stays the static hole `op:formatString:shape`. A char-typed entry is
+  `op:formatString:kt-char` unless it is a plain character literal (`${'$'}`).
+
+Tagged templates are not `formatString` in jssrc2cpg and are untouched. Checked by the
+`#guard`s beside the definitions and by `tests/test_format_string.py`, which runs a TS
+and a Kotlin fixture through Joern, Lean, Node and the JVM from the same arguments.
 
 #### 17.R4 Statement effects in expression operands
 

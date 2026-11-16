@@ -116,7 +116,7 @@ jobs:
           AUTOFORM_RUST_EVIDENCE_DIR: ${{ runner.temp }}/rust-evidence
         run: |
           mkdir -p "$AUTOFORM_RUST_EVIDENCE_DIR"
-          python -m pytest tests/test_rust_unit.py tests/test_rust_aeneas.py -v -rA --junitxml=rust-junit.xml
+          python -m pytest tests/test_rust_unit.py tests/test_rust_aeneas.py tests/test_rust_regress.py -v -rA --junitxml=rust-junit.xml
           python3 - <<'EOF'
           import xml.etree.ElementTree as ET
           s = ET.parse("rust-junit.xml").getroot()

@@ -56,6 +56,13 @@ user instance call `__contains__`/`__getitem__`/`__setitem__`/`__delitem__`/`__e
 `#guard` per protocol in `Semantics.lean`; `FuelMono.lean` and `ExcSafe.lean` extended
 with no `sorry`; `in:non-container` and `index:non-container` are 0 on cachetools.
 
+*Status, 2026-11-13 — met.* Pointers to where the evidence lives, not a status report: the
+`Cache.get`/`pop`/`setdefault` conformance domains are proved in
+`Autoform/SpecsGen/Cachetools/Base.lean:73, 91, 96` (`dom_conform_*Cache_get`/`_pop`/`_setdefault`);
+the per-protocol `#guard`s are at `Autoform/Lang/Core/Semantics.lean:5054-5081` (`in`, `[]`,
+`[]=`, `del []`) and `:5310-5338` (`==`, `<`, `len`, `bool`, `hash`, `str`);
+`ledger-Cachetools.json` carries neither `in:non-container` nor `index:non-container`.
+
 ## Milestone 2 — calling conventions, completed
 
 1. **Value-callees.** `Expr.callValue e args kws`: calling a closure, function value or
@@ -70,6 +77,10 @@ with no `sorry`; `in:non-container` and `index:non-container` are 0 on cachetool
 `tests/test_python_receivers.py` names as deliberate refusals; every refusal is a
 theorem or a test, not prose.
 
+*Status, 2026-11-13 — met.* `Expr.callValue` is at `Autoform/Lang/Core/Syntax.lean:467`; the deliberate
+refusals are the ones `tests/test_python_receivers.py` names; `ledger-Cachetools.json` carries
+neither `call:computed-callee` nor `call:python-receiver-signature`.
+
 ## Milestone 3 — standard-library contracts
 
 Mine the top-100 external callees across the eight scale corpora
@@ -81,6 +92,11 @@ row — or a `Contracts.lean` boundary assumption with a satisfiability witness.
 reports `closedByContract` separately from `closedByTranslation`
 (`docs/ledger-schema.md` updated); `README.md` says which is which.
 
+*Status, 2026-11-13 — partial.* Every `ledger-*.json` on disk carries `closedByContract` beside
+`closedByTranslation`; the `README.md` split is being added today. `scripts/external_callees.py`
+exists, but the top-100 mining across the eight corpora has not been run: only four of the eight
+have an AST on disk (`ast-Cachetools.json`, `ast-Requests.json`, `ast-Click.json`, `ast-Jinja2.json`).
+
 ## Milestone 4 — control constructs and exception values
 
 Generators and `yield` (suspended frames as heap objects); `with` (context managers via
@@ -88,6 +104,15 @@ Generators and `yield` (suspended frames as heap objects); `with` (context manag
 `async`/`await` as an explicit, counted hole. Exception payloads: `Val.exc name args`,
 so `except E as e: e.args` translates; `ExcSafe` restated over the new representation,
 the TRY dispatch unchanged.
+
+*Status, 2026-11-13 — partial.* Generators are lowered by `cartographer/generator_lowering.py`; `async` is
+a counted hole (`generator:async`, `genexpr:async` at `generator_lowering.py:85-86, 314-315`;
+`ledger-Jinja2.json` reports `generator:async` 4). `with` is not modelled as a protocol:
+`__enter__`/`__exit__` appear nowhere under `Autoform/Lang/Core/`, and `with` reaches Core only as
+pysrc2cpg's desugaring into temporaries plus `try/finally`
+(`cartographer/compiler/SourceCompiler.scala:7925-7949`). `expr:genExp` is not 0: Requests 1,
+Click 5, Jinja2 9 (`holesByLabel` in the ledgers, at `d8a7b74`). `Val.exc` does not exist —
+`inductive Val` in `Autoform/Lang/Core/Syntax.lean` has no exception constructor.
 
 ## Milestone 5 — kernel-scale proofs
 
@@ -129,6 +154,15 @@ exclusion (`scripts/reland_corpus.sh` passes the flag only when `AUTOFORM_SPEC_E
 is set, and the 2026-10-09 re-land set nothing). The three constructors are not
 addressed by this status line.
 
+*Status, 2026-11-13 — partial.* `RRCache.__init__` is proved by computation
+(`Autoform/SpecsGen/Cachetools/Part6.lean:49`); `FIFOCache.__init__` and `LRUCache.__init__` have no
+theorem under `Autoform/SpecsGen/Cachetools/`. A `ResolveIndex` exists (`Autoform/Ledger.lean:373-440`)
+but `resolveIndex_agrees_with_resolve` is stated nowhere under `Autoform/`, and `Ctx.resolve` is still
+the linear suffix scan (`Autoform/Lang/Core/Semantics.lean:1330-1345`, which records the index as the
+open item). The exclusion list stays empty: `Autoform/SpecsGen/Cachetools.lean:83-85` declares
+`obligations := []` and no `excludedSubjects` at all (the module header at `:76` says one is declared
+there; only `obligations` is).
+
 ## Milestone 6 — deeper specifications
 
 Discharge `Refine.lean` obligations (3), the loop-invariant rule, and (4), the
@@ -148,6 +182,11 @@ the `≠ outOfFuel` guard from the law instead of running each case twice
 proved functional specification against a `HeapRep`; the mutation gate on the spec
 module is re-measured and the `README.md` figure replaced with that command's output.
 
+*Status, 2026-11-13 — met for the loop exit, unmet for the mutation exit.* `TTLLink_unlink_ring`
+(`Autoform/Specs/CachetoolsSpec/Part7.lean:190`) is the functional specification of `_Link.unlink`
+against the ring representation. The `README.md` mutation figure (`README.md:140`) is still the
+pinned 2026-10-11 run; the qualifier is being added today.
+
 ## Milestone 7 — the scale re-land
 
 Re-land sqlparse, requests, flask, jinja, click, rich and django with
@@ -157,6 +196,13 @@ ledgers only.
 
 *Exit:* the bar holds on every row, or the row states the exact label and count that
 misses it.
+
+*Status, 2026-11-13 — unmet.* Of the eight rows only cachetools, requests, click and jinja2 have ledgers on
+disk. At `d8a7b74`, functions / hole-free / verifiable core: `ledger-Cachetools.json` 209/204/150,
+`ledger-Requests.json` 260/226/134, `ledger-Click.json` 549/475/264, `ledger-Jinja2.json` 817/662/439 —
+hole-free 98 %, 87 %, 87 %, 81 % against the 85 % bar; core 72 %, 52 %, 48 %, 54 % against 60 %.
+`docs/scale.md` is being regenerated from the ledgers today; these figures are the ledgers', not a
+second source.
 
 ## Milestone 8 — other languages, same discipline
 
@@ -171,6 +217,14 @@ Per-language dialects: `.javascript` exists — route `.typescript` to it and fi
 *Exit:* the support matrix in `docs/languages.md` has no ⚠️ or ❌ cell in a row that
 claims a number, and every language with "yes" under *Translates* has "yes" under
 *Differential oracle*.
+
+*Status, 2026-11-13 — partial; the matrix exit is being met today.* Dialects: `Dialect` is
+`python | cLike | javascript | java | go` (`Autoform/Lang/Core/Syntax.lean:54-71`), TypeScript routes
+to `.javascript` and Kotlin to `.java` (`Autoform/Lang/Core/Numeric.lean:757-771`). Oracles:
+`scripts/differential.py:4042-4043` maps every language to a runtime (`cpython`, `cc`, `jvm`, `go`,
+`node`, `kotlin`) and records `measurement_basis` (`:4795`). The `docs/languages.md` matrix (`:51-62`)
+still has ⚠️ and "not yet on this corpus" cells in rows that claim numbers; it is being regenerated
+from the artifacts today.
 
 ## Rules that do not bend
 

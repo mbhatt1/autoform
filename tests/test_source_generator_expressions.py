@@ -19,7 +19,7 @@ from render_lean import render_func
 CASES = ["stored", "first_iterator", "deferred_failure", "creation_failure", "nested",
          "destructured", "live_source", "collect_list", "collect_tuple", "short_any",
          "short_all", "exhausted_any", "exhausted_all", "shadow_consumer", "later_argument",
-         "no_length", "exhausted", "consume_returned", "pep479"]
+         "no_length", "exhausted", "consume_returned", "pep479", "nested_range"]
 
 
 # The native run observes fuel 500. Kernel computation at a sufficient smaller
@@ -194,8 +194,7 @@ def test_generator_expressions_source(tmp_path, numeric_env):
             f"fun result => match result with | .val (.int n) => n == ({result} : Int) | _ => false")
     for name, label in [("captured_cell", "genexpr:free-variable-cells"),
                         ("custom_length_hint", "iterator:length-hint"),
-                        ("floating_sum", "iterator:sum-type"),
-                        ("nested_range", "call:range")]:
+                        ("floating_sum", "iterator:sum-type")]:
         proofs += observation_proof(
             f'runSource program initialGlobals 500 "generator_expressions.py:<module>.{name}" [.int 2]',
             f'fun result => match result with | .hole {json.dumps(label)} => true | _ => false')
